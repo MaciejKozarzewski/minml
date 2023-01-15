@@ -1,0 +1,68 @@
+/*
+ * Add.cpp
+ *
+ *  Created on: Feb 24, 2021
+ *      Author: Maciej Kozarzewski
+ */
+
+#include <minml/layers/Add.hpp>
+#include <minml/core/Context.hpp>
+#include <minml/core/ml_exceptions.hpp>
+#include <minml/utils/json.hpp>
+#include <minml/core/math.hpp>
+
+namespace ml
+{
+	Add::Add(const std::string &activation) :
+			Layer(activation)
+	{
+	}
+
+	void Add::setInputShape(const std::vector<Shape> &shapes)
+	{
+		if (shapes.size() < 2)
+			throw LogicError(METHOD_NAME, "Add layer expects at least two inputs");
+
+		for (size_t i = 1; i < shapes.size(); i++)
+			if (shapes[0] != shapes[i])
+				throw ShapeMismatch(METHOD_NAME, shapes[0], shapes[i]);
+		m_input_shapes = shapes;
+	}
+	Shape Add::getOutputShape() const
+	{
+		if (m_input_shapes.size() == 0)
+			throw UninitializedObject(METHOD_NAME, "input shape has not been set");
+		return getInputShape();
+	}
+
+	std::string Add::name() const
+	{
+		return "Add";
+	}
+
+	std::unique_ptr<Layer> Add::clone(const Json &config) const
+	{
+		std::unique_ptr<Add> result = std::make_unique<Add>(config["nonlinearity"]);
+		result->m_dtype = typeFromString(config["dtype"].getString());
+		return std::unique_ptr<Layer>(static_cast<Layer*>(result.release()));
+	}
+
+	void Add::forward(const std::vector<Tensor> &input, Tensor &output)
+	{
+		assert(input.size() == m_input_shapes.size());
+
+		for (size_t i = 1; i < input.size(); i++)
+			addTensors(context(), output, input[0], input[i]);
+		activationForwardInPlace(context(), output, m_activation);
+	}
+	void Add::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next)
+	{
+		assert(input.size() == m_input_shapes.size());
+		assert(gradient_prev.size() == m_input_shapes.size());
+
+		activationBackwardInPlace(context(), gradient_next, output, m_activation);
+		for (size_t i = 0; i < gradient_prev.size(); i++)
+			gradient_prev[i].copyFrom(context(), gradient_next);
+	}
+} /* namespace ml */
+
