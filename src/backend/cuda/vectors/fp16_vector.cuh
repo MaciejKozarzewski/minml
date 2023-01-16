@@ -64,12 +64,15 @@ namespace vectors
 #else
 			__device__ Vector(half x)
 			{
+				assert(false);
 			}
 			__device__ Vector(float x)
 			{
+				assert(false);
 			}
 			__device__ Vector(double x)
 			{
+				assert(false);
 			}
 #endif
 #if __CUDA_ARCH__ >= FP16_COMPUTE_MIN_ARCH
@@ -163,7 +166,7 @@ namespace vectors
 			}
 			__device__ Vector<half> operator-() const
 			{
-				return Vector<half>(-m_data);
+				return __hneg2(m_data);
 			}
 #elif __CUDA_ARCH__ >= FP16_STORAGE_MIN_ARCH
 			__device__ Vector(const half * __restrict__ ptr, int num = 1)
@@ -215,30 +218,38 @@ namespace vectors
 				return m_data;
 			}
 #else
-			__device__ Vector(const half * __restrict__ ptr, int num = 0)
+			__device__ Vector(const half *__restrict__ ptr, int num = 0)
 			{
+				assert(false);
 			}
-			__device__ Vector(const float * __restrict__ ptr, int num = 0)
+			__device__ Vector(const float *__restrict__ ptr, int num = 0)
 			{
+				assert(false);
 			}
-			__device__ void load(const half * __restrict__ ptr, int num = 0)
+			__device__ void load(const half *__restrict__ ptr, int num = 0)
 			{
+				assert(false);
 			}
-			__device__ void load(const float * __restrict__ ptr, int num = 0)
+			__device__ void load(const float *__restrict__ ptr, int num = 0)
 			{
+				assert(false);
 			}
-			__device__ void store(half * __restrict__ ptr, int num = 0) const
+			__device__ void store(half *__restrict__ ptr, int num = 0) const
 			{
+				assert(false);
 			}
-			__device__ void store(float * __restrict__ ptr, int num = 0) const
+			__device__ void store(float *__restrict__ ptr, int num = 0) const
 			{
+				assert(false);
 			}
 			__device__ operator float() const
 			{
+				assert(false);
 				return 0.0f;
 			}
 			__device__ Vector<half> operator-() const
 			{
+				assert(false);
 				return Vector<half>(0.0f);
 			}
 #endif
@@ -248,6 +259,7 @@ namespace vectors
 				const uint32_t tmp = ~reinterpret_cast<const uint32_t*>(&m_data)[0];
 				return Vector<half>(reinterpret_cast<const half*>(&tmp)[0]);
 #else
+				assert(false);
 				return Vector<half>();
 #endif
 			}
@@ -261,6 +273,7 @@ namespace vectors
 #elif __CUDA_ARCH__ >= FP16_STORAGE_MIN_ARCH
 		return 1;
 #else
+		assert(false);
 		return 0;
 #endif
 	}
@@ -284,7 +297,7 @@ namespace vectors
 	DEVICE_INLINE Vector<half> operator+(const Vector<half> &lhs, const Vector<half> &rhs)
 	{
 #if __CUDA_ARCH__ >= FP16_COMPUTE_MIN_ARCH
-		return Vector<half>(static_cast<half2>(lhs) + static_cast<half2>(rhs));
+		return __hadd2(lhs, rhs);
 #elif __CUDA_ARCH__ >= FP16_STORAGE_MIN_ARCH
 		return Vector<half>(static_cast<float>(lhs) + static_cast<float>(rhs));
 #else
@@ -294,7 +307,7 @@ namespace vectors
 	DEVICE_INLINE Vector<half> operator-(const Vector<half> &lhs, const Vector<half> &rhs)
 	{
 #if __CUDA_ARCH__ >= FP16_COMPUTE_MIN_ARCH
-		return Vector<half>(static_cast<half2>(lhs) - static_cast<half2>(rhs));
+		return __hsub2(lhs, rhs);
 #elif __CUDA_ARCH__ >= FP16_STORAGE_MIN_ARCH
 		return Vector<half>(static_cast<float>(lhs) - static_cast<float>(rhs));
 #else
@@ -304,7 +317,7 @@ namespace vectors
 	DEVICE_INLINE Vector<half> operator*(const Vector<half> &lhs, const Vector<half> &rhs)
 	{
 #if __CUDA_ARCH__ >= FP16_COMPUTE_MIN_ARCH
-		return Vector<half>(static_cast<half2>(lhs) * static_cast<half2>(rhs));
+		return __hmul2(lhs, rhs);
 #elif __CUDA_ARCH__ >= FP16_STORAGE_MIN_ARCH
 		return Vector<half>(static_cast<float>(lhs) * static_cast<float>(rhs));
 #else
@@ -314,13 +327,15 @@ namespace vectors
 	DEVICE_INLINE Vector<half> operator/(const Vector<half> &lhs, const Vector<half> &rhs)
 	{
 #if __CUDA_ARCH__ >= FP16_COMPUTE_MIN_ARCH
-		return Vector<half>(static_cast<half2>(lhs) / static_cast<half2>(rhs));
+		return __h2div(lhs, rhs);
 #elif __CUDA_ARCH__ >= FP16_STORAGE_MIN_ARCH
 		return Vector<half>(static_cast<float>(lhs) / static_cast<float>(rhs));
 #else
 		return Vector<half>();
 #endif
 	}
+
+	// TODO add fused multiply-add instructions (__hfma2)
 
 	DEVICE_INLINE Vector<half> sgn(Vector<half> x) noexcept
 	{
@@ -339,11 +354,7 @@ namespace vectors
 	DEVICE_INLINE Vector<half> abs(Vector<half> x) noexcept
 	{
 #if __CUDA_ARCH__ >= FP16_COMPUTE_MIN_ARCH
-		half2 tmp = x;
-		half2 result;
-		result.x = static_cast<half>(fabsf(static_cast<float>(tmp.x)));
-		result.y = static_cast<half>(fabsf(static_cast<float>(tmp.y)));
-		return result;
+		return __habs2(x);
 #elif __CUDA_ARCH__ >= FP16_STORAGE_MIN_ARCH
 		return Vector<half>(fabsf(static_cast<float>(x)));
 #else
@@ -353,7 +364,7 @@ namespace vectors
 	DEVICE_INLINE Vector<half> max(Vector<half> x, Vector<half> y)
 	{
 #if __CUDA_ARCH__ >= FP16_COMPUTE_MIN_ARCH
-		return Vector<half>(fmax(static_cast<float>(x.low()), static_cast<float>(y.low())), fmax(static_cast<float>(x.high()), static_cast<float>(y.high())));
+		return __hmax2(x, y);
 #elif __CUDA_ARCH__ >= FP16_STORAGE_MIN_ARCH
 		return fmax(x, y);
 #else
@@ -363,7 +374,7 @@ namespace vectors
 	DEVICE_INLINE Vector<half> min(Vector<half> x, Vector<half> y)
 	{
 #if __CUDA_ARCH__ >= FP16_COMPUTE_MIN_ARCH
-		return Vector<half>(fmin(static_cast<float>(x.low()), static_cast<float>(y.low())), fmin(static_cast<float>(x.high()), static_cast<float>(y.high())));
+		return __hmin2(x, y);
 #elif __CUDA_ARCH__ >= FP16_STORAGE_MIN_ARCH
 		return fmin(x, y);
 #else
@@ -373,7 +384,7 @@ namespace vectors
 	DEVICE_INLINE Vector<half> ceil(Vector<half> x)
 	{
 #if __CUDA_ARCH__ >= FP16_COMPUTE_MIN_ARCH
-		return Vector<half>(ceilf(static_cast<float>(x.low())), ceilf(static_cast<float>(x.high())));
+		return h2ceil(x);
 #elif __CUDA_ARCH__ >= FP16_STORAGE_MIN_ARCH
 		return ceilf(x);
 #else
@@ -383,7 +394,7 @@ namespace vectors
 	DEVICE_INLINE Vector<half> floor(Vector<half> x)
 	{
 #if __CUDA_ARCH__ >= FP16_COMPUTE_MIN_ARCH
-		return Vector<half>(floorf(static_cast<float>(x.low())), floorf(static_cast<float>(x.high())));
+		return h2floor(x);
 #elif __CUDA_ARCH__ >= FP16_STORAGE_MIN_ARCH
 		return floorf(x);
 #else
@@ -393,7 +404,7 @@ namespace vectors
 	DEVICE_INLINE Vector<half> sqrt(Vector<half> x)
 	{
 #if __CUDA_ARCH__ >= FP16_COMPUTE_MIN_ARCH
-		return Vector<half>(sqrtf(static_cast<float>(x.low())), sqrtf(static_cast<float>(x.high())));
+		return h2sqrt(x);
 #elif __CUDA_ARCH__ >= FP16_STORAGE_MIN_ARCH
 		return sqrtf(x);
 #else
@@ -505,7 +516,7 @@ namespace vectors
 	DEVICE_INLINE half horizontal_add(Vector<half> x)
 	{
 #if __CUDA_ARCH__ >= FP16_COMPUTE_MIN_ARCH
-		return x.low() + x.high();
+		__hadd(x.low(), x.high());
 #elif __CUDA_ARCH__ >= FP16_STORAGE_MIN_ARCH
 		return x.get();
 #else
@@ -515,7 +526,7 @@ namespace vectors
 	DEVICE_INLINE half horizontal_mul(Vector<half> x)
 	{
 #if __CUDA_ARCH__ >= FP16_COMPUTE_MIN_ARCH
-		return x.low() + x.high();
+		__hmul(x.low(), x.high());
 #elif __CUDA_ARCH__ >= FP16_STORAGE_MIN_ARCH
 		return x.get();
 #else
@@ -525,7 +536,7 @@ namespace vectors
 	DEVICE_INLINE half horizontal_max(Vector<half> x)
 	{
 #if __CUDA_ARCH__ >= FP16_COMPUTE_MIN_ARCH
-		return x.low() > x.high() ? x.low() : x.high();
+		return __hmax(x.low(), x.high());
 #elif __CUDA_ARCH__ >= FP16_STORAGE_MIN_ARCH
 		return x.get();
 #else
@@ -535,7 +546,7 @@ namespace vectors
 	DEVICE_INLINE half horizontal_min(Vector<half> x)
 	{
 #if __CUDA_ARCH__ >= FP16_COMPUTE_MIN_ARCH
-		return x.low() < x.high() ? x.low() : x.high();
+		return __hmin(x.low(), x.high());
 #elif __CUDA_ARCH__ >= FP16_STORAGE_MIN_ARCH
 		return x.get();
 #else

@@ -12,12 +12,6 @@
 
 #define DEVICE_INLINE __device__ __forceinline__
 
-#if __has_include(<cuda_bf16.h>)
-#  define HAS_BF16_HEADER 1
-#else
-#  define HAS_BF16_HEADER 0
-#endif
-
 #define BF16_COMPUTE_MIN_ARCH 800
 
 #define FP16_COMPUTE_MIN_ARCH 700
