@@ -84,14 +84,6 @@ namespace ml
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
-	void cuda_fake_low_precision(mlContext_t context, mlShape_t shape, void *dst)
-	{
-		throw NotImplemented(METHOD_NAME);
-	}
-	void cuda_fold_batchnorm(mlContext_t context, mlShape_t shape, void *layer_weights, void *layer_bias, const void *batchnorm_weights)
-	{
-		throw NotImplemented(METHOD_NAME);
-	}
 
 	mlConvolutionAlgorithm_t cuda_get_convolution_algorithm(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape)
 	{
@@ -113,8 +105,8 @@ namespace ml
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
-	void cuda_winograd_gradient_transform(mlContext_t context, mlDataType_t dtype, mlShape_t weight_shape, mlShape_t gradient_shape, void *gradient,
-			void *matrices)
+	void cuda_winograd_gradient_transform(mlContext_t context, mlDataType_t dtype, mlShape_t weight_shape, mlShape_t gradient_shape,
+				const void *gradient, void *matrices)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
@@ -125,6 +117,12 @@ namespace ml
 
 	void cuda_convolution_implicit_gemm_forward(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, mlShape_t weights_shape,
 			const void *input, const void *weights, void *output, const void *bias, const void *add, mlActivationType_t act)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+	
+	void cuda_convolution_fused_winograd_forward(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, mlShape_t weights_shape,
+				const void *input, const void *weights, void *output, const void *bias, const void *add, mlActivationType_t act)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
@@ -141,12 +139,12 @@ namespace ml
 	}
 
 	void cuda_gemm(mlContext_t context, mlDataType_t dtype, mlShape_t shape_C, void *C, mlShape_t shape_A, const void *A, mlShape_t shape_B,
-			const void *B, char opA, char opB, float beta)
+			const void *B, char opA, char opB, float alpha, float beta)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
 	void cuda_gemm_batched(mlContext_t context, mlDataType_t dtype, mlShape_t shape_C, void *C, mlShape_t shape_A, const void *A, mlShape_t shape_B,
-			const void *B, char opA, char opB, float beta)
+			const void *B, char opA, char opB, float alpha, float beta)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
@@ -169,7 +167,11 @@ namespace ml
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
-	void cuda_batchnorm_update(mlContext_t context, mlShape_t shape, const void *running_stat, void *weights)
+	void cuda_batchnorm_update(mlContext_t context, mlShape_t shape, const void *running_stat, void *weights, bool use_gamma, bool use_beta)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+	void cuda_fold_batchnorm(mlContext_t context, mlShape_t shape, void *layer_weights, void *layer_bias, const void *batchnorm_weights)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
@@ -184,6 +186,10 @@ namespace ml
 	}
 
 	// used for training
+	void cuda_emulate_low_precision(mlContext_t context, mlShape_t shape, void *dst, const void *src)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
 	void cuda_add_tensors(mlContext_t context, mlShape_t shape, void *dst, const void *src1, const void *src2)
 	{
 		throw NotImplemented(METHOD_NAME);
@@ -192,7 +198,11 @@ namespace ml
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
-	float cuda_cross_entropy_loss(mlContext_t context, mlShape_t shape, void *gradient, const void *output, const void *target)
+	float cuda_cross_entropy_loss(mlContext_t context, mlShape_t shape, const void *output, const void *target)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+	void cuda_cross_entropy_gradient(mlContext_t context, mlShape_t shape, void *gradient, const void *output, const void *target)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}

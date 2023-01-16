@@ -49,17 +49,14 @@ namespace
 	}
 	std::vector<std::string> get_device_infos()
 	{
-		std::vector<std::string> result;
-		const int count = get_number_of_devices();
-		for (int i = 0; i < count; i++)
-		{
-			cudaDeviceProp prop;
-			cudaError_t status = cudaGetDeviceProperties(&prop, i);
-			assert(status == cudaSuccess);
+		const std::vector<cudaDeviceProp> &properties = get_device_properties();
 
-			std::string tmp = std::string(prop.name) + " : " + std::to_string(prop.multiProcessorCount) + " x ";
-			tmp += "SM " + std::to_string(prop.major) + "." + std::to_string(prop.minor);
-			tmp += " with " + std::to_string(prop.totalGlobalMem >> 20) + "MB of memory";
+		std::vector<std::string> result;
+		for (auto prop = properties.begin(); prop < properties.end(); prop++)
+		{
+			std::string tmp = std::string(prop->name) + " : " + std::to_string(prop->multiProcessorCount) + " x ";
+			tmp += "SM " + std::to_string(prop->major) + "." + std::to_string(prop->minor);
+			tmp += " with " + std::to_string(prop->totalGlobalMem >> 20) + "MB of memory";
 			result.push_back(tmp);
 		}
 		return result;
@@ -100,7 +97,6 @@ namespace ml
 
 	namespace cuda
 	{
-		// from utils.hpp
 		int get_compute_capability(int device_index)
 		{
 			return (get_device_properties()[device_index].major * 10 + get_device_properties()[device_index].minor);

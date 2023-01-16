@@ -144,7 +144,7 @@ double get_accuracy(const Tensor &output, const Tensor &target)
 void test_mnist()
 {
 	std::cout << Device::hardwareInfo();
-//	return;
+	return;
 
 	Device::setNumberOfThreads(1);
 	MNIST dataset;

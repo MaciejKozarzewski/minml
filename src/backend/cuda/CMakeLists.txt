@@ -2,12 +2,7 @@ include(CheckLanguage)
 check_language(CUDA)
 enable_language(CUDA)
 
-if(NOT DEFINED CMAKE_CUDA_STANDARD)
-	set(CMAKE_CUDA_STANDARD 14)
-	set(CMAKE_CUDA_STANDARD_REQUIRED ON)
-endif()
-
-add_library(cuda_backend OBJECT kernels/activations.cu
+add_library(cuda_backend SHARED kernels/activations.cu
 				kernels/batchnorm.cu
 				kernels/conversion.cu
 				kernels/implicit_gemm_conv.cu
@@ -21,10 +16,12 @@ add_library(cuda_backend OBJECT kernels/activations.cu
 				misc.cpp
 				utils.cpp)
 
-set_target_properties(cuda_backend PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+set_target_properties(cuda_backend PROPERTIES CUDA_STANDARD 14 CUDA_STANDARD_REQUIRED YES POSITION_INDEPENDENT_CODE ON CUDA_SEPARABLE_COMPILATION ON CUDA_RESOLVE_DEVICE_SYMBOLS ON)
+#set_target_properties(cuda_backend PROPERTIES CUDA_STANDARD 14 CUDA_STANDARD_REQUIRED YES CUDA_SEPARABLE_COMPILATION ON CUDA_RESOLVE_DEVICE_SYMBOLS ON)
+
+set_property(TARGET cuda_backend PROPERTY CUDA_ARCHITECTURES all)
 target_compile_definitions(cuda_backend PRIVATE USE_CUDA)
 target_include_directories(cuda_backend PUBLIC "${PROJECT_SOURCE_DIR}/include" "/usr/local/cuda/include")
 
 target_link_libraries(MinML PRIVATE cuda_backend)
-target_link_libraries(MinML PUBLIC cudart cublas)
 

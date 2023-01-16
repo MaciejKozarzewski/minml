@@ -45,6 +45,62 @@ namespace
 		}
 	}
 
+	__global__ void kernel_get_cuda_arch(void *dst)
+	{
+		int *ptr = reinterpret_cast<int*>(dst);
+#if __CUDA_ARCH__ == 100
+		ptr[0] = 100;
+#elif __CUDA_ARCH__ == 110
+		ptr[0] = 110;
+#elif __CUDA_ARCH__ == 120
+		ptr[0] = 120;
+#elif __CUDA_ARCH__ == 130
+		ptr[0] = 130;
+#elif __CUDA_ARCH__ == 200
+		ptr[0] = 200;
+#elif __CUDA_ARCH__ == 210
+		ptr[0] = 210;
+#elif __CUDA_ARCH__ == 300
+		ptr[0] = 300;
+#elif __CUDA_ARCH__ == 320
+		ptr[0] = 320;
+#elif __CUDA_ARCH__ == 350
+		ptr[0] = 350;
+#elif __CUDA_ARCH__ == 370
+		ptr[0] = 370;
+#elif __CUDA_ARCH__ == 500
+		ptr[0] = 500;
+#elif __CUDA_ARCH__ == 520
+		ptr[0] = 520;
+#elif __CUDA_ARCH__ == 530
+		ptr[0] = 530;
+#elif __CUDA_ARCH__ == 600
+		ptr[0] = 600;
+#elif __CUDA_ARCH__ == 610
+		ptr[0] = 610;
+#elif __CUDA_ARCH__ == 620
+		ptr[0] = 620;
+#elif __CUDA_ARCH__ == 700
+		ptr[0] = 700;
+#elif __CUDA_ARCH__ == 720
+		ptr[0] = 720;
+#elif __CUDA_ARCH__ == 750
+		ptr[0] = 750;
+#elif __CUDA_ARCH__ == 800
+		ptr[0] = 800;
+#elif __CUDA_ARCH__ == 860
+		ptr[0] = 860;
+#elif __CUDA_ARCH__ == 870
+		ptr[0] = 870;
+#elif __CUDA_ARCH__ == 890
+		ptr[0] = 890;
+#elif __CUDA_ARCH__ == 900
+		ptr[0] = 900;
+#else
+		ptr[0] = 0;
+#endif
+	}
+
 	bool is_aligned(const void *ptr, int bytes) noexcept
 	{
 		return (reinterpret_cast<std::uintptr_t>(ptr) % bytes) == 0;
@@ -53,6 +109,23 @@ namespace
 
 namespace ml
 {
+	namespace cuda
+	{
+		int get_cuda_arch(int device_index)
+		{
+			void *ptr = cuda_malloc(device_index, 4);
+			cudaSetDevice(device_index);
+			kernel_get_cuda_arch<<<1, 1>>>(ptr);
+			cudaDeviceSynchronize();
+			int result = 0;
+			cuda_memcpy_to_host(nullptr, &result, ptr, 0, 4);
+			cudaDeviceSynchronize();
+			cuda_free(ptr);
+
+			return result;
+		}
+	}
+
 	void* cuda_malloc(int device_index, int count)
 	{
 		void *result = nullptr;
