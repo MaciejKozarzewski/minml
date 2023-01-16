@@ -100,6 +100,10 @@ namespace SIMD_NAMESPACE
 				return m_data;
 			}
 #else
+			Vector(uint32_t raw_bytes) noexcept :
+					m_data(bitwise_cast<float>(raw_bytes))
+			{
+			}
 			operator float() const noexcept
 			{
 				return m_data;

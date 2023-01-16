@@ -117,6 +117,12 @@ namespace SIMD_NAMESPACE
 	{
 		return constant<i, i, i, i>();
 	}
+#else
+	template<uint32_t i>
+	inline uint32_t constant() noexcept
+	{
+		return i;
+	}
 #endif
 
 	template<typename T, typename U>

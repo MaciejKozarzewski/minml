@@ -115,11 +115,12 @@ namespace ml
 	{
 		assert(input.size() == 1);
 		assert(gradient_prev.size() == 1);
+		const bool emulate_low_precision = isTrainable() and dtype() == DataType::FLOAT32;
 
 		Tensor tmp_grad = flatten_input_tensor(gradient_prev[0]);
 
 		activationBackwardInPlace(context(), gradient_next, output, m_activation);
-		if (isTrainable())
+		if (emulate_low_precision)
 		{
 			Tensor tmp = m_workspace.lock()->view(getWeightShape());
 			emulateLowPrecision(context(), tmp, getWeights().getParam());

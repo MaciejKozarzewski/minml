@@ -153,17 +153,23 @@ void test_mnist()
 
 	Graph model;
 	auto x = model.addInput( { batch_size, 28, 28, 1 });
-	x = model.add(Conv2D(32, 3, "linear"), x);
-	x = model.add(BatchNormalization("relu").useGamma(false), x);
-	x = model.add(Dense(32, "linear").useBias(false), x);
-	x = model.add(BatchNormalization("relu").useGamma(false), x);
+	x = model.add(Conv2D(32, 5, "relu"), x);
+//	x = model.add(BatchNormalization("relu").useGamma(false), x);
+
+//	auto y = model.add(Conv2D(32, 3, "linear"), x);
+//	y = model.add(BatchNormalization("linear").useGamma(false), y);
+//	x = model.add(Add("relu"), { x, y });
+//	x = model.add(Conv2D(31, 1, "relu"), x);
+
+//	x = model.add(Dense(32, "linear").useBias(false), x);
+//	x = model.add(BatchNormalization("relu").useGamma(false), x);
 	x = model.add(Dense(10, "softmax"), x);
 	model.addOutput(x);
 
 	model.init();
 	model.setOptimizer(Optimizer(1.0e-3f));
 	model.setRegularizer(Regularizer(1.0e-5f));
-	model.moveTo(Device::cuda(1));
+//	model.moveTo(Device::cuda(1));
 	model.print();
 
 //	model.forward(1);
@@ -215,17 +221,19 @@ void test_mnist()
 		if (loss != loss)
 			break;
 	}
+	return;
+	model.makeNonTrainable();
 
-//	dataset.packSamples(model.getInput(), model.getTarget(), 0);
-//	model.getOutput().zeroall(model.context());
-//	model.print();
-//	model.forward(1);
-//	model.context().synchronize();
-//
-//	std::cout << "output = ";
-//	for (int j = 0; j < 10; j++)
-//		std::cout << model.getOutput().get( { 0, j }) << ' ';
-//	std::cout << '\n';
+	dataset.packSamples(model.getInput(), model.getTarget(), 0);
+	model.getOutput().zeroall(model.context());
+	model.print();
+	model.forward(1);
+	model.context().synchronize();
+
+	std::cout << "output = ";
+	for (int j = 0; j < 10; j++)
+		std::cout << model.getOutput().get( { 0, j }) << ' ';
+	std::cout << '\n';
 //	std::cout << "target = ";
 //	for (int j = 0; j < 10; j++)
 //		std::cout << model.getTarget().get( { 0, j }) << ' ';
@@ -246,7 +254,9 @@ void test_mnist()
 //		std::cout << model.getTarget().get( { 0, j }) << ' ';
 //	std::cout << '\n' << '\n';
 
-	const bool result = FoldBatchNorm().optimize(model);
+	bool result = FoldBatchNorm().optimize(model);
+	std::cout << "changed anything = " << result << '\n';
+	result = FoldAdd().optimize(model);
 	std::cout << "changed anything = " << result << '\n';
 	model.print();
 
@@ -259,10 +269,11 @@ void test_mnist()
 	for (int j = 0; j < 10; j++)
 		std::cout << model.getOutput().get( { 0, j }) << ' ';
 	std::cout << '\n';
-	std::cout << "target = ";
-	for (int j = 0; j < 10; j++)
-		std::cout << model.getTarget().get( { 0, j }) << ' ';
-	std::cout << '\n' << '\n';
+//	std::cout << "target = ";
+//	for (int j = 0; j < 10; j++)
+//		std::cout << model.getTarget().get( { 0, j }) << ' ';
+//	std::cout << '\n' << '\n';
+//	return;
 
 //	for (int i = 0; i < 28; i++)
 //	{
@@ -272,7 +283,7 @@ void test_mnist()
 //	}
 //	printf("----------------------------------------\n");
 
-	model.convertTo(DataType::BFLOAT16);
+	model.convertTo(DataType::FLOAT16);
 	model.print();
 
 	dataset.packSamples(model.getInput(), model.getTarget(), 0);

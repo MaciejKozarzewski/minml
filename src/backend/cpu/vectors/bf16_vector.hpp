@@ -79,8 +79,8 @@ namespace SIMD_NAMESPACE
 		__m128i tmp = _mm_srli_epi32(_mm_castps_si128(x), 16); // shift right by 16 bits while shifting in zeros
 		return _mm_packus_epi32(tmp, _mm_setzero_si128()); // pack 32 bits into 16 bits
 #else
-		__m128i y0 = _mm_shufflelo_epi16(x, 0x0D);
-		__m128i y1 = _mm_shufflehi_epi16(x, 0x0D);
+		__m128i y0 = _mm_shufflelo_epi16(_mm_castps_si128(x), 0x0D);
+		__m128i y1 = _mm_shufflehi_epi16(_mm_castps_si128(x), 0x0D);
 		y0 = _mm_unpacklo_epi32(y0, _mm_setzero_si128());
 		y1 = _mm_unpackhi_epi32(_mm_setzero_si128(), y1);
 		return _mm_move_epi64(_mm_or_si128(y0, y1));

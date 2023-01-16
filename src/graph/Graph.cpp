@@ -292,11 +292,6 @@ namespace ml
 	{
 		m_targets.clear();
 		for (int i = 0; i < numberOfNodes(); i++)
-		{
-			getNode(i).getLayer().getWeights().setTrainable(false);
-			getNode(i).getLayer().getBias().setTrainable(false);
-		}
-		for (int i = 0; i < numberOfNodes(); i++)
 			getNode(i).makeNonTrainable();
 		m_is_trainable = false;
 	}

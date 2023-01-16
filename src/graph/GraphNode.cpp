@@ -233,6 +233,8 @@ namespace ml
 	void GraphNode::makeNonTrainable()
 	{
 		m_gradient_tensor = nullptr;
+		getLayer().getWeights().setTrainable(false);
+		getLayer().getBias().setTrainable(false);
 	}
 
 	void GraphNode::link(GraphNode *prev, GraphNode *next)

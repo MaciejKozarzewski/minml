@@ -4,6 +4,7 @@
 /cpu_only/
 doc/html/*
 doc/latex/*
+build/*
 bin/*
 bin/objects/*
 extern/openblas/*

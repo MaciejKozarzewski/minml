@@ -14,5 +14,8 @@
 #include "fp16_vector.hpp"
 #include "fp32_vector.hpp"
 #include "vector_functions.hpp"
+#include "vector_length.hpp"
+#include "vector_load_store.hpp"
+#include "vector_utils.hpp"
 
 #endif /* VECTORS_SIMD_VECTORS_HPP_ */

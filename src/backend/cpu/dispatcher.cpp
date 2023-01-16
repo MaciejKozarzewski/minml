@@ -23,7 +23,7 @@ namespace ml
 			case cpu::SimdLevel::AVX:
 				return ns_avx::cpu_kernel_unpack_input(context, shape, dst_dtype, dst, src);
 			case cpu::SimdLevel::SSE41:
-				return ns_sse41::ccpu_kernel_unpack_input(context, shape, dst_dtype, dst, src);
+				return ns_sse41::cpu_kernel_unpack_input(context, shape, dst_dtype, dst, src);
 			case cpu::SimdLevel::SSE2:
 				return ns_sse2::cpu_kernel_unpack_input(context, shape, dst_dtype, dst, src);
 			case cpu::SimdLevel::NONE:
