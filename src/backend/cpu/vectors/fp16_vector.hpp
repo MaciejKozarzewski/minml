@@ -136,7 +136,7 @@ namespace SIMD_NAMESPACE
 			}
 			operator Vector<float>() const noexcept
 			{
-				return Vector<float>(m_data);
+				return Vector<float>(m_data); // @suppress("Ambiguous problem")
 			}
 			void load(const float *ptr, int num = length) noexcept
 			{

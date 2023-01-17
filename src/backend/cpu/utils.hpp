@@ -34,6 +34,7 @@ namespace ml
 
 		std::string toString(SimdLevel sl);
 		SimdLevel getSimdSupport() noexcept;
+		bool has_hardware_fp16_conversion();
 
 		class Context
 		{

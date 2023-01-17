@@ -20,16 +20,16 @@ namespace scalar
 {
 	static inline float bfloat16_to_float(bfloat16 x) noexcept
 	{
-		uint16_t tmp[2] = { 0u, x.m_data };
+		const uint32_t bits = static_cast<uint32_t>(x.m_data) << 16;
 		float result;
-		std::memcpy(&result, tmp, sizeof(float));
+		std::memcpy(&result, &bits, sizeof(float));
 		return result;
 	}
 	static inline bfloat16 float_to_bfloat16(float x) noexcept
 	{
-		uint16_t tmp[2];
-		std::memcpy(&tmp, &x, sizeof(float));
-		return bfloat16 { tmp[1] };
+		uint32_t bits;
+		std::memcpy(&bits, &x, sizeof(float));
+		return bfloat16 { static_cast<uint16_t>(bits >> 16) };
 	}
 }
 
@@ -153,7 +153,7 @@ namespace SIMD_NAMESPACE
 			}
 			operator Vector<float>() const noexcept
 			{
-				return Vector<float>(m_data);
+				return Vector<float>(m_data); // @suppress("Ambiguous problem")
 			}
 			void load(const float *ptr, int num) noexcept
 			{

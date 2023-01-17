@@ -289,12 +289,12 @@ namespace SIMD_NAMESPACE
 #elif SUPPORTS_SSE2
 	static inline __m128 cutoff_ps(__m128 data, int num, __m128 value) noexcept
 	{
-		__m128 mask = get_cutoff_mask_ps(num);
+		const __m128 mask = get_cutoff_mask_ps(num);
 		return _mm_or_ps(_mm_and_ps(mask, data), _mm_andnot_ps(mask, value));
 	}
 	static inline __m128d cutoff_pd(__m128d data, int num, __m128d value) noexcept
 	{
-		__m128d mask = get_cutoff_mask_pd(num);
+		const __m128d mask = get_cutoff_mask_pd(num);
 		return _mm_or_pd(_mm_and_pd(mask, data), _mm_andnot_pd(mask, value));
 	}
 #else
