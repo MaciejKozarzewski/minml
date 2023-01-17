@@ -14,44 +14,97 @@
 #include <minml/utils/testing_util.hpp>
 #include <minml/layers/Layer.hpp>
 
-namespace
-{
-	ml::Tensor to_tensor(const std::vector<float> &vec)
-	{
-		ml::Tensor result(ml::Shape( { (int) vec.size() }), "float32", ml::Device::cpu());
-		ml::memcpy(result.device(), result.data(), 0, ml::Device::cpu(), vec.data(), 0, sizeof(float) * vec.size());
-		return result;
-	}
-}
+#include <iostream>
 
 namespace ml
 {
 
-	TEST(TestSoftmax, ForwardOnCPU)
+	TEST(TestSoftmax, ForwardOnCPU_fp32)
 	{
-		Tensor input = to_tensor( { { 0.1f, -0.9f, 2.0f, 0.0f, 0.3f, -1.0f, 0.7f, -0.1f } });
-		input.reshape(Shape( { 2, 4 }));
+		Context context;
+		Tensor input = toTensor( { { 0.1f, -0.9f, 2.0f, 0.0f }, { 0.3f, -1.0f, 0.7f, -0.1f } });
+		Tensor correct_output = toTensor( { { 0.11162444f, 0.04106433f, 0.74630924f, 0.10100197f }, { 0.29114823f, 0.07934714f, 0.43434212f,
+				0.19516249f } });
 
-		Tensor correct_output = to_tensor( {
-				{ 0.11162444f, 0.04106433f, 0.74630924f, 0.10100197f, 0.29114823f, 0.07934714f, 0.43434212f, 0.19516249f } });
-		correct_output.reshape(Shape( { 2, 4 }));
-
-		activationForwardInPlace(Context(), input, ActivationType::SOFTMAX);
+		activationForwardInPlace(context, input, ActivationType::SOFTMAX);
 		EXPECT_LE(testing::diffForTest(input, correct_output), 1.0e-4f);
 	}
-	TEST(TestSoftmax, ForwardOnCUDA)
+	TEST(TestSoftmax, ForwardOnCPU_fp16)
+	{
+		Context context;
+		Tensor input = toTensor( { { 0.1f, -0.9f, 2.0f, 0.0f }, { 0.3f, -1.0f, 0.7f, -0.1f } });
+		Tensor correct_output = toTensor( { { 0.11162444f, 0.04106433f, 0.74630924f, 0.10100197f }, { 0.29114823f, 0.07934714f, 0.43434212f,
+				0.19516249f } });
+
+		input.convertTo(context, DataType::FLOAT16);
+		correct_output.convertTo(context, DataType::FLOAT16);
+
+		activationForwardInPlace(Context(), input, ActivationType::SOFTMAX);
+		EXPECT_LE(testing::diffForTest(input, correct_output), 1.0e-3f);
+	}
+	TEST(TestSoftmax, ForwardOnCPU_bf16)
+	{
+		Context context;
+		Tensor input = toTensor( { { 0.1f, -0.9f, 2.0f, 0.0f }, { 0.3f, -1.0f, 0.7f, -0.1f } });
+		Tensor correct_output = toTensor( { { 0.11162444f, 0.04106433f, 0.74630924f, 0.10100197f }, { 0.29114823f, 0.07934714f, 0.43434212f,
+				0.19516249f } });
+
+		input.convertTo(context, DataType::BFLOAT16);
+		correct_output.convertTo(context, DataType::BFLOAT16);
+
+		activationForwardInPlace(Context(), input, ActivationType::SOFTMAX);
+		EXPECT_LE(testing::diffForTest(input, correct_output), 1.0e-2f);
+	}
+
+	TEST(TestSoftmax, ForwardOnCUDA_fp32)
 	{
 		if (Device::numberOfCudaDevices() == 0)
 			GTEST_SKIP_("No CUDA enabled devices");
-		Tensor input = to_tensor( { { 0.1f, -0.9f, 2.0f, 0.0f, 0.3f, -1.0f, 0.7f, -0.1f } });
-		input.reshape(Shape( { 2, 4 }));
+		Context context(Device::cuda(0));
+		Tensor input = toTensor( { { 0.1f, -0.9f, 2.0f, 0.0f }, { 0.3f, -1.0f, 0.7f, -0.1f } });
+		Tensor correct_output = toTensor( { { 0.11162444f, 0.04106433f, 0.74630924f, 0.10100197f }, { 0.29114823f, 0.07934714f, 0.43434212f,
+				0.19516249f } });
 
-		Tensor correct_output = to_tensor( {
-				{ 0.11162444f, 0.04106433f, 0.74630924f, 0.10100197f, 0.29114823f, 0.07934714f, 0.43434212f, 0.19516249f } });
-		correct_output.reshape(Shape( { 2, 4 }));
+		input.moveTo(context.device());
 
-		activationForwardInPlace(Context(), input, ActivationType::SOFTMAX);
+		activationForwardInPlace(context, input, ActivationType::SOFTMAX);
+		context.synchronize();
 		EXPECT_LE(testing::diffForTest(input, correct_output), 1.0e-4f);
 	}
+	TEST(TestSoftmax, ForwardOnCUDA_fp16)
+	{
+		if (Device::numberOfCudaDevices() == 0 or not Device::cuda(0).supportsType(DataType::FLOAT16))
+			GTEST_SKIP_("No CUDA enabled devices");
+		Context context(Device::cuda(0));
+		Tensor input = toTensor( { { 0.1f, -0.9f, 2.0f, 0.0f }, { 0.3f, -1.0f, 0.7f, -0.1f } });
+		Tensor correct_output = toTensor( { { 0.11162444f, 0.04106433f, 0.74630924f, 0.10100197f }, { 0.29114823f, 0.07934714f, 0.43434212f,
+				0.19516249f } });
+
+		input.moveTo(context.device());
+		input.convertTo(context, DataType::FLOAT16);
+		correct_output.convertTo(Context(), DataType::FLOAT16);
+
+		activationForwardInPlace(context, input, ActivationType::SOFTMAX);
+		context.synchronize();
+		EXPECT_LE(testing::diffForTest(input, correct_output), 1.0e-3f);
+	}
+	TEST(TestSoftmax, ForwardOnCUDA_bf16)
+	{
+		if (Device::numberOfCudaDevices() == 0 or not Device::cuda(0).supportsType(DataType::FLOAT16))
+			GTEST_SKIP_("No CUDA enabled devices");
+		Context context(Device::cuda(0));
+		Tensor input = toTensor( { { 0.1f, -0.9f, 2.0f, 0.0f }, { 0.3f, -1.0f, 0.7f, -0.1f } });
+		Tensor correct_output = toTensor( { { 0.11162444f, 0.04106433f, 0.74630924f, 0.10100197f }, { 0.29114823f, 0.07934714f, 0.43434212f,
+				0.19516249f } });
+
+		input.moveTo(context.device());
+		input.convertTo(context, DataType::BFLOAT16);
+		correct_output.convertTo(Context(), DataType::BFLOAT16);
+
+		activationForwardInPlace(context, input, ActivationType::SOFTMAX);
+		context.synchronize();
+		EXPECT_LE(testing::diffForTest(input, correct_output), 1.0e-2f);
+	}
+
 } /* namespace ml */
 
