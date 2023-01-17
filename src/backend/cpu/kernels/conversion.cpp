@@ -10,6 +10,63 @@
 
 #include "../vectors/vectors.hpp"
 
+namespace
+{
+	using namespace SIMD_NAMESPACE;
+
+	template<typename SrcType, typename DstType>
+	struct Converter
+	{
+			void operator()(DstType *dst, const SrcType *src, int elements) const noexcept
+			{
+				Vector<float16>(src, elements).store(dst, elements);
+			}
+	};
+
+//	template<typename T>
+//	struct Converter<T, T>
+//	{
+//			void operator()(T *dst, const T *src, int elements) const noexcept
+//			{
+//				Vector<T>(src, elements).store(dst, elements);
+//			}
+//	};
+//
+//	template<>
+//	struct Converter<float, float16>
+//	{
+//			void operator()(float16 *dst, const float *src, int elements) const noexcept
+//			{
+//				Vector<float>(src, elements).store(dst, elements);
+//			}
+//	};
+//	template<>
+//	struct Converter<float, bfloat16>
+//	{
+//			void operator()(bfloat16 *dst, const float *src, int elements) const noexcept
+//			{
+//				Vector<float>(src, elements).store(dst, elements);
+//			}
+//	};
+//
+//	template<>
+//	struct Converter<float16, float>
+//	{
+//			void operator()(float *dst, const float16 *src, int elements) const noexcept
+//			{
+//				Vector<float>(src, elements).store(dst, elements);
+//			}
+//	};
+//	template<>
+//	struct Converter<float16, bfloat16>
+//	{
+//			void operator()(bfloat16 *dst, const float *src, int elements) const noexcept
+//			{
+//				Vector<bfloat16>(src, elements).store(dst, elements);
+//			}
+//	};
+}
+
 namespace SIMD_NAMESPACE
 {
 	using namespace ml;

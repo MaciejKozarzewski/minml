@@ -1,9 +1,9 @@
 target_sources(MinML PRIVATE 	batchnorm.cpp
+				cpu_context.cpp
 				cpu_memory.cpp
 				cpu_properties.cpp
 				dispatcher.cpp
 				gemms.cpp
-				misc.cpp
 				training.cpp
 				utils.cpp)
 								

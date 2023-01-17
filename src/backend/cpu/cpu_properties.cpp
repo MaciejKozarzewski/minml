@@ -492,6 +492,11 @@ namespace ml
 			static const SimdLevel supported_simd_level = check_supported_simd_level();
 			return supported_simd_level;
 		}
+		bool has_hardware_fp16_conversion()
+		{
+			static const bool result = cpu_x86::get().HW_F16C;
+			return result;
+		}
 
 		std::string toString(SimdLevel sl)
 		{

@@ -24,7 +24,8 @@ namespace ml
 	}
 	void cpu_destroy_context(mlContext_t context)
 	{
-		delete reinterpret_cast<cpu::Context*>(context);
+		if (context != nullptr)
+			delete reinterpret_cast<cpu::Context*>(context);
 	}
 
 } /* namespace ml */
