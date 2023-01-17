@@ -1,9 +1,10 @@
 /*
  * cpu_properties.cpp
  *
- *  Created on: May 12, 2020
- *      Author: Alexander J. Yee
- *      modified by Maciej Kozarzewski
+ *  Created on : Dec 4, 2014
+ *      Author: Alexander J. Yee (https://github.com/Mysticial/FeatureDetector)
+ *  Modified on: May 12, 2020
+ *      by Maciej Kozarzewski
  */
 
 #include <minml/backend/cpu_backend.h>
@@ -68,7 +69,7 @@ namespace
 
 		if (NULL != fnIsWow64Process)
 		{
-			if (!fnIsWow64Process(GetCurrentProcess(), &bIsWow64))
+			if (not fnIsWow64Process(GetCurrentProcess(), &bIsWow64))
 			{
 				printf("Error Detecting Operating System.\n");
 				printf("Defaulting to 32-bit OS.\n\n");
@@ -132,10 +133,10 @@ namespace
 		uint32_t info[4];
 		cpuid(info, 1, 0);
 
-		bool osUsesXSAVE_XRSTORE = (info[2] & (1 << 27)) != 0;
-		bool cpuAVXSuport = (info[2] & (1 << 28)) != 0;
+		const bool osUsesXSAVE_XRSTORE = (info[2] & (1 << 27)) != 0;
+		const bool cpuAVXSuport = (info[2] & (1 << 28)) != 0;
 
-		if (osUsesXSAVE_XRSTORE && cpuAVXSuport)
+		if (osUsesXSAVE_XRSTORE and cpuAVXSuport)
 		{
 			uint64_t xcrFeatureMask = xgetbv(_XCR_XFEATURE_ENABLED_MASK);
 			avxSupported = (xcrFeatureMask & 0x6) == 0x6;
@@ -145,7 +146,7 @@ namespace
 	}
 	bool detect_OS_AVX512()
 	{
-		if (!detect_OS_AVX())
+		if (not detect_OS_AVX())
 			return false;
 
 		uint64_t xcrFeatureMask = xgetbv(_XCR_XFEATURE_ENABLED_MASK);
@@ -302,9 +303,9 @@ namespace
 
 					HYPER_THREADING = (info[3] & (1 << 28)) != 0;
 #if defined(_WIN32)
-				SYSTEM_INFO systeminfo;
-				GetSystemInfo(&systeminfo);
-				cores = systeminfo.dwNumberOfProcessors;
+					SYSTEM_INFO systeminfo;
+					GetSystemInfo(&systeminfo);
+					cores = systeminfo.dwNumberOfProcessors;
 #else
 					cores = sysconf( _SC_NPROCESSORS_ONLN);
 #endif // defined(_WIN32)
@@ -361,6 +362,7 @@ namespace
 					HW_SSE4a = (info[2] & (1 << 6)) != 0;
 					HW_FMA4 = (info[2] & (1 << 16)) != 0;
 					HW_XOP = (info[2] & (1 << 11)) != 0;
+					HW_PREFETCHW = (info[2] & ((int) 1 << 8)) != 0;
 				}
 			}
 		public:
@@ -544,7 +546,7 @@ namespace ml
 			case DTYPE_BFLOAT16:
 				return true;
 			case DTYPE_FLOAT16:
-				return cpu_x86::get().HW_F16C;
+				return true;
 			case DTYPE_FLOAT32:
 				return true;
 			default:
