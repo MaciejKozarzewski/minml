@@ -21,7 +21,7 @@ namespace
 	}
 	float safe_log(float x) noexcept
 	{
-		return std::log(1.0e-6f + x);
+		return std::log(1.0e-8f + x);
 	}
 	float cross_entropy(float output, float target) noexcept
 	{

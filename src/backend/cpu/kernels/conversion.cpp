@@ -19,7 +19,6 @@ namespace
 	{
 			void operator()(DstType *dst, const SrcType *src, int elements) const noexcept
 			{
-				Vector<float16>(src, elements).store(dst, elements);
 			}
 	};
 

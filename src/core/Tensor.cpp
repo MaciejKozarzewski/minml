@@ -292,10 +292,10 @@ namespace ml
 			throw DataTypeMismatch(METHOD_NAME, this->dtype(), other.dtype());
 
 		if (context.device().isCPU())
-			ml::memcpy(device(), data(), 0, other.device(), other.data(), 0, sizeInBytes());
+			ml::memcpy(this->device(), this->data(), 0, other.device(), other.data(), 0, sizeInBytes());
 		else
 		{
-			if (context.device() != this->device() && context.device() != other.device())
+			if (context.device() != this->device() and context.device() != other.device())
 				throw DeviceMismatch(METHOD_NAME, "context on " + context.device().toString() + ", Tensor on " + device().toString());
 			ml::memcpy_async(context, device(), data(), 0, other.device(), other.data(), 0, sizeInBytes());
 		}

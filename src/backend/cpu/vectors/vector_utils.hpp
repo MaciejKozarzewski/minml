@@ -136,11 +136,13 @@ namespace SIMD_NAMESPACE
 #if SUPPORTS_SSE41
 	static inline int get_cutoff_mask(int num) noexcept
 	{
+		assert(num > 0);
 		return (1 << num) - 1;
 	}
 #elif SUPPORTS_SSE2
 	static inline __m128d get_cutoff_mask_pd(int num) noexcept
 	{
+		assert(num > 0);
 		switch (num)
 		{
 			case 0:
@@ -154,6 +156,7 @@ namespace SIMD_NAMESPACE
 	}
 	static inline __m128 get_cutoff_mask_ps(int num) noexcept
 	{
+		assert(num > 0);
 		switch (num)
 		{
 			case 0:
@@ -171,6 +174,7 @@ namespace SIMD_NAMESPACE
 	}
 	static inline __m128i get_cutoff_mask_i(int num_bytes) noexcept
 	{
+		assert(num > 0);
 		switch (num_bytes)
 		{
 			case 0:
@@ -215,6 +219,7 @@ namespace SIMD_NAMESPACE
 #if SUPPORTS_AVX
 	static inline __m256d cutoff_pd(__m256d data, int num, __m256d value) noexcept
 	{
+		assert(num > 0);
 		switch (num)
 		{
 			case 0:
@@ -232,6 +237,7 @@ namespace SIMD_NAMESPACE
 	}
 	static inline __m256 cutoff_ps(__m256 data, int num, __m256 value) noexcept
 	{
+		assert(num > 0);
 		switch (num)
 		{
 			case 0:
@@ -258,6 +264,7 @@ namespace SIMD_NAMESPACE
 #elif SUPPORTS_SSE41
 	static inline __m128 cutoff_ps(__m128 data, int num, __m128 value) noexcept
 	{
+		assert(num > 0);
 		switch(num)
 		{
 			case 0:
@@ -289,21 +296,25 @@ namespace SIMD_NAMESPACE
 #elif SUPPORTS_SSE2
 	static inline __m128 cutoff_ps(__m128 data, int num, __m128 value) noexcept
 	{
+		assert(num > 0);
 		const __m128 mask = get_cutoff_mask_ps(num);
 		return _mm_or_ps(_mm_and_ps(mask, data), _mm_andnot_ps(mask, value));
 	}
 	static inline __m128d cutoff_pd(__m128d data, int num, __m128d value) noexcept
 	{
+		assert(num > 0);
 		const __m128d mask = get_cutoff_mask_pd(num);
 		return _mm_or_pd(_mm_and_pd(mask, data), _mm_andnot_pd(mask, value));
 	}
 #else
 	static inline float cutoff_ps(float data, int num, float value) noexcept
 	{
+		assert(num > 0);
 		return (num == 0) ? value : data;
 	}
 	static inline double cutoff_pd(double data, int num, double value) noexcept
 	{
+		assert(num > 0);
 		return (num == 0) ? value : data;
 	}
 #endif

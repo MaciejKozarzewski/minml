@@ -7,8 +7,7 @@ target_sources(MinML PRIVATE 	batchnorm.cpp
 				training.cpp
 				utils.cpp)
 								
-set(kernelsrc 	kernels/activations.cpp
-		kernels/add_bias_act.cpp
+set(kernelsrc 	kernels/add_bias_act.cpp
 		kernels/conv_explicit_gemm.cpp
 		kernels/conv_implicit_gemm.cpp
 		kernels/conv_winograd_fused.cpp
