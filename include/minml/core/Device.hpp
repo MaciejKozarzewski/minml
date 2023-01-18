@@ -1,5 +1,5 @@
 /*
- * device.hpp
+ * Device.hpp
  *
  *  Created on: May 12, 2020
  *      Author: Maciej Kozarzewski
@@ -14,15 +14,16 @@
 namespace ml /* forward declarations */
 {
 	class DeviceContext;
-	enum class DataType;
+	enum class DataType
+	;
 }
 
 namespace ml
 {
 	enum class DeviceType
 	{
-			CPU,
-			CUDA
+		CPU,
+		CUDA
 	};
 
 	class Device
@@ -47,6 +48,7 @@ namespace ml
 			std::string toString() const;
 			std::string info() const;
 
+			static int numberOfCpuCores();
 			static int numberOfCudaDevices();
 			static void setNumberOfThreads(int t);
 			static std::string hardwareInfo();

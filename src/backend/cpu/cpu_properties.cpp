@@ -539,6 +539,10 @@ namespace ml
 		openblas_set_num_threads(number);
 #endif
 	}
+	int cpu_number_of_cores()
+	{
+		return cpu_x86::get().cores;
+	}
 	bool cpu_supports_type(mlDataType_t dtype)
 	{
 		switch (dtype)

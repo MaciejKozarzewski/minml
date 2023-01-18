@@ -80,6 +80,11 @@ namespace ml
 		}
 	}
 
+	int Device::numberOfCpuCores()
+	{
+		static const int result = cpu_number_of_cores();
+		return result;
+	}
 	int Device::numberOfCudaDevices()
 	{
 		static const int result = cuda_get_number_of_devices();
