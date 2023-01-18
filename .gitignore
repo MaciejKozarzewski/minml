@@ -19,3 +19,4 @@ scripts/tmp_script.bat
 .settings/*
 CMakeFiles/*
 CMakeCache.txt
+*.bin

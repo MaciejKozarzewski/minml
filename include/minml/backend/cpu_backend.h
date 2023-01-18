@@ -19,6 +19,7 @@ namespace ml
 #endif
 
 		void cpu_set_number_of_threads(int number);
+		int cpu_number_of_cores();
 		bool cpu_supports_type(mlDataType_t dtype);
 		const char* cpu_get_device_info();
 

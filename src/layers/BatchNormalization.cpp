@@ -94,7 +94,7 @@ namespace ml
 	{
 		assert(input.size() == 1);
 
-		if (input[0].shape().firstDim() == 1)
+		if (input[0].shape().volumeWithoutLastDim() == 1 or not isTrainable())
 			batchnormInference(context(), input[0], output, getWeights().getParam(), m_activation);
 		else
 			batchnormForward(context(), input[0], output, getWeights().getParam(), *m_running_stats, m_running_id, m_activation);

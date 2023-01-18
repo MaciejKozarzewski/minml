@@ -18,6 +18,7 @@
 #include <minml/training/Optimizer.hpp>
 #include <minml/utils/random.hpp>
 #include <minml/utils/time_util.hpp>
+#include <minml/utils/file_util.hpp>
 
 #include <iostream>
 #include <fstream>
@@ -225,9 +226,13 @@ float half_to_float(const uint16_t x)
 		{
 			if (mantissa != 0)
 			{ // denormalized
-				const uint32_t v = _lzcnt_u32(mantissa);
-				exponent = (134 - v) << 10;
-				mantissa = (mantissa << (v - 21)) & 0x000003FF;
+//				const uint32_t v = _bit_scan_forward(mantissa); //_lzcnt_u32(mantissa);
+//				exponent = (134 - v) << 10;
+//				mantissa = (mantissa << (v - 21)) & 0x000003FF;
+
+				const uint32_t v = as_uint((float) mantissa) >> 23; // evil log2 bit hack to count leading zeros in denormalized format
+				exponent = (v - 24) << 10;
+				mantissa = (mantissa << (137 - v)) & 0x03FF;
 			}
 		}
 	}
@@ -366,8 +371,8 @@ uint16_t float_to_half(const float x)
 
 void test_mnist()
 {
-//	std::cout << Device::hardwareInfo();
-
+////	std::cout << Device::hardwareInfo();
+//
 //	for (int i = 0; i < 65536; i++)
 //	{
 //		const uint32_t x_native_fp32 = as_uint(_cvtsh_ss(i));
@@ -390,89 +395,90 @@ void test_mnist()
 //		}
 //	}
 //	std::cout << "all correct\n";
-
-	int64_t last_bit_mismatch = 0;
-	double start = getTime();
-//	for (int64_t i = 0; i < 4294967296; i++)
-	for (int64_t i = 0; i < 1073741824; i++)
-	{
-//		last_bit_mismatch += _cvtsh_ss(i & 65535);
-		last_bit_mismatch += half_to_float(i & 65535);
-
-//		const float x = as_float(i);
-//		last_bit_mismatch += _cvtss_sh(x, _MM_FROUND_TO_NEAREST_INT);
-//		last_bit_mismatch += float_to_half(x);
-	}
-	double stop = getTime();
-	std::cout << 4294967296.0 / (stop - start) << '\n';
-	std::cout << last_bit_mismatch << '\n';
-	return;
-
-	for (int64_t i = 0; i < 4294967296; i++)
-//	int64_t i = 2139095041;
-	{
-		if (i % 100000000 == 0)
-			std::cout << "checked " << i / 1000000 << "M ...\n";
-		const float x = as_float(i);
-		const uint16_t x_native_fp16 = _cvtss_sh(x, _MM_FROUND_TO_NEAREST_INT);
-		const uint16_t x_emulated_fp16 = float_to_half(x);
-		if (x_native_fp16 != x_emulated_fp16)
-		{
-			if ((x_native_fp16 & 0xFFFE) != (x_emulated_fp16 & 0xFFFE))
-			{
-				std::cout << "mismatch at i = " << i << '\n';
-
-				std::cout << "float = " << x << '\n';
-				std::cout << "bits (fp32)     = ";
-				print_bits((uint32_t) i);
-				std::cout << "bits (native)   = ";
-				print_bits(x_native_fp16);
-				std::cout << "bits (emulated) = ";
-				print_bits(x_emulated_fp16);
-
-				std::cout << "recovered fp32 " << _cvtsh_ss(x_native_fp16) << " " << _cvtsh_ss(x_emulated_fp16) << '\n';
-				return;
-			}
-			else
-				last_bit_mismatch++;
-		}
-	}
-	std::cout << "last bit mismatched " << last_bit_mismatch << '\n';
-	std::cout << "all correct\n";
-	return;
-
-	{
-		const float x = 1.23e-6;
-		print_bits(x);
-		const uint16_t x_native_fp16 = _cvtss_sh(x, _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC);
-		const uint16_t x_emulated_fp16 = float_to_half(x);
-
-		std::cout << "original  " << x << '\n';
-		std::cout << "bits (native)   = ";
-		print_bits(x_native_fp16);
-		std::cout << "bits (emulated) = ";
-		print_bits(x_emulated_fp16);
-
-		std::cout << _cvtsh_ss(x_native_fp16) << " " << _cvtsh_ss(x_emulated_fp16) << '\n';
-
-		const float x_native_fp32 = _cvtsh_ss(x_native_fp16);
-		const float x_emulated_fp32 = half_to_float(x_native_fp16);
-
-		std::cout << "original  " << x << '\n';
-		std::cout << "bits (native)   = ";
-		print_bits(x_native_fp32);
-		std::cout << "bits (emulated) = ";
-		print_bits(x_emulated_fp32);
-
-		std::cout << "recovered " << x_native_fp32 << " " << x_emulated_fp32 << '\n';
-
-//		const float x_sw_fp32 = half_to_float(x_sw_fp16);
-//		const float x_hw_fp32 = _cvtsh_ss(x_hw_fp16);
+//	return;
 //
-
-//		std::cout << "recovered " << x_decompressed << '\n';
-	}
-	return;
+//	int64_t last_bit_mismatch = 0;
+//	double start = getTime();
+////	for (int64_t i = 0; i < 4294967296; i++)
+//	for (int64_t i = 0; i < 1073741824; i++)
+//	{
+////		last_bit_mismatch += _cvtsh_ss(i & 65535);
+//		last_bit_mismatch += half_to_float(i & 65535);
+//
+////		const float x = as_float(i);
+////		last_bit_mismatch += _cvtss_sh(x, _MM_FROUND_TO_NEAREST_INT);
+////		last_bit_mismatch += float_to_half(x);
+//	}
+//	double stop = getTime();
+//	std::cout << 4294967296.0 / (stop - start) << '\n';
+//	std::cout << last_bit_mismatch << '\n';
+//	return;
+//
+//	for (int64_t i = 0; i < 4294967296; i++)
+////	int64_t i = 2139095041;
+//	{
+//		if (i % 100000000 == 0)
+//			std::cout << "checked " << i / 1000000 << "M ...\n";
+//		const float x = as_float(i);
+//		const uint16_t x_native_fp16 = _cvtss_sh(x, _MM_FROUND_TO_NEAREST_INT);
+//		const uint16_t x_emulated_fp16 = float_to_half(x);
+//		if (x_native_fp16 != x_emulated_fp16)
+//		{
+//			if ((x_native_fp16 & 0xFFFE) != (x_emulated_fp16 & 0xFFFE))
+//			{
+//				std::cout << "mismatch at i = " << i << '\n';
+//
+//				std::cout << "float = " << x << '\n';
+//				std::cout << "bits (fp32)     = ";
+//				print_bits((uint32_t) i);
+//				std::cout << "bits (native)   = ";
+//				print_bits(x_native_fp16);
+//				std::cout << "bits (emulated) = ";
+//				print_bits(x_emulated_fp16);
+//
+//				std::cout << "recovered fp32 " << _cvtsh_ss(x_native_fp16) << " " << _cvtsh_ss(x_emulated_fp16) << '\n';
+//				return;
+//			}
+//			else
+//				last_bit_mismatch++;
+//		}
+//	}
+//	std::cout << "last bit mismatched " << last_bit_mismatch << '\n';
+//	std::cout << "all correct\n";
+//	return;
+//
+//	{
+//		const float x = 1.23e-6;
+//		print_bits(x);
+//		const uint16_t x_native_fp16 = _cvtss_sh(x, _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC);
+//		const uint16_t x_emulated_fp16 = float_to_half(x);
+//
+//		std::cout << "original  " << x << '\n';
+//		std::cout << "bits (native)   = ";
+//		print_bits(x_native_fp16);
+//		std::cout << "bits (emulated) = ";
+//		print_bits(x_emulated_fp16);
+//
+//		std::cout << _cvtsh_ss(x_native_fp16) << " " << _cvtsh_ss(x_emulated_fp16) << '\n';
+//
+//		const float x_native_fp32 = _cvtsh_ss(x_native_fp16);
+//		const float x_emulated_fp32 = half_to_float(x_native_fp16);
+//
+//		std::cout << "original  " << x << '\n';
+//		std::cout << "bits (native)   = ";
+//		print_bits(x_native_fp32);
+//		std::cout << "bits (emulated) = ";
+//		print_bits(x_emulated_fp32);
+//
+//		std::cout << "recovered " << x_native_fp32 << " " << x_emulated_fp32 << '\n';
+//
+////		const float x_sw_fp32 = half_to_float(x_sw_fp16);
+////		const float x_hw_fp32 = _cvtsh_ss(x_hw_fp16);
+////
+//
+////		std::cout << "recovered " << x_decompressed << '\n';
+//	}
+//	return;
 
 	Device::setNumberOfThreads(1);
 	MNIST dataset;
@@ -481,7 +487,7 @@ void test_mnist()
 
 	Graph model;
 	auto x = model.addInput( { batch_size, 28, 28, 1 });
-	x = model.add(Conv2D(32, 5, "relu"), x);
+	x = model.add(Conv2D(8, 3, "relu"), x);
 //	x = model.add(BatchNormalization("relu").useGamma(false), x);
 
 //	auto y = model.add(Conv2D(32, 3, "linear"), x);
@@ -528,7 +534,7 @@ void test_mnist()
 	{
 		double loss = 0.0;
 		double acc = 0.0;
-		for (int step = 0; step < 1000; step++)
+		for (int step = 0; step < 100; step++)
 		{
 			dataset.packSamples(model.getInput(), model.getTarget());
 			model.forward(batch_size);
@@ -549,8 +555,21 @@ void test_mnist()
 		if (loss != loss)
 			break;
 	}
-	return;
+	{
+		SerializedObject so;
+		Json json = model.save(so);
+		FileSaver fs("mnist_network.bin");
+		fs.save(json, so, 2);
+	}
+//	return;
 	model.makeNonTrainable();
+	{
+		SerializedObject so;
+		Json json = model.save(so);
+		FileSaver fs("mnist_network_opt.bin");
+		fs.save(json, so, 2);
+	}
+	return;
 
 	dataset.packSamples(model.getInput(), model.getTarget(), 0);
 	model.getOutput().zeroall(model.context());
@@ -597,6 +616,7 @@ void test_mnist()
 	for (int j = 0; j < 10; j++)
 		std::cout << model.getOutput().get( { 0, j }) << ' ';
 	std::cout << '\n';
+	return;
 //	std::cout << "target = ";
 //	for (int j = 0; j < 10; j++)
 //		std::cout << model.getTarget().get( { 0, j }) << ' ';

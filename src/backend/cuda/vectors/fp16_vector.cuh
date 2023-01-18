@@ -273,7 +273,6 @@ namespace vectors
 #elif __CUDA_ARCH__ >= FP16_STORAGE_MIN_ARCH
 		return 1;
 #else
-		assert(false);
 		return 0;
 #endif
 	}

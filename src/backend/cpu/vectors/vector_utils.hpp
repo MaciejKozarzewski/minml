@@ -172,10 +172,10 @@ namespace SIMD_NAMESPACE
 				return _mm_castsi128_ps(_mm_set1_epi32(0xFFFFFFFFu));
 		}
 	}
-	static inline __m128i get_cutoff_mask_i(int num_bytes) noexcept
+	static inline __m128i get_cutoff_mask_i(int num) noexcept
 	{
 		assert(num > 0);
-		switch (num_bytes)
+		switch (num)
 		{
 			case 0:
 				return _mm_setzero_si128();

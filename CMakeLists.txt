@@ -5,9 +5,12 @@ option(BUILD_TESTING "Build unit tests?" ON)
 option(BUILD_WITH_OPENBLAS "Use OpenBlas for linear algebra on CPU?" ON)
 option(DYNAMIC_ARCH "Use runtime dispatching of simd code" ON)
 option(BUILD_WITH_CUDA "Build with CUDA support" ON)
-set(CMAKE_DEBUG_POSTFIX "d" CACHE STRING "Choose debug postfix" FORCE)
-set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose build type" FORCE)
+set(CMAKE_DEBUG_POSTFIX "_d" CACHE STRING "Choose debug postfix" FORCE)
+set(CMAKE_BUILD_TYPE "Debug" CACHE STRING "Choose build type" FORCE)
 
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 add_library(MinML STATIC)
 add_subdirectory("src/backend/cpu")
@@ -19,6 +22,7 @@ add_subdirectory("src/utils")
 
 set_target_properties(MinML PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED YES CXX_EXTENSIONS NO)
 target_include_directories(MinML PUBLIC "${PROJECT_SOURCE_DIR}/include")
+target_link_libraries(MinML PUBLIC z)
 
 find_package(OpenMP)
 if(OpenMP_CXX_FOUND)
