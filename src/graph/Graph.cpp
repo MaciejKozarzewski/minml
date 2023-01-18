@@ -348,8 +348,12 @@ namespace ml
 		for (int i = 0; i < json.size(); i++)
 			load_node(json[i], binary_data);
 
+		m_is_trainable = false;
 		for (int i = 0; i < numberOfNodes(); i++)
+		{
 			getNode(i).getLayer().loadParameters(json[i]["layer"], binary_data);
+			m_is_trainable |= getNode(i).getLayer().isTrainable();
+		}
 	}
 
 	GraphNodeID Graph::add_node(const Layer &layer, const std::vector<GraphNodeID> &inputs)
