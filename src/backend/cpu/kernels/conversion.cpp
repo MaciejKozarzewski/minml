@@ -111,6 +111,8 @@ namespace SIMD_NAMESPACE
 				switch (src_dtype)
 				{
 					case DTYPE_BFLOAT16:
+						if (dst != src)
+							std::memcpy(dst, src, sizeof(bfloat16) * elements);
 						break;
 					case DTYPE_FLOAT16:
 						for (int i = 0; i < elements; i++)
@@ -134,6 +136,8 @@ namespace SIMD_NAMESPACE
 							getPointer<float16>(dst)[i] = scalar::float_to_float16(scalar::bfloat16_to_float(getPointer<bfloat16>(src)[i]));
 						break;
 					case DTYPE_FLOAT16:
+						if (dst != src)
+							std::memcpy(dst, src, sizeof(float16) * elements);
 						break;
 					case DTYPE_FLOAT32:
 						for (int i = 0; i < elements; i++)
@@ -157,6 +161,8 @@ namespace SIMD_NAMESPACE
 							getPointer<float>(dst)[i] = scalar::float16_to_float(getPointer<float16>(src)[i]);
 						break;
 					case DTYPE_FLOAT32:
+						if (dst != src)
+							std::memcpy(dst, src, sizeof(float) * elements);
 						break;
 					default:
 						break;

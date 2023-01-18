@@ -70,6 +70,10 @@ namespace ml
 		static const int result = get_number_of_devices();
 		return result;
 	}
+	int cuda_get_memory(int index)
+	{
+		return get_device_properties().at(index).totalGlobalMem >> 20;
+	}
 	bool cuda_supports_type(int index, mlDataType_t dtype)
 	{
 		if (index >= 0 and index < cuda_get_number_of_devices())

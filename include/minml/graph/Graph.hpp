@@ -92,6 +92,7 @@ namespace ml
 			void backward(int batchSize);
 			std::vector<float> getLoss(int batchSize);
 			void learn();
+			void setLearningRate(float lr);
 
 			void print() const;
 			void makeNonTrainable();

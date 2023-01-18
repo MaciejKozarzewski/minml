@@ -501,8 +501,8 @@ void test_mnist()
 	model.addOutput(x);
 
 	model.init();
-	model.setOptimizer(Optimizer(1.0e-3f));
-	model.setRegularizer(Regularizer(1.0e-5f));
+//	model.setOptimizer(Optimizer(1.0e-3f));
+//	model.setRegularizer(Regularizer(1.0e-5f));
 //	model.moveTo(Device::cuda(1));
 	model.print();
 
@@ -530,11 +530,12 @@ void test_mnist()
 //	model.setRegularizer(RegularizerL2(0.0001f));
 //	model.moveTo(Device::cuda(1));
 
-	for (int e = 0; e < 10; e++)
+	const int steps = 100;
+	for (int e = 0; e < 100; e++)
 	{
 		double loss = 0.0;
 		double acc = 0.0;
-		for (int step = 0; step < 100; step++)
+		for (int s = 0; s < steps; s++)
 		{
 			dataset.packSamples(model.getInput(), model.getTarget());
 			model.forward(batch_size);
@@ -546,7 +547,7 @@ void test_mnist()
 			if (loss != loss)
 				break;
 		}
-		std::cout << "epoch " << e << ", loss = " << loss / 1000 << ", accuracy = " << acc / (1000 * batch_size) << '\n';
+		std::cout << "epoch " << e << ", loss = " << loss / steps << ", accuracy = " << acc / (steps * batch_size) << '\n';
 
 //		SerializedObject so;
 //		Json json = model.save(so);
@@ -561,7 +562,7 @@ void test_mnist()
 		FileSaver fs("mnist_network.bin");
 		fs.save(json, so, 2);
 	}
-//	return;
+	return;
 	model.makeNonTrainable();
 	{
 		SerializedObject so;

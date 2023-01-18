@@ -262,6 +262,14 @@ namespace ml
 		for (int i = 0; i < numberOfNodes(); i++)
 			getNode(i).getLayer().learn();
 	}
+	void Graph::setLearningRate(float lr)
+	{
+		for (int i = 0; i < numberOfNodes(); i++)
+		{
+			getNode(i).getLayer().getWeights().getOptimizer().setLearningRate(lr);
+			getNode(i).getLayer().getBias().getOptimizer().setLearningRate(lr);
+		}
+	}
 
 	void Graph::print() const
 	{

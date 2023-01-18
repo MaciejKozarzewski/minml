@@ -67,7 +67,7 @@ namespace
 		__shared__ float workspace[1024];
 		__shared__ cg::block_tile_memory<128> btm;
 		cg::thread_block thb = cg::this_thread_block(btm);
-		cg::thread_block_tile<128> tile = cg::tiled_partition<128>(thb);
+		cg::thread_block_tile < 128 > tile = cg::tiled_partition < 128 > (thb);
 
 		for (int i = blockIdx.x; i < first_dim; i += gridDim.x)
 		{
@@ -165,8 +165,15 @@ namespace ml
 			}
 			case ACTIVATION_SOFTMAX:
 			{
-				const int first_dim = get_first_dim(shape);
-				const int last_dim = volume_without_first_dim(shape);
+				int first_dim = get_first_dim(shape);
+				int last_dim = get_last_dim(shape);
+				if (shape.rank == 4)
+				{
+					if (get_last_dim(shape) > 1)
+						first_dim = volume_without_last_dim(shape);
+					else
+						last_dim = volume_without_first_dim(shape);
+				}
 
 				if (last_dim == 3)
 				{

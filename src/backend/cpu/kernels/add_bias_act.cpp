@@ -89,8 +89,6 @@ namespace
 					tmp = max(Vector<T>::zero(), tmp);
 				tmp.store(ptr + j, last_dim - j);
 			}
-			if (act == ACTIVATION_SOFTMAX)
-				kernel_softmax_in_place(ptr, last_dim);
 		}
 	}
 }
@@ -125,8 +123,15 @@ namespace SIMD_NAMESPACE
 			}
 			case ACTIVATION_SOFTMAX:
 			{
-				const int first_dim = get_first_dim(shape);
-				const int last_dim = get_last_dim(shape);
+				int first_dim = get_first_dim(shape);
+				int last_dim = get_last_dim(shape);
+				if (shape.rank == 4)
+				{
+					if (get_last_dim(shape) > 1)
+						first_dim = volume_without_last_dim(shape);
+					else
+						last_dim = volume_without_first_dim(shape);
+				}
 				switch (dtype)
 				{
 					case DTYPE_BFLOAT16:
@@ -178,23 +183,8 @@ namespace SIMD_NAMESPACE
 			default:
 				break;
 		}
-
-//		const int first_dim = get_first_dim(shape);
-//		const int last_dim = get_last_dim(shape);
-//
-//		for (int i = 0; i < first_dim; i++)
-//		{
-//			float *ptr = getPointer<float>(input) + i * last_dim;
-//			for (int j = 0; j < last_dim; j++)
-//			{
-//				float tmp = ptr[j] + getPointer<float>(bias)[j];
-//				if (act == ACTIVATION_RELU)
-//					tmp = std::max(0.0f, tmp);
-//				ptr[j] = tmp;
-//			}
-//			if (act == ACTIVATION_SOFTMAX)
-//				kernel_softmax_in_place(ptr, last_dim);
-//		}
+		if (act == ACTIVATION_SOFTMAX)
+			cpu_kernel_activation_forward_in_place(context, dtype, shape, input, act);
 	}
 }
 

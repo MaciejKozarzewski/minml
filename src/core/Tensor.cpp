@@ -192,6 +192,10 @@ namespace ml
 	{
 		return m_shape[idx];
 	}
+	int Tensor::stride(int idx) const noexcept
+	{
+		return m_stride[idx];
+	}
 	const Shape& Tensor::shape() const noexcept
 	{
 		return m_shape;
@@ -276,9 +280,41 @@ namespace ml
 		}
 		ml::memset(device(), data(), 0, sizeInBytes(), tmp, sizeOf(dtype()));
 	}
+	void Tensor::copyToHost(const Context &context, void *ptr, size_t bytes) const
+	{
+		if (bytes > static_cast<size_t>(this->sizeInBytes()))
+			throw IllegalArgument(METHOD_NAME, "bytes", "must be lower than tensor size in bytes", bytes);
+		if (bytes == 0)
+			return; // no elements copied
+
+		if (context.device().isCPU())
+			ml::memcpy(Device::cpu(), ptr, 0, this->device(), this->data(), 0, bytes);
+		else
+		{
+			if (context.device() != this->device())
+				throw DeviceMismatch(METHOD_NAME, "context on " + context.device().toString() + ", Tensor on " + device().toString());
+			ml::memcpy_async(context, Device::cpu(), ptr, 0, this->device(), this->data(), 0, bytes);
+		}
+	}
+	void Tensor::copyFromHost(const Context &context, const void *ptr, size_t bytes)
+	{
+		if (bytes > static_cast<size_t>(this->sizeInBytes()))
+			throw IllegalArgument(METHOD_NAME, "bytes", "must be lower than tensor size in bytes", bytes);
+		if (bytes == 0)
+			return; // no elements copied
+
+		if (context.device().isCPU())
+			ml::memcpy(this->device(), this->data(), 0, Device::cpu(), ptr, 0, bytes);
+		else
+		{
+			if (context.device() != this->device())
+				throw DeviceMismatch(METHOD_NAME, "context on " + context.device().toString() + ", Tensor on " + device().toString());
+			ml::memcpy_async(context, this->device(), this->data(), 0, Device::cpu(), ptr, 0, bytes);
+		}
+	}
 	void Tensor::copyFrom(const Context &context, const Tensor &other)
 	{
-		this->copyFrom(context, other, this->volume());
+		this->copyFrom(context, other, other.volume());
 	}
 	void Tensor::copyFrom(const Context &context, const Tensor &other, size_t elements)
 	{

@@ -46,6 +46,11 @@ else()
 	target_sources(MinML PRIVATE 	"src/backend/cuda_dummy_backend.cpp")
 endif()
 
+if (WIN32)
+	target_compile_definitions(MinML PRIVATE BUILDING_DLL)
+	target_compile_definitions(${CUDA_BACKEND_NAME} PRIVATE BUILDING_DLL)
+endif()
+
 if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME AND BUILD_TESTING)
 	enable_testing()
 	include(GoogleTest)

@@ -79,11 +79,16 @@ namespace ml
 			{
 				switch (src_dtype)
 				{
+					case DTYPE_BFLOAT16:
+						if (dst != src)
+							kernel_convert<<<gridDim, blockDim, 0, stream>>>(getPointer<__nv_bfloat16 >(dst), getPointer<__nv_bfloat16 >(src),
+									elements);
+						break;
 					case DTYPE_FLOAT16:
-						kernel_convert<<<gridDim, blockDim, 0, stream>>>(getPointer<__nv_bfloat16>(dst), getPointer<half>(src), elements);
+						kernel_convert<<<gridDim, blockDim, 0, stream>>>(getPointer<__nv_bfloat16 >(dst), getPointer<half>(src), elements);
 						break;
 					case DTYPE_FLOAT32:
-						kernel_convert<<<gridDim, blockDim, 0, stream>>>(getPointer<__nv_bfloat16>(dst), getPointer<float>(src), elements);
+						kernel_convert<<<gridDim, blockDim, 0, stream>>>(getPointer<__nv_bfloat16 >(dst), getPointer<float>(src), elements);
 						break;
 					default:
 						break;
@@ -95,7 +100,11 @@ namespace ml
 				switch (src_dtype)
 				{
 					case DTYPE_BFLOAT16:
-						kernel_convert<<<gridDim, blockDim, 0, stream>>>(getPointer<half>(dst), getPointer<__nv_bfloat16>(src), elements);
+						kernel_convert<<<gridDim, blockDim, 0, stream>>>(getPointer<half>(dst), getPointer<__nv_bfloat16 >(src), elements);
+						break;
+					case DTYPE_FLOAT16:
+						if (dst != src)
+							kernel_convert<<<gridDim, blockDim, 0, stream>>>(getPointer<half>(dst), getPointer<half>(src), elements);
 						break;
 					case DTYPE_FLOAT32:
 						kernel_convert<<<gridDim, blockDim, 0, stream>>>(getPointer<half>(dst), getPointer<float>(src), elements);
@@ -110,10 +119,14 @@ namespace ml
 				switch (src_dtype)
 				{
 					case DTYPE_BFLOAT16:
-						kernel_convert<<<gridDim, blockDim, 0, stream>>>(getPointer<float>(dst), getPointer<__nv_bfloat16>(src), elements);
+						kernel_convert<<<gridDim, blockDim, 0, stream>>>(getPointer<float>(dst), getPointer<__nv_bfloat16 >(src), elements);
 						break;
 					case DTYPE_FLOAT16:
 						kernel_convert<<<gridDim, blockDim, 0, stream>>>(getPointer<float>(dst), getPointer<half>(src), elements);
+						break;
+					case DTYPE_FLOAT32:
+						if (dst != src)
+							kernel_convert<<<gridDim, blockDim, 0, stream>>>(getPointer<float>(dst), getPointer<float>(src), elements);
 						break;
 					default:
 						break;

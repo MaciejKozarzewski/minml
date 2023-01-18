@@ -15,10 +15,8 @@ namespace ml
 	class Context;
 	class Shape;
 	class Tensor;
-	enum class DataType
-	;
-	enum class ActivationType
-	;
+	enum class DataType;
+	enum class ActivationType;
 }
 
 namespace ml

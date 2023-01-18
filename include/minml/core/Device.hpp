@@ -14,8 +14,7 @@
 namespace ml /* forward declarations */
 {
 	class DeviceContext;
-	enum class DataType
-	;
+	enum class DataType;
 }
 
 namespace ml
@@ -48,6 +47,10 @@ namespace ml
 			std::string toString() const;
 			std::string info() const;
 
+			/*
+			 * \brief In MB.
+			 */
+			int memory() const;
 			static int numberOfCpuCores();
 			static int numberOfCudaDevices();
 			static void setNumberOfThreads(int t);

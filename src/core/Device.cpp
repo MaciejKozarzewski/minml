@@ -59,11 +59,11 @@ namespace ml
 	}
 	bool Device::isCPU() const noexcept
 	{
-		return m_type == DeviceType::CPU;
+		return type() == DeviceType::CPU;
 	}
 	bool Device::isCUDA() const noexcept
 	{
-		return m_type == DeviceType::CUDA;
+		return type() == DeviceType::CUDA;
 	}
 
 //flags
@@ -80,9 +80,21 @@ namespace ml
 		}
 	}
 
+	int Device::memory() const
+	{
+		switch (type())
+		{
+			case DeviceType::CPU:
+				return cpu_get_memory();
+			case DeviceType::CUDA:
+				return cuda_get_memory(index());
+			default:
+				return 0;
+		}
+	}
 	int Device::numberOfCpuCores()
 	{
-		static const int result = cpu_number_of_cores();
+		static const int result = cpu_get_number_of_cores();
 		return result;
 	}
 	int Device::numberOfCudaDevices()
@@ -109,7 +121,7 @@ namespace ml
 			case DeviceType::CPU:
 				return "CPU";
 			case DeviceType::CUDA:
-				return "CUDA:" + std::to_string(m_index);
+				return "CUDA:" + std::to_string(index());
 		}
 		return "Illegal device";
 	}

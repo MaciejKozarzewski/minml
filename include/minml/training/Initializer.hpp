@@ -8,8 +8,6 @@
 #ifndef MINML_TRAINING_INITIALIZER_HPP_
 #define MINML_TRAINING_INITIALIZER_HPP_
 
-#include <memory>
-
 class Json;
 class SerializedObject;
 namespace ml /* forward declarations */

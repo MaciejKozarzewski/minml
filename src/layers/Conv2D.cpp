@@ -242,6 +242,9 @@ namespace ml
 							Tensor(Shape(), dtype(), device()), m_activation);
 				else
 					winogradOutputTransform(context(), getWeightShape(), output_matrices, output, getBias().getParam(), input[1], m_activation);
+
+				if (m_activation == ActivationType::SOFTMAX)
+					activationForwardInPlace(context(), output, m_activation);
 				break;
 			}
 			case ConvolutionAlgorithm::WINOGRAD_FUSED:

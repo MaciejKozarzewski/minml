@@ -64,6 +64,7 @@ namespace ml
 
 			int rank() const noexcept;
 			int dim(int idx) const noexcept;
+			int stride(int idx) const noexcept;
 			int firstDim() const noexcept;
 			int lastDim() const noexcept;
 			int volume() const noexcept;
@@ -75,6 +76,8 @@ namespace ml
 			void convertTo(const Context &context, DataType newType);
 			void zeroall(const Context &context);
 			void setall(const Context &context, float value);
+			void copyToHost(const Context &context, void *ptr, size_t bytes) const;
+			void copyFromHost(const Context &context, const void *ptr, size_t bytes);
 			void copyFrom(const Context &context, const Tensor &other);
 			void copyFrom(const Context &context, const Tensor &other, size_t elements);
 

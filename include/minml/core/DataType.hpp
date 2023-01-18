@@ -18,7 +18,8 @@ namespace ml
 		UNKNOWN,
 		BFLOAT16,
 		FLOAT16,
-		FLOAT32
+		FLOAT32,
+		INT32
 	};
 
 	uint16_t convert_fp32_to_fp16(float x);
