@@ -124,7 +124,6 @@ namespace ml
 		result["param"] = m_param.serialize(binary_data);
 		if (isTrainable())
 		{
-			result["update"] = m_gradient.serialize(binary_data);
 			result["optimizer"] = m_optimizer.serialize(binary_data);
 			result["regularizer"] = m_regularizer.serialize(binary_data);
 		}
@@ -137,7 +136,6 @@ namespace ml
 		m_is_trainable = json["is trainable"];
 		if (isTrainable())
 		{
-			m_gradient.unserialize(json["update"], binary_data);
 			m_optimizer.unserialize(json["optimizer"], binary_data);
 			m_regularizer.unserialize(json["regularizer"], binary_data);
 		}
