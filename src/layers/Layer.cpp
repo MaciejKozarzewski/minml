@@ -218,22 +218,25 @@ namespace ml
 
 	std::unique_ptr<Layer> loadLayer(const Json &json, const SerializedObject &binary_data)
 	{
+		static const Add add;
+		static const BatchNormalization batchnorm;
 		static const Conv2D conv2d(0, 0);
 		static const Dense dense(0);
 		static const Input input;
-		static const Add add;
 
 		const std::string name = json["name"];
 		std::unique_ptr<Layer> result;
 
+		if (name == add.name())
+			result = add.clone(json);
+		if (name == batchnorm.name())
+			result = batchnorm.clone(json);
 		if (name == conv2d.name())
 			result = conv2d.clone(json);
 		if (name == dense.name())
 			result = dense.clone(json);
 		if (name == input.name())
 			result = input.clone(json);
-		if (name == add.name())
-			result = add.clone(json);
 
 		if (result == nullptr)
 			throw LogicError(METHOD_NAME, "unknown layer '" + static_cast<std::string>(json["name"]) + "'");
