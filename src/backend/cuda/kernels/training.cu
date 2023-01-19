@@ -58,7 +58,6 @@ namespace
 		for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < elements; i += gridDim.x * blockDim.x)
 			acc += cross_entropy(output[i], target[i]) - cross_entropy(target[i], target[i]);
 		const float sum = cg::reduce(tile, acc, cg::plus<float>());
-
 		if (threadIdx.x == 0)
 			workspace[blockIdx.x] = sum * inv_batch_size;
 	}
@@ -74,7 +73,6 @@ namespace
 		for (int i = threadIdx.x; i < elements; i += blockDim.x)
 			acc += workspace[i];
 		const float sum = cg::reduce(tile, acc, cg::plus<float>());
-
 		if (threadIdx.x == 0)
 			workspace[0] = sum;
 	}
@@ -196,7 +194,7 @@ namespace ml
 
 		dim3 blockDim(32, 32);
 		dim3 gridDim1((last_dim + 31) / 32, workspace_first_dim);
-		dim3 gridDim2((last_dim + 255) / 256);
+		dim3 gridDim2((last_dim + 31) / 32);
 		cudaStream_t stream = cuda::Context::getStream(context);
 
 		kernel_sum_over_first_dim<1> <<<gridDim1, blockDim, 0, stream>>>(workspace, getPointer<float>(src), first_dim, last_dim, beta);

@@ -67,7 +67,7 @@ namespace
 		__shared__ float workspace[1024];
 		__shared__ cg::block_tile_memory<128> btm;
 		cg::thread_block thb = cg::this_thread_block(btm);
-		cg::thread_block_tile < 128 > tile = cg::tiled_partition < 128 > (thb);
+		cg::thread_block_tile < 128 > tile = cg::tiled_partition<128>(thb);
 
 		for (int i = blockIdx.x; i < first_dim; i += gridDim.x)
 		{
@@ -86,7 +86,6 @@ namespace
 				partial_sum += workspace[j];
 			}
 			const float inv_sum = 1.0f / cg::reduce(tile, partial_sum, cg::plus<float>());
-
 			for (int j = tile.thread_rank(); j < last_dim; j += tile.size())
 				output[i * last_dim + j] = static_cast<T>(workspace[j] * inv_sum);
 		}
