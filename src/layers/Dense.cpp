@@ -106,6 +106,7 @@ namespace ml
 		}
 		else
 			gemm(context(), 'n', 't', output, flatten_input_tensor(input[0]), getWeights().getParam(), 1.0f, 0.0f);
+
 		if (isUsingBias())
 			addBiasAct(context(), output, getBias().getParam(), m_activation);
 		else

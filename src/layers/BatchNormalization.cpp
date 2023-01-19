@@ -94,10 +94,14 @@ namespace ml
 	{
 		assert(input.size() == 1);
 
-		if (input[0].shape().volumeWithoutLastDim() == 1 or not isTrainable())
-			batchnormInference(context(), input[0], output, getWeights().getParam(), m_activation);
-		else
+		if (isTrainable())
+		{
+			if (input[0].shape().volumeWithoutLastDim() == 1)
+				throw LogicError(METHOD_NAME, "cannot calculate batch normalization on tensor of shape " + input[0].shape().toString());
 			batchnormForward(context(), input[0], output, getWeights().getParam(), *m_running_stats, m_running_id, m_activation);
+		}
+		else
+			batchnormInference(context(), input[0], output, getWeights().getParam(), m_activation);
 	}
 	void BatchNormalization::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev,
 			Tensor &gradient_next)

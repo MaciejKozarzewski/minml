@@ -50,9 +50,9 @@ namespace ml
 	void Add::forward(const std::vector<Tensor> &input, Tensor &output)
 	{
 		assert(input.size() == m_input_shapes.size());
+		assert(input.size() == 2);
 
-		for (size_t i = 1; i < input.size(); i++)
-			addTensors(context(), output, input[0], input[i]);
+		addTensors(context(), output, input[0], input[1]);
 		activationForwardInPlace(context(), output, m_activation);
 	}
 	void Add::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next)

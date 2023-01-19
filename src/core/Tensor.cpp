@@ -408,6 +408,12 @@ namespace ml
 				std::memcpy(&x, tmp, sizeof(float));
 				return x;
 			}
+			case DataType::INT32:
+			{
+				int x;
+				std::memcpy(&x, tmp, sizeof(int));
+				return x;
+			}
 			default:
 				throw DataTypeMismatch(METHOD_NAME, "unknown data type");
 		}
@@ -425,6 +431,9 @@ namespace ml
 				break;
 			case DataType::FLOAT32:
 				std::memcpy(tmp, &value, sizeof(float));
+				break;
+			case DataType::INT32:
+				std::memcpy(tmp, &value, sizeof(int));
 				break;
 			default:
 				throw DataTypeMismatch(METHOD_NAME, "unknown data type");

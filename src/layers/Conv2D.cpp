@@ -252,18 +252,6 @@ namespace ml
 				break;
 			}
 		}
-		context().synchronize();
-//		for (int out = 0; out < output.shape()[0]; out++)
-//			for (int in = 0; in < output.shape()[3]; in++)
-//			{
-//				for (int i = 0; i < output.shape()[1]; i++)
-//				{
-//					for (int j = 0; j < output.shape()[2]; j++)
-//						std::cout << output.get( { out, i, j, in }) << ' ';
-//					std::cout << '\n';
-//				}
-//				std::cout << "------------------------------------\n";
-//			}
 	}
 	void Conv2D::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next)
 	{
@@ -328,7 +316,7 @@ namespace ml
 				Tensor gradient_next_matrix = gradient_next.view(
 						{ gradient_next.shape().volumeWithoutLastDim(), getWeightShape().volumeWithoutLastDim() });
 				gemm(context(), 'n', 'n', gradient_prev_matrix, gradient_next_matrix, weight_matrix, 1, 0);
-
+//
 				Tensor input_matrix = input[0].view( { input[0].shape().volumeWithoutLastDim(), input[0].lastDim() });
 				Tensor weight_update_matrix = getWeights().getGradient().view(
 						{ getWeightShape().firstDim(), getWeightShape().volumeWithoutFirstDim() });
