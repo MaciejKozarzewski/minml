@@ -57,15 +57,21 @@ namespace
 
 namespace ml
 {
-	void unpackInput(const Context &context, const Shape &shape, DataType dst_dtype, void *dst, const void *src)
+	void unpackInput(const Context &context, Tensor &dst, const Tensor &src)
 	{
+		assert(src.dtype() == DataType::INT32);
+		assert(src.lastDim() == 1);
+		assert(dst.dim(0) == src.dim(0));
+		assert(dst.dim(1) == src.dim(1));
+		assert(dst.dim(2) == src.dim(2));
+
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
-				cpu_unpack_input(get(context), get(shape), get(dst_dtype), dst, reinterpret_cast<const unsigned int*>(src));
+				cpu_unpack_input(get(context), get_shape(dst), get(dst.dtype()), dst.data(), src.data());
 				break;
 			case DeviceType::CUDA:
-				cuda_unpack_input(get(context), get(shape), get(dst_dtype), dst, reinterpret_cast<const unsigned int*>(src));
+				cuda_unpack_input(get(context), get_shape(dst), get(dst.dtype()), dst.data(), src.data());
 				break;
 		}
 	}

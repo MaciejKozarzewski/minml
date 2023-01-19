@@ -21,7 +21,7 @@ namespace ml
 
 namespace ml
 {
-	void unpackInput(const Context &context, const Shape &shape, DataType dst_dtype, void *dst, const void *src);
+	void unpackInput(const Context &context, Tensor &dst, const Tensor &src);
 	void convertType(const Context &context, void *dst, DataType dst_dtype, const void *src, DataType src_dtype, int elements);
 
 	void winogradWeightTransform(const Context &context, const Tensor &weights, Tensor &matrices, bool invert, bool low_precision);
