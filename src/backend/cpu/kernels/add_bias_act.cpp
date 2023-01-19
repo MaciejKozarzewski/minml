@@ -74,7 +74,7 @@ namespace
 	{
 		assert(input != nullptr);
 		assert(bias != nullptr);
-		const int first_dim = get_first_dim(shape);
+		const int first_dim = volume_without_last_dim(shape);
 		const int last_dim = get_last_dim(shape);
 
 		for (int i = 0; i < first_dim; i++)
