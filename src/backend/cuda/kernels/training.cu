@@ -56,7 +56,7 @@ namespace
 
 		float acc = 0.0f;
 		for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < elements; i += gridDim.x * blockDim.x)
-			acc += cross_entropy(output[i], target[i]) - cross_entropy(target[i], target[i]);
+			acc += max(0.0f, cross_entropy(output[i], target[i]) - cross_entropy(target[i], target[i]));
 		const float sum = cg::reduce(tile, acc, cg::plus<float>());
 		if (threadIdx.x == 0)
 			workspace[blockIdx.x] = sum * inv_batch_size;

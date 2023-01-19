@@ -105,7 +105,7 @@ namespace ml
 
 		float result = 0.0f;
 		for (int i = 0; i < elements; i++)
-			result += cross_entropy(output_ptr[i], target_ptr[i]) - cross_entropy(target_ptr[i], target_ptr[i]);
+			result += std::max(0.0f, cross_entropy(output_ptr[i], target_ptr[i]) - cross_entropy(target_ptr[i], target_ptr[i]));
 		return result * inv_batch_size;
 	}
 	void cpu_cross_entropy_gradient(mlContext_t context, mlShape_t shape, void *gradient, const void *output, const void *target)
