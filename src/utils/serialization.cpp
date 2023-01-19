@@ -64,12 +64,18 @@ uint8_t* SerializedObject::data() noexcept
 
 void SerializedObject::save(const void *src, size_t size_in_bytes)
 {
+	if (size_in_bytes == 0)
+		return;
+
 	assert(src != nullptr);
 	const char *ptr = reinterpret_cast<const char*>(src);
 	m_data.insert(m_data.end(), ptr, ptr + size_in_bytes);
 }
 void SerializedObject::load(void *dst, size_t offset, size_t size_in_bytes) const
 {
+	if (size_in_bytes == 0)
+		return;
+
 	assert(dst != nullptr);
 	assert(offset + size_in_bytes <= m_data.size());
 	char *ptr = reinterpret_cast<char*>(dst);
