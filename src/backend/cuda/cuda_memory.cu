@@ -206,6 +206,23 @@ namespace ml
 			}
 		}
 	}
+	void cuda_memcpy_within_device(mlContext_t context, void *dst, int dst_offset, const void *src, int count)
+	{
+		assert(dst != nullptr);
+		assert(src != nullptr);
+		if (context == nullptr)
+		{
+			cudaError_t status = cudaMemcpy(reinterpret_cast<uint8_t*>(dst) + dst_offset, src, count, cudaMemcpyDeviceToDevice);
+			assert(status == cudaSuccess);
+		}
+		else
+		{
+			cudaError_t status = cudaMemcpyAsync(reinterpret_cast<uint8_t*>(dst) + dst_offset, src, count, cudaMemcpyDeviceToDevice,
+					cuda::Context::getStream(context));
+			assert(status == cudaSuccess);
+
+		}
+	}
 	void cuda_memcpy_from_host(mlContext_t context, void *dst, int dst_offset, const void *src, int count)
 	{
 		assert(dst != nullptr);

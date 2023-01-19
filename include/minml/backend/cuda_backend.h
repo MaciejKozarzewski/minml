@@ -40,6 +40,7 @@ namespace ml
 		DLL_PUBLIC void cuda_free(void *ptr);
 		DLL_PUBLIC void* cuda_view(void *src, int offset, int count);
 		DLL_PUBLIC void cuda_memset(mlContext_t context, void *dst, int dst_offset, int dst_count, const void *src, int src_count);
+		DLL_PUBLIC void cuda_memcpy_within_device(mlContext_t context, void *dst, int dst_offset, const void *src, int count);
 		DLL_PUBLIC void cuda_memcpy_from_host(mlContext_t context, void *dst, int dst_offset, const void *src, int count);
 		DLL_PUBLIC void cuda_memcpy_to_host(mlContext_t context, void *dst, const void *src, int src_offset, int count);
 

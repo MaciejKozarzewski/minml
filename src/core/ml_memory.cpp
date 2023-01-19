@@ -78,9 +78,14 @@ namespace
 						cuda_memcpy_to_host(context, apply_offset(dst_ptr, dst_offset), src_ptr, src_offset, count);
 						break;
 					case DeviceType::CUDA: // CUDA -> CUDA
-						std::unique_ptr<uint8_t[]> buffer = std::make_unique<uint8_t[]>(count);
-						cuda_memcpy_to_host(context, buffer.get(), src_ptr, src_offset, count);
-						cuda_memcpy_from_host(context, dst_ptr, dst_offset, buffer.get(), count);
+						if (dst_device == src_device)
+							cuda_memcpy_within_device(context, dst_ptr, dst_offset, src_ptr, count);
+						else
+						{ // copy between devices must go via host (TODO unless devices support peer-to-peer transfer)
+							std::unique_ptr<uint8_t[]> buffer = std::make_unique<uint8_t[]>(count);
+							cuda_memcpy_to_host(context, buffer.get(), src_ptr, src_offset, count);
+							cuda_memcpy_from_host(context, dst_ptr, dst_offset, buffer.get(), count);
+						}
 						break;
 				}
 				break;
