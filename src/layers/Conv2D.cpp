@@ -242,9 +242,6 @@ namespace ml
 							Tensor(Shape(), dtype(), device()), m_activation);
 				else
 					winogradOutputTransform(context(), getWeightShape(), output_matrices, output, getBias().getParam(), input[1], m_activation);
-
-				if (m_activation == ActivationType::SOFTMAX)
-					activationForwardInPlace(context(), output, m_activation);
 				break;
 			}
 			case ConvolutionAlgorithm::WINOGRAD_FUSED:
@@ -316,7 +313,7 @@ namespace ml
 				Tensor gradient_next_matrix = gradient_next.view(
 						{ gradient_next.shape().volumeWithoutLastDim(), getWeightShape().volumeWithoutLastDim() });
 				gemm(context(), 'n', 'n', gradient_prev_matrix, gradient_next_matrix, weight_matrix, 1, 0);
-//
+
 				Tensor input_matrix = input[0].view( { input[0].shape().volumeWithoutLastDim(), input[0].lastDim() });
 				Tensor weight_update_matrix = getWeights().getGradient().view(
 						{ getWeightShape().firstDim(), getWeightShape().volumeWithoutFirstDim() });
