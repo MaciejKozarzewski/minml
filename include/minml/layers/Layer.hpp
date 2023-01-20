@@ -31,6 +31,7 @@ namespace ml
 	enum class ActivationType
 	{
 		LINEAR,
+		TANH,
 		RELU,
 		SOFTMAX
 	};

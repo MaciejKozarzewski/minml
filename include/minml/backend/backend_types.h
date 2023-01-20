@@ -50,6 +50,7 @@ namespace ml
 		typedef enum
 		{
 			ACTIVATION_LINEAR,
+			ACTIVATION_TANH,
 			ACTIVATION_RELU,
 			ACTIVATION_SOFTMAX
 		} mlActivationType_t;

@@ -52,6 +52,23 @@ namespace
 	}
 
 	template<typename T>
+	void kernel_tanh_in_place(T *ptr, int length)
+	{
+		for (int i = 0; i < length; i += Vector<T>::length)
+		{
+			Vector<T> tmp(ptr + i, length - i);
+			tmp = tanh(tmp);
+			tmp.store(ptr + i, length - i);
+		}
+	}
+	template<typename T>
+	void kernel_tanh_backward_in_place(T *gradient, const T *output, int length)
+	{
+		for (int i = 0; i < length; i++)
+			gradient[i] *= (1.0f - output[i] * output[i]);
+	}
+
+	template<typename T>
 	void kernel_relu_in_place(T *ptr, int length)
 	{
 		for (int i = 0; i < length; i += Vector<T>::length)
@@ -87,6 +104,8 @@ namespace
 				tmp += b;
 				if (act == ACTIVATION_RELU)
 					tmp = max(Vector<T>::zero(), tmp);
+				if (act == ACTIVATION_TANH)
+					tmp = tanh(tmp);
 				tmp.store(ptr + j, last_dim - j);
 			}
 		}
@@ -103,6 +122,24 @@ namespace SIMD_NAMESPACE
 		{
 			case ACTIVATION_LINEAR:
 				break;
+			case ACTIVATION_TANH:
+			{
+				switch (dtype)
+				{
+					case DTYPE_BFLOAT16:
+						kernel_tanh_in_place(getPointer<bfloat16>(input), volume(shape));
+						break;
+					case DTYPE_FLOAT16:
+						kernel_tanh_in_place(getPointer<float16>(input), volume(shape));
+						break;
+					case DTYPE_FLOAT32:
+						kernel_tanh_in_place(getPointer<float>(input), volume(shape));
+						break;
+					default:
+						break;
+				}
+				break;
+			}
 			case ACTIVATION_RELU:
 			{
 				switch (dtype)
@@ -158,6 +195,9 @@ namespace SIMD_NAMESPACE
 		switch (act)
 		{
 			case ACTIVATION_LINEAR:
+				break;
+			case ACTIVATION_TANH:
+				kernel_tanh_backward_in_place(getPointer<float>(gradient), getPointer<float>(output), volume(shape));
 				break;
 			case ACTIVATION_RELU:
 				kernel_relu_backward_in_place(getPointer<float>(gradient), getPointer<float>(output), volume(shape));

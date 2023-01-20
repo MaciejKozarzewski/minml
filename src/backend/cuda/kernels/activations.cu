@@ -67,7 +67,7 @@ namespace
 		__shared__ float workspace[1024];
 		__shared__ cg::block_tile_memory<128> btm;
 		cg::thread_block thb = cg::this_thread_block(btm);
-		cg::thread_block_tile < 128 > tile = cg::tiled_partition<128>(thb);
+		cg::thread_block_tile < 128 > tile = cg::tiled_partition < 128 > (thb);
 
 		for (int i = blockIdx.x; i < first_dim; i += gridDim.x)
 		{
@@ -89,6 +89,22 @@ namespace
 			for (int j = tile.thread_rank(); j < last_dim; j += tile.size())
 				output[i * last_dim + j] = static_cast<T>(workspace[j] * inv_sum);
 		}
+	}
+
+	template<typename T>
+	__global__ void kernel_tanh_forward_in_place(T *output, int length)
+	{
+		for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < length; i += gridDim.x * blockDim.x)
+		{
+			Vector<T> tmp(output + i, length - i);
+			tmp = vectors::tanh(tmp);
+			tmp.store(output + i, length - i);
+		}
+	}
+	__global__ void kernel_tanh_backward_in_place(float *gradient, const float *output, int length)
+	{
+		for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < length; i += gridDim.x * blockDim.x)
+			gradient[i] *= (1.0f - output[i] * output[i]);
 	}
 
 	template<typename T>
@@ -125,7 +141,9 @@ namespace
 				Vector<T> tmp = input_wrapper.load(i, j);
 				tmp += _bias;
 				if (act == ml::ACTIVATION_RELU)
-					tmp = max(vector_zero<T>(), tmp);
+					tmp = vectors::max(vector_zero<T>(), tmp);
+				if (act == ml::ACTIVATION_TANH)
+					tmp = vectors::tanh(tmp);
 				input_wrapper.store(tmp, i, j);
 			}
 		}
@@ -143,6 +161,25 @@ namespace ml
 		{
 			case ACTIVATION_LINEAR:
 				break;
+			case ACTIVATION_TANH:
+			{
+				dim3 blockDim(256);
+				dim3 gridDim = cuda::gridSize<1024>(volume(shape), 256);
+				switch (dtype)
+				{
+					case DTYPE_BFLOAT16:
+						kernel_tanh_forward_in_place<<<gridDim, blockDim, 0, stream>>>(getPointer<__nv_bfloat16 >(input), volume(shape));
+						break;
+					case DTYPE_FLOAT16:
+						kernel_tanh_forward_in_place<<<gridDim, blockDim, 0, stream>>>(getPointer<half>(input), volume(shape));
+						break;
+					case DTYPE_FLOAT32:
+						kernel_tanh_forward_in_place<<<gridDim, blockDim, 0, stream>>>(getPointer<float>(input), volume(shape));
+						break;
+				}
+
+				break;
+			}
 			case ACTIVATION_RELU:
 			{
 				dim3 blockDim(256);
@@ -224,6 +261,14 @@ namespace ml
 		{
 			case ACTIVATION_LINEAR:
 				break;
+			case ACTIVATION_TANH:
+			{
+				dim3 blockDim(256);
+				dim3 gridDim = cuda::gridSize<1024>(volume(shape), 256);
+				kernel_tanh_backward_in_place<<<gridDim, blockDim, 0, stream>>>(getPointer<float>(gradient), getPointer<float>(output),
+						volume(shape));
+				break;
+			}
 			case ACTIVATION_RELU:
 			{
 				dim3 blockDim(256);

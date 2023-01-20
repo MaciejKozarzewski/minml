@@ -168,7 +168,9 @@ namespace
 							if (bias != nullptr)
 								tmp += bias_value;
 							if (activation == ACTIVATION_RELU)
-								tmp = max(vector_zero<T>(), tmp);
+								tmp = vectors::max(vector_zero<T>(), tmp);
+							if (activation == ACTIVATION_TANH)
+								tmp = vectors::tanh(tmp);
 
 							output_wrapper.store(tmp, blockIdx.z, h, w, f);
 						}

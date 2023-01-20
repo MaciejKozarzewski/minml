@@ -37,6 +37,8 @@ namespace ml
 			default:
 			case ActivationType::LINEAR:
 				return "linear";
+			case ActivationType::TANH:
+				return "tanh";
 			case ActivationType::RELU:
 				return "relu";
 			case ActivationType::SOFTMAX:
@@ -47,6 +49,8 @@ namespace ml
 	{
 		if (str == "linear")
 			return ActivationType::LINEAR;
+		if (str == "tanh")
+			return ActivationType::TANH;
 		if (str == "relu")
 			return ActivationType::RELU;
 		if (str == "softmax")

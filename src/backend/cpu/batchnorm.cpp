@@ -12,6 +12,7 @@
 
 #include <cmath>
 #include <cassert>
+#include <iostream>
 
 namespace
 {
@@ -85,6 +86,8 @@ namespace ml
 				float tmp = input_ptr[i * last_dim + j] * scale_ptr[j] + shift_ptr[j];
 				if (act == ACTIVATION_RELU)
 					tmp = std::max(0.0f, tmp);
+				if (act == ACTIVATION_TANH)
+					tmp = std::tanh(tmp);
 				output_ptr[i * last_dim + j] = tmp;
 			}
 	}
@@ -140,6 +143,8 @@ namespace ml
 						/ get_stddev(running_stat_ptr, j, last_dim) + beta[j];
 				if (act == ACTIVATION_RELU)
 					tmp = std::max(0.0f, tmp);
+				if (act == ACTIVATION_TANH)
+					tmp = std::tanh(tmp);
 				output_ptr[i * last_dim + j] = tmp;
 			}
 	}
@@ -187,6 +192,8 @@ namespace ml
 				const int idx = i * last_dim + j;
 				if (act == ACTIVATION_RELU and output_ptr[idx] <= 0.0f)
 					gradient_next_ptr[idx] = 0.0f;
+				if (act == ACTIVATION_TANH)
+					gradient_next_ptr[idx] *= (1.0f - square(output_ptr[idx]));
 
 				d_sigma[j] += gradient_next_ptr[idx] * (input_ptr[idx] - mean_ptr[j]) / std::sqrt(variance_ptr[j] + epsilon);
 				d_mu[j] += gradient_next_ptr[idx];
@@ -281,7 +288,6 @@ namespace ml
 			for (int j = 0; j < last_dim; j++)
 				getPointer<float>(layer_weights)[i * last_dim + j] *= scale;
 		}
-
 	}
 } /* namespace ml */
 

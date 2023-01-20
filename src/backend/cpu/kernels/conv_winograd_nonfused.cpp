@@ -249,6 +249,9 @@ namespace
 						if (activation == ACTIVATION_RELU)
 							for (int i = 0; i < transformed.length(); i++)
 								transformed[i] = max(Vector<T>::zero(), transformed[i]);
+						if (activation == ACTIVATION_TANH)
+							for (int i = 0; i < transformed.length(); i++)
+								transformed[i] = tanh(transformed[i]);
 
 						transformed.store_row(ptr_out, col, out, elements_left, TransformSize);
 					}

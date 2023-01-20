@@ -135,6 +135,8 @@ namespace
 				float tmp = input[i * shape.y + tid] * scale + shift;
 				if (act == ACTIVATION_RELU)
 					tmp = max(0.0f, tmp);
+				if (act == ACTIVATION_TANH)
+					tmp = tanh(tmp);
 				output[i * shape.y + tid] = tmp;
 			}
 		}
@@ -158,6 +160,8 @@ namespace
 				float tmp = input[i * shape.y + tid] * scale + shift;
 				if (act == ACTIVATION_RELU)
 					tmp = max(0.0f, tmp);
+				if (act == ACTIVATION_TANH)
+					tmp = tanh(tmp);
 				output[i * shape.y + tid] = tmp;
 			}
 		}
@@ -180,6 +184,8 @@ namespace
 				const int tmp_idx = i * shape.y + tid;
 				if (act == ACTIVATION_RELU and output[tmp_idx] <= 0.0f)
 					gradient_next[tmp_idx] = 0.0f;
+				if (act == ACTIVATION_TANH)
+					gradient_next[tmp_idx] *= (1.0f - square(output[tmp_idx]));
 				d_sigma_acc += gradient_next[tmp_idx] * (input[tmp_idx] - mean) / stddev;
 				d_mu_acc += gradient_next[tmp_idx];
 			}
