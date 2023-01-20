@@ -362,6 +362,8 @@ namespace ml
 			getNode(i).getLayer().loadParameters(json[i]["layer"], binary_data);
 			m_is_trainable |= getNode(i).getLayer().isTrainable();
 		}
+		if (isTrainable())
+			m_targets = std::vector<std::unique_ptr<Tensor>>(numberOfOutputs());
 	}
 
 	GraphNodeID Graph::add_node(const Layer &layer, const std::vector<GraphNodeID> &inputs)
