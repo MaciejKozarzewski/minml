@@ -39,6 +39,7 @@ namespace ml
 
 			std::vector<std::unique_ptr<GraphNode>> m_nodes;
 			std::vector<std::unique_ptr<Tensor>> m_targets;
+			std::vector<float> m_target_weights;
 
 			std::vector<GraphNode*> m_input_nodes; // non-owning
 			std::vector<GraphNode*> m_output_nodes; // non-owning
@@ -63,7 +64,7 @@ namespace ml
 			GraphNodeID addInput(const Shape &shape);
 			GraphNodeID add(const Layer &layer, GraphNodeID node);
 			GraphNodeID add(const Layer &layer, std::initializer_list<GraphNodeID> nodes);
-			void addOutput(GraphNodeID node);
+			void addOutput(GraphNodeID node, float weight = 1.0f);
 
 			const Tensor& getInput(int index = 0) const;
 			const Tensor& getOutput(int index = 0) const;

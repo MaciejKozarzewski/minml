@@ -230,14 +230,14 @@ namespace ml
 		assert(status == cudaSuccess);
 		return result;
 	}
-	void cuda_cross_entropy_gradient(mlContext_t context, mlShape_t shape, void *gradient, const void *output, const void *target)
+	void cuda_cross_entropy_gradient(mlContext_t context, mlShape_t shape, void *gradient, const void *output, const void *target, float weight)
 	{
 		assert(output != nullptr);
 		assert(target != nullptr);
 		assert(gradient != nullptr);
 
 		const int length = volume(shape);
-		const float inv_batch_size = 1.0f / get_first_dim(shape);
+		const float inv_batch_size = weight / get_first_dim(shape);
 
 		assert(cuda::Context::getWorkspaceSize(context) >= 4096 * sizeof(float));
 

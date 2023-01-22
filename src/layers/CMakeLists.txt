@@ -4,4 +4,5 @@ target_sources(MinML PRIVATE 	Add.cpp
 								Dense.cpp
 								Input.cpp
 								Layer.cpp
-								Parameter.cpp)
+								Parameter.cpp
+								Softmax.cpp)

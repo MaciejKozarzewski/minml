@@ -12,6 +12,7 @@
 
 #include <cmath>
 #include <cassert>
+#include <iostream>
 
 namespace
 {
@@ -108,7 +109,7 @@ namespace ml
 			result += std::max(0.0f, cross_entropy(output_ptr[i], target_ptr[i]) - cross_entropy(target_ptr[i], target_ptr[i]));
 		return result * inv_batch_size;
 	}
-	void cpu_cross_entropy_gradient(mlContext_t context, mlShape_t shape, void *gradient, const void *output, const void *target)
+	void cpu_cross_entropy_gradient(mlContext_t context, mlShape_t shape, void *gradient, const void *output, const void *target, float weight)
 	{
 		assert(output != nullptr);
 		assert(target != nullptr);
@@ -120,7 +121,7 @@ namespace ml
 		const float *output_ptr = getPointer<float>(output);
 		const float *target_ptr = getPointer<float>(target);
 
-		const float inv_batch_size = 1.0f / get_first_dim(shape);
+		const float inv_batch_size = weight / get_first_dim(shape);
 
 		for (int i = 0; i < elements; i++)
 			gradient_ptr[i] = inv_batch_size * (output_ptr[i] - target_ptr[i]);
