@@ -58,6 +58,9 @@ namespace ml
 
 		switch (dst_dtype)
 		{
+			case DTYPE_BFLOAT16:
+				kernel_unpack_input<<<gridDim, 32, 0, stream>>>(getPointer<__nv_bfloat16 >(dst), getPointer<uint32_t>(src), first_dim);
+				break;
 			case DTYPE_FLOAT16:
 				kernel_unpack_input<<<gridDim, 32, 0, stream>>>(getPointer<half>(dst), getPointer<uint32_t>(src), first_dim);
 				break;
@@ -73,17 +76,19 @@ namespace ml
 		dim3 gridDim = cuda::gridSize<1024>(elements, 256);
 		cudaStream_t stream = cuda::Context::getStream(context);
 
+		if (dst_dtype == src_dtype and dst != src)
+		{ // same type, different locations, can just copy memory
+			cudaError_t status = cudaMemcpy(dst, src, elements * size_of(dst_dtype), cudaMemcpyDeviceToDevice);
+			assert(status == cudaSuccess);
+			return;
+		}
+
 		switch (dst_dtype)
 		{
 			case DTYPE_BFLOAT16:
 			{
 				switch (src_dtype)
 				{
-					case DTYPE_BFLOAT16:
-						if (dst != src)
-							kernel_convert<<<gridDim, blockDim, 0, stream>>>(getPointer<__nv_bfloat16 >(dst), getPointer<__nv_bfloat16 >(src),
-									elements);
-						break;
 					case DTYPE_FLOAT16:
 						kernel_convert<<<gridDim, blockDim, 0, stream>>>(getPointer<__nv_bfloat16 >(dst), getPointer<half>(src), elements);
 						break;
@@ -101,10 +106,6 @@ namespace ml
 				{
 					case DTYPE_BFLOAT16:
 						kernel_convert<<<gridDim, blockDim, 0, stream>>>(getPointer<half>(dst), getPointer<__nv_bfloat16 >(src), elements);
-						break;
-					case DTYPE_FLOAT16:
-						if (dst != src)
-							kernel_convert<<<gridDim, blockDim, 0, stream>>>(getPointer<half>(dst), getPointer<half>(src), elements);
 						break;
 					case DTYPE_FLOAT32:
 						kernel_convert<<<gridDim, blockDim, 0, stream>>>(getPointer<half>(dst), getPointer<float>(src), elements);
@@ -124,10 +125,6 @@ namespace ml
 					case DTYPE_FLOAT16:
 						kernel_convert<<<gridDim, blockDim, 0, stream>>>(getPointer<float>(dst), getPointer<half>(src), elements);
 						break;
-					case DTYPE_FLOAT32:
-						if (dst != src)
-							kernel_convert<<<gridDim, blockDim, 0, stream>>>(getPointer<float>(dst), getPointer<float>(src), elements);
-						break;
 					default:
 						break;
 				}
@@ -136,11 +133,6 @@ namespace ml
 			default:
 				break;
 		}
-
-//		if (dst_dtype == DTYPE_FLOAT16 and src_dtype == DTYPE_FLOAT32)
-//			kernel_convert<<<gridDim, blockDim, 0, stream>>>(getPointer<half>(dst), getPointer<float>(src), elements);
-//		if (dst_dtype == DTYPE_FLOAT32 and src_dtype == DTYPE_FLOAT16)
-//			kernel_convert<<<gridDim, blockDim, 0, stream>>>(getPointer<float>(dst), getPointer<half>(src), elements);
 		assert(cudaGetLastError() == cudaSuccess);
 	}
 } /* namespace ml */

@@ -9,6 +9,7 @@
 #include <minml/backend/backend_utils.hpp>
 
 #include "../vectors/vectors.hpp"
+#include "../vectors/vector_conversion.hpp"
 
 #include <type_traits>
 
@@ -16,56 +17,17 @@ namespace
 {
 	using namespace SIMD_NAMESPACE;
 
-	template<typename SrcType, typename DstType>
-	struct Converter
+	template<typename T, typename U>
+	void kernel_convert(T *dst, const U *src, const int elements)
 	{
-			void operator()(DstType *dst, const SrcType *src, int elements) const noexcept
-			{
-			}
-	};
-
-//	template<typename T>
-//	struct Converter<T, T>
-//	{
-//			void operator()(T *dst, const T *src, int elements) const noexcept
-//			{
-//				Vector<T>(src, elements).store(dst, elements);
-//			}
-//	};
-//
-//	template<>
-//	struct Converter<float, float16>
-//	{
-//			void operator()(float16 *dst, const float *src, int elements) const noexcept
-//			{
-//				Vector<float>(src, elements).store(dst, elements);
-//			}
-//	};
-//	template<>
-//	struct Converter<float, bfloat16>
-//	{
-//			void operator()(bfloat16 *dst, const float *src, int elements) const noexcept
-//			{
-//				Vector<float>(src, elements).store(dst, elements);
-//			}
-//	};
-//
-//	template<>
-//	struct Converter<float16, float>
-//	{
-//			void operator()(float *dst, const float16 *src, int elements) const noexcept
-//			{
-//				Vector<float>(src, elements).store(dst, elements);
-//			}
-//	};
-//	template<>
-//	struct Converter<float16, bfloat16>
-//	{
-//			void operator()(bfloat16 *dst, const float *src, int elements) const noexcept
-//			{
-//				Vector<bfloat16>(src, elements).store(dst, elements);
-//			}
-//	};
+		VectorConverter<T, U> convert;
+		for (int i = 0; i < elements; i += convert.length)
+		{
+			const int processed_elements = std::min(convert.length, elements - i);
+			const Vector<T> tmp = convert(Vector<U>(src + i, processed_elements));
+			tmp.store(dst + i, processed_elements);
+		}
+	}
 
 	template<typename T>
 	void kernel_unpack_input(T *dst, const uint32_t *src, int first_dim)
@@ -104,23 +66,23 @@ namespace SIMD_NAMESPACE
 	}
 	void cpu_kernel_convert_type(mlContext_t context, void *dst, mlDataType_t dst_dtype, const void *src, mlDataType_t src_dtype, int elements)
 	{
+		if (dst_dtype == src_dtype and dst != src)
+		{ // same type, different locations, can just copy memory
+			std::memcpy(dst, src, size_of(dst_dtype) * elements);
+			return;
+		}
+
 		switch (dst_dtype)
 		{
 			case DTYPE_BFLOAT16:
 			{
 				switch (src_dtype)
 				{
-					case DTYPE_BFLOAT16:
-						if (dst != src)
-							std::memcpy(dst, src, sizeof(bfloat16) * elements);
-						break;
 					case DTYPE_FLOAT16:
-						for (int i = 0; i < elements; i++)
-							getPointer<bfloat16>(dst)[i] = scalar::float_to_bfloat16(scalar::float16_to_float(getPointer<float16>(src)[i]));
+						kernel_convert(getPointer<bfloat16>(dst), getPointer<float16>(src), elements);
 						break;
 					case DTYPE_FLOAT32:
-						for (int i = 0; i < elements; i++)
-							getPointer<bfloat16>(dst)[i] = scalar::float_to_bfloat16(getPointer<float>(src)[i]);
+						kernel_convert(getPointer<bfloat16>(dst), getPointer<float>(src), elements);
 						break;
 					default:
 						break;
@@ -132,16 +94,10 @@ namespace SIMD_NAMESPACE
 				switch (src_dtype)
 				{
 					case DTYPE_BFLOAT16:
-						for (int i = 0; i < elements; i++)
-							getPointer<float16>(dst)[i] = scalar::float_to_float16(scalar::bfloat16_to_float(getPointer<bfloat16>(src)[i]));
-						break;
-					case DTYPE_FLOAT16:
-						if (dst != src)
-							std::memcpy(dst, src, sizeof(float16) * elements);
+						kernel_convert(getPointer<float16>(dst), getPointer<bfloat16>(src), elements);
 						break;
 					case DTYPE_FLOAT32:
-						for (int i = 0; i < elements; i++)
-							getPointer<float16>(dst)[i] = scalar::float_to_float16(getPointer<float>(src)[i]);
+						kernel_convert(getPointer<float16>(dst), getPointer<float>(src), elements);
 						break;
 					default:
 						break;
@@ -153,16 +109,10 @@ namespace SIMD_NAMESPACE
 				switch (src_dtype)
 				{
 					case DTYPE_BFLOAT16:
-						for (int i = 0; i < elements; i++)
-							getPointer<float>(dst)[i] = scalar::bfloat16_to_float(getPointer<bfloat16>(src)[i]);
+						kernel_convert(getPointer<float>(dst), getPointer<bfloat16>(src), elements);
 						break;
 					case DTYPE_FLOAT16:
-						for (int i = 0; i < elements; i++)
-							getPointer<float>(dst)[i] = scalar::float16_to_float(getPointer<float16>(src)[i]);
-						break;
-					case DTYPE_FLOAT32:
-						if (dst != src)
-							std::memcpy(dst, src, sizeof(float) * elements);
+						kernel_convert(getPointer<float>(dst), getPointer<float16>(src), elements);
 						break;
 					default:
 						break;
@@ -172,6 +122,63 @@ namespace SIMD_NAMESPACE
 			default:
 				break;
 		}
+
+//		switch (dst_dtype)
+//		{
+//			case DTYPE_BFLOAT16:
+//			{
+//				switch (src_dtype)
+//				{
+//					case DTYPE_FLOAT16:
+//						for (int i = 0; i < elements; i++)
+//							getPointer<bfloat16>(dst)[i] = scalar::float_to_bfloat16(scalar::float16_to_float(getPointer<float16>(src)[i]));
+//						break;
+//					case DTYPE_FLOAT32:
+//						for (int i = 0; i < elements; i++)
+//							getPointer<bfloat16>(dst)[i] = scalar::float_to_bfloat16(getPointer<float>(src)[i]);
+//						break;
+//					default:
+//						break;
+//				}
+//				break;
+//			}
+//			case DTYPE_FLOAT16:
+//			{
+//				switch (src_dtype)
+//				{
+//					case DTYPE_BFLOAT16:
+//						for (int i = 0; i < elements; i++)
+//							getPointer<float16>(dst)[i] = scalar::float_to_float16(scalar::bfloat16_to_float(getPointer<bfloat16>(src)[i]));
+//						break;
+//					case DTYPE_FLOAT32:
+//						for (int i = 0; i < elements; i++)
+//							getPointer<float16>(dst)[i] = scalar::float_to_float16(getPointer<float>(src)[i]);
+//						break;
+//					default:
+//						break;
+//				}
+//				break;
+//			}
+//			case DTYPE_FLOAT32:
+//			{
+//				switch (src_dtype)
+//				{
+//					case DTYPE_BFLOAT16:
+//						for (int i = 0; i < elements; i++)
+//							getPointer<float>(dst)[i] = scalar::bfloat16_to_float(getPointer<bfloat16>(src)[i]);
+//						break;
+//					case DTYPE_FLOAT16:
+//						for (int i = 0; i < elements; i++)
+//							getPointer<float>(dst)[i] = scalar::float16_to_float(getPointer<float16>(src)[i]);
+//						break;
+//					default:
+//						break;
+//				}
+//				break;
+//			}
+//			default:
+//				break;
+//		}
 	}
 }
 

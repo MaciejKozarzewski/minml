@@ -42,6 +42,19 @@ struct float16
 		}
 };
 
+template<typename T, typename U>
+T bitwise_cast(U x) noexcept
+{
+	static_assert(sizeof(T) == sizeof(U), "Cannot cast types of different sizes");
+	union
+	{
+			U u;
+			T t;
+	} tmp;
+	tmp.u = x;
+	return tmp.t;
+}
+
 namespace SIMD_NAMESPACE
 {
 #if SUPPORTS_AVX
@@ -125,14 +138,6 @@ namespace SIMD_NAMESPACE
 	}
 #endif
 
-	template<typename T, typename U>
-	inline constexpr T bitwise_cast(U x) noexcept
-	{
-		static_assert(sizeof(T) == sizeof(U));
-		T result;
-		std::memcpy(&result, &x, sizeof(T));
-		return result;
-	}
 #if SUPPORTS_SSE41
 	static inline int get_cutoff_mask(int num) noexcept
 	{

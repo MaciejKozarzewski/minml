@@ -21,14 +21,11 @@ namespace scalar
 	static inline float bfloat16_to_float(bfloat16 x) noexcept
 	{
 		const uint32_t bits = static_cast<uint32_t>(x.m_data) << 16;
-		float result;
-		std::memcpy(&result, &bits, sizeof(float));
-		return result;
+		return bitwise_cast<float>(bits);
 	}
 	static inline bfloat16 float_to_bfloat16(float x) noexcept
 	{
-		uint32_t bits;
-		std::memcpy(&bits, &x, sizeof(float));
+		const uint32_t bits = bitwise_cast<uint32_t>(x);
 		return bfloat16 { static_cast<uint16_t>(bits >> 16) };
 	}
 }
