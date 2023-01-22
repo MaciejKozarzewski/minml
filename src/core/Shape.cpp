@@ -55,25 +55,25 @@ namespace ml
 	}
 	int Shape::dim(int index) const
 	{
-		if (index < 0 || index >= m_rank)
+		if (index < 0 or index >= m_rank)
 			throw IndexOutOfBounds(METHOD_NAME, "index", index, m_rank);
 		return m_dim[index];
 	}
 	int& Shape::dim(int index)
 	{
-		if (index < 0 || index >= m_rank)
+		if (index < 0 or index >= m_rank)
 			throw IndexOutOfBounds(METHOD_NAME, "index", index, m_rank);
 		return m_dim[index];
 	}
 	int Shape::operator[](int index) const
 	{
-		if (index < 0 || index >= m_rank)
+		if (index < 0 or index >= m_rank)
 			throw IndexOutOfBounds(METHOD_NAME, "index", index, m_rank);
 		return m_dim[index];
 	}
 	int& Shape::operator[](int index)
 	{
-		if (index < 0 || index >= m_rank)
+		if (index < 0 or index >= m_rank)
 			throw IndexOutOfBounds(METHOD_NAME, "index", index, m_rank);
 		return m_dim[index];
 	}
@@ -132,9 +132,9 @@ namespace ml
 			return result;
 		}
 	}
-	int Shape::volume(std::initializer_list<int> dims) const
+	int Shape::volume(const std::vector<int> &dims) const
 	{
-		if (m_rank == 0 || dims.size() == 0)
+		if (m_rank == 0 or dims.size() == 0)
 			return 0;
 		else
 		{
@@ -142,7 +142,7 @@ namespace ml
 			for (int i = 0; i < static_cast<int>(dims.size()); i++)
 			{
 				int index = dims.begin()[i];
-				if (index < 0 || index >= m_rank)
+				if (index < 0 or index >= m_rank)
 					throw IndexOutOfBounds(METHOD_NAME, "index" + std::to_string(i), index, m_rank);
 				result *= m_dim[index];
 			}

@@ -13,6 +13,8 @@
 #include <minml/core/ml_exceptions.hpp>
 #include <minml/utils/testing_util.hpp>
 
+#include <cmath>
+
 namespace
 {
 	template<typename T>

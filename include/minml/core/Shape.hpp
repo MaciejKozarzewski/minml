@@ -46,7 +46,7 @@ namespace ml
 			int volume() const noexcept;
 			int volumeWithoutFirstDim() const noexcept;
 			int volumeWithoutLastDim() const noexcept;
-			int volume(std::initializer_list<int> dims) const;
+			int volume(const std::vector<int> &dims) const;
 
 			friend bool operator==(const Shape &lhs, const Shape &rhs) noexcept;
 			friend bool operator!=(const Shape &lhs, const Shape &rhs) noexcept;

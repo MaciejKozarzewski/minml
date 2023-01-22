@@ -76,6 +76,28 @@ namespace
 		return result;
 	}
 
+	float sum_for_test_fp32(const float *ptr, size_t length)
+	{
+		double result = 0.0;
+		for (size_t i = 0; i < length; i++)
+			result += ptr[i];
+		return result;
+	}
+	float sum_for_test_bf16(const uint16_t *ptr, size_t length)
+	{
+		double result = 0.0;
+		for (size_t i = 0; i < length; i++)
+			result += convert_bf16_to_fp32(ptr[i]);
+		return result;
+	}
+	float sum_for_test_fp16(const uint16_t *ptr, size_t length)
+	{
+		double result = 0.0;
+		for (size_t i = 0; i < length; i++)
+			result += convert_fp16_to_fp32(ptr[i]);
+		return result;
+	}
+
 	void abs_for_test_fp32(float *ptr, size_t length)
 	{
 		for (size_t i = 0; i < length; i++)
@@ -155,6 +177,23 @@ namespace ml
 					return norm_for_test_fp16(reinterpret_cast<uint16_t*>(tmp.data()), tmp.volume());
 				case DataType::FLOAT32:
 					return norm_for_test_fp32(reinterpret_cast<float*>(tmp.data()), tmp.volume());
+				case DataType::UNKNOWN:
+					throw DataTypeNotSupported(METHOD_NAME, tensor.dtype());
+			}
+			return 0.0;
+		}
+		double sumForTest(const Tensor &tensor)
+		{
+			Tensor tmp(tensor.shape(), tensor.dtype(), Device::cpu());
+			tmp.copyFrom(Context(), tensor);
+			switch (tmp.dtype())
+			{
+				case DataType::BFLOAT16:
+					return sum_for_test_bf16(reinterpret_cast<uint16_t*>(tmp.data()), tmp.volume());
+				case DataType::FLOAT16:
+					return sum_for_test_fp16(reinterpret_cast<uint16_t*>(tmp.data()), tmp.volume());
+				case DataType::FLOAT32:
+					return sum_for_test_fp32(reinterpret_cast<float*>(tmp.data()), tmp.volume());
 				case DataType::UNKNOWN:
 					throw DataTypeNotSupported(METHOD_NAME, tensor.dtype());
 			}
