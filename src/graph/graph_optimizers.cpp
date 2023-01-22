@@ -55,6 +55,7 @@ namespace ml
 					}
 					if (prev->getLayer().name() == dense.name())
 						static_cast<Dense&>(prev->getLayer()).useBias(true);
+					prev->getLayer().getBias().setTrainable(false);
 
 					if (prev->getLayer().name() == conv2d.name() or prev->getLayer().name() == dense.name())
 					{
