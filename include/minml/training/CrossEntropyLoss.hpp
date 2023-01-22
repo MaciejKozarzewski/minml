@@ -20,7 +20,9 @@ namespace ml
 
 	class CrossEntropyLoss
 	{
+			float m_weight;
 		public:
+			CrossEntropyLoss(float weight = 1.0f);
 			float getLoss(const Context &context,  const Tensor &output, const Tensor &target) const;
 			void getGradient(const Context &context, Tensor &gradient, const Tensor &output, const Tensor &target) const;
 			Json serialize(SerializedObject &binary_data) const;
