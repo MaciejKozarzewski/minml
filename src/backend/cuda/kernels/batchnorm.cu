@@ -40,73 +40,114 @@ namespace
 		return ptr[3 * last_dim + idx];
 	}
 
-	__device__ float square(float x)
+	template<typename T>
+	__device__ T square(T x)
 	{
 		return x * x;
 	}
 
-	__device__ void reduce_add_32x32_dual(float *ptr1, float *ptr2)
+	/*
+	 * Welford's online algorithm for calculating mean and variance
+	 */
+	template<typename T>
+	class AvgVarStats
+	{
+			T samples = static_cast<T>(0);
+			T M = static_cast<T>(0); // mean
+			T M2 = static_cast<T>(0); // variance
+		public:
+			__device__ void add(T x) noexcept
+			{
+				samples += static_cast<T>(1);
+				const T delta = x - M;
+				M += delta / samples;
+				M2 += delta * (x - M);
+			}
+			__device__ T get_average() const noexcept
+			{
+				return M;
+			}
+			__device__ T get_variance() const noexcept
+			{
+				assert(samples >= static_cast<T>(2));
+				return M2 / (samples - static_cast<T>(1));
+			}
+
+			__device__ void merge_with(const AvgVarStats<T> &rhs) noexcept
+			{
+				assert(this->samples >= static_cast<T>(0) && rhs.samples >= static_cast<T>(0));
+				if (rhs.samples == static_cast<T>(0))
+					return;
+				if (this->samples == static_cast<T>(0))
+				{
+					this->samples = rhs.samples;
+					this->M = rhs.M;
+					this->M2 = rhs.M2;
+				}
+				else
+				{
+					const T total_samples = this->samples + rhs.samples;
+					const T total_M = (this->samples * this->M + rhs.samples * rhs.M) / total_samples;
+					const T total_M2 = this->M2 + rhs.M2 + square(this->M - rhs.M) * (this->samples * rhs.samples) / total_samples;
+					this->samples = total_samples;
+					this->M = total_M;
+					this->M2 = total_M2;
+				}
+			}
+	};
+
+	using namespace ml;
+	__device__ void combine_stats(AvgVarStats<float> *stats)
 	{
 		assert(blockDim.x == 32 && blockDim.y == 32);
-		for (int i = 16; i >= 1; i /= 2) // sum results stored in temporary array
+		for (int i = 16; i >= 1; i /= 2)
 		{
 			if (threadIdx.y < i)
-			{
-				ptr1[threadIdx.y * 32 + threadIdx.x] += ptr1[(i + threadIdx.y) * 32 + threadIdx.x];
-				ptr2[threadIdx.y * 32 + threadIdx.x] += ptr2[(i + threadIdx.y) * 32 + threadIdx.x];
-			}
+				stats[threadIdx.y * 32 + threadIdx.x].merge_with(stats[(i + threadIdx.y) * 32 + threadIdx.x]);
 			__syncthreads();
 		}
 	}
-
-	using namespace ml;
-	__global__ void kernel_batchnorm_forward_avg_var_1(float *__restrict__ workspace, const float *__restrict__ input, int first_dim, int last_dim)
-	{
-		__shared__ float sum[32 * 32];
-		__shared__ float sum_squares[32 * 32];
-		const int tid = blockIdx.x * 32 + threadIdx.x;
-		float _s = 0.0f, _ss = 0.0f;
-		if (tid < last_dim)
-			for (int i = 32 * blockIdx.y + threadIdx.y; i < first_dim; i += 32 * gridDim.y)
-			{
-				const float tmp = input[i * last_dim + tid];
-				_s += tmp;
-				_ss += square(tmp);
-			}
-		sum[threadIdx.y * 32 + threadIdx.x] = _s;
-		sum_squares[threadIdx.y * 32 + threadIdx.x] = _ss;
-		__syncthreads();
-
-		reduce_add_32x32_dual(sum, sum_squares);
-		if (threadIdx.y == 0 and tid < last_dim)
-		{
-			workspace[blockIdx.y * 2 * last_dim + tid] = sum[threadIdx.x];
-			workspace[(blockIdx.y * 2 + 1) * last_dim + tid] = sum_squares[threadIdx.x];
-		}
-	}
-	__global__ void kernel_batchnorm_forward_avg_var_2(float *__restrict__ running_stat, const float *__restrict__ workspace, int first_dim,
-			int last_dim, int m)
+	__global__ void kernel_batchnorm_forward_avg_var_1(AvgVarStats<float> *__restrict__ workspace, const float *__restrict__ input, int first_dim,
+			int last_dim)
 	{
 		assert(blockDim.x == 32 && blockDim.y == 32);
-		__shared__ float sum[32 * 32];
-		__shared__ float sum_squares[32 * 32];
+		__shared__ AvgVarStats<float> shared_stats[32 * 32]; // 32 x 3 layout will be perfectly interleaved with no bank conflicts
+
 		const int tid = blockIdx.x * 32 + threadIdx.x;
-		float _s = 0.0f, _ss = 0.0f;
+
+		AvgVarStats<float> thread_stat;
 		if (tid < last_dim)
-			for (int i = threadIdx.y; i < first_dim; i += 32)
-			{
-				_s += workspace[i * 2 * last_dim + tid];
-				_ss += workspace[(i * 2 + 1) * last_dim + tid];
-			}
-		sum[threadIdx.y * 32 + threadIdx.x] = _s;
-		sum_squares[threadIdx.y * 32 + threadIdx.x] = _ss;
+			for (int i = 32 * blockIdx.y + threadIdx.y; i < first_dim; i += 32 * gridDim.y)
+				thread_stat.add(input[i * last_dim + tid]);
+
+		shared_stats[threadIdx.y * 32 + threadIdx.x] = thread_stat;
 		__syncthreads();
 
-		reduce_add_32x32_dual(sum, sum_squares);
+		combine_stats(shared_stats);
+		if (threadIdx.y == 0 and tid < last_dim)
+			workspace[blockIdx.y * last_dim + tid] = shared_stats[threadIdx.x];
+	}
+	__global__ void kernel_batchnorm_forward_avg_var_2(float *__restrict__ running_stat, const AvgVarStats<float> *__restrict__ workspace,
+			int first_dim, int last_dim)
+	{
+		assert(blockDim.x == 32 && blockDim.y == 32);
+		__shared__ AvgVarStats<float> shared_stats[32 * 32]; // 32 x 3 layout will be perfectly interleaved with no bank conflicts
+
+		const int tid = blockIdx.x * 32 + threadIdx.x;
+
+		AvgVarStats<float> thread_stat;
+		if (tid < last_dim)
+			for (int i = threadIdx.y; i < first_dim; i += 32)
+				thread_stat.merge_with(workspace[i * last_dim + tid]);
+
+		shared_stats[threadIdx.y * 32 + threadIdx.x] = thread_stat;
+		__syncthreads();
+
+		combine_stats(shared_stats);
 		if (threadIdx.y == 0 and tid < last_dim)
 		{
-			running_stat[tid] = sum[threadIdx.x] / m;
-			running_stat[last_dim + tid] = (sum_squares[threadIdx.x] - square(sum[threadIdx.x]) / m) / (m - 1.0f);
+			running_stat[tid] = shared_stats[threadIdx.x].get_average();
+			running_stat[last_dim + tid] = shared_stats[threadIdx.x].get_variance();
 		}
 	}
 
@@ -167,6 +208,19 @@ namespace
 		}
 	}
 
+	__device__ void reduce_add_32x32_dual(float *ptr1, float *ptr2)
+	{
+		assert(blockDim.x == 32 && blockDim.y == 32);
+		for (int i = 16; i >= 1; i /= 2) // sum results stored in temporary array
+		{
+			if (threadIdx.y < i)
+			{
+				ptr1[threadIdx.y * 32 + threadIdx.x] += ptr1[(i + threadIdx.y) * 32 + threadIdx.x];
+				ptr2[threadIdx.y * 32 + threadIdx.x] += ptr2[(i + threadIdx.y) * 32 + threadIdx.x];
+			}
+			__syncthreads();
+		}
+	}
 	__global__ void kernel_batchnorm_backward_delta_1(float *workspace, const float *input, const float *output, float *gradient_next,
 			const float *running_stats, int2 shape, mlActivationType_t act)
 	{
@@ -183,7 +237,7 @@ namespace
 			{
 				const int tmp_idx = i * shape.y + tid;
 				if (act == ACTIVATION_RELU and output[tmp_idx] <= 0.0f)
-					gradient_next[tmp_idx] = 0.0f;
+					gradient_next[tmp_idx] *= 0.01f;
 				if (act == ACTIVATION_TANH)
 					gradient_next[tmp_idx] *= (1.0f - square(output[tmp_idx]));
 				d_sigma_acc += gradient_next[tmp_idx] * (input[tmp_idx] - mean) / stddev;
@@ -311,8 +365,9 @@ namespace ml
 		const int first_dim = volume_without_last_dim(shape);
 		const int last_dim = get_last_dim(shape);
 
-		float *workspace = cuda::Context::getWorkspace<float>(context);
-		const int workspace_first_dim = std::min((size_t) 256, cuda::Context::getWorkspaceSize(context) / (2 * sizeof(float) * last_dim));
+		AvgVarStats<float> *workspace = cuda::Context::getWorkspace<AvgVarStats<float>>(context);
+		const int workspace_first_dim = std::min((size_t) 256, cuda::Context::getWorkspaceSize(context) / (sizeof(AvgVarStats<float> ) * last_dim));
+		assert(workspace_first_dim > 0);
 
 		float *running_stats_ptr = getPointer<float>(running_stats) + running_stat_idx * 2 * last_dim;
 
@@ -326,7 +381,7 @@ namespace ml
 
 		kernel_batchnorm_forward_avg_var_1<<<gridDim1, blockDim, 0,stream >>>(workspace, getPointer<float>(input), first_dim, last_dim);
 		assert(cudaGetLastError() == cudaSuccess);
-		kernel_batchnorm_forward_avg_var_2<<<gridDim2, blockDim, 0, stream>>>(running_stats_ptr, workspace, workspace_first_dim, last_dim, first_dim);
+		kernel_batchnorm_forward_avg_var_2<<<gridDim2, blockDim, 0, stream>>>(running_stats_ptr, workspace, workspace_first_dim, last_dim);
 		assert(cudaGetLastError() == cudaSuccess);
 
 		dim3 blockDim3(32, 8);

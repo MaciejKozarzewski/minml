@@ -17,12 +17,15 @@
 namespace
 {
 	static constexpr float epsilon = 1.0e-6f;
-	void setzero(float *ptr, int elements) noexcept
+
+	template<typename T>
+	void setzero(T *ptr, int elements) noexcept
 	{
 		for (int i = 0; i < elements; i++)
-			ptr[i] = 0.0f;
+			ptr[i] = static_cast<T>(0);
 	}
-	float square(float x)
+	template<typename T>
+	T square(T x)
 	{
 		return x * x;
 	}
@@ -46,6 +49,44 @@ namespace
 		assert(idx >= 0 && idx < last_dim);
 		return ptr[3 * last_dim + idx];
 	}
+
+	/*
+	 * Welford's online algorithm for calculating mean and variance
+	 */
+	template<typename T>
+	class AvgVarStats
+	{
+			T samples = static_cast<T>(0);
+			T M = static_cast<T>(0);
+			T M2 = static_cast<T>(0);
+		public:
+			void add(T x) noexcept
+			{
+				samples += static_cast<T>(1);
+				const T delta = x - M;
+				M += delta / samples;
+				M2 += delta * (x - M);
+			}
+			T get_average() const noexcept
+			{
+				return M;
+			}
+			T get_variance() const noexcept
+			{
+				assert(samples >= static_cast<T>(2));
+				return M2 / (samples - static_cast<T>(1));
+			}
+
+			static AvgVarStats merge(const AvgVarStats<T> &lhs, const AvgVarStats<T> &rhs) noexcept
+			{
+				assert(lhs.samples >= static_cast<T>(0) && rhs.samples >= static_cast<T>(0));
+				AvgVarStats result;
+				result.samples = lhs.samples + rhs.samples;
+				result.M = (lhs.samples * lhs.M + rhs.samples * rhs.M) / result.samples;
+				result.M2 = lhs.M2 + rhs.M2 + square(lhs.M - rhs.M) * (lhs.samples * rhs.samples) / result.samples;
+				return result;
+			}
+	};
 }
 
 namespace ml
@@ -108,24 +149,19 @@ namespace ml
 		float *weights_ptr = getPointer<float>(weights);
 		float *running_stat_ptr = getPointer<float>(running_stats) + 2 * running_stat_idx * last_dim;
 
-		assert(cpu::Context::getWorkspaceSize(context) >= 2 * last_dim * sizeof(float));
+		assert(cpu::Context::getWorkspaceSize(context) >= last_dim * sizeof(AvgVarStats<float>));
+		AvgVarStats<float> *stats = cpu::Context::getWorkspace<AvgVarStats<float>>(context);
 
-		float *sum_ptr = cpu::Context::getWorkspace<float>(context);
-		float *sum_squares_ptr = cpu::Context::getWorkspace<float>(context) + last_dim;
-
-		setzero(sum_ptr, last_dim);
-		setzero(sum_squares_ptr, last_dim);
+		for (int j = 0; j < last_dim; j++)
+			stats[j] = AvgVarStats<float>();
 		for (int i = 0; i < first_dim; i++)
 			for (int j = 0; j < last_dim; j++)
-			{
-				const float tmp = input_ptr[i * last_dim + j];
-				sum_ptr[j] += tmp;
-				sum_squares_ptr[j] += square(tmp);
-			}
+				stats[j].add(input_ptr[i * last_dim + j]);
+
 		for (int j = 0; j < last_dim; j++)
 		{
-			running_stat_ptr[j] = sum_ptr[j] / first_dim; // average
-			running_stat_ptr[last_dim + j] = (sum_squares_ptr[j] - square(sum_ptr[j]) / first_dim) / (first_dim - 1.0f); // variance
+			running_stat_ptr[j] = stats[j].get_average();
+			running_stat_ptr[last_dim + j] = stats[j].get_variance();
 		}
 
 		/* weights rows are:
@@ -191,7 +227,7 @@ namespace ml
 			{
 				const int idx = i * last_dim + j;
 				if (act == ACTIVATION_RELU and output_ptr[idx] <= 0.0f)
-					gradient_next_ptr[idx] = 0.0f;
+					gradient_next_ptr[idx] *= 0.01f;
 				if (act == ACTIVATION_TANH)
 					gradient_next_ptr[idx] *= (1.0f - square(output_ptr[idx]));
 
