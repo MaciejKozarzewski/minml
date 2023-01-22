@@ -114,12 +114,15 @@ namespace ml
 		int get_cuda_arch(int device_index)
 		{
 			void *ptr = cuda_malloc(device_index, 4);
-			cudaSetDevice(device_index);
+			cudaError_t status = cudaSetDevice(device_index);
+			assert(status == cudaSuccess);
 			kernel_get_cuda_arch<<<1, 1>>>(ptr);
-			cudaDeviceSynchronize();
+			status = cudaDeviceSynchronize();
+			assert(status == cudaSuccess);
 			int result = 0;
 			cuda_memcpy_to_host(nullptr, &result, ptr, 0, 4);
-			cudaDeviceSynchronize();
+			status = cudaDeviceSynchronize();
+			assert(status == cudaSuccess);
 			cuda_free(ptr);
 
 			return result;
