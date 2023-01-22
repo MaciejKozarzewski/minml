@@ -100,6 +100,7 @@ namespace ml
 		private:
 			size_t get_index(const int *ptr, size_t size) const;
 			void create_stride() noexcept;
+			void deallocate_if_owning();
 
 	};
 

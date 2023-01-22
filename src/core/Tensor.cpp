@@ -69,12 +69,7 @@ namespace ml
 	}
 	Tensor::~Tensor() noexcept
 	{
-		if (isOwning())
-		{
-			if (isPageLocked()) // TODO not sure if this is necessary
-				pageUnlock();
-			ml::free(device(), data());
-		}
+		deallocate_if_owning();
 	}
 	Tensor& Tensor::operator=(const Tensor &other)
 	{
@@ -86,7 +81,7 @@ namespace ml
 				{
 					if (this->sizeInBytes() != other.sizeInBytes() or this->device() != other.device())
 					{ // reallocate if different size or device
-						ml::free(this->device(), this->data());
+						deallocate_if_owning();
 						m_data = ml::malloc(other.device(), other.sizeInBytes());
 					}
 				}
@@ -96,8 +91,7 @@ namespace ml
 			}
 			else
 			{
-				if (this->isOwning()) // assign other[tensor view] to this[owning tensor] -> produces tensor view
-					ml::free(this->device(), this->data());
+				deallocate_if_owning(); // assign other[tensor view] to this[owning tensor] -> produces tensor view
 				this->m_data = other.m_data;
 			}
 			this->m_device = other.device();
@@ -216,7 +210,7 @@ namespace ml
 		{
 			void *tmp = ml::malloc(newDevice, sizeInBytes());
 			ml::memcpy(newDevice, tmp, 0, device(), data(), 0, sizeInBytes());
-			ml::free(m_device, m_data);
+			deallocate_if_owning();
 			m_data = tmp;
 		}
 		m_device = newDevice;
@@ -247,7 +241,7 @@ namespace ml
 			{
 				void *tmp = ml::malloc(device(), volume() * sizeof(newType));
 				convertType(context, tmp, newType, data(), dtype(), volume());
-				ml::free(device(), data());
+				deallocate_if_owning();
 				m_data = tmp;
 			}
 		}
@@ -348,7 +342,10 @@ namespace ml
 		if (isPageLocked())
 			throw LogicError(METHOD_NAME, "tensor already is page locked");
 		if (device().isCPU())
+		{
 			cuda_page_lock(data(), sizeInBytes());
+			m_is_page_locked = true;
+		}
 	}
 	void Tensor::pageUnlock()
 	{
@@ -357,7 +354,10 @@ namespace ml
 		if (not isPageLocked())
 			throw LogicError(METHOD_NAME, "tensor is not page locked");
 		if (device().isCPU())
+		{
 			cuda_page_unlock(data());
+			m_is_page_locked = false;
+		}
 	}
 
 	Tensor Tensor::view() const
@@ -517,6 +517,15 @@ namespace ml
 		{
 			m_stride[i] = tmp;
 			tmp *= static_cast<uint32_t>(m_shape[i]);
+		}
+	}
+	void Tensor::deallocate_if_owning()
+	{
+		if (isOwning())
+		{
+			if (isPageLocked())
+				pageUnlock();
+			ml::free(device(), data());
 		}
 	}
 
