@@ -20,6 +20,7 @@ namespace ml
 		void initForTest(Tensor &t, double shift);
 		double diffForTest(const Tensor &lhs, const Tensor &rhs);
 		double normForTest(const Tensor &tensor);
+		double sumForTest(const Tensor &tensor);
 		void abs(Tensor &tensor);
 	}
 }
