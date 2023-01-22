@@ -24,6 +24,7 @@
 #include <minml/layers/Input.hpp>
 #include <minml/layers/Add.hpp>
 #include <minml/layers/BatchNormalization.hpp>
+#include <minml/layers/Softmax.hpp>
 #include <unordered_map>
 #include <cmath>
 #include <mutex>
@@ -37,6 +38,8 @@ namespace ml
 			default:
 			case ActivationType::LINEAR:
 				return "linear";
+			case ActivationType::SIGMOID:
+				return "sigmoid";
 			case ActivationType::TANH:
 				return "tanh";
 			case ActivationType::RELU:
@@ -49,6 +52,8 @@ namespace ml
 	{
 		if (str == "linear")
 			return ActivationType::LINEAR;
+		if (str == "sigmoid")
+			return ActivationType::SIGMOID;
 		if (str == "tanh")
 			return ActivationType::TANH;
 		if (str == "relu")
@@ -62,6 +67,8 @@ namespace ml
 			m_dtype(dtype),
 			m_activation(activationFromString(activation))
 	{
+		if (m_activation == ActivationType::SOFTMAX)
+			throw LogicError(METHOD_NAME, "softmax cannot be uased as a layer activation function");
 	}
 
 	bool Layer::isTrainable() const noexcept
@@ -227,6 +234,7 @@ namespace ml
 		static const Conv2D conv2d(0, 0);
 		static const Dense dense(0);
 		static const Input input;
+		static const Softmax softmax( { 0 });
 
 		const std::string name = json["name"];
 		std::unique_ptr<Layer> result;
@@ -241,6 +249,8 @@ namespace ml
 			result = dense.clone(json);
 		if (name == input.name())
 			result = input.clone(json);
+		if (name == softmax.name())
+			result = softmax.clone(json);
 
 		if (result == nullptr)
 			throw LogicError(METHOD_NAME, "unknown layer '" + static_cast<std::string>(json["name"]) + "'");

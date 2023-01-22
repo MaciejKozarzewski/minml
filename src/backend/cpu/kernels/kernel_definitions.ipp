@@ -42,5 +42,5 @@ void cpu_kernel_gemm_batched(mlContext_t context, mlDataType_t dtype, mlShape_t 
 
 void cpu_kernel_add_bias_act(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *input, const void *bias, mlActivationType_t act);
 
-void cpu_kernel_activation_forward_in_place(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *input, mlActivationType_t act);
-void cpu_kernel_activation_backward_in_place(mlContext_t context, mlShape_t shape, void *gradient, const void *output, mlActivationType_t act);
+void cpu_kernel_activation_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input, mlActivationType_t act);
+void cpu_kernel_activation_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient, const void *output, mlActivationType_t act);

@@ -33,48 +33,44 @@ namespace
 	}
 
 	template<typename T>
-	__global__ void kernel_softmax_in_place_3_channels(T *output, int first_dim)
+	__global__ void kernel_softmax_3_channels(T *output, const T *input, int first_dim)
 	{
 		const int idx = blockIdx.x * blockDim.x + threadIdx.x;
 		if (idx < first_dim)
 		{
-			float3 workspace;
-			workspace.x = static_cast<float>(output[idx * 3 + 0]);
-			workspace.y = static_cast<float>(output[idx * 3 + 1]);
-			workspace.z = static_cast<float>(output[idx * 3 + 2]);
+			float x0 = static_cast<float>(input[idx * 3 + 0]);
+			float x1 = static_cast<float>(input[idx * 3 + 1]);
+			float x2 = static_cast<float>(input[idx * 3 + 2]);
 
-			const float max_value = max(workspace.x, max(workspace.y, workspace.z));
-			workspace.x = exp(workspace.x - max_value);
-			workspace.y = exp(workspace.y - max_value);
-			workspace.z = exp(workspace.z - max_value);
+			const float max_value = max(x0, max(x1, x2));
+			x0 = exp(x0 - max_value);
+			x1 = exp(x1 - max_value);
+			x2 = exp(x2 - max_value);
 
-			const float inv_sum = 1.0f / (workspace.x + workspace.y + workspace.z);
-			workspace.x *= inv_sum;
-			workspace.y *= inv_sum;
-			workspace.z *= inv_sum;
+			const float inv_sum = 1.0f / (x0 + x1 + x2);
 
-			output[idx * 3 + 0] = static_cast<T>(workspace.x);
-			output[idx * 3 + 1] = static_cast<T>(workspace.y);
-			output[idx * 3 + 2] = static_cast<T>(workspace.z);
+			output[idx * 3 + 0] = static_cast<T>(x0 * inv_sum);
+			output[idx * 3 + 1] = static_cast<T>(x1 * inv_sum);
+			output[idx * 3 + 2] = static_cast<T>(x2 * inv_sum);
 		}
 	}
 
 	template<typename T>
-	__global__ void kernel_softmax_in_place_generic(T *output, int first_dim, int last_dim)
+	__global__ void kernel_softmax_generic(T *output, const T *input, int first_dim, int last_dim)
 	{
 		assert(last_dim <= 1024);
 		assert(blockDim.x == 128);
 		__shared__ float workspace[1024];
 		__shared__ cg::block_tile_memory<128> btm;
 		cg::thread_block thb = cg::this_thread_block(btm);
-		cg::thread_block_tile < 128 > tile = cg::tiled_partition < 128 > (thb);
+		cg::thread_block_tile < 128 > tile = cg::tiled_partition<128>(thb);
 
 		for (int i = blockIdx.x; i < first_dim; i += gridDim.x)
 		{
 			float max_value = -3.4028234663e+38F; // starting with lowest possible fp32 value
 			for (int j = tile.thread_rank(); j < last_dim; j += tile.size())
 			{
-				workspace[j] = static_cast<float>(output[i * last_dim + j]);
+				workspace[j] = static_cast<float>(input[i * last_dim + j]);
 				max_value = max(max_value, workspace[j]);
 			}
 			const float shift = cg::reduce(tile, max_value, cg::greater<float>());
@@ -92,36 +88,54 @@ namespace
 	}
 
 	template<typename T>
-	__global__ void kernel_tanh_forward_in_place(T *output, int length)
+	__global__ void kernel_sigmoid_forward(T *output, const T *input, int length)
 	{
 		for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < length; i += gridDim.x * blockDim.x)
 		{
-			Vector<T> tmp(output + i, length - i);
+			Vector<T> tmp(input + i, length - i);
+			tmp = vector_one<T>() / (vector_one<T>() + vectors::exp(-tmp));
+			tmp.store(output + i, length - i);
+		}
+	}
+	__global__ void kernel_sigmoid_backward(float *gradient_prev, const float *gradient_next, const float *output, int length)
+	{
+		for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < length; i += gridDim.x * blockDim.x)
+			gradient_prev[i] = gradient_next[i] * output[i] * (1.0f - output[i]);
+	}
+
+	template<typename T>
+	__global__ void kernel_tanh_forward(T *output, const T *input, int length)
+	{
+		for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < length; i += gridDim.x * blockDim.x)
+		{
+			Vector<T> tmp(input + i, length - i);
 			tmp = vectors::tanh(tmp);
 			tmp.store(output + i, length - i);
 		}
 	}
-	__global__ void kernel_tanh_backward_in_place(float *gradient, const float *output, int length)
+	__global__ void kernel_tanh_backward(float *gradient_prev, const float *gradient_next, const float *output, int length)
 	{
 		for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < length; i += gridDim.x * blockDim.x)
-			gradient[i] *= (1.0f - output[i] * output[i]);
+			gradient_prev[i] = gradient_next[i] * (1.0f - output[i] * output[i]);
 	}
 
 	template<typename T>
-	__global__ void kernel_relu_forward_in_place(T *output, int length)
+	__global__ void kernel_relu_forward(T *output, const T *input, int length)
 	{
 		for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < length; i += gridDim.x * blockDim.x)
 		{
-			Vector<T> tmp(output + i, length - i);
+			Vector<T> tmp(input + i, length - i);
 			tmp = max(vector_zero<T>(), tmp);
 			tmp.store(output + i, length - i);
 		}
 	}
-	__global__ void kernel_relu_backward_in_place(float *gradient, const float *output, int length)
+	__global__ void kernel_relu_backward(float *gradient_prev, const float *gradient_next, const float *output, int length)
 	{
 		for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < length; i += gridDim.x * blockDim.x)
 			if (output[i] == 0.0f)
-				gradient[i] = 0.0f;
+				gradient_prev[i] = gradient_next[i] * 0.01f;
+			else
+				gradient_prev[i] = gradient_next[i];
 	}
 
 	template<typename T>
@@ -144,6 +158,8 @@ namespace
 					tmp = vectors::max(vector_zero<T>(), tmp);
 				if (act == ml::ACTIVATION_TANH)
 					tmp = vectors::tanh(tmp);
+				if (act == ml::ACTIVATION_SIGMOID)
+					tmp = vector_one<T>() / (vector_one<T>() + vectors::exp(-tmp));
 				input_wrapper.store(tmp, i, j);
 			}
 		}
@@ -152,15 +168,36 @@ namespace
 
 namespace ml
 {
-	void cuda_activation_forward_in_place(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *input, mlActivationType_t act)
+	void cuda_activation_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input, mlActivationType_t act)
 	{
 		assert(input != nullptr);
+		assert(output != nullptr);
 
 		cudaStream_t stream = cuda::Context::getStream(context);
 		switch (act)
 		{
 			case ACTIVATION_LINEAR:
 				break;
+			case ACTIVATION_SIGMOID:
+			{
+				dim3 blockDim(256);
+				dim3 gridDim = cuda::gridSize<1024>(volume(shape), 256);
+				switch (dtype)
+				{
+					case DTYPE_BFLOAT16:
+						kernel_sigmoid_forward<<<gridDim, blockDim, 0, stream>>>(getPointer<__nv_bfloat16 >(output),
+								getPointer<__nv_bfloat16 >(input), volume(shape));
+						break;
+					case DTYPE_FLOAT16:
+						kernel_sigmoid_forward<<<gridDim, blockDim, 0, stream>>>(getPointer<half>(output), getPointer<half>(input), volume(shape));
+						break;
+					case DTYPE_FLOAT32:
+						kernel_sigmoid_forward<<<gridDim, blockDim, 0, stream>>>(getPointer<float>(output), getPointer<float>(input), volume(shape));
+						break;
+				}
+
+				break;
+			}
 			case ACTIVATION_TANH:
 			{
 				dim3 blockDim(256);
@@ -168,13 +205,14 @@ namespace ml
 				switch (dtype)
 				{
 					case DTYPE_BFLOAT16:
-						kernel_tanh_forward_in_place<<<gridDim, blockDim, 0, stream>>>(getPointer<__nv_bfloat16 >(input), volume(shape));
+						kernel_tanh_forward<<<gridDim, blockDim, 0, stream>>>(getPointer<__nv_bfloat16 >(output), getPointer<__nv_bfloat16 >(input),
+								volume(shape));
 						break;
 					case DTYPE_FLOAT16:
-						kernel_tanh_forward_in_place<<<gridDim, blockDim, 0, stream>>>(getPointer<half>(input), volume(shape));
+						kernel_tanh_forward<<<gridDim, blockDim, 0, stream>>>(getPointer<half>(output), getPointer<half>(input), volume(shape));
 						break;
 					case DTYPE_FLOAT32:
-						kernel_tanh_forward_in_place<<<gridDim, blockDim, 0, stream>>>(getPointer<float>(input), volume(shape));
+						kernel_tanh_forward<<<gridDim, blockDim, 0, stream>>>(getPointer<float>(output), getPointer<float>(input), volume(shape));
 						break;
 				}
 
@@ -187,13 +225,14 @@ namespace ml
 				switch (dtype)
 				{
 					case DTYPE_BFLOAT16:
-						kernel_relu_forward_in_place<<<gridDim, blockDim, 0, stream>>>(getPointer<__nv_bfloat16 >(input), volume(shape));
+						kernel_relu_forward<<<gridDim, blockDim, 0, stream>>>(getPointer<__nv_bfloat16 >(output), getPointer<__nv_bfloat16 >(input),
+								volume(shape));
 						break;
 					case DTYPE_FLOAT16:
-						kernel_relu_forward_in_place<<<gridDim, blockDim, 0, stream>>>(getPointer<half>(input), volume(shape));
+						kernel_relu_forward<<<gridDim, blockDim, 0, stream>>>(getPointer<half>(output), getPointer<half>(input), volume(shape));
 						break;
 					case DTYPE_FLOAT32:
-						kernel_relu_forward_in_place<<<gridDim, blockDim, 0, stream>>>(getPointer<float>(input), volume(shape));
+						kernel_relu_forward<<<gridDim, blockDim, 0, stream>>>(getPointer<float>(output), getPointer<float>(input), volume(shape));
 						break;
 				}
 
@@ -201,15 +240,9 @@ namespace ml
 			}
 			case ACTIVATION_SOFTMAX:
 			{
-				int first_dim = get_first_dim(shape);
-				int last_dim = get_last_dim(shape);
-				if (shape.rank == 4)
-				{
-					if (get_last_dim(shape) > 1)
-						first_dim = volume_without_last_dim(shape);
-					else
-						last_dim = volume_without_first_dim(shape);
-				}
+				assert(shape.rank == 2);
+				const int first_dim = get_first_dim(shape);
+				const int last_dim = get_last_dim(shape);
 
 				if (last_dim == 3)
 				{
@@ -218,13 +251,15 @@ namespace ml
 					switch (dtype)
 					{
 						case DTYPE_BFLOAT16:
-							kernel_softmax_in_place_3_channels<<<gridDim, blockDim, 0, stream>>>(getPointer<__nv_bfloat16 >(input), first_dim);
+							kernel_softmax_3_channels<<<gridDim, blockDim, 0, stream>>>(getPointer<__nv_bfloat16 >(output),
+									getPointer<__nv_bfloat16 >(input), first_dim);
 							break;
 						case DTYPE_FLOAT16:
-							kernel_softmax_in_place_3_channels<<<gridDim, blockDim, 0, stream>>>(getPointer<half>(input), first_dim);
+							kernel_softmax_3_channels<<<gridDim, blockDim, 0, stream>>>(getPointer<half>(output), getPointer<half>(input), first_dim);
 							break;
 						case DTYPE_FLOAT32:
-							kernel_softmax_in_place_3_channels<<<gridDim, blockDim, 0, stream>>>(getPointer<float>(input), first_dim);
+							kernel_softmax_3_channels<<<gridDim, blockDim, 0, stream>>>(getPointer<float>(output), getPointer<float>(input),
+									first_dim);
 							break;
 					}
 				}
@@ -235,13 +270,16 @@ namespace ml
 					switch (dtype)
 					{
 						case DTYPE_BFLOAT16:
-							kernel_softmax_in_place_generic<<<gridDim, blockDim, 0, stream>>>(getPointer<__nv_bfloat16 >(input), first_dim, last_dim);
+							kernel_softmax_generic<<<gridDim, blockDim, 0, stream>>>(getPointer<__nv_bfloat16 >(output),
+									getPointer<__nv_bfloat16 >(input), first_dim, last_dim);
 							break;
 						case DTYPE_FLOAT16:
-							kernel_softmax_in_place_generic<<<gridDim, blockDim, 0, stream>>>(getPointer<half>(input), first_dim, last_dim);
+							kernel_softmax_generic<<<gridDim, blockDim, 0, stream>>>(getPointer<half>(output), getPointer<half>(input), first_dim,
+									last_dim);
 							break;
 						case DTYPE_FLOAT32:
-							kernel_softmax_in_place_generic<<<gridDim, blockDim, 0, stream>>>(getPointer<float>(input), first_dim, last_dim);
+							kernel_softmax_generic<<<gridDim, blockDim, 0, stream>>>(getPointer<float>(output), getPointer<float>(input), first_dim,
+									last_dim);
 							break;
 					}
 				}
@@ -251,9 +289,11 @@ namespace ml
 
 		assert(cudaGetLastError() == cudaSuccess);
 	}
-	void cuda_activation_backward_in_place(mlContext_t context, mlShape_t shape, void *gradient, const void *output, mlActivationType_t act)
+	void cuda_activation_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next, const void *output,
+			mlActivationType_t act)
 	{
-		assert(gradient != nullptr);
+		assert(gradient_prev != nullptr);
+		assert(gradient_next != nullptr);
 		assert(output != nullptr);
 
 		cudaStream_t stream = cuda::Context::getStream(context);
@@ -261,20 +301,28 @@ namespace ml
 		{
 			case ACTIVATION_LINEAR:
 				break;
+			case ACTIVATION_SIGMOID:
+			{
+				dim3 blockDim(256);
+				dim3 gridDim = cuda::gridSize<1024>(volume(shape), 256);
+				kernel_sigmoid_backward<<<gridDim, blockDim, 0, stream>>>(getPointer<float>(gradient_prev), getPointer<float>(gradient_next),
+						getPointer<float>(output), volume(shape));
+				break;
+			}
 			case ACTIVATION_TANH:
 			{
 				dim3 blockDim(256);
 				dim3 gridDim = cuda::gridSize<1024>(volume(shape), 256);
-				kernel_tanh_backward_in_place<<<gridDim, blockDim, 0, stream>>>(getPointer<float>(gradient), getPointer<float>(output),
-						volume(shape));
+				kernel_tanh_backward<<<gridDim, blockDim, 0, stream>>>(getPointer<float>(gradient_prev), getPointer<float>(gradient_next),
+						getPointer<float>(output), volume(shape));
 				break;
 			}
 			case ACTIVATION_RELU:
 			{
 				dim3 blockDim(256);
 				dim3 gridDim = cuda::gridSize<1024>(volume(shape), 256);
-				kernel_relu_backward_in_place<<<gridDim, blockDim, 0, stream>>>(getPointer<float>(gradient), getPointer<float>(output),
-						volume(shape));
+				kernel_relu_backward<<<gridDim, blockDim, 0, stream>>>(getPointer<float>(gradient_prev), getPointer<float>(gradient_next),
+						getPointer<float>(output), volume(shape));
 				break;
 			}
 			case ACTIVATION_SOFTMAX:
@@ -307,8 +355,6 @@ namespace ml
 				kernel_add_to_last_dim<<<gridDim, blockDim, 0, stream>>>(getPointer<float>(input), getPointer<float>(bias), first_dim, last_dim, act);
 				break;
 		}
-		if (act == ACTIVATION_SOFTMAX)
-			cuda_activation_forward_in_place(context, dtype, shape, input, act);
 		assert(cudaGetLastError() == cudaSuccess);
 	}
 

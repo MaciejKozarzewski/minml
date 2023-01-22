@@ -26,7 +26,7 @@ namespace ml
 		Tensor correct_output = toTensor( { { 0.11162444f, 0.04106433f, 0.74630924f, 0.10100197f }, { 0.29114823f, 0.07934714f, 0.43434212f,
 				0.19516249f } });
 
-		activationForwardInPlace(context, input, ActivationType::SOFTMAX);
+		activationForward(context, input, input, ActivationType::SOFTMAX);
 		EXPECT_LE(testing::diffForTest(input, correct_output), 1.0e-4f);
 	}
 	TEST(TestSoftmax, ForwardOnCPU_fp16)
@@ -39,7 +39,7 @@ namespace ml
 		input.convertTo(context, DataType::FLOAT16);
 		correct_output.convertTo(context, DataType::FLOAT16);
 
-		activationForwardInPlace(Context(), input, ActivationType::SOFTMAX);
+		activationForward(Context(), input, input, ActivationType::SOFTMAX);
 		EXPECT_LE(testing::diffForTest(input, correct_output), 1.0e-3f);
 	}
 	TEST(TestSoftmax, ForwardOnCPU_bf16)
@@ -52,7 +52,7 @@ namespace ml
 		input.convertTo(context, DataType::BFLOAT16);
 		correct_output.convertTo(context, DataType::BFLOAT16);
 
-		activationForwardInPlace(Context(), input, ActivationType::SOFTMAX);
+		activationForward(Context(), input, input, ActivationType::SOFTMAX);
 		EXPECT_LE(testing::diffForTest(input, correct_output), 1.0e-2f);
 	}
 
@@ -67,7 +67,7 @@ namespace ml
 
 		input.moveTo(context.device());
 
-		activationForwardInPlace(context, input, ActivationType::SOFTMAX);
+		activationForward(context, input, input, ActivationType::SOFTMAX);
 		context.synchronize();
 		EXPECT_LE(testing::diffForTest(input, correct_output), 1.0e-4f);
 	}
@@ -84,7 +84,7 @@ namespace ml
 		input.convertTo(context, DataType::FLOAT16);
 		correct_output.convertTo(Context(), DataType::FLOAT16);
 
-		activationForwardInPlace(context, input, ActivationType::SOFTMAX);
+		activationForward(context, input, input, ActivationType::SOFTMAX);
 		context.synchronize();
 		EXPECT_LE(testing::diffForTest(input, correct_output), 1.0e-3f);
 	}
@@ -101,7 +101,7 @@ namespace ml
 		input.convertTo(context, DataType::BFLOAT16);
 		correct_output.convertTo(Context(), DataType::BFLOAT16);
 
-		activationForwardInPlace(context, input, ActivationType::SOFTMAX);
+		activationForward(context, input, input, ActivationType::SOFTMAX);
 		context.synchronize();
 		EXPECT_LE(testing::diffForTest(input, correct_output), 1.0e-2f);
 	}

@@ -51,7 +51,7 @@ namespace
 										tmp += weight.get( { out, i, j, in }) * input.get( { b, pad_h + h + i, pad_w + w + j, in });
 						output.set(tmp, { b, h, w, out });
 					}
-		ml::activationForwardInPlace(ml::Context(), output, act);
+		ml::activationForward(ml::Context(), output, output, act);
 	}
 	void baseline_conv2D_backward(const ml::Tensor &output, ml::Tensor &gradient_prev, ml::Tensor &gradient_next, const ml::Tensor &weight,
 			ml::ActivationType act)
@@ -69,7 +69,7 @@ namespace
 		const int pad_h = -kernel_height / 2; //TODO handle padding
 		const int pad_w = -kernel_width / 2; //TODO handle padding
 
-		ml::activationBackwardInPlace(ml::Context(), gradient_next, output, act);
+		ml::activationBackward(ml::Context(), gradient_next, gradient_next, output, act);
 		gradient_prev.zeroall(ml::Context());
 		for (int b = 0; b < batch; b++)
 			for (int out = 0; out < filters_out; out++)

@@ -178,6 +178,8 @@ namespace
 					tmp = max(0.0f, tmp);
 				if (act == ACTIVATION_TANH)
 					tmp = tanh(tmp);
+				if (act == ACTIVATION_SIGMOID)
+					tmp = 1.0f / (1.0f + exp(-tmp));
 				output[i * shape.y + tid] = tmp;
 			}
 		}
@@ -203,6 +205,8 @@ namespace
 					tmp = max(0.0f, tmp);
 				if (act == ACTIVATION_TANH)
 					tmp = tanh(tmp);
+				if (act == ACTIVATION_SIGMOID)
+					tmp = 1.0f / (1.0f + exp(-tmp));
 				output[i * shape.y + tid] = tmp;
 			}
 		}
@@ -240,6 +244,8 @@ namespace
 					gradient_next[tmp_idx] *= 0.01f;
 				if (act == ACTIVATION_TANH)
 					gradient_next[tmp_idx] *= (1.0f - square(output[tmp_idx]));
+				if (act == ACTIVATION_SIGMOID)
+					gradient_next[tmp_idx] *= output[tmp_idx] * (1.0f - output[tmp_idx]);
 				d_sigma_acc += gradient_next[tmp_idx] * (input[tmp_idx] - mean) / stddev;
 				d_mu_acc += gradient_next[tmp_idx];
 			}

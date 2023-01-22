@@ -171,6 +171,8 @@ namespace
 								tmp = vectors::max(vector_zero<T>(), tmp);
 							if (activation == ACTIVATION_TANH)
 								tmp = vectors::tanh(tmp);
+							if (activation == ACTIVATION_SIGMOID)
+								tmp = vector_one<T>() / (vector_one<T>() + vectors::exp(-tmp));
 
 							output_wrapper.store(tmp, blockIdx.z, h, w, f);
 						}
@@ -434,8 +436,6 @@ namespace ml
 				launch_output_transform<float>(context, weight_shape, output_shape, matrices, output, bias, add, act);
 				break;
 		}
-		if (act == ACTIVATION_SOFTMAX)
-			cuda_activation_forward_in_place(context, dtype, output_shape, output, act);
 	}
 	void cuda_winograd_gradient_transform(mlContext_t context, mlDataType_t dtype, mlShape_t weight_shape, mlShape_t gradient_shape,
 			const void *gradient, void *matrices)

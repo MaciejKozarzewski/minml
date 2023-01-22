@@ -99,17 +99,17 @@ namespace ml
 		DLL_PUBLIC void cuda_fold_batchnorm(mlContext_t context, mlShape_t shape, void *layer_weights, void *layer_bias,
 				const void *batchnorm_weights);
 
-		DLL_PUBLIC void cuda_activation_forward_in_place(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *input,
+		DLL_PUBLIC void cuda_activation_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input,
 				mlActivationType_t act);
-		DLL_PUBLIC void cuda_activation_backward_in_place(mlContext_t context, mlShape_t shape, void *gradient, const void *output,
-				mlActivationType_t act);
+		DLL_PUBLIC void cuda_activation_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next,
+				const void *output, mlActivationType_t act);
 
 		// implemented in 'training.cu'
 		DLL_PUBLIC void cuda_emulate_low_precision(mlContext_t context, mlShape_t shape, void *dst, const void *src);
 		DLL_PUBLIC void cuda_add_tensors(mlContext_t context, mlShape_t shape, void *dst, const void *src1, const void *src2);
 		DLL_PUBLIC void cuda_sum_over_first_dim(mlContext_t context, mlShape_t shape, void *dst, const void *src, float beta);
 		DLL_PUBLIC float cuda_cross_entropy_loss(mlContext_t context, mlShape_t shape, const void *output, const void *target);
-		DLL_PUBLIC void cuda_cross_entropy_gradient(mlContext_t context, mlShape_t shape, void *gradient, const void *output, const void *target);
+		DLL_PUBLIC void cuda_cross_entropy_gradient(mlContext_t context, mlShape_t shape, void *gradient, const void *output, const void *target, float weight);
 		DLL_PUBLIC void cuda_adam_optimize(mlContext_t context, mlShape_t shape, void *weight, void *update, void *momentum, void *variance,
 				float learning_rate, float beta1, float beta2);
 		DLL_PUBLIC void cuda_l2_regularization(mlContext_t context, mlShape_t shape, void *gradient, const void *param, float coefficient,

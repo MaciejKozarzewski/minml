@@ -53,15 +53,14 @@ namespace ml
 	void batchnormUpdate(const Context &context, const Tensor &running_stat, int stats_to_average, Tensor &weights, bool use_gamma, bool use_beta);
 	void foldBatchnorm(const Context &context, Tensor &layer_weights, Tensor &layer_bias, const Tensor &batchnorm_weights);
 
-	void softmaxForwardInPlace(const Context &context, Tensor &input);
-	void activationForwardInPlace(const Context &context, Tensor &input, ActivationType act);
-	void activationBackwardInPlace(const Context &context, Tensor &gradient, const Tensor &output, ActivationType act);
+	void activationForward(const Context &context, Tensor &output, const Tensor &input, ActivationType act);
+	void activationBackward(const Context &context, Tensor &gradient_prev, const Tensor &gradient_next, const Tensor &output, ActivationType act);
 
 	void emulateLowPrecision(const Context &context, Tensor &dst, const Tensor &src);
 	void sumOverFirstDim(const Context &context, Tensor &dst, const Tensor &src, float beta);
 	void addTensors(const Context &context, Tensor &dst, const Tensor &src1, const Tensor &src2);
 	float crossEntropyLoss(const Context &context, const Tensor &output, const Tensor &target);
-	void crossEntropyGradient(const Context &context, Tensor &gradient, const Tensor &output, const Tensor &target);
+	void crossEntropyGradient(const Context &context, Tensor &gradient, const Tensor &output, const Tensor &target, float weight = 1.0f);
 	void adamOptimize(const Context &context, Tensor &weight, Tensor &update, Tensor &momentum, Tensor &variance, float learning_rate, float beta1,
 			float beta2);
 	void l2Regularization(const Context &context, Tensor &gradient, const Tensor &param, float coefficient, float offset);

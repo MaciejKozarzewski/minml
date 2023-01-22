@@ -313,44 +313,45 @@ namespace ml
 #endif
 	}
 
-	void cpu_activation_forward_in_place(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *input, mlActivationType_t act)
+	void cpu_activation_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input, mlActivationType_t act)
 	{
 #if DYNAMIC_ARCH
 		switch (cpu::Context::getSimdLevel(context))
 		{
 			case cpu::SimdLevel::AVX2:
-				return ns_avx2::cpu_kernel_activation_forward_in_place(context, dtype, shape, input, act);
+				return ns_avx2::cpu_kernel_activation_forward(context, dtype, shape, output, input, act);
 			case cpu::SimdLevel::AVX:
-				return ns_avx::cpu_kernel_activation_forward_in_place(context, dtype, shape, input, act);
+				return ns_avx::cpu_kernel_activation_forward(context, dtype, shape, output, input, act);
 			case cpu::SimdLevel::SSE41:
-				return ns_sse41::cpu_kernel_activation_forward_in_place(context, dtype, shape, input, act);
+				return ns_sse41::cpu_kernel_activation_forward(context, dtype, shape, output, input, act);
 			case cpu::SimdLevel::SSE2:
-				return ns_sse2::cpu_kernel_activation_forward_in_place(context, dtype, shape, input, act);
+				return ns_sse2::cpu_kernel_activation_forward(context, dtype, shape, output, input, act);
 			case cpu::SimdLevel::NONE:
-				return ns_none::cpu_kernel_activation_forward_in_place(context, dtype, shape, input, act);
+				return ns_none::cpu_kernel_activation_forward(context, dtype, shape, output, input, act);
 		}
 #else
-		SIMD_NAMESPACE::cpu_kernel_activation_forward_in_place(context, dtype, shape, input, act);
+		SIMD_NAMESPACE::cpu_kernel_activation_forward(context, dtype, shape, output, input, act);
 #endif
 	}
-	void cpu_activation_backward_in_place(mlContext_t context, mlShape_t shape, void *gradient, const void *output, mlActivationType_t act)
+	void cpu_activation_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next, const void *output,
+			mlActivationType_t act)
 	{
 #if DYNAMIC_ARCH
 		switch (cpu::Context::getSimdLevel(context))
 		{
 			case cpu::SimdLevel::AVX2:
-				return ns_avx2::cpu_kernel_activation_backward_in_place(context, shape, gradient, output, act);
+				return ns_avx2::cpu_kernel_activation_backward(context, shape, gradient_prev, gradient_next, output, act);
 			case cpu::SimdLevel::AVX:
-				return ns_avx::cpu_kernel_activation_backward_in_place(context, shape, gradient, output, act);
+				return ns_avx::cpu_kernel_activation_backward(context, shape, gradient_prev, gradient_next, output, act);
 			case cpu::SimdLevel::SSE41:
-				return ns_sse41::cpu_kernel_activation_backward_in_place(context, shape, gradient, output, act);
+				return ns_sse41::cpu_kernel_activation_backward(context, shape, gradient_prev, gradient_next, output, act);
 			case cpu::SimdLevel::SSE2:
-				return ns_sse2::cpu_kernel_activation_backward_in_place(context, shape, gradient, output, act);
+				return ns_sse2::cpu_kernel_activation_backward(context, shape, gradient_prev, gradient_next, output, act);
 			case cpu::SimdLevel::NONE:
-				return ns_none::cpu_kernel_activation_backward_in_place(context, shape, gradient, output, act);
+				return ns_none::cpu_kernel_activation_backward(context, shape, gradient_prev, gradient_next, output, act);
 		}
 #else
-		SIMD_NAMESPACE::cpu_kernel_activation_backward_in_place(context, shape, gradient, output, act);
+		SIMD_NAMESPACE::cpu_kernel_activation_backward(context, shape, gradient_prev, gradient_next, output, act);
 #endif
 	}
 

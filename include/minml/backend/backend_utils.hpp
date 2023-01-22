@@ -23,6 +23,22 @@ namespace ml
 		return reinterpret_cast<const T*>(ptr);
 	}
 
+	[[maybe_unused]] static int size_of(mlDataType_t dtype) noexcept
+	{
+		switch (dtype)
+		{
+			default:
+			case DTYPE_UNKNOWN:
+				return 0;
+			case DTYPE_BFLOAT16:
+			case DTYPE_FLOAT16:
+				return 2;
+			case DTYPE_FLOAT32:
+			case DTYPE_INT32:
+				return 4;
+		}
+	}
+
 	[[maybe_unused]] static int volume(const mlShape_t &shape) noexcept
 	{
 		if (shape.rank == 0)

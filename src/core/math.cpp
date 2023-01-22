@@ -31,10 +31,6 @@ namespace
 	{
 		return static_cast<mlActivationType_t>(act);
 	}
-	mlConvolutionAlgorithm_t get(ConvolutionAlgorithm algo) noexcept
-	{
-		return static_cast<mlConvolutionAlgorithm_t>(algo);
-	}
 	mlContext_t get(const Context &context) noexcept
 	{
 		return context.backend();
@@ -328,27 +324,29 @@ namespace ml
 		context.synchronize();
 	}
 
-	void activationForwardInPlace(const Context &context, Tensor &input, ActivationType act)
+	void activationForward(const Context &context, Tensor &output, const Tensor &input, ActivationType act)
 	{
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
-				cpu_activation_forward_in_place(get(context), get(input.dtype()), get_shape(input), input.data(), get(act));
+				cpu_activation_forward(get(context), get(input.dtype()), get_shape(input), output.data(), input.data(), get(act));
 				break;
 			case DeviceType::CUDA:
-				cuda_activation_forward_in_place(get(context), get(input.dtype()), get_shape(input), input.data(), get(act));
+				cuda_activation_forward(get(context), get(input.dtype()), get_shape(input), output.data(), input.data(), get(act));
 				break;
 		}
 	}
-	void activationBackwardInPlace(const Context &context, Tensor &gradient, const Tensor &output, ActivationType act)
+	void activationBackward(const Context &context, Tensor &gradient_prev, const Tensor &gradient_next, const Tensor &output, ActivationType act)
 	{
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
-				cpu_activation_backward_in_place(get(context), get_shape(gradient), gradient.data(), output.data(), get(act));
+				cpu_activation_backward(get(context), get_shape(gradient_prev), gradient_prev.data(), gradient_next.data(), output.data(),
+						get(act));
 				break;
 			case DeviceType::CUDA:
-				cuda_activation_backward_in_place(get(context), get_shape(gradient), gradient.data(), output.data(), get(act));
+				cuda_activation_backward(get(context), get_shape(gradient_prev), gradient_prev.data(), gradient_next.data(), output.data(),
+						get(act));
 				break;
 		}
 	}
@@ -402,15 +400,15 @@ namespace ml
 		}
 		return 0.0f;
 	}
-	void crossEntropyGradient(const Context &context, Tensor &gradient, const Tensor &output, const Tensor &target)
+	void crossEntropyGradient(const Context &context, Tensor &gradient, const Tensor &output, const Tensor &target, float weight)
 	{
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
-				cpu_cross_entropy_gradient(get(context), get_shape(output), gradient.data(), output.data(), target.data());
+				cpu_cross_entropy_gradient(get(context), get_shape(output), gradient.data(), output.data(), target.data(), weight);
 				break;
 			case DeviceType::CUDA:
-				cuda_cross_entropy_gradient(get(context), get_shape(output), gradient.data(), output.data(), target.data());
+				cuda_cross_entropy_gradient(get(context), get_shape(output), gradient.data(), output.data(), target.data(), weight);
 				break;
 		}
 	}

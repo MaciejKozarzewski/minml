@@ -50,19 +50,11 @@ namespace ml
 		typedef enum
 		{
 			ACTIVATION_LINEAR,
+			ACTIVATION_SIGMOID,
 			ACTIVATION_TANH,
 			ACTIVATION_RELU,
 			ACTIVATION_SOFTMAX
 		} mlActivationType_t;
-
-		typedef enum
-		{
-			CONV_ALGO_DIRECT,
-			CONV_ALGO_EXPLICIT_GEMM,
-			CONV_ALGO_IMPLICIT_GEMM,
-			CONV_ALGO_WINOGRAD_FUSED,
-			CONV_ALGO_WINOGRAD_NON_FUSED
-		} mlConvolutionAlgorithm_t;
 
 		typedef void *mlContext_t;
 

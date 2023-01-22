@@ -129,6 +129,8 @@ namespace ml
 					tmp = std::max(0.0f, tmp);
 				if (act == ACTIVATION_TANH)
 					tmp = std::tanh(tmp);
+				if (act == ACTIVATION_SIGMOID)
+					tmp = 1.0f / (1.0f + std::exp(-tmp));
 				output_ptr[i * last_dim + j] = tmp;
 			}
 	}
@@ -181,6 +183,8 @@ namespace ml
 					tmp = std::max(0.0f, tmp);
 				if (act == ACTIVATION_TANH)
 					tmp = std::tanh(tmp);
+				if (act == ACTIVATION_SIGMOID)
+					tmp = 1.0f / (1.0f + std::exp(-tmp));
 				output_ptr[i * last_dim + j] = tmp;
 			}
 	}
@@ -230,6 +234,8 @@ namespace ml
 					gradient_next_ptr[idx] *= 0.01f;
 				if (act == ACTIVATION_TANH)
 					gradient_next_ptr[idx] *= (1.0f - square(output_ptr[idx]));
+				if (act == ACTIVATION_SIGMOID)
+					gradient_next_ptr[idx] *= output_ptr[idx] * (1.0f - output_ptr[idx]);
 
 				d_sigma[j] += gradient_next_ptr[idx] * (input_ptr[idx] - mean_ptr[j]) / std::sqrt(variance_ptr[j] + epsilon);
 				d_mu[j] += gradient_next_ptr[idx];

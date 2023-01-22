@@ -216,10 +216,42 @@ namespace ml
 				}
 				else
 					gemm(context(), 'n', 't', output_matrix, input_matrix, weight_matrix, 1, 0);
+
+//				if (isUsingBias() and m_output_filters == 3)
+//				{
+//					std::cout << "------------------------------------------------\n";
+//					std::cout << "input norm = " << testing::normForTest(input[0]) << '\n';
+//					for (int j = 0; j < m_input_filters; j++)
+//						std::cout << input[0].get( { 0, 0, 0, j }) << ' ';
+//					std::cout << "weights norm = " << testing::normForTest(getWeights().getParam()) << '\n';
+//					for (int i = 0; i < m_output_filters; i++)
+//					{
+//						for (int j = 0; j < m_input_filters; j++)
+//							std::cout << getWeights().getParam().get( { i, 0, 0, j }) << ' ';
+//						std::cout << '\n';
+//					}
+//					std::cout << "biases: " << getBias().getParam().get( { 0 }) << " " << getBias().getParam().get( { 1 }) << " "
+//							<< getBias().getParam().get( { 2 }) << "\n";
+//					for (int out = 0; out < output.shape()[0]; out++)
+//						for (int in = 0; in < output.shape()[3]; in++)
+//						{
+//							for (int i = 0; i < output.shape()[1]; i++)
+//							{
+//								for (int j = 0; j < output.shape()[2]; j++)
+//									std::cout << output.get( { out, i, j, in }) << ' ';
+//								std::cout << '\n';
+//							}
+//							std::cout << "------------------------------------\n";
+//						}
+//				}
+
 				if (isUsingBias())
 					addBiasAct(context(), output, getBias().getParam(), m_activation);
 				else
-					activationForwardInPlace(context(), output, m_activation);
+					activationForward(context(), output, output, m_activation);
+
+//				std::cout << "Conv2D 1x1 " << input[0].shape() << " : " << testing::normForTest(input[0]) << " -> " << output.shape() << " : "
+//						<< testing::normForTest(output) << '\n';
 
 				break;
 			}
@@ -299,7 +331,7 @@ namespace ml
 //			return;
 //		}
 
-		activationBackwardInPlace(context(), gradient_next, output, m_activation);
+		activationBackward(context(), gradient_next, gradient_next, output, m_activation);
 		switch (m_algorithm)
 		{
 			default:
@@ -319,6 +351,10 @@ namespace ml
 						{ getWeightShape().firstDim(), getWeightShape().volumeWithoutFirstDim() });
 				Tensor gradient_matrix = gradient_next.view( { gradient_next.shape().volumeWithoutLastDim(), gradient_next.lastDim() });
 				gemm(context(), 't', 'n', weight_update_matrix, gradient_matrix, input_matrix, 1, 1);
+
+//				std::cout << "Conv2D 1x1 " << input[0].shape() << " -> " << output.shape() << " gradient per weight = "
+//						<< testing::normForTest(weight_update_matrix) / weight_update_matrix.volume() << ", gradient sum = "
+//						<< testing::sumForTest(weight_update_matrix) << ", weight norm  = " << testing::normForTest(getWeights().getParam()) << '\n';
 				break;
 			}
 			case ConvolutionAlgorithm::WINOGRAD_NON_FUSED:

@@ -252,6 +252,9 @@ namespace
 						if (activation == ACTIVATION_TANH)
 							for (int i = 0; i < transformed.length(); i++)
 								transformed[i] = tanh(transformed[i]);
+						if (activation == ACTIVATION_SIGMOID)
+							for (int i = 0; i < transformed.length(); i++)
+								transformed[i] = Vector<T>::one() / (Vector<T>::one() + exp(-transformed[i]));
 
 						transformed.store_row(ptr_out, col, out, elements_left, TransformSize);
 					}
@@ -533,8 +536,6 @@ namespace SIMD_NAMESPACE
 			default:
 				break;
 		}
-		if (act == ACTIVATION_SOFTMAX)
-			cpu_kernel_activation_forward_in_place(context, dtype, output_shape, output, act);
 	}
 	void cpu_kernel_winograd_gradient_transform(mlContext_t context, mlDataType_t dtype, mlShape_t weight_shape, mlShape_t gradient_shape,
 			const void *gradient, void *matrices)

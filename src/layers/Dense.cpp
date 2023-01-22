@@ -110,7 +110,7 @@ namespace ml
 		if (isUsingBias())
 			addBiasAct(context(), output, getBias().getParam(), m_activation);
 		else
-			activationForwardInPlace(context(), output, m_activation);
+			activationForward(context(), output, output, m_activation);
 	}
 	void Dense::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next)
 	{
@@ -120,7 +120,7 @@ namespace ml
 
 		Tensor tmp_grad = flatten_input_tensor(gradient_prev[0]);
 
-		activationBackwardInPlace(context(), gradient_next, output, m_activation);
+		activationBackward(context(), gradient_next, gradient_next, output, m_activation);
 		if (emulate_low_precision)
 		{
 			Tensor tmp = m_workspace.lock()->view(getWeightShape());
