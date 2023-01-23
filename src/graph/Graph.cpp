@@ -80,7 +80,7 @@ namespace ml
 	{
 		m_output_nodes.push_back(get_node(node));
 		m_targets.push_back(nullptr);
-		m_target_weights.push_back(weight);
+		m_loss_weights.push_back(weight);
 	}
 
 	const Tensor& Graph::getInput(int index) const
@@ -224,49 +224,17 @@ namespace ml
 
 		for (size_t i = 0; i < m_targets.size(); i++)
 		{
-			CrossEntropyLoss loss(m_target_weights.at(i));
+			CrossEntropyLoss loss(m_loss_weights.at(i));
 			Shape tmp(getTarget(i).shape());
 			tmp[0] = batchSize;
 			Tensor gradient = getGradient(i).view(tmp);
 			Tensor output = getOutput(i).view(tmp);
 			Tensor target = getTarget(i).view(tmp);
 			loss.getGradient(context(), gradient, output, target);
-
-//			if (std::isnan(testing::normForTest(gradient)))
-//			{
-//				std::cout << "Loss at output " << i << "is NaN\n";
-//				exit(9);
-//			}
-
-//			if (i == 2)
-//			{
-//				for (int j = 0; j < 225; j++)
-//				{
-//					std::cout << "output =";
-//					for (int k = 0; k < 3; k++)
-//						std::cout << ' ' << output.get( { 0, j / 15, j % 15, k });
-//					std::cout << ", target =";
-//					for (int k = 0; k < 3; k++)
-//						std::cout << ' ' << target.get( { 0, j / 15, j % 15, k });
-//					std::cout << ", gradient =";
-//					for (int k = 0; k < 3; k++)
-//						std::cout << ' ' << gradient.get( { 0, j / 15, j % 15, k });
-//					std::cout << '\n';
-//				}
-//			}
 		}
 
 		for (int i = static_cast<int>(m_nodes.size()) - 1; i >= 0; i--)
-		{
 			m_nodes[i]->backward(batchSize, *m_backup_tensor);
-//			if (std::isnan(testing::normForTest(m_nodes[i]->getGradientTensor())))
-//			{
-//				std::cout << "Loss at layer " << m_nodes[i]->getLayer().name() << " is NaN\n";
-//				exit(9);
-//			}
-//			else
-//				std::cout << "successfully backwarded layer " << m_nodes[i]->getLayer().name() << '\n';
-		}
 	}
 	std::vector<float> Graph::getLoss(int batchSize)
 	{
@@ -278,7 +246,7 @@ namespace ml
 		std::vector<float> result(numberOfOutputs());
 		for (size_t i = 0; i < m_targets.size(); i++)
 		{
-			CrossEntropyLoss loss(m_target_weights.at(i));
+			CrossEntropyLoss loss(m_loss_weights.at(i));
 			Shape tmp(getTarget(i).shape());
 			tmp[0] = batchSize;
 			Tensor output = getOutput(i).view(tmp);
@@ -461,9 +429,11 @@ namespace ml
 		Json result;
 		result["is_input_node"] = node->isInputNode();
 		result["is_output_node"] = node->isOutputNode();
-		if(node->isOutputNode())
+		if (node->isOutputNode())
 		{
-			result["loss_weight"] = m_target_weights.at(0); // TODO
+			for (size_t i = 0; i < m_output_nodes.size(); i++)
+				if (m_output_nodes[i] == node)
+					result["loss_weight"] = m_loss_weights.at(i);
 		}
 		result["input_nodes"] = Json(JsonType::Array);
 		for (int i = 0; i < node->numberOfInputs(); i++)
@@ -488,7 +458,10 @@ namespace ml
 		if (json["is_input_node"])
 			m_input_nodes.push_back(m_nodes.back().get());
 		if (json["is_output_node"])
+		{
 			m_output_nodes.push_back(m_nodes.back().get());
+			m_loss_weights.push_back(json["loss_weight"].getDouble());
+		}
 	}
 	int Graph::index_of_node(const GraphNode *node) const noexcept
 	{

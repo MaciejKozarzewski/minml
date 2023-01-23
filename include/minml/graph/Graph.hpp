@@ -39,7 +39,7 @@ namespace ml
 
 			std::vector<std::unique_ptr<GraphNode>> m_nodes;
 			std::vector<std::unique_ptr<Tensor>> m_targets;
-			std::vector<float> m_target_weights;
+			std::vector<float> m_loss_weights;
 
 			std::vector<GraphNode*> m_input_nodes; // non-owning
 			std::vector<GraphNode*> m_output_nodes; // non-owning
