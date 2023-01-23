@@ -80,36 +80,7 @@ namespace ml
 		const Tensor in = input[0].view(shape);
 		Tensor out = output.view(shape);
 
-//		std::cout << "Softmax " << in.shape() << " : " << testing::normForTest(in) << '\n';
-//
-#ifndef NDEBUG
-		context().synchronize();
-		std::cout << "Softmax::forward() : input " << in.info() << "\n";
-		for (int i = 0; i < first_dim; i++)
-		{
-			std::cout << i << " : ";
-			for (int j = 0; j < last_dim; j++)
-				std::cout << in.get( { i, j }) << ' ';
-			std::cout << '\n';
-		}
-		std::cout << "------------------------\n";
-#endif
-
 		activationForward(context(), out, in, m_activation);
-//		out.setall(context(), 1.0f);
-
-//		if (output.rank() == 2)
-//		{
-//			std::cout << "Softmax::forward() : output " << out.info() << "\n";
-//			for (int i = 0; i < first_dim; i++)
-//			{
-//				std::cout << i << " : ";
-//				for (int j = 0; j < last_dim; j++)
-//					std::cout << out.get( { i, j }) << ' ';
-//				std::cout << '\n';
-//			}
-//			std::cout << "------------------------\n";
-//		}
 	}
 	void Softmax::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next)
 	{
