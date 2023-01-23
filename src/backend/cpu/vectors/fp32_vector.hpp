@@ -272,7 +272,7 @@ namespace SIMD_NAMESPACE
 #elif SUPPORTS_SSE2
 		return _mm_and_ps(lhs, rhs);
 #else
-		return bitwise_cast<float>(bitwise_cast<uint32_t>(lhs) & bitwise_cast<uint32_t>(rhs));
+		return bitwise_cast<float>(bitwise_cast<uint32_t>(static_cast<float>(lhs)) & bitwise_cast<uint32_t>(static_cast<float>(rhs)));
 #endif
 	}
 	static inline Vector<float> operator|(Vector<float> lhs, Vector<float> rhs) noexcept
@@ -282,7 +282,7 @@ namespace SIMD_NAMESPACE
 #elif SUPPORTS_SSE2
 		return _mm_or_ps(lhs, rhs);
 #else
-		return bitwise_cast<float>(bitwise_cast<uint32_t>(lhs) | bitwise_cast<uint32_t>(rhs));
+		return bitwise_cast<float>(bitwise_cast<uint32_t>(static_cast<float>(lhs)) | bitwise_cast<uint32_t>(static_cast<float>(rhs)));
 #endif
 	}
 	static inline Vector<float> operator^(Vector<float> lhs, Vector<float> rhs) noexcept
@@ -292,7 +292,7 @@ namespace SIMD_NAMESPACE
 #elif SUPPORTS_SSE2
 		return _mm_xor_ps(lhs, rhs);
 #else
-		return bitwise_cast<float>(bitwise_cast<uint32_t>(lhs) ^ bitwise_cast<uint32_t>(rhs));
+		return bitwise_cast<float>(bitwise_cast<uint32_t>(static_cast<float>(lhs)) ^ bitwise_cast<uint32_t>(static_cast<float>(rhs)));
 #endif
 	}
 	static inline Vector<float> operator~(Vector<float> x) noexcept
@@ -302,7 +302,7 @@ namespace SIMD_NAMESPACE
 #elif SUPPORTS_SSE2
 		return _mm_xor_ps(x, _mm_castsi128_ps(constant<0xFFFFFFFFu>()));
 #else
-		return bitwise_cast<float>(~bitwise_cast<uint32_t>(x));
+		return bitwise_cast<float>(~bitwise_cast<uint32_t>(static_cast<float>(x)));
 #endif
 	}
 	static inline Vector<float> operator!(Vector<float> x) noexcept
