@@ -73,13 +73,14 @@ namespace ml
 			throw IllegalArgument(METHOD_NAME, "Conv2D layer expects either one or two input shapes");
 		if (shapes[0].rank() != 4)
 			throw IllegalArgument(METHOD_NAME, "Conv2D layer expects 4D shapes");
-		if (shapes.size() == 2 and shapes[0] != shapes[1])
-			throw IllegalArgument(METHOD_NAME, "Conv2D layer expects both input shapes to be equal");
 
 		m_input_shapes = shapes;
 		m_height = shapes[0][1];
 		m_width = shapes[0][2];
 		m_input_filters = shapes[0][3];
+
+		if (shapes.size() == 2 and shapes[1] != getOutputShape())
+			throw IllegalArgument(METHOD_NAME, "Conv2D layer expects second input shape to be equal to the output shape");
 	}
 	Shape Conv2D::getOutputShape() const
 	{
