@@ -29,11 +29,15 @@ namespace
 		float workspace[stride];
 		for (int i = 0; i < volume; i += stride)
 		{
-			for (int j = 0; j < 3; j++)
-			{
-				const Vector<T> tmp(src + j * Vector<T>::length, volume - i - j);
-				tmp.store(workspace + j * Vector<T>::length);
-			}
+			int remaining_elements = volume - i;
+			for (int j = 0; j < 3; j++, remaining_elements -= Vector<T>::length)
+				if (remaining_elements > 0)
+				{
+					const Vector<T> tmp(src + j * Vector<T>::length, remaining_elements);
+					tmp.store(workspace + j * Vector<T>::length);
+				}
+				else
+					Vector<T>::zero().store(workspace + j * Vector<T>::length);
 
 			for (int j = 0; j < Vector<T>::length; j++)
 			{
@@ -52,11 +56,13 @@ namespace
 				workspace[j * 3 + 2] = x2 * inv_sum;
 			}
 
-			for (int j = 0; j < 3; j++)
-			{
-				const Vector<T> tmp(workspace + j * Vector<T>::length);
-				tmp.store(dst + j * Vector<T>::length, volume - i - j);
-			}
+			remaining_elements = volume - i;
+			for (int j = 0; j < 3; j++, remaining_elements -= Vector<T>::length)
+				if (remaining_elements > 0)
+				{
+					const Vector<T> tmp(workspace + j * Vector<T>::length);
+					tmp.store(dst + j * Vector<T>::length, remaining_elements);
+				}
 			src += stride;
 			dst += stride;
 		}
