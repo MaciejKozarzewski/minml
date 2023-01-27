@@ -12,6 +12,7 @@
 #include <minml/core/ml_exceptions.hpp>
 #include <minml/utils/json.hpp>
 #include <minml/utils/testing_util.hpp>
+#include <minml/utils/random.hpp>
 
 namespace ml
 {
@@ -84,8 +85,35 @@ namespace ml
 
 	void BatchNormalization::init()
 	{
-		getWeights().getParam().setall(context(), 1.0f);
-		getWeights().getParam().view(Shape( { getInputShape().lastDim() }), 3 * getInputShape().lastDim()).setall(context(), 0.0f);
+		const int last_dim = getInputShape().lastDim();
+		Tensor mean = getWeights().getParam().view(Shape( { last_dim }), 0 * last_dim);
+		Tensor variance = getWeights().getParam().view(Shape( { last_dim }), 1 * last_dim);
+		Tensor gamma = getWeights().getParam().view(Shape( { last_dim }), 2 * last_dim);
+		Tensor beta = getWeights().getParam().view(Shape( { last_dim }), 3 * last_dim);
+
+		mean.setall(context(), 0.0f);
+		variance.setall(context(), 1.0f);
+
+		if (m_use_gamma)
+		{
+			std::vector<float> tmp(last_dim);
+			for (int i = 0; i < last_dim; i++)
+				tmp[i] = 0.9f + 0.2f * randFloat();
+			gamma.copyFromHost(context(), tmp.data(), sizeof(float) * last_dim);
+		}
+		else
+			gamma.setall(context(), 1.0f);
+
+		if (m_use_beta)
+		{
+			std::vector<float> tmp(last_dim);
+			for (int i = 0; i < last_dim; i++)
+				tmp[i] = 0.1f * randFloat();
+			beta.copyFromHost(context(), tmp.data(), sizeof(float) * last_dim);
+		}
+		else
+			beta.setall(context(), 0.0f);
+
 		m_running_stats->zeroall(context());
 		m_total_steps = 0;
 		m_running_id = 0;

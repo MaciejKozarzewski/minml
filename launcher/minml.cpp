@@ -660,7 +660,15 @@ void test_mnist()
 int main()
 {
 	std::cout << "BEGIN" << std::endl;
-	test_mnist();
+//	test_mnist();
+	{
+		Graph graph;
+		FileLoader fl("/home/maciek/alphagomoku/minml_test/minml3v7_10x128_opt.bin");
+		graph.load(fl.getJson(), fl.getBinaryData());
+		graph.moveTo(Device::cpu());
+		graph.setInputShape(Shape( { 1, 15, 15, 32 }));
+		graph.forward(1);
+	}
 	std::cout << "END" << std::endl;
 	return 0;
 

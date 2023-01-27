@@ -22,8 +22,8 @@ namespace ml
 	class Initializer
 	{
 		public:
-			void init_weights(const Context &context, Parameter &bias, float scale, float offset);
-			void init_bias(const Context &context, Parameter &weights, float scale, float offset);
+			void init_weights(const Context &context, Parameter &weights, float scale, float offset);
+			void init_bias(const Context &context, Parameter &bias, float scale, float offset);
 
 			Json serialize(SerializedObject &binary_data) const;
 			void unserialize(const Json &json, const SerializedObject &binary_data);
