@@ -17,18 +17,18 @@ template<int Rank>
 class Indexer
 {
 	public:
-		__device__ Indexer()
+		__host__ __device__ Indexer()
 		{
 		}
-		__device__ int last_dim() const
-		{
-			return 0;
-		}
-		__device__ int at() const
+		__host__ __device__ int last_dim() const
 		{
 			return 0;
 		}
-		__device__ constexpr int rank() const
+		__host__ __device__ int at() const
+		{
+			return 0;
+		}
+		__host__ __device__ constexpr int rank() const
 		{
 			return Rank;
 		}
@@ -40,23 +40,23 @@ class Indexer<1>
 	public:
 		int length;
 	public:
-		__device__ Indexer() // @suppress("Class members should be properly initialized")
+		__host__ __device__ Indexer() // @suppress("Class members should be properly initialized")
 		{
 		}
-		__device__ Indexer(int dim0) :
+		__host__ __device__ Indexer(int dim0) :
 				length(dim0)
 		{
 		}
-		__device__ int last_dim() const
+		__host__ __device__ int last_dim() const
 		{
 			return length;
 		}
-		__device__ int at(int x0) const
+		__host__ __device__ int at(int x0) const
 		{
 			assert(0 <= x0 && x0 < length);
 			return x0;
 		}
-		__device__ constexpr int rank() const
+		__host__ __device__ constexpr int rank() const
 		{
 			return 1;
 		}
@@ -71,10 +71,10 @@ class Indexer<2>
 		int d0, d1;
 #endif
 	public:
-		__device__ Indexer() // @suppress("Class members should be properly initialized")
+		__host__ __device__ Indexer() // @suppress("Class members should be properly initialized")
 		{
 		}
-		__device__ Indexer(int dim0, int dim1) :
+		__host__ __device__ Indexer(int dim0, int dim1) :
 				stride0(dim1)
 		{
 #ifndef NDEBUG
@@ -82,17 +82,17 @@ class Indexer<2>
 			d1 = dim1;
 #endif
 		}
-		__device__ int last_dim() const
+		__host__ __device__ int last_dim() const
 		{
 			return stride0;
 		}
-		__device__ int at(int x0, int x1) const
+		__host__ __device__ int at(int x0, int x1) const
 		{
 			assert(0 <= x0 && x0 < d0);
 			assert(0 <= x1 && x1 < d1);
 			return x0 * stride0 + x1;
 		}
-		__device__ constexpr int rank() const
+		__host__ __device__ constexpr int rank() const
 		{
 			return 2;
 		}
@@ -107,10 +107,10 @@ class Indexer<3>
 		int d0, d1, d2;
 #endif
 	public:
-		__device__ Indexer() // @suppress("Class members should be properly initialized")
+		__host__ __device__ Indexer() // @suppress("Class members should be properly initialized")
 		{
 		}
-		__device__ Indexer(int dim0, int dim1, int dim2) :
+		__host__ __device__ Indexer(int dim0, int dim1, int dim2) :
 				stride0(dim1 * dim2),
 				stride1(dim2)
 		{
@@ -120,18 +120,18 @@ class Indexer<3>
 			d2 = dim2;
 #endif
 		}
-		__device__ int last_dim() const
+		__host__ __device__ int last_dim() const
 		{
 			return stride1;
 		}
-		__device__ int at(int x0, int x1, int x2) const
+		__host__ __device__ int at(int x0, int x1, int x2) const
 		{
 			assert(0 <= x0 && x0 < d0);
 			assert(0 <= x1 && x1 < d1);
 			assert(0 <= x2 && x2 < d2);
 			return x0 * stride0 + x1 * stride1 + x2;
 		}
-		__device__ constexpr int rank() const
+		__host__ __device__ constexpr int rank() const
 		{
 			return 3;
 		}
@@ -146,10 +146,10 @@ class Indexer<4>
 		int d0, d1, d2, d3;
 #endif
 	public:
-		__device__ Indexer() // @suppress("Class members should be properly initialized")
+		__host__ __device__ Indexer() // @suppress("Class members should be properly initialized")
 		{
 		}
-		__device__ Indexer(int dim0, int dim1, int dim2, int dim3) :
+		__host__ __device__ Indexer(int dim0, int dim1, int dim2, int dim3) :
 				stride0(dim1 * dim2 * dim3),
 				stride1(dim2 * dim3),
 				stride2(dim3)
@@ -161,11 +161,11 @@ class Indexer<4>
 			d3 = dim3;
 #endif
 		}
-		__device__ int last_dim() const
+		__host__ __device__ int last_dim() const
 		{
 			return stride2;
 		}
-		__device__ int at(int x0, int x1, int x2, int x3) const
+		__host__ __device__ int at(int x0, int x1, int x2, int x3) const
 		{
 			assert(0 <= x0 && x0 < d0);
 			assert(0 <= x1 && x1 < d1);
@@ -173,7 +173,7 @@ class Indexer<4>
 			assert(0 <= x3 && x3 < d3);
 			return x0 * stride0 + x1 * stride1 + x2 * stride2 + x3;
 		}
-		__device__ constexpr int rank() const
+		__host__ __device__ constexpr int rank() const
 		{
 			return 4;
 		}

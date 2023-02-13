@@ -11,6 +11,8 @@
 #include <cstdint>
 
 #define DEVICE_INLINE __device__ __forceinline__
+#define HOST_DEVICE_INLINE __host__ __device__ __forceinline__
+#define HOST_DEVICE __host__ __device__
 
 #define BF16_COMPUTE_MIN_ARCH 800
 
@@ -20,7 +22,7 @@
 namespace internal
 {
 	template<typename T>
-	__device__ T sgn(T x) noexcept
+	HOST_DEVICE T sgn(T x) noexcept
 	{
 		return (static_cast<T>(0.0) < x) - (x < static_cast<T>(0.0));
 	}
@@ -28,44 +30,44 @@ namespace internal
 
 namespace vectors
 {
-	template<typename T, class dummy = T>
+	template<typename T>
 	class Vector;
 
 	template<typename T>
-	__device__ bool is_aligned(const void * ptr)
+	HOST_DEVICE bool is_aligned(const void *ptr)
 	{
 		return (reinterpret_cast<std::uintptr_t>(ptr) % sizeof(T)) == 0;
 	}
 
 	template<typename T>
-	__device__ constexpr int vector_length()
+	HOST_DEVICE constexpr int vector_length()
 	{
 		return 1;
 	}
 
 	template<typename T>
-	__device__ Vector<T> vector_zero()
+	HOST_DEVICE Vector<T> vector_zero()
 	{
 		return Vector<T>();
 	}
 	template<typename T>
-	__device__ Vector<T> vector_one()
+	HOST_DEVICE Vector<T> vector_one()
 	{
 		return Vector<T>();
 	}
 	template<typename T>
-	__device__ Vector<T> vector_epsilon()
+	HOST_DEVICE Vector<T> vector_epsilon()
 	{
 		return Vector<T>();
 	}
 
 	template<typename T>
-	__device__ Vector<T> square(Vector<T> x)
+	HOST_DEVICE Vector<T> square(Vector<T> x)
 	{
 		return x * x;
 	}
 	template<typename T>
-	__device__ Vector<T> sgn(Vector<T> x) noexcept
+	HOST_DEVICE Vector<T> sgn(Vector<T> x) noexcept
 	{
 		if (x > vector_zero<T>())
 			return vector_one<T>();
@@ -79,92 +81,92 @@ namespace vectors
 	}
 
 	template<typename T>
-	__device__ Vector<T> operator+(const Vector<T> &lhs, T rhs)
+	HOST_DEVICE Vector<T> operator+(const Vector<T> &lhs, T rhs)
 	{
 		return lhs + Vector<T>(rhs);
 	}
 	template<typename T>
-	__device__ Vector<T> operator+(T lhs, const Vector<T> &rhs)
+	HOST_DEVICE Vector<T> operator+(T lhs, const Vector<T> &rhs)
 	{
 		return Vector<T>(lhs) + rhs;
 	}
 	template<typename T>
-	__device__ Vector<T>& operator+=(Vector<T> &lhs, const Vector<T> &rhs)
+	HOST_DEVICE Vector<T>& operator+=(Vector<T> &lhs, const Vector<T> &rhs)
 	{
 		lhs = lhs + rhs;
 		return lhs;
 	}
 	template<typename T>
-	__device__ Vector<T>& operator+=(Vector<T> &lhs, T rhs)
+	HOST_DEVICE Vector<T>& operator+=(Vector<T> &lhs, T rhs)
 	{
 		lhs = lhs + rhs;
 		return lhs;
 	}
 
 	template<typename T>
-	__device__ Vector<T> operator-(const Vector<T> &lhs, T rhs)
+	HOST_DEVICE Vector<T> operator-(const Vector<T> &lhs, T rhs)
 	{
 		return lhs - Vector<T>(rhs);
 	}
 	template<typename T>
-	__device__ Vector<T> operator-(T lhs, const Vector<T> &rhs)
+	HOST_DEVICE Vector<T> operator-(T lhs, const Vector<T> &rhs)
 	{
 		return Vector<T>(lhs) - rhs;
 	}
 	template<typename T>
-	__device__ Vector<T>& operator-=(Vector<T> &lhs, const Vector<T> &rhs)
+	HOST_DEVICE Vector<T>& operator-=(Vector<T> &lhs, const Vector<T> &rhs)
 	{
 		lhs = lhs - rhs;
 		return lhs;
 	}
 	template<typename T>
-	__device__ Vector<T>& operator-=(Vector<T> &lhs, T rhs)
+	HOST_DEVICE Vector<T>& operator-=(Vector<T> &lhs, T rhs)
 	{
 		lhs = lhs - rhs;
 		return lhs;
 	}
 
 	template<typename T>
-	__device__ Vector<T> operator*(const Vector<T> &lhs, T rhs)
+	HOST_DEVICE Vector<T> operator*(const Vector<T> &lhs, T rhs)
 	{
 		return lhs * Vector<T>(rhs);
 	}
 	template<typename T>
-	__device__ Vector<T> operator*(T lhs, const Vector<T> &rhs)
+	HOST_DEVICE Vector<T> operator*(T lhs, const Vector<T> &rhs)
 	{
 		return Vector<T>(lhs) * rhs;
 	}
 	template<typename T>
-	__device__ Vector<T>& operator*=(Vector<T> &lhs, const Vector<T> &rhs)
+	HOST_DEVICE Vector<T>& operator*=(Vector<T> &lhs, const Vector<T> &rhs)
 	{
 		lhs = lhs * rhs;
 		return lhs;
 	}
 	template<typename T>
-	__device__ Vector<T>& operator*=(Vector<T> &lhs, T rhs)
+	HOST_DEVICE Vector<T>& operator*=(Vector<T> &lhs, T rhs)
 	{
 		lhs = lhs * rhs;
 		return lhs;
 	}
 
 	template<typename T>
-	__device__ Vector<T> operator/(const Vector<T> &lhs, T rhs)
+	HOST_DEVICE Vector<T> operator/(const Vector<T> &lhs, T rhs)
 	{
 		return lhs / Vector<T>(rhs);
 	}
 	template<typename T>
-	__device__ Vector<T> operator/(T lhs, const Vector<T> &rhs)
+	HOST_DEVICE Vector<T> operator/(T lhs, const Vector<T> &rhs)
 	{
 		return Vector<T>(lhs) / rhs;
 	}
 	template<typename T>
-	__device__ Vector<T>& operator/=(Vector<T> &lhs, const Vector<T> &rhs)
+	HOST_DEVICE Vector<T>& operator/=(Vector<T> &lhs, const Vector<T> &rhs)
 	{
 		lhs = lhs / rhs;
 		return lhs;
 	}
 	template<typename T>
-	__device__ Vector<T>& operator/=(Vector<T> &lhs, T rhs)
+	HOST_DEVICE Vector<T>& operator/=(Vector<T> &lhs, T rhs)
 	{
 		lhs = lhs / rhs;
 		return lhs;

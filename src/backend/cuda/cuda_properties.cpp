@@ -117,6 +117,25 @@ namespace ml
 			const int sm_ver = cuda::get_compute_capability(cuda::Context::getDeviceIndex(context));
 			return sm_ver >= 80;
 		}
+
+		bool has_tensor_cores(mlContext_t context)
+		{
+			const int index = cuda::Context::getDeviceIndex(context);
+			const int sm_ver = cuda::get_compute_capability(index);
+			if (sm_ver >= 75)
+			{
+				if (sm_ver == 75)
+				{
+					const std::string name = get_device_properties().at(index).name;
+					return name.find("RTX") != std::string::npos;
+				}
+				else
+					return true;
+			}
+			else
+				return false;
+
+		}
 	}
 } /* namespace ml */
 

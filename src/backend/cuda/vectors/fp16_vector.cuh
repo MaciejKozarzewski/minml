@@ -28,63 +28,63 @@ namespace vectors
 #else
 #endif
 		public:
-			__device__ Vector() // @suppress("Class members should be properly initialized")
+			HOST_DEVICE Vector() // @suppress("Class members should be properly initialized")
 			{
 			}
 #if __CUDA_ARCH__ >= FP16_COMPUTE_MIN_ARCH
-			__device__ Vector(half2 x) :
+			HOST_DEVICE Vector(half2 x) :
 					m_data(x)
 			{
 			}
-			__device__ Vector(half x) :
+			HOST_DEVICE Vector(half x) :
 					m_data(x, x)
 			{
 			}
-			__device__ Vector(half x, half y) :
+			HOST_DEVICE Vector(half x, half y) :
 					m_data(x, y)
 			{
 			}
-			__device__ Vector(float x) :
+			HOST_DEVICE Vector(float x) :
 					m_data(x, x)
 			{
 			}
-			__device__ Vector(float x, float y) :
+			HOST_DEVICE Vector(float x, float y) :
 					m_data(x, y)
 			{
 			}
 #elif __CUDA_ARCH__ >= FP16_STORAGE_MIN_ARCH
-			__device__ Vector(half x) :
+			HOST_DEVICE Vector(half x) :
 					m_data(x)
 			{
 			}
-			__device__ Vector(float x) :
+			HOST_DEVICE Vector(float x) :
 					m_data(x)
 			{
 			}
 #else
-			__device__ Vector(half x)
+			HOST_DEVICE Vector(half x)
 			{
 				assert(false);
 			}
-			__device__ Vector(float x)
+			HOST_DEVICE Vector(float x)
 			{
 				assert(false);
 			}
-			__device__ Vector(double x)
+			HOST_DEVICE Vector(double x)
 			{
 				assert(false);
 			}
 #endif
 #if __CUDA_ARCH__ >= FP16_COMPUTE_MIN_ARCH
-			__device__ Vector(const half * __restrict__ ptr, int num = 2)
+			HOST_DEVICE Vector(const half * __restrict__ ptr, int num = 2)
 			{
 				load(ptr, num);
 			}
-			__device__ Vector(const float * __restrict__ ptr, int num = 2)
+			HOST_DEVICE Vector(const float * __restrict__ ptr, int num = 2)
 			{
 				load(ptr, num);
 			}
-			__device__ void load(const half * __restrict__ ptr, int num = 2)
+			HOST_DEVICE void load(const half * __restrict__ ptr, int num = 2)
 			{
 				assert(ptr != nullptr);
 				assert(num >= 0);
@@ -103,7 +103,7 @@ namespace vectors
 						m_data = half2(0.0f, 0.0f);
 				}
 			}
-			__device__ void load(const float * __restrict__ ptr, int num = 2)
+			HOST_DEVICE void load(const float * __restrict__ ptr, int num = 2)
 			{
 				assert(ptr != nullptr);
 				assert(num >= 0);
@@ -117,7 +117,7 @@ namespace vectors
 						m_data = half2(0.0f, 0.0f);
 				}
 			}
-			__device__ void store(half * __restrict__ ptr, int num = 2) const
+			HOST_DEVICE void store(half * __restrict__ ptr, int num = 2) const
 			{
 				assert(ptr != nullptr);
 				assert(num >= 0);
@@ -137,7 +137,7 @@ namespace vectors
 						ptr[0] = m_data.x;
 				}
 			}
-			__device__ void store(float * __restrict__ ptr, int num = 2) const
+			HOST_DEVICE void store(float * __restrict__ ptr, int num = 2) const
 			{
 				assert(ptr != nullptr);
 				assert(num >= 0);
@@ -152,108 +152,108 @@ namespace vectors
 						ptr[0] = static_cast<float>(m_data.x);
 				}
 			}
-			__device__ operator half2() const
+			HOST_DEVICE operator half2() const
 			{
 				return m_data;
 			}
-			__device__ half low() const
+			HOST_DEVICE half low() const
 			{
 				return m_data.x;
 			}
-			__device__ half high() const
+			HOST_DEVICE half high() const
 			{
 				return m_data.y;
 			}
-			__device__ Vector<half> operator-() const
+			HOST_DEVICE Vector<half> operator-() const
 			{
 				return __hneg2(m_data);
 			}
 #elif __CUDA_ARCH__ >= FP16_STORAGE_MIN_ARCH
-			__device__ Vector(const half * __restrict__ ptr, int num = 1)
+			HOST_DEVICE Vector(const half * __restrict__ ptr, int num = 1)
 			{
 				load(ptr, num);
 			}
-			__device__ Vector(const float * __restrict__ ptr, int num = 1)
+			HOST_DEVICE Vector(const float * __restrict__ ptr, int num = 1)
 			{
 				load(ptr, num);
 			}
-			__device__ void load(const half * __restrict__ ptr, int num = 1)
+			HOST_DEVICE void load(const half * __restrict__ ptr, int num = 1)
 			{
 				assert(ptr != nullptr);
 				assert(num >= 0);
 				if (num >= 1)
 					m_data = static_cast<float>(ptr[0]);
 			}
-			__device__ void load(const float * __restrict__ ptr, int num = 1)
+			HOST_DEVICE void load(const float * __restrict__ ptr, int num = 1)
 			{
 				assert(ptr != nullptr);
 				assert(num >= 0);
 				if (num >= 1)
 					m_data = ptr[0];
 			}
-			__device__ void store(half * __restrict__ ptr, int num = 1) const
+			HOST_DEVICE void store(half * __restrict__ ptr, int num = 1) const
 			{
 				assert(ptr != nullptr);
 				assert(num >= 0);
 				if (num >= 1)
 					ptr[0] = m_data;
 			}
-			__device__ void store(float * __restrict__ ptr, int num = 1) const
+			HOST_DEVICE void store(float * __restrict__ ptr, int num = 1) const
 			{
 				assert(ptr != nullptr);
 				assert(num >= 0);
 				if (num >= 1)
 					ptr[0] = m_data;
 			}
-			__device__ operator float() const
+			HOST_DEVICE operator float() const
 			{
 				return m_data;
 			}
-			__device__ Vector<half> operator-() const
+			HOST_DEVICE Vector<half> operator-() const
 			{
 				return Vector<half>(-m_data);
 			}
-			__device__ half get() const
+			HOST_DEVICE half get() const
 			{
 				return m_data;
 			}
 #else
-			__device__ Vector(const half *__restrict__ ptr, int num = 0)
+			HOST_DEVICE Vector(const half *__restrict__ ptr, int num = 0)
 			{
 				assert(false);
 			}
-			__device__ Vector(const float *__restrict__ ptr, int num = 0)
+			HOST_DEVICE Vector(const float *__restrict__ ptr, int num = 0)
 			{
 				assert(false);
 			}
-			__device__ void load(const half *__restrict__ ptr, int num = 0)
+			HOST_DEVICE void load(const half *__restrict__ ptr, int num = 0)
 			{
 				assert(false);
 			}
-			__device__ void load(const float *__restrict__ ptr, int num = 0)
+			HOST_DEVICE void load(const float *__restrict__ ptr, int num = 0)
 			{
 				assert(false);
 			}
-			__device__ void store(half *__restrict__ ptr, int num = 0) const
+			HOST_DEVICE void store(half *__restrict__ ptr, int num = 0) const
 			{
 				assert(false);
 			}
-			__device__ void store(float *__restrict__ ptr, int num = 0) const
+			HOST_DEVICE void store(float *__restrict__ ptr, int num = 0) const
 			{
 				assert(false);
 			}
-			__device__ operator float() const
+			HOST_DEVICE operator float() const
 			{
 				assert(false);
 				return 0.0f;
 			}
-			__device__ Vector<half> operator-() const
+			HOST_DEVICE Vector<half> operator-() const
 			{
 				assert(false);
 				return Vector<half>(0.0f);
 			}
 #endif
-			__device__ Vector<half> operator~() const
+			HOST_DEVICE Vector<half> operator~() const
 			{
 #if __CUDA_ARCH__ >= FP16_STORAGE_MIN_ARCH
 				const uint32_t tmp = ~reinterpret_cast<const uint32_t*>(&m_data)[0];
@@ -266,7 +266,7 @@ namespace vectors
 	};
 
 	template<>
-	DEVICE_INLINE constexpr int vector_length<half>()
+	HOST_DEVICE_INLINE constexpr int vector_length<half>()
 	{
 #if __CUDA_ARCH__ >= FP16_COMPUTE_MIN_ARCH
 		return 2;
@@ -278,22 +278,22 @@ namespace vectors
 	}
 
 	template<>
-	DEVICE_INLINE Vector<half> vector_zero()
+	HOST_DEVICE_INLINE Vector<half> vector_zero()
 	{
 		return Vector<half>(0.0f);
 	}
 	template<>
-	DEVICE_INLINE Vector<half> vector_one()
+	HOST_DEVICE_INLINE Vector<half> vector_one()
 	{
 		return Vector<half>(1.0f);
 	}
 	template<>
-	DEVICE_INLINE Vector<half> vector_epsilon()
+	HOST_DEVICE_INLINE Vector<half> vector_epsilon()
 	{
 		return Vector<half>(0.00006103515625f);
 	}
 
-	DEVICE_INLINE Vector<half> operator+(const Vector<half> &lhs, const Vector<half> &rhs)
+	HOST_DEVICE_INLINE Vector<half> operator+(const Vector<half> &lhs, const Vector<half> &rhs)
 	{
 #if __CUDA_ARCH__ >= FP16_COMPUTE_MIN_ARCH
 		return __hadd2(lhs, rhs);
@@ -303,7 +303,7 @@ namespace vectors
 		return Vector<half>();
 #endif
 	}
-	DEVICE_INLINE Vector<half> operator-(const Vector<half> &lhs, const Vector<half> &rhs)
+	HOST_DEVICE_INLINE Vector<half> operator-(const Vector<half> &lhs, const Vector<half> &rhs)
 	{
 #if __CUDA_ARCH__ >= FP16_COMPUTE_MIN_ARCH
 		return __hsub2(lhs, rhs);
@@ -313,7 +313,7 @@ namespace vectors
 		return Vector<half>();
 #endif
 	}
-	DEVICE_INLINE Vector<half> operator*(const Vector<half> &lhs, const Vector<half> &rhs)
+	HOST_DEVICE_INLINE Vector<half> operator*(const Vector<half> &lhs, const Vector<half> &rhs)
 	{
 #if __CUDA_ARCH__ >= FP16_COMPUTE_MIN_ARCH
 		return __hmul2(lhs, rhs);
@@ -323,7 +323,7 @@ namespace vectors
 		return Vector<half>();
 #endif
 	}
-	DEVICE_INLINE Vector<half> operator/(const Vector<half> &lhs, const Vector<half> &rhs)
+	HOST_DEVICE_INLINE Vector<half> operator/(const Vector<half> &lhs, const Vector<half> &rhs)
 	{
 #if __CUDA_ARCH__ >= FP16_COMPUTE_MIN_ARCH
 		return __h2div(lhs, rhs);
@@ -336,7 +336,7 @@ namespace vectors
 
 	// TODO add fused multiply-add instructions (__hfma2)
 
-	DEVICE_INLINE Vector<half> sgn(Vector<half> x) noexcept
+	HOST_DEVICE_INLINE Vector<half> sgn(Vector<half> x) noexcept
 	{
 #if __CUDA_ARCH__ >= FP16_COMPUTE_MIN_ARCH
 		half2 tmp = x;
@@ -350,7 +350,7 @@ namespace vectors
 		return Vector<half>();
 #endif
 	}
-	DEVICE_INLINE Vector<half> abs(Vector<half> x) noexcept
+	HOST_DEVICE_INLINE Vector<half> abs(Vector<half> x) noexcept
 	{
 #if __CUDA_ARCH__ >= FP16_COMPUTE_MIN_ARCH
 		return __habs2(x);
@@ -360,7 +360,7 @@ namespace vectors
 		return Vector<half>();
 #endif
 	}
-	DEVICE_INLINE Vector<half> max(Vector<half> x, Vector<half> y)
+	HOST_DEVICE_INLINE Vector<half> max(Vector<half> x, Vector<half> y)
 	{
 #if __CUDA_ARCH__ >= FP16_COMPUTE_MIN_ARCH
 		return __hmax2(x, y);
@@ -370,7 +370,7 @@ namespace vectors
 		return Vector<half>();
 #endif
 	}
-	DEVICE_INLINE Vector<half> min(Vector<half> x, Vector<half> y)
+	HOST_DEVICE_INLINE Vector<half> min(Vector<half> x, Vector<half> y)
 	{
 #if __CUDA_ARCH__ >= FP16_COMPUTE_MIN_ARCH
 		return __hmin2(x, y);
@@ -380,7 +380,7 @@ namespace vectors
 		return Vector<half>();
 #endif
 	}
-	DEVICE_INLINE Vector<half> ceil(Vector<half> x)
+	HOST_DEVICE_INLINE Vector<half> ceil(Vector<half> x)
 	{
 #if __CUDA_ARCH__ >= FP16_COMPUTE_MIN_ARCH
 		return h2ceil(x);
@@ -390,7 +390,7 @@ namespace vectors
 		return Vector<half>();
 #endif
 	}
-	DEVICE_INLINE Vector<half> floor(Vector<half> x)
+	HOST_DEVICE_INLINE Vector<half> floor(Vector<half> x)
 	{
 #if __CUDA_ARCH__ >= FP16_COMPUTE_MIN_ARCH
 		return h2floor(x);
@@ -400,7 +400,7 @@ namespace vectors
 		return Vector<half>();
 #endif
 	}
-	DEVICE_INLINE Vector<half> sqrt(Vector<half> x)
+	HOST_DEVICE_INLINE Vector<half> sqrt(Vector<half> x)
 	{
 #if __CUDA_ARCH__ >= FP16_COMPUTE_MIN_ARCH
 		return h2sqrt(x);
@@ -410,7 +410,7 @@ namespace vectors
 		return Vector<half>();
 #endif
 	}
-	DEVICE_INLINE Vector<half> pow(Vector<half> x, Vector<half> y)
+	HOST_DEVICE_INLINE Vector<half> pow(Vector<half> x, Vector<half> y)
 	{
 #if __CUDA_ARCH__ >= FP16_COMPUTE_MIN_ARCH
 		return Vector<half>(powf(static_cast<float>(x.low()), static_cast<float>(y.low())), powf(static_cast<float>(x.high()), static_cast<float>(y.high())));
@@ -420,7 +420,7 @@ namespace vectors
 		return Vector<half>();
 #endif
 	}
-	DEVICE_INLINE Vector<half> mod(Vector<half> x, Vector<half> y)
+	HOST_DEVICE_INLINE Vector<half> mod(Vector<half> x, Vector<half> y)
 	{
 #if __CUDA_ARCH__ >= FP16_COMPUTE_MIN_ARCH
 		return Vector<half>(fmodf(static_cast<float>(x.low()), static_cast<float>(y.low())),
@@ -431,7 +431,7 @@ namespace vectors
 		return Vector<half>();
 #endif
 	}
-	DEVICE_INLINE Vector<half> exp(Vector<half> x)
+	HOST_DEVICE_INLINE Vector<half> exp(Vector<half> x)
 	{
 #if __CUDA_ARCH__ >= FP16_COMPUTE_MIN_ARCH
 		return h2exp(x);
@@ -441,7 +441,7 @@ namespace vectors
 		return Vector<half>();
 #endif
 	}
-	DEVICE_INLINE Vector<half> log(Vector<half> x)
+	HOST_DEVICE_INLINE Vector<half> log(Vector<half> x)
 	{
 #if __CUDA_ARCH__ >= FP16_COMPUTE_MIN_ARCH
 		return h2log(x);
@@ -451,7 +451,7 @@ namespace vectors
 		return Vector<half>();
 #endif
 	}
-	DEVICE_INLINE Vector<half> tanh(Vector<half> x)
+	HOST_DEVICE_INLINE Vector<half> tanh(Vector<half> x)
 	{
 #if __CUDA_ARCH__ >= FP16_COMPUTE_MIN_ARCH
 		return Vector<half>(tanhf(static_cast<float>(x.low())), tanhf(static_cast<float>(x.high())));
@@ -461,7 +461,7 @@ namespace vectors
 		return Vector<half>();
 #endif
 	}
-	DEVICE_INLINE Vector<half> expm1(Vector<half> x)
+	HOST_DEVICE_INLINE Vector<half> expm1(Vector<half> x)
 	{
 #if __CUDA_ARCH__ >= FP16_COMPUTE_MIN_ARCH
 		return h2exp(x) - static_cast<__half2 >(vector_one<half>());
@@ -471,7 +471,7 @@ namespace vectors
 		return Vector<half>();
 #endif
 	}
-	DEVICE_INLINE Vector<half> log1p(Vector<half> x)
+	HOST_DEVICE_INLINE Vector<half> log1p(Vector<half> x)
 	{
 #if __CUDA_ARCH__ >= FP16_COMPUTE_MIN_ARCH
 		return h2log(vector_one<half>() + x);
@@ -481,7 +481,7 @@ namespace vectors
 		return Vector<half>();
 #endif
 	}
-	DEVICE_INLINE Vector<half> sin(Vector<half> x)
+	HOST_DEVICE_INLINE Vector<half> sin(Vector<half> x)
 	{
 #if __CUDA_ARCH__ >= FP16_COMPUTE_MIN_ARCH
 		return h2sin(x);
@@ -491,7 +491,7 @@ namespace vectors
 		return Vector<half>();
 #endif
 	}
-	DEVICE_INLINE Vector<half> cos(Vector<half> x)
+	HOST_DEVICE_INLINE Vector<half> cos(Vector<half> x)
 	{
 #if __CUDA_ARCH__ >= FP16_COMPUTE_MIN_ARCH
 		return h2cos(x);
@@ -501,7 +501,7 @@ namespace vectors
 		return Vector<half>();
 #endif
 	}
-	DEVICE_INLINE Vector<half> tan(Vector<half> x)
+	HOST_DEVICE_INLINE Vector<half> tan(Vector<half> x)
 	{
 #if __CUDA_ARCH__ >= FP16_COMPUTE_MIN_ARCH
 		return Vector<half>(tanf(static_cast<float>(x.low())), tanf(static_cast<float>(x.high())));
@@ -512,7 +512,7 @@ namespace vectors
 #endif
 	}
 
-	DEVICE_INLINE half horizontal_add(Vector<half> x)
+	HOST_DEVICE_INLINE half horizontal_add(Vector<half> x)
 	{
 #if __CUDA_ARCH__ >= FP16_COMPUTE_MIN_ARCH
 		__hadd(x.low(), x.high());
@@ -522,7 +522,7 @@ namespace vectors
 		return half();
 #endif
 	}
-	DEVICE_INLINE half horizontal_mul(Vector<half> x)
+	HOST_DEVICE_INLINE half horizontal_mul(Vector<half> x)
 	{
 #if __CUDA_ARCH__ >= FP16_COMPUTE_MIN_ARCH
 		__hmul(x.low(), x.high());
@@ -532,7 +532,7 @@ namespace vectors
 		return half();
 #endif
 	}
-	DEVICE_INLINE half horizontal_max(Vector<half> x)
+	HOST_DEVICE_INLINE half horizontal_max(Vector<half> x)
 	{
 #if __CUDA_ARCH__ >= FP16_COMPUTE_MIN_ARCH
 		return __hmax(x.low(), x.high());
@@ -542,7 +542,7 @@ namespace vectors
 		return half();
 #endif
 	}
-	DEVICE_INLINE half horizontal_min(Vector<half> x)
+	HOST_DEVICE_INLINE half horizontal_min(Vector<half> x)
 	{
 #if __CUDA_ARCH__ >= FP16_COMPUTE_MIN_ARCH
 		return __hmin(x.low(), x.high());
@@ -552,11 +552,11 @@ namespace vectors
 		return half();
 #endif
 	}
-	DEVICE_INLINE half horizontal_or(Vector<half> x)
+	HOST_DEVICE_INLINE half horizontal_or(Vector<half> x)
 	{
 		return half(); // TODO
 	}
-	DEVICE_INLINE half horizontal_and(Vector<half> x)
+	HOST_DEVICE_INLINE half horizontal_and(Vector<half> x)
 	{
 		return half(); // TODO
 	}

@@ -25,7 +25,7 @@ namespace internal
 			T x0;
 	};
 	template<typename T>
-	struct Storage<T, 2>
+	struct __builtin_align__(2 * sizeof(T)) Storage<T, 2>
 	{
 			T x0, x1;
 	};
@@ -35,7 +35,7 @@ namespace internal
 			T x0, x1, x2;
 	};
 	template<typename T>
-	struct Storage<T, 4>
+	struct __builtin_align__(4 * sizeof(T)) Storage<T, 4>
 	{
 			T x0, x1, x2, x3;
 	};
@@ -50,30 +50,35 @@ namespace internal
 			T x0, x1, x2, x3, x4, x5;
 	};
 	template<typename T>
-	struct Storage<T, 8>
+	struct __builtin_align__(4 * sizeof(T)) Storage<T, 8>
 	{
 			T x0, x1, x2, x3, x4, x5, x6, x7;
+	};
+	template<typename T>
+	struct __builtin_align__(4 * sizeof(T)) Storage<T, 16>
+	{
+			T x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12, x13, x14, x15;
 	};
 }
 
 template<typename T, int N>
 struct Line: internal::Storage<T, N>
 {
-		__device__ constexpr int size() const
+		__host__ __device__ constexpr int size() const
 		{
 			return N;
 		}
-		__device__ T& operator[](int index)
+		__host__ __device__ T& operator[](int index)
 		{
 			assert(0 <= index && index < size());
 			return reinterpret_cast<T*>(this)[index];
 		}
-		__device__ T operator[](int index) const
+		__host__ __device__ T operator[](int index) const
 		{
 			assert(0 <= index && index < size());
 			return reinterpret_cast<const T*>(this)[index];
 		}
-		__device__ void fill(T value)
+		__host__ __device__ void fill(T value)
 		{
 			for (int i = 0; i < size(); i++)
 				reinterpret_cast<T*>(this)[i] = value;
@@ -83,47 +88,47 @@ struct Line: internal::Storage<T, N>
 template<typename T, int Rows, int Cols>
 struct Tile: internal::Storage<Line<T, Cols>, Rows>
 {
-		__device__ constexpr int rows() const
+		__host__ __device__ constexpr int rows() const
 		{
 			return Rows;
 		}
-		__device__ constexpr int columns() const
+		__host__ __device__ constexpr int columns() const
 		{
 			return Cols;
 		}
-		__device__ constexpr int size() const
+		__host__ __device__ constexpr int size() const
 		{
 			return rows() * columns();
 		}
-		__device__ T& at(int row, int col)
+		__host__ __device__ T& at(int row, int col)
 		{
 			return reinterpret_cast<T*>(this)[row * columns() + col];
 		}
-		__device__ T at(int row, int col) const
+		__host__ __device__ T at(int row, int col) const
 		{
 			return reinterpret_cast<const T*>(this)[row * columns() + col];
 		}
-		__device__ Line<T, Cols>& get_row(int index)
+		__host__ __device__ Line<T, Cols>& get_row(int index)
 		{
 			assert(0 <= index && index < rows());
 			return reinterpret_cast<Line<T, Cols>*>(this)[index];
 		}
-		__device__ Line<T, Cols> get_row(int index) const
+		__host__ __device__ Line<T, Cols> get_row(int index) const
 		{
 			assert(0 <= index && index < rows());
 			return reinterpret_cast<const Line<T, Cols>*>(this)[index];
 		}
-		__device__ void fill(T value)
+		__host__ __device__ void fill(T value)
 		{
 			for (int i = 0; i < rows(); i++)
 				get_row(i).fill(value);
 		}
-		__device__ T& operator[](int index)
+		__host__ __device__ T& operator[](int index)
 		{
 			assert(0 <= index && index < size());
 			return reinterpret_cast<T*>(this)[index];
 		}
-		__device__ T operator[](int index) const
+		__host__ __device__ T operator[](int index) const
 		{
 			assert(0 <= index && index < size());
 			return reinterpret_cast<const T*>(this)[index];

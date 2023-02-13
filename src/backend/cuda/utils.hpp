@@ -56,6 +56,7 @@ namespace ml
 
 		bool has_fp16_math(mlContext_t context);
 		bool has_bf16_math(mlContext_t context);
+		bool has_tensor_cores(mlContext_t context);
 
 		int get_cuda_arch(int device_index);
 

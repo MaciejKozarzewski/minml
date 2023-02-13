@@ -255,19 +255,23 @@ namespace
 	/*
 	 * host code
 	 */
-
+	template<typename T>
+	bool is_fp32()
+	{
+		return std::is_same<T, float>::value;
+	}
 	int get_kernel_size(const mlShape_t &weight_shape)
 	{
 		assert(weight_shape.rank == 4);
 		assert(weight_shape.dim[1] == weight_shape.dim[2]);
 		return weight_shape.dim[1];
 	}
-	int get_transform_size(const mlShape_t &weight_shape)
+	int get_transform_size(mlContext_t context, const mlShape_t &weight_shape, bool is_float32)
 	{
 		switch (get_kernel_size(weight_shape))
 		{
 			case 3:
-				return 4; // get_last_dim(weight_shape) <= 4 ? 2 : 4;
+				return 2;//(ml::cuda::has_tensor_cores(context) and not is_float32) ? 2 : 4;
 			case 5:
 				return 2;
 			default:
@@ -286,7 +290,7 @@ namespace
 		const int filters_in = weight_shape.dim[3];
 
 		const int kernel_size = get_kernel_size(weight_shape);
-		const int transform_size = get_transform_size(weight_shape);
+		const int transform_size = get_transform_size(context, weight_shape, is_fp32<T>());
 
 		const int max_threads = cuda::has_fp16_math(context) ? 64 : 128;
 		dim3 blockSize(std::min(max_threads, filters_in));
@@ -295,9 +299,9 @@ namespace
 
 		if (kernel_size == 3)
 		{
-//			if (transform_size == 2)
-//				kernel_transform_weights<3, 2> <<<gridSize, blockSize, 0, stream>>>(getPointer<T>(matrices), getPointer<T>(weights), filters_out,
-//						filters_in, invert, low_precision);
+			if (transform_size == 2)
+				kernel_transform_weights<3, 2> <<<gridSize, blockSize, 0, stream>>>(getPointer<T>(matrices), getPointer<T>(weights), filters_out,
+						filters_in, invert, low_precision);
 			if (transform_size == 4)
 				kernel_transform_weights<3, 4> <<<gridSize, blockSize, 0, stream>>>(getPointer<T>(matrices), getPointer<T>(weights), filters_out,
 						filters_in, invert, low_precision);
@@ -319,7 +323,7 @@ namespace
 		const int filters = input_shape.dim[3];
 
 		const int kernel_size = get_kernel_size(weight_shape);
-		const int transform_size = get_transform_size(weight_shape);
+		const int transform_size = get_transform_size(context, weight_shape, is_fp32<T>());
 
 		const int tiles_h = get_number_of_tiles(height, transform_size);
 		const int tiles_w = get_number_of_tiles(width, transform_size);
@@ -331,9 +335,9 @@ namespace
 
 		if (kernel_size == 3)
 		{
-//			if (transform_size == 2)
-//				kernel_transform_input<3, 2> <<<gridSize, blockSize, 0, stream>>>(getPointer<T>(matrices), getPointer<T>(input), batch_size, height,
-//						width, filters);
+			if (transform_size == 2)
+				kernel_transform_input<3, 2> <<<gridSize, blockSize, 0, stream>>>(getPointer<T>(matrices), getPointer<T>(input), batch_size, height,
+						width, filters);
 			if (transform_size == 4)
 				kernel_transform_input<3, 4> <<<gridSize, blockSize, 0, stream>>>(getPointer<T>(matrices), getPointer<T>(input), batch_size, height,
 						width, filters);
@@ -357,7 +361,7 @@ namespace
 		const int filters = output_shape.dim[3];
 
 		const int kernel_size = get_kernel_size(weight_shape);
-		const int transform_size = get_transform_size(weight_shape);
+		const int transform_size = get_transform_size(context, weight_shape, is_fp32<T>());
 
 		const int tiles_h = get_number_of_tiles(height, transform_size);
 		const int tiles_w = get_number_of_tiles(width, transform_size);
@@ -369,9 +373,9 @@ namespace
 
 		if (kernel_size == 3)
 		{
-//			if (transform_size == 2)
-//				kernel_transform_output<3, 2> <<<gridSize, blockSize, 0, stream>>>(getPointer<T>(matrices), getPointer<T>(output), getPointer<T>(add),
-//						getPointer<T>(bias), act, batch_size, height, width, filters);
+			if (transform_size == 2)
+				kernel_transform_output<3, 2> <<<gridSize, blockSize, 0, stream>>>(getPointer<T>(matrices), getPointer<T>(output), getPointer<T>(add),
+						getPointer<T>(bias), act, batch_size, height, width, filters);
 			if (transform_size == 4)
 				kernel_transform_output<3, 4> <<<gridSize, blockSize, 0, stream>>>(getPointer<T>(matrices), getPointer<T>(output), getPointer<T>(add),
 						getPointer<T>(bias), act, batch_size, height, width, filters);
@@ -446,7 +450,7 @@ namespace ml
 		const int filters = gradient_shape.dim[3];
 
 		const int kernel_size = get_kernel_size(weight_shape);
-		const int transform_size = get_transform_size(weight_shape);
+		const int transform_size = get_transform_size(context, weight_shape, true);
 
 		const int tiles_h = get_number_of_tiles(height, transform_size);
 		const int tiles_w = get_number_of_tiles(width, transform_size);
@@ -458,9 +462,9 @@ namespace ml
 
 		if (kernel_size == 3)
 		{
-//			if (transform_size == 2)
-//				kernel_transform_gradient<3, 2> <<<gridSize, blockSize, 0, stream>>>(getPointer<float>(matrices), getPointer<float>(gradient),
-//						batch_size, height, width, filters);
+			if (transform_size == 2)
+				kernel_transform_gradient<3, 2> <<<gridSize, blockSize, 0, stream>>>(getPointer<float>(matrices), getPointer<float>(gradient),
+						batch_size, height, width, filters);
 			if (transform_size == 4)
 				kernel_transform_gradient<3, 4> <<<gridSize, blockSize, 0, stream>>>(getPointer<float>(matrices), getPointer<float>(gradient),
 						batch_size, height, width, filters);
@@ -478,7 +482,7 @@ namespace ml
 		const int filters_in = weight_shape.dim[3];
 
 		const int kernel_size = get_kernel_size(weight_shape);
-		const int transform_size = get_transform_size(weight_shape);
+		const int transform_size = get_transform_size(context, weight_shape, true);
 
 		const int max_threads = cuda::has_fp16_math(context) ? 64 : 128;
 		dim3 blockSize(std::min(max_threads, filters_in));
@@ -487,9 +491,9 @@ namespace ml
 
 		if (kernel_size == 3)
 		{
-//			if (transform_size == 2)
-//				kernel_transform_update<3, 2> <<<gridSize, blockSize, 0, stream>>>(getPointer<float>(matrices), getPointer<float>(update),
-//						filters_out, filters_in);
+			if (transform_size == 2)
+				kernel_transform_update<3, 2> <<<gridSize, blockSize, 0, stream>>>(getPointer<float>(matrices), getPointer<float>(update),
+						filters_out, filters_in);
 			if (transform_size == 4)
 				kernel_transform_update<3, 4> <<<gridSize, blockSize, 0, stream>>>(getPointer<float>(matrices), getPointer<float>(update),
 						filters_out, filters_in);

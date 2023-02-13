@@ -31,7 +31,7 @@ namespace
 
 	__device__ float round_small_to_zero(float x)
 	{
-		return (fabsf(x) < 1.0e-8f) ? 0.0f : x;
+		return (fabsf(x) < 1.0e-6f) ? 0.0f : x;
 	}
 	__device__ float safe_log(float x)
 	{

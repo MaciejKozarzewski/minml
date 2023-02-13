@@ -18,7 +18,7 @@ namespace
 {
 	float round_small_to_zero(float x) noexcept
 	{
-		return (fabsf(x) < 1.0e-8f) ? 0.0f : x;
+		return (fabsf(x) < 1.0e-6f) ? 0.0f : x;
 	}
 	float safe_log(float x) noexcept
 	{
