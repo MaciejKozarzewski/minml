@@ -48,6 +48,7 @@ namespace ml
 		DLL_PUBLIC void cuda_unpack_input(mlContext_t context, mlShape_t shape, mlDataType_t dst_dtype, void *dst, const void *src);
 		DLL_PUBLIC void cuda_convert_type(mlContext_t context, void *dst, mlDataType_t dst_dtype, const void *src, mlDataType_t src_dtype,
 				int elements);
+		DLL_PUBLIC void cuda_transpose_021(mlContext_t context, mlDataType_t dtype, mlShape_t shape, const void *input, void *output);
 
 		// implemented in 'winograd_non_fused.cu'
 		DLL_PUBLIC void cuda_winograd_weight_transform(mlContext_t context, mlDataType_t dtype, mlShape_t weight_shape, const void *weights,
@@ -73,9 +74,9 @@ namespace ml
 
 		// implemented in 'global_pooling.cu'
 		DLL_PUBLIC void cuda_global_avg_and_max_pooling_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, const void *input,
-				void *output, void *max_indices);
+				void *output, const void *weights);
 		DLL_PUBLIC void cuda_global_avg_and_max_pooling_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next,
-				const void *max_indices);
+				const void *input, const void *weights);
 
 		// implemented in 'gemms.cpp'
 		DLL_PUBLIC void cuda_gemm(mlContext_t context, mlDataType_t dtype, mlShape_t shape_C, void *C, mlShape_t shape_A, const void *A,
@@ -109,7 +110,8 @@ namespace ml
 		DLL_PUBLIC void cuda_add_tensors(mlContext_t context, mlShape_t shape, void *dst, const void *src1, const void *src2);
 		DLL_PUBLIC void cuda_sum_over_first_dim(mlContext_t context, mlShape_t shape, void *dst, const void *src, float beta);
 		DLL_PUBLIC float cuda_cross_entropy_loss(mlContext_t context, mlShape_t shape, const void *output, const void *target);
-		DLL_PUBLIC void cuda_cross_entropy_gradient(mlContext_t context, mlShape_t shape, void *gradient, const void *output, const void *target, float weight);
+		DLL_PUBLIC void cuda_cross_entropy_gradient(mlContext_t context, mlShape_t shape, void *gradient, const void *output, const void *target,
+				float weight);
 		DLL_PUBLIC void cuda_adam_optimize(mlContext_t context, mlShape_t shape, void *weight, void *update, void *momentum, void *variance,
 				float learning_rate, float beta1, float beta2);
 		DLL_PUBLIC void cuda_l2_regularization(mlContext_t context, mlShape_t shape, void *gradient, const void *param, float coefficient,

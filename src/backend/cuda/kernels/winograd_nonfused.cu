@@ -31,11 +31,6 @@ namespace
 	using namespace ml;
 	using namespace vectors;
 
-	__device__ constexpr int square(int x)
-	{
-		return x * x;
-	}
-
 	template<typename T>
 	__device__ T fake_low_precision(T x)
 	{
@@ -271,7 +266,7 @@ namespace
 		switch (get_kernel_size(weight_shape))
 		{
 			case 3:
-				return 2;//(ml::cuda::has_tensor_cores(context) and not is_float32) ? 2 : 4;
+				return 4;//(ml::cuda::has_tensor_cores(context) and not is_float32) ? 2 : 4;
 			case 5:
 				return 2;
 			default:

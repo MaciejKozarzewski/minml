@@ -24,6 +24,7 @@
 #include <minml/layers/Input.hpp>
 #include <minml/layers/Add.hpp>
 #include <minml/layers/BatchNormalization.hpp>
+#include <minml/layers/GlobalBroadcastHW.hpp>
 #include <minml/layers/Softmax.hpp>
 #include <unordered_map>
 #include <cmath>
@@ -231,6 +232,7 @@ namespace ml
 	{
 		static const Add add;
 		static const BatchNormalization batchnorm;
+		static const GlobalBroadcastHW global_broadcast;
 		static const Conv2D conv2d(0, 0);
 		static const Dense dense(0);
 		static const Input input;
@@ -243,6 +245,8 @@ namespace ml
 			result = add.clone(json);
 		if (name == batchnorm.name())
 			result = batchnorm.clone(json);
+		if (name == global_broadcast.name())
+			result = global_broadcast.clone(json);
 		if (name == conv2d.name())
 			result = conv2d.clone(json);
 		if (name == dense.name())

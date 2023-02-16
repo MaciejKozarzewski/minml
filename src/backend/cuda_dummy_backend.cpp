@@ -84,6 +84,10 @@ namespace ml
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
+	void cuda_transpose_021(mlContext_t context, mlDataType_t dtype, mlShape_t shape, const void *input, void *output)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
 
 	mlConvolutionAlgorithm_t cuda_get_convolution_algorithm(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape)
 	{

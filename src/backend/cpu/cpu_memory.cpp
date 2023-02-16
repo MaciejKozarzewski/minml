@@ -19,12 +19,12 @@ namespace ml
 		if (count <= 0)
 			return nullptr;
 		else
-			return new uint8_t[count];
+			return ::operator new[](count, std::align_val_t(64));
 	}
 	void cpu_free(void *ptr)
 	{
 		if (ptr != nullptr)
-			delete[] reinterpret_cast<uint8_t*>(ptr);
+			::operator delete[](ptr, std::align_val_t(64));
 	}
 	void* cpu_view(void *src, int offset, int count)
 	{

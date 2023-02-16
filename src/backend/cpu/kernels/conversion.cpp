@@ -39,6 +39,19 @@ namespace
 				dst[j] = (mask & 1u) ? Vector<T>::scalar_one() : Vector<T>::scalar_zero();
 		}
 	}
+
+	template<typename T>
+	void transpose(void *dst, const void *src, int dim0, int dim1, int dim2)
+	{
+		for (int i = 0; i < dim0; i++)
+			for (int j = 0; j < dim1; j++)
+				for (int k = 0; k < dim2; k++)
+				{
+					const int src_idx = (i * dim1 + j) * dim2 + k;
+					const int dst_idx = (i * dim2 + k) * dim1 + j;
+					reinterpret_cast<T*>(dst)[dst_idx] = reinterpret_cast<const T*>(src)[src_idx];
+				}
+	}
 }
 
 namespace SIMD_NAMESPACE
@@ -122,63 +135,24 @@ namespace SIMD_NAMESPACE
 			default:
 				break;
 		}
+	}
+	void cpu_kernel_transpose_021(mlContext_t context, mlDataType_t dtype, mlShape_t shape, const void *input, void *output)
+	{
+		assert(input != output);
 
-//		switch (dst_dtype)
-//		{
-//			case DTYPE_BFLOAT16:
-//			{
-//				switch (src_dtype)
-//				{
-//					case DTYPE_FLOAT16:
-//						for (int i = 0; i < elements; i++)
-//							getPointer<bfloat16>(dst)[i] = scalar::float_to_bfloat16(scalar::float16_to_float(getPointer<float16>(src)[i]));
-//						break;
-//					case DTYPE_FLOAT32:
-//						for (int i = 0; i < elements; i++)
-//							getPointer<bfloat16>(dst)[i] = scalar::float_to_bfloat16(getPointer<float>(src)[i]);
-//						break;
-//					default:
-//						break;
-//				}
-//				break;
-//			}
-//			case DTYPE_FLOAT16:
-//			{
-//				switch (src_dtype)
-//				{
-//					case DTYPE_BFLOAT16:
-//						for (int i = 0; i < elements; i++)
-//							getPointer<float16>(dst)[i] = scalar::float_to_float16(scalar::bfloat16_to_float(getPointer<bfloat16>(src)[i]));
-//						break;
-//					case DTYPE_FLOAT32:
-//						for (int i = 0; i < elements; i++)
-//							getPointer<float16>(dst)[i] = scalar::float_to_float16(getPointer<float>(src)[i]);
-//						break;
-//					default:
-//						break;
-//				}
-//				break;
-//			}
-//			case DTYPE_FLOAT32:
-//			{
-//				switch (src_dtype)
-//				{
-//					case DTYPE_BFLOAT16:
-//						for (int i = 0; i < elements; i++)
-//							getPointer<float>(dst)[i] = scalar::bfloat16_to_float(getPointer<bfloat16>(src)[i]);
-//						break;
-//					case DTYPE_FLOAT16:
-//						for (int i = 0; i < elements; i++)
-//							getPointer<float>(dst)[i] = scalar::float16_to_float(getPointer<float16>(src)[i]);
-//						break;
-//					default:
-//						break;
-//				}
-//				break;
-//			}
-//			default:
-//				break;
-//		}
+		switch (dtype)
+		{
+			case DTYPE_BFLOAT16:
+			case DTYPE_FLOAT16:
+				transpose<uint16_t>(getPointer<uint16_t>(output), getPointer<uint16_t>(input), shape.dim[0], shape.dim[1], shape.dim[2]);
+				break;
+			case DTYPE_FLOAT32:
+			case DTYPE_INT32:
+				transpose<uint32_t>(getPointer<uint32_t>(output), getPointer<uint32_t>(input), shape.dim[0], shape.dim[1], shape.dim[2]);
+				break;
+			default:
+				break;
+		}
 	}
 }
 

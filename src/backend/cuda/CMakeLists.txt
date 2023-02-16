@@ -13,7 +13,6 @@ set(codesrc 	kernels/activations.cu
 		cuda_memory.cu
 		cuda_properties.cpp
 		gemms.cpp
-		misc.cpp
 		utils.cpp)
 
 if (WIN32)

@@ -87,6 +87,14 @@ class TensorWrapper
 		{
 			store_vector<T>(value, ptr, indexer, dims...);
 		}
+		T* data() noexcept
+		{
+			return ptr;
+		}
+		const T* data() const noexcept
+		{
+			return ptr;
+		}
 		constexpr int rank() const
 		{
 			return Rank;
@@ -119,6 +127,10 @@ class ConstTensorWrapper
 		SIMD_NAMESPACE::Vector<T> load(Dims ... dims) const
 		{
 			return load_vector<T>(ptr, indexer, dims...);
+		}
+		const T* data() const noexcept
+		{
+			return ptr;
 		}
 		constexpr int rank() const
 		{

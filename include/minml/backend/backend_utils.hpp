@@ -10,6 +10,9 @@
 
 #include <minml/backend/backend_types.h>
 
+#include <initializer_list>
+#include <cassert>
+
 namespace ml
 {
 	template<typename T>
@@ -21,6 +24,16 @@ namespace ml
 	const T* getPointer(const void *ptr) noexcept
 	{
 		return reinterpret_cast<const T*>(ptr);
+	}
+
+	[[maybe_unused]] static mlShape_t make_shape(std::initializer_list<int> dims) noexcept
+	{
+		assert(dims.size() <= 4);
+		mlShape_t result;
+		result.rank = dims.size();
+		for (int i = 0; i < result.rank; i++)
+			result.dim[i] = dims.begin()[i];
+		return result;
 	}
 
 	[[maybe_unused]] static int size_of(mlDataType_t dtype) noexcept

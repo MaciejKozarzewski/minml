@@ -14,6 +14,7 @@
 #include <minml/layers/Dense.hpp>
 #include <minml/layers/Conv2D.hpp>
 #include <minml/layers/BatchNormalization.hpp>
+#include <minml/layers/GlobalBroadcastHW.hpp>
 #include <minml/layers/Add.hpp>
 #include <minml/training/Optimizer.hpp>
 #include <minml/utils/random.hpp>
@@ -660,6 +661,7 @@ void test_mnist()
 int main()
 {
 	std::cout << "BEGIN" << std::endl;
+
 //	test_mnist();
 	{
 		Graph graph;
@@ -670,7 +672,7 @@ int main()
 		graph.forward(1);
 	}
 	std::cout << "END" << std::endl;
-	return 0;
+//	return 0;
 
 	const int blocks = 10;
 	const int filters = 128;
@@ -680,6 +682,7 @@ int main()
 	x = graph.add(Conv2D(filters, 3, "linear").useBias(false), x);
 	for (int i = 0; i < blocks; i++)
 		x = graph.add(Conv2D(filters, 3, "linear").useBias(false), x);
+	x = graph.add(GlobalBroadcastHW(), x);
 	graph.addOutput(x);
 
 //	x = graph.add(Conv2D(filters, 3, "linear").useBias(false), x);

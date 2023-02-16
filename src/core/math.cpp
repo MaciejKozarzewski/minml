@@ -83,6 +83,24 @@ namespace ml
 				break;
 		}
 	}
+	void transpose_021(const Context &context, const Tensor &input, Tensor &output)
+	{
+		assert(input.rank() == 3 && output.rank() == 3);
+		assert(input.dtype() == output.dtype());
+		assert(input.dim(0) == output.dim(0));
+		assert(input.dim(1) == output.dim(2));
+		assert(input.dim(2) == output.dim(1));
+
+		switch (context.device().type())
+		{
+			case DeviceType::CPU:
+				cpu_transpose_021(get(context), get(input.dtype()), get_shape(input), input.data(), output.data());
+				break;
+			case DeviceType::CUDA:
+				cuda_transpose_021(get(context), get(input.dtype()), get_shape(input), input.data(), output.data());
+				break;
+		}
+	}
 
 	void winogradWeightTransform(const Context &context, const Tensor &weights, Tensor &matrices, bool invert, bool low_precision)
 	{
@@ -180,35 +198,6 @@ namespace ml
 			case DeviceType::CUDA:
 				cuda_convolution_fused_winograd_forward(get(context), get(weights.dtype()), get_shape(input), get_shape(weights), input.data(),
 						weights.data(), output.data(), bias.data(), add.data(), get(act));
-				break;
-		}
-	}
-
-	void globalAvgAndMaxPoolingForward(const Context &context, const Tensor &input, Tensor &output, Tensor &max_indices)
-	{
-		switch (context.device().type())
-		{
-			case DeviceType::CPU:
-				cpu_global_avg_and_max_pooling_forward(get(context), get(input.dtype()), get_shape(input), input.data(), output.data(),
-						max_indices.data());
-				break;
-			case DeviceType::CUDA:
-				cuda_global_avg_and_max_pooling_forward(get(context), get(input.dtype()), get_shape(input), input.data(), output.data(),
-						max_indices.data());
-				break;
-		}
-	}
-	void globalAvgAndMaxPoolingBackward(const Context &context, Tensor &gradient_prev, const Tensor &gradient_next, const Tensor &max_indices)
-	{
-		switch (context.device().type())
-		{
-			case DeviceType::CPU:
-				cpu_global_avg_and_max_pooling_backward(get(context), get_shape(gradient_prev), gradient_prev.data(), gradient_next.data(),
-						max_indices.data());
-				break;
-			case DeviceType::CUDA:
-				cuda_global_avg_and_max_pooling_backward(get(context), get_shape(gradient_prev), gradient_prev.data(), gradient_next.data(),
-						max_indices.data());
 				break;
 		}
 	}
@@ -341,12 +330,10 @@ namespace ml
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
-				cpu_activation_backward(get(context), get_shape(gradient_prev), gradient_prev.data(), gradient_next.data(), output.data(),
-						get(act));
+				cpu_activation_backward(get(context), get_shape(gradient_prev), gradient_prev.data(), gradient_next.data(), output.data(), get(act));
 				break;
 			case DeviceType::CUDA:
-				cuda_activation_backward(get(context), get_shape(gradient_prev), gradient_prev.data(), gradient_next.data(), output.data(),
-						get(act));
+				cuda_activation_backward(get(context), get_shape(gradient_prev), gradient_prev.data(), gradient_next.data(), output.data(), get(act));
 				break;
 		}
 	}

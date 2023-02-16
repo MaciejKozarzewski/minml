@@ -53,6 +53,26 @@ namespace ml
 		SIMD_NAMESPACE::cpu_kernel_convert_type(context, dst, dst_dtype, src, src_dtype, elements);
 #endif
 	}
+	void cpu_transpose_021(mlContext_t context, mlDataType_t dtype, mlShape_t shape, const void *input, void *output)
+	{
+#if DYNAMIC_ARCH
+		switch (cpu::Context::getSimdLevel(context))
+		{
+			case cpu::SimdLevel::AVX2:
+				return ns_avx2::cpu_kernel_transpose_021(context, dtype, shape, input, output);
+			case cpu::SimdLevel::AVX:
+				return ns_avx::cpu_kernel_transpose_021(context, dtype, shape, input, output);
+			case cpu::SimdLevel::SSE41:
+				return ns_sse41::cpu_kernel_transpose_021(context, dtype, shape, input, output);
+			case cpu::SimdLevel::SSE2:
+				return ns_sse2::cpu_kernel_transpose_021(context, dtype, shape, input, output);
+			case cpu::SimdLevel::NONE:
+				return ns_none::cpu_kernel_transpose_021(context, dtype, shape, input, output);
+		}
+#else
+		SIMD_NAMESPACE::cpu_kernel_transpose_021(context, dtype, shape, input, output);
+#endif
+	}
 
 	void cpu_winograd_weight_transform(mlContext_t context, mlDataType_t dtype, mlShape_t weight_shape, const void *weights, void *matrices,
 			bool invert, bool low_precision)
@@ -209,44 +229,44 @@ namespace ml
 	void cpu_global_avg_and_max_pooling_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, const void *input, void *output,
 			void *max_indices)
 	{
-#if DYNAMIC_ARCH
-		switch (cpu::Context::getSimdLevel(context))
-		{
-			case cpu::SimdLevel::AVX2:
-				return ns_avx2::cpu_kernel_global_avg_and_max_pooling_forward(context, dtype, shape, input, output, max_indices);
-			case cpu::SimdLevel::AVX:
-				return ns_avx::cpu_kernel_global_avg_and_max_pooling_forward(context, dtype, shape, input, output, max_indices);
-			case cpu::SimdLevel::SSE41:
-				return ns_sse41::cpu_kernel_global_avg_and_max_pooling_forward(context, dtype, shape, input, output, max_indices);
-			case cpu::SimdLevel::SSE2:
-				return ns_sse2::cpu_kernel_global_avg_and_max_pooling_forward(context, dtype, shape, input, output, max_indices);
-			case cpu::SimdLevel::NONE:
-				return ns_none::cpu_kernel_global_avg_and_max_pooling_forward(context, dtype, shape, input, output, max_indices);
-		}
-#else
-		SIMD_NAMESPACE::cpu_kernel_global_avg_and_max_pooling_forward(context, dtype, shape, input, output, max_indices);
-#endif
+//#if DYNAMIC_ARCH
+//		switch (cpu::Context::getSimdLevel(context))
+//		{
+//			case cpu::SimdLevel::AVX2:
+//				return ns_avx2::cpu_kernel_global_avg_and_max_pooling_forward(context, dtype, shape, input, output, max_indices);
+//			case cpu::SimdLevel::AVX:
+//				return ns_avx::cpu_kernel_global_avg_and_max_pooling_forward(context, dtype, shape, input, output, max_indices);
+//			case cpu::SimdLevel::SSE41:
+//				return ns_sse41::cpu_kernel_global_avg_and_max_pooling_forward(context, dtype, shape, input, output, max_indices);
+//			case cpu::SimdLevel::SSE2:
+//				return ns_sse2::cpu_kernel_global_avg_and_max_pooling_forward(context, dtype, shape, input, output, max_indices);
+//			case cpu::SimdLevel::NONE:
+//				return ns_none::cpu_kernel_global_avg_and_max_pooling_forward(context, dtype, shape, input, output, max_indices);
+//		}
+//#else
+//		SIMD_NAMESPACE::cpu_kernel_global_avg_and_max_pooling_forward(context, dtype, shape, input, output, max_indices);
+//#endif
 	}
 	void cpu_global_avg_and_max_pooling_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next,
 			const void *max_indices)
 	{
-#if DYNAMIC_ARCH
-		switch (cpu::Context::getSimdLevel(context))
-		{
-			case cpu::SimdLevel::AVX2:
-				return ns_avx2::cpu_kernel_global_avg_and_max_pooling_backward(context, shape, gradient_prev, gradient_next, max_indices);
-			case cpu::SimdLevel::AVX:
-				return ns_avx::cpu_kernel_global_avg_and_max_pooling_backward(context, shape, gradient_prev, gradient_next, max_indices);
-			case cpu::SimdLevel::SSE41:
-				return ns_sse41::cpu_kernel_global_avg_and_max_pooling_backward(context, shape, gradient_prev, gradient_next, max_indices);
-			case cpu::SimdLevel::SSE2:
-				return ns_sse2::cpu_kernel_global_avg_and_max_pooling_backward(context, shape, gradient_prev, gradient_next, max_indices);
-			case cpu::SimdLevel::NONE:
-				return ns_none::cpu_kernel_global_avg_and_max_pooling_backward(context, shape, gradient_prev, gradient_next, max_indices);
-		}
-#else
-		SIMD_NAMESPACE::cpu_kernel_global_avg_and_max_pooling_backward(context, shape, gradient_prev, gradient_next, max_indices);
-#endif
+//#if DYNAMIC_ARCH
+//		switch (cpu::Context::getSimdLevel(context))
+//		{
+//			case cpu::SimdLevel::AVX2:
+//				return ns_avx2::cpu_kernel_global_avg_and_max_pooling_backward(context, shape, gradient_prev, gradient_next, max_indices);
+//			case cpu::SimdLevel::AVX:
+//				return ns_avx::cpu_kernel_global_avg_and_max_pooling_backward(context, shape, gradient_prev, gradient_next, max_indices);
+//			case cpu::SimdLevel::SSE41:
+//				return ns_sse41::cpu_kernel_global_avg_and_max_pooling_backward(context, shape, gradient_prev, gradient_next, max_indices);
+//			case cpu::SimdLevel::SSE2:
+//				return ns_sse2::cpu_kernel_global_avg_and_max_pooling_backward(context, shape, gradient_prev, gradient_next, max_indices);
+//			case cpu::SimdLevel::NONE:
+//				return ns_none::cpu_kernel_global_avg_and_max_pooling_backward(context, shape, gradient_prev, gradient_next, max_indices);
+//		}
+//#else
+//		SIMD_NAMESPACE::cpu_kernel_global_avg_and_max_pooling_backward(context, shape, gradient_prev, gradient_next, max_indices);
+//#endif
 	}
 
 //	void cpu_gemm(mlContext_t context, mlDataType_t dtype, mlShape_t shape_C, void *C, mlShape_t shape_A, const void *A, mlShape_t shape_B,

@@ -23,6 +23,7 @@ namespace ml
 {
 	void unpackInput(const Context &context, Tensor &dst, const Tensor &src);
 	void convertType(const Context &context, void *dst, DataType dst_dtype, const void *src, DataType src_dtype, int elements);
+	void transpose_021(const Context &context, const Tensor &input, Tensor &output);
 
 	void winogradWeightTransform(const Context &context, const Tensor &weights, Tensor &matrices, bool invert, bool low_precision);
 	void winogradInputTransform(const Context &context, const Shape &weight_shape, const Tensor &input, Tensor &matrices);
