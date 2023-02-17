@@ -59,4 +59,5 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME AND BUILD_TESTING)
 endif()
 
 add_executable(MinML_launcher "launcher/minml.cpp")
+set_target_properties(MinML_launcher PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED YES CXX_EXTENSIONS NO)
 target_link_libraries(MinML_launcher PUBLIC MinML)
