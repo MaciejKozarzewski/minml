@@ -552,9 +552,9 @@ namespace ml
 		switch (dtype)
 		{
 			case DTYPE_BFLOAT16:
-				return true;
+				return false;
 			case DTYPE_FLOAT16:
-				return true;
+				return false;
 			case DTYPE_FLOAT32:
 				return true;
 			default:
