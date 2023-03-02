@@ -41,7 +41,7 @@ class Json
 		Json(bool b) noexcept;
 
 		Json(int i) noexcept;
-		Json(size_t i) noexcept;
+		Json(int64_t i) noexcept;
 		Json(float f) noexcept;
 		Json(double d) noexcept;
 
@@ -63,7 +63,7 @@ class Json
 
 		operator bool() const;
 		operator int() const;
-		operator size_t() const;
+		operator int64_t() const;
 		operator float() const;
 		operator double() const;
 		operator std::string() const;

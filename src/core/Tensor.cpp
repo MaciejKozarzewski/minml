@@ -482,11 +482,11 @@ namespace ml
 		}
 
 		if (device().isCPU())
-			binary_data.load(data(), static_cast<size_t>(json["binary_offset"]), sizeInBytes());
+			binary_data.load(data(), json["binary_offset"].getLong(), sizeInBytes());
 		else
 		{
 			std::unique_ptr<int8_t[]> buffer_on_cpu = std::make_unique<int8_t[]>(sizeInBytes());
-			binary_data.load(buffer_on_cpu.get(), static_cast<size_t>(json["binary_offset"]), sizeInBytes());
+			binary_data.load(buffer_on_cpu.get(), json["binary_offset"].getLong(), sizeInBytes());
 			ml::memcpy(device(), data(), 0, Device::cpu(), buffer_on_cpu.get(), 0, sizeInBytes());
 		}
 	}
