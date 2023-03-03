@@ -87,7 +87,7 @@ namespace ml
 				}
 				else
 					m_data = ml::malloc(other.device(), other.sizeInBytes());
-				ml::memcpy(this->device(), this->data(), 0, other.device(), other.data(), 0, sizeInBytes());
+				ml::memcpy(this->device(), this->data(), 0, other.device(), other.data(), 0, other.sizeInBytes());
 			}
 			else
 			{
@@ -526,6 +526,8 @@ namespace ml
 			if (isPageLocked())
 				pageUnlock();
 			ml::free(device(), data());
+			m_data = nullptr;
+			m_is_owning = false;
 		}
 	}
 
