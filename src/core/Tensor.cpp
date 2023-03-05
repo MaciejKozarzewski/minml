@@ -526,8 +526,6 @@ namespace ml
 			if (isPageLocked())
 				pageUnlock();
 			ml::free(device(), data());
-			m_data = nullptr;
-			m_is_owning = false;
 		}
 	}
 
