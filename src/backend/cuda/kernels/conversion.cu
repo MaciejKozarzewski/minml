@@ -32,12 +32,12 @@ namespace
 	}
 
 	template<typename T>
-	__global__ void kernel_unpack_input(T *output, const uint32_t *input, int first_dim)
+	__global__ void kernel_unpack_input(T *output, const uint32_t *input, int first_dim, int last_dim)
 	{
 		for (int i = blockIdx.x; i < first_dim; i += gridDim.x)
 		{
 			const uint32_t value = input[i] >> threadIdx.x;
-			output[i * 32 + threadIdx.x] = (value & 1) ? one<T>() : zero<T>();
+			output[i * last_dim + threadIdx.x] = (value & 1) ? one<T>() : zero<T>();
 		}
 	}
 
@@ -90,19 +90,21 @@ namespace ml
 	void cuda_unpack_input(mlContext_t context, mlShape_t shape, mlDataType_t dst_dtype, void *dst, const void *src)
 	{
 		const int first_dim = volume_without_last_dim(shape);
+		const int last_dim = get_last_dim(shape);
 		dim3 gridDim = std::max(first_dim, 4096);
 		cudaStream_t stream = cuda::Context::getStream(context);
 
 		switch (dst_dtype)
 		{
 			case DTYPE_BFLOAT16:
-				kernel_unpack_input<<<gridDim, 32, 0, stream>>>(getPointer<__nv_bfloat16 >(dst), getPointer<uint32_t>(src), first_dim);
+				kernel_unpack_input<<<gridDim, last_dim, 0, stream>>>(getPointer<__nv_bfloat16 >(dst), getPointer<uint32_t>(src), first_dim,
+						last_dim);
 				break;
 			case DTYPE_FLOAT16:
-				kernel_unpack_input<<<gridDim, 32, 0, stream>>>(getPointer<half>(dst), getPointer<uint32_t>(src), first_dim);
+				kernel_unpack_input<<<gridDim, last_dim, 0, stream>>>(getPointer<half>(dst), getPointer<uint32_t>(src), first_dim, last_dim);
 				break;
 			case DTYPE_FLOAT32:
-				kernel_unpack_input<<<gridDim, 32, 0, stream>>>(getPointer<float>(dst), getPointer<uint32_t>(src), first_dim);
+				kernel_unpack_input<<<gridDim, last_dim, 0, stream>>>(getPointer<float>(dst), getPointer<uint32_t>(src), first_dim, last_dim);
 				break;
 		}
 		assert(cudaGetLastError() == cudaSuccess);

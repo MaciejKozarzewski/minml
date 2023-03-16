@@ -30,12 +30,12 @@ namespace
 	}
 
 	template<typename T>
-	void kernel_unpack_input(T *dst, const uint32_t *src, int first_dim)
+	void kernel_unpack_input(T *dst, const uint32_t *src, int first_dim, int last_dim)
 	{
-		for (int i = 0; i < first_dim; i++, dst += 32)
+		for (int i = 0; i < first_dim; i++, dst += last_dim)
 		{
 			uint32_t mask = src[i];
-			for (int j = 0; j < 32; j++, mask >>= 1)
+			for (int j = 0; j < last_dim; j++, mask >>= 1)
 				dst[j] = (mask & 1u) ? Vector<T>::scalar_one() : Vector<T>::scalar_zero();
 		}
 	}
@@ -61,17 +61,18 @@ namespace SIMD_NAMESPACE
 	void cpu_kernel_unpack_input(mlContext_t context, mlShape_t shape, mlDataType_t dst_dtype, void *dst, const void *src)
 	{
 		const int first_dim = volume_without_last_dim(shape);
-		assert(get_last_dim(shape) == 32);
+		const int last_dim = get_last_dim(shape);
+		assert(last_dim <= 32);
 		switch (dst_dtype)
 		{
 			case DTYPE_BFLOAT16:
-				kernel_unpack_input(getPointer<bfloat16>(dst), getPointer<uint32_t>(src), first_dim);
+				kernel_unpack_input(getPointer<bfloat16>(dst), getPointer<uint32_t>(src), first_dim, last_dim);
 				break;
 			case DTYPE_FLOAT16:
-				kernel_unpack_input(getPointer<float16>(dst), getPointer<uint32_t>(src), first_dim);
+				kernel_unpack_input(getPointer<float16>(dst), getPointer<uint32_t>(src), first_dim, last_dim);
 				break;
 			case DTYPE_FLOAT32:
-				kernel_unpack_input(getPointer<float>(dst), getPointer<uint32_t>(src), first_dim);
+				kernel_unpack_input(getPointer<float>(dst), getPointer<uint32_t>(src), first_dim, last_dim);
 				break;
 			default:
 				break;
