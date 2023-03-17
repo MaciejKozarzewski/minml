@@ -18,12 +18,12 @@ namespace ml
 			std::unique_ptr<Tensor> m_running_stats;
 			int m_running_id = 0;
 			int m_total_steps = 0;
-			int m_history_size = 64;
+			int m_history_size = 100;
 			bool m_use_gamma = true;
 			bool m_use_beta = true;
 
 		public:
-			BatchNormalization(const std::string &activation = "linear", bool useGamma = true, bool useBeta = true, int historySize = 64);
+			BatchNormalization(const std::string &activation = "linear", bool useGamma = true, bool useBeta = true, int historySize = 100);
 
 			BatchNormalization& useGamma(bool b) noexcept;
 			BatchNormalization& useBeta(bool b) noexcept;
