@@ -126,287 +126,81 @@ namespace
 
 namespace ml
 {
-//	TEST(TestConv2D, explicit_gemm_conv2D_3x3_forward)
-//	{
-//		Tensor input( { 2, 13, 17, 35 }, "float32", Device::cpu());
-//		Tensor output( { 2, 13, 17, 21 }, "float32", Device::cpu());
-//		Tensor weights( { 21, 3, 3, 35 }, "float32", Device::cpu());
-//		Tensor bias( { 21 }, "float32", Device::cpu());
-//		testing::initForTest(weights, 0.0f);
-//		testing::initForTest(input, 1.0f);
-//		testing::initForTest(bias, 1.0f);
-//
-//		Tensor correct_output(output.shape(), "float32", Device::cpu());
-//		baseline_conv2D_forward(input, correct_output, weights, bias, ActivationType::RELU);
-//
-//		const int workspace_size = max(math::convolution2D::explicitGemmWorkspace(input.shape(), output.shape(), weights.shape()));
-//		Tensor workspace( { workspace_size }, "float32", Device::cpu());
-//		testing::initForTest(workspace, 0.0f);
-//		math::convolution2D::explicitGemmForward(DeviceContext(), input, output, weights, bias, workspace, NonlinearityType::SIGMOID);
-//		EXPECT_LE(testing::diffForTest(correct_output, output), 1.0e-4f);
-//
-//		if (Device::numberOfCudaDevices() > 0)
-//		{
-//			DeviceContext context(Device::cuda(0));
-//			input.moveTo(Device::cuda(0));
-//			output.moveTo(Device::cuda(0));
-//			weights.moveTo(Device::cuda(0));
-//			bias.moveTo(Device::cuda(0));
-//			workspace.moveTo(Device::cuda(0));
-//			output.zeroall(context);
-//
-//			math::convolution2D::explicitGemmForward(context, input, output, weights, bias, workspace, NonlinearityType::SIGMOID);
-//			EXPECT_LE(testing::diffForTest(correct_output, output), 1.0e-4f);
-//		}
-//	}
-//	TEST(TestConv2D, explicit_gemm_conv2D_3x3_backward)
-//	{
-//		Tensor gradient_prev( { 2, 16, 4, 5 }, "float32", Device::cpu());
-//		Tensor output( { 2, 16, 4, 15 }, "float32", Device::cpu());
-//		Tensor gradient_next(output.shape(), "float32", Device::cpu());
-//		Tensor weights( { output.lastDim(), 3, 3, gradient_prev.lastDim() }, "float32", Device::cpu());
-//		testing::initForTest(output, 0.0f);
-//		testing::initForTest(gradient_next, 1.0f);
-//		testing::initForTest(weights, 1.57f);
-//
-//		Tensor correct_gradient_prev(gradient_prev);
-//		baseline_conv2D_backward(output, correct_gradient_prev, gradient_next, weights, NonlinearityType::SIGMOID);
-//		testing::initForTest(gradient_next, 1.0f);
-//
-//		const int workspace_size = max(math::convolution2D::explicitGemmWorkspace(gradient_prev.shape(), output.shape(), weights.shape()));
-//		Tensor workspace( { workspace_size }, "float32", Device::cpu());
-//		testing::initForTest(workspace, 0.0f);
-//		math::convolution2D::explicitGemmBackward(DeviceContext(), gradient_prev, gradient_next, output, weights, workspace,
-//				NonlinearityType::SIGMOID);
-//		EXPECT_LE(testing::diffForTest(correct_gradient_prev, gradient_prev), 1.0e-4f);
-//
-//		if (Device::numberOfCudaDevices() > 0)
-//		{
-//			DeviceContext context(Device::cuda(0));
-//			gradient_prev.moveTo(Device::cuda(0));
-//			gradient_prev.zeroall(context);
-//			gradient_next.moveTo(Device::cuda(0));
-//			testing::initForTest(gradient_next, 1.0f);
-//			weights.moveTo(Device::cuda(0));
-//			workspace.moveTo(Device::cuda(0));
-//			output.moveTo(Device::cuda(0));
-//
-//			math::convolution2D::explicitGemmBackward(context, gradient_prev, gradient_next, output, weights, workspace, NonlinearityType::SIGMOID);
-//			EXPECT_LE(testing::diffForTest(correct_gradient_prev, gradient_prev), 1.0e-4f);
-//		}
-//	}
-//	TEST(TestConv2D, explicit_gemm_conv2D_3x3_update)
-//	{
-//		Tensor input( { 2, 13, 17, 35 }, "float32", Device::cpu());
-//		Tensor gradient_next( { 2, 13, 17, 21 }, "float32", Device::cpu());
-//		Tensor weight_update( { 21, 3, 3, 35 }, "float32", Device::cpu());
-//		Tensor storage( { 8, 21 }, "float32", Device::cpu());
-//		testing::initForTest(input, 0.0f);
-//		testing::initForTest(gradient_next, 1.0f);
-//		testing::initForTest(weight_update, 1.57f);
-//
-//		Tensor correct_weight_update(weight_update);
-//		baseline_conv2D_update(input, gradient_next, correct_weight_update);
-//
-//		const int workspace_size = max(math::convolution2D::explicitGemmWorkspace(input.shape(), gradient_next.shape(), weight_update.shape()));
-//		Tensor workspace( { workspace_size }, "float32", Device::cpu());
-//		testing::initForTest(workspace, 0.0f);
-//		math::convolution2D::explicitGemmUpdate(DeviceContext(), input, gradient_next, weight_update, workspace);
-//		EXPECT_LE(testing::diffForTest(correct_weight_update, weight_update), 1.0e-4f);
-//
-//		if (Device::numberOfCudaDevices() > 0)
-//		{
-//			DeviceContext context(Device::cuda(0));
-//			storage.moveTo(Device::cuda(0));
-//			input.moveTo(Device::cuda(0));
-//			gradient_next.moveTo(Device::cuda(0));
-//			testing::initForTest(weight_update, 1.57f);
-//			weight_update.moveTo(Device::cuda(0));
-//			workspace.moveTo(Device::cuda(0));
-//
-//			math::convolution2D::explicitGemmUpdate(context, input, gradient_next, weight_update, workspace);
-//			EXPECT_LE(testing::diffForTest(correct_weight_update, weight_update), 1.0e-4f);
-//		}
-//	}
-//
-//	TEST(TestConv2D, explicit_gemm_conv2D_5x5_forward)
-//	{
-//		Tensor input( { 2, 13, 17, 35 }, "float32", Device::cpu());
-//		Tensor output( { 2, 13, 17, 21 }, "float32", Device::cpu());
-//		Tensor weights( { 21, 5, 5, 35 }, "float32", Device::cpu());
-//		Tensor bias( { 21 }, "float32", Device::cpu());
-//		testing::initForTest(weights, 0.0f);
-//		testing::initForTest(input, 1.0f);
-//		testing::initForTest(bias, 1.0f);
-//
-//		Tensor correct_output(output.shape(), "float32", Device::cpu());
-//		baseline_conv2D_forward(input, correct_output, weights, bias, NonlinearityType::SIGMOID);
-//
-//		const int workspace_size = max(math::convolution2D::explicitGemmWorkspace(input.shape(), output.shape(), weights.shape()));
-//		Tensor workspace( { workspace_size }, "float32", Device::cpu());
-//		testing::initForTest(workspace, 0.0f);
-//		math::convolution2D::explicitGemmForward(DeviceContext(), input, output, weights, bias, workspace, NonlinearityType::SIGMOID);
-//		EXPECT_LE(testing::diffForTest(correct_output, output), 1.0e-4f);
-//
-//		if (Device::numberOfCudaDevices() > 0)
-//		{
-//			DeviceContext context(Device::cuda(0));
-//			input.moveTo(Device::cuda(0));
-//			output.moveTo(Device::cuda(0));
-//			weights.moveTo(Device::cuda(0));
-//			bias.moveTo(Device::cuda(0));
-//			workspace.moveTo(Device::cuda(0));
-//			output.zeroall(context);
-//
-//			math::convolution2D::explicitGemmForward(context, input, output, weights, bias, workspace, NonlinearityType::SIGMOID);
-//			EXPECT_LE(testing::diffForTest(correct_output, output), 1.0e-4f);
-//		}
-//	}
-//	TEST(TestConv2D, explicit_gemm_conv2D_5x5_backward)
-//	{
-//		Tensor gradient_prev( { 2, 13, 17, 35 }, "float32", Device::cpu());
-//		Tensor output( { 2, 13, 17, 21 }, "float32", Device::cpu());
-//		Tensor gradient_next(output.shape(), "float32", Device::cpu());
-//		Tensor weights( { output.lastDim(), 5, 5, gradient_prev.lastDim() }, "float32", Device::cpu());
-//		testing::initForTest(output, 0.0f);
-//		testing::initForTest(gradient_next, 1.0f);
-//		testing::initForTest(weights, 1.57f);
-//
-//		Tensor correct_gradient_prev(gradient_prev);
-//		baseline_conv2D_backward(output, correct_gradient_prev, gradient_next, weights, NonlinearityType::SIGMOID);
-//		testing::initForTest(gradient_next, 1.0f);
-//
-//		const int workspace_size = max(math::convolution2D::explicitGemmWorkspace(gradient_prev.shape(), output.shape(), weights.shape()));
-//		Tensor workspace( { workspace_size }, "float32", Device::cpu());
-//		testing::initForTest(workspace, 0.0f);
-//		math::convolution2D::explicitGemmBackward(DeviceContext(), gradient_prev, gradient_next, output, weights, workspace,
-//				NonlinearityType::SIGMOID);
-//		EXPECT_LE(testing::diffForTest(correct_gradient_prev, gradient_prev), 1.0e-4f);
-//
-//		if (Device::numberOfCudaDevices() > 0)
-//		{
-//			DeviceContext context(Device::cuda(0));
-//			gradient_prev.moveTo(Device::cuda(0));
-//			gradient_prev.zeroall(context);
-//			gradient_next.moveTo(Device::cuda(0));
-//			testing::initForTest(gradient_next, 1.0f);
-//			weights.moveTo(Device::cuda(0));
-//			workspace.moveTo(Device::cuda(0));
-//			output.moveTo(Device::cuda(0));
-//
-//			math::convolution2D::explicitGemmBackward(context, gradient_prev, gradient_next, output, weights, workspace, NonlinearityType::SIGMOID);
-//			EXPECT_LE(testing::diffForTest(correct_gradient_prev, gradient_prev), 1.0e-4f);
-//		}
-//	}
-//	TEST(TestConv2D, explicit_gemm_conv2D_5x5_update)
-//	{
-//		Tensor input( { 2, 13, 17, 35 }, "float32", Device::cpu());
-//		Tensor gradient_next( { 2, 13, 17, 21 }, "float32", Device::cpu());
-//		Tensor weight_update( { 21, 5, 5, 35 }, "float32", Device::cpu());
-//		Tensor storage( { 8, 21 }, "float32", Device::cpu());
-//		testing::initForTest(input, 0.0f);
-//		testing::initForTest(gradient_next, 1.0f);
-//		testing::initForTest(weight_update, 1.57f);
-//
-//		Tensor correct_weight_update(weight_update);
-//		baseline_conv2D_update(input, gradient_next, correct_weight_update);
-//
-//		const int workspace_size = max(math::convolution2D::explicitGemmWorkspace(input.shape(), gradient_next.shape(), weight_update.shape()));
-//		Tensor workspace( { workspace_size }, "float32", Device::cpu());
-//		testing::initForTest(workspace, 0.0f);
-//		math::convolution2D::explicitGemmUpdate(DeviceContext(), input, gradient_next, weight_update, workspace);
-//		EXPECT_LE(testing::diffForTest(correct_weight_update, weight_update), 1.0e-4f);
-//
-//		if (Device::numberOfCudaDevices() > 0)
-//		{
-//			DeviceContext context(Device::cuda(0));
-//			storage.moveTo(Device::cuda(0));
-//			input.moveTo(Device::cuda(0));
-//			gradient_next.moveTo(Device::cuda(0));
-//			testing::initForTest(weight_update, 1.57f);
-//			weight_update.moveTo(Device::cuda(0));
-//			workspace.moveTo(Device::cuda(0));
-//
-//			math::convolution2D::explicitGemmUpdate(context, input, gradient_next, weight_update, workspace);
-//			EXPECT_LE(testing::diffForTest(correct_weight_update, weight_update), 1.0e-4f);
-//		}
-//	}
-//
-//	TEST(TestConv2D, winograd4x4_conv2D_3x3_forward)
-//	{
-//		DeviceContext context(Device::cpu());
-//		Tensor input( { 2, 13, 17, 35 }, "float32", Device::cpu());
-//		Tensor output( { 2, 13, 17, 21 }, "float32", Device::cpu());
-//		Tensor weights( { 21, 3, 3, 35 }, "float32", Device::cpu());
-//		Tensor bias( { 21 }, "float32", Device::cpu());
-//		testing::initForTest(weights, 0.0f);
-//		testing::initForTest(input, 1.0f);
-//		testing::initForTest(bias, 1.0f);
-//
-//		Tensor correct_output(output.shape(), "float32", Device::cpu());
-//		baseline_conv2D_forward(input, correct_output, weights, bias, NonlinearityType::SIGMOID);
-//
-//		Tensor weight_matrices = Tensor( { 36, 21, 35 }, "float32", Device::cpu());
-//		math::winograd4x4TransformWeight(context, weights, weight_matrices, false);
-//
-//		Tensor input_matrices = Tensor( { 36, 2 * 4 * 5, 35 }, "float32", Device::cpu());
-//		Tensor output_matrices = Tensor( { 36, 2 * 4 * 5, 21 }, "float32", Device::cpu());
-//		math::winograd4x4TransformInput(context, input, input_matrices);
-//		math::gemmBatched(context, 'n', 't', output_matrices, input_matrices, weight_matrices);
-//		math::winograd4x4TransformOutput(context, output, output_matrices, bias, nullptr, NonlinearityType::SIGMOID);
-//		EXPECT_LE(testing::diffForTest(correct_output, output), 1.0e-4f);
-//	}
-//	TEST(TestConv2D, winograd4x4_conv2D_3x3_backward)
-//	{
-//		DeviceContext context(Device::cpu());
-//		Tensor gradient_prev( { 2, 13, 17, 35 }, "float32", Device::cpu());
-//		Tensor output( { 2, 13, 17, 21 }, "float32", Device::cpu());
-//		Tensor gradient_next(output.shape(), "float32", Device::cpu());
-//		Tensor weights( { output.lastDim(), 3, 3, gradient_prev.lastDim() }, "float32", Device::cpu());
-//		ml::testing::initForTest(output, 0.0f);
-//		ml::testing::initForTest(gradient_next, 1.0f);
-//		ml::testing::initForTest(weights, 1.57f);
-//
-//		Tensor correct_gradient_prev(gradient_prev);
-//		baseline_conv2D_backward(output, correct_gradient_prev, gradient_next, weights, NonlinearityType::SIGMOID);
-//
-//		ml::testing::initForTest(gradient_next, 1.0f);
-//		math::nonlinearityBackwardInPlace(context, gradient_next, output, NonlinearityType::SIGMOID);
-//
-//		Tensor weight_matrices = Tensor( { 36, 21, 35 }, "float32", Device::cpu());
-//		Tensor gradient_prev_matrices = Tensor( { 36, 2 * 4 * 5, 35 }, "float32", Device::cpu());
-//		Tensor gradient_next_matrices = Tensor( { 36, 2 * 4 * 5, 21 }, "float32", Device::cpu());
-//
-//		math::winograd4x4TransformWeight(context, weights, weight_matrices, true);
-//		math::winograd4x4TransformInput(context, gradient_next, gradient_next_matrices);
-//		math::gemmBatched(context, 'n', 'n', gradient_prev_matrices, gradient_next_matrices, weight_matrices);
-//		math::winograd4x4TransformOutput(context, gradient_prev, gradient_prev_matrices, Tensor( { }, "float32", Device::cpu()));
-//		EXPECT_LE(testing::diffForTest(correct_gradient_prev, gradient_prev), 1.0e-4f);
-//	}
-//	TEST(TestConv2D, winograd4x4_conv2D_3x3_update)
-//	{
-//		DeviceContext context(Device::cpu());
-//		Tensor input( { 2, 13, 17, 35 }, "float32", Device::cpu());
-//		Tensor gradient_next( { 2, 13, 17, 21 }, "float32", Device::cpu());
-//		Tensor weight_update( { 21, 3, 3, 35 }, "float32", Device::cpu());
-//		Tensor storage( { 8, 21 }, "float32", Device::cpu());
-//		testing::initForTest(input, 0.0f);
-//		testing::initForTest(gradient_next, 1.0f);
-//		testing::initForTest(weight_update, 1.57f);
-//
-//		Tensor correct_weight_update(weight_update);
-//		baseline_conv2D_update(input, gradient_next, correct_weight_update);
-//
-//		Tensor weight_update_matrices = Tensor( { 36, 21, 35 }, "float32", Device::cpu());
-//		Tensor gradient_prev_matrices = Tensor( { 36, 2 * 4 * 5, 35 }, "float32", Device::cpu());
-//		Tensor gradient_next_matrices = Tensor( { 36, 2 * 4 * 5, 21 }, "float32", Device::cpu());
-//
-//		math::winograd4x4TransformGradient(context, gradient_next, gradient_next_matrices);
-//		math::winograd4x4TransformInput(context, input, gradient_prev_matrices);
-//		math::gemmBatched(context, 't', 'n', weight_update_matrices, gradient_next_matrices, gradient_prev_matrices);
-//		math::winograd4x4TransformUpdate(context, weight_update, weight_update_matrices);
-//
-//		EXPECT_LE(testing::diffForTest(correct_weight_update, weight_update), 1.0e-4f);
-//	}
+	TEST(TestConv2D, winograd_conv2D_3x3_forward)
+	{
+		Context context(Device::cpu());
+		Tensor input( { 2, 13, 17, 35 }, "float32", Device::cpu());
+		Tensor output( { 2, 13, 17, 21 }, "float32", Device::cpu());
+		Tensor weights( { 21, 3, 3, 35 }, "float32", Device::cpu());
+		Tensor bias( { 21 }, "float32", Device::cpu());
+		testing::initForTest(weights, 0.0f);
+		testing::initForTest(input, 1.0f);
+		testing::initForTest(bias, 1.0f);
+
+		Tensor correct_output(output.shape(), "float32", Device::cpu());
+		baseline_conv2D_forward(input, correct_output, weights, bias, ActivationType::SIGMOID);
+
+		Tensor weight_matrices = Tensor( { 36, 21, 35 }, "float32", Device::cpu());
+		winogradWeightTransform(context, weights, weight_matrices, false, false);
+
+		Tensor input_matrices = Tensor( { 36, 2 * 4 * 5, 35 }, "float32", Device::cpu());
+		Tensor output_matrices = Tensor( { 36, 2 * 4 * 5, 21 }, "float32", Device::cpu());
+		winogradInputTransform(context, weights.shape(), input, input_matrices);
+		gemmBatched(context, 'n', 't', output_matrices, input_matrices, weight_matrices, 1.0f, 0.0f);
+		winogradOutputTransform(context, weights.shape(), output_matrices, output, bias, Tensor(), ActivationType::SIGMOID);
+		EXPECT_LE(testing::diffForTest(correct_output, output), 1.0e-4f);
+	}
+	TEST(TestConv2D, winograd_conv2D_3x3_backward)
+	{
+		Context context(Device::cpu());
+		Tensor gradient_prev( { 2, 13, 17, 35 }, "float32", Device::cpu());
+		Tensor output( { 2, 13, 17, 21 }, "float32", Device::cpu());
+		Tensor gradient_next(output.shape(), "float32", Device::cpu());
+		Tensor weights( { output.lastDim(), 3, 3, gradient_prev.lastDim() }, "float32", Device::cpu());
+		ml::testing::initForTest(output, 0.0f);
+		ml::testing::initForTest(gradient_next, 1.0f);
+		ml::testing::initForTest(weights, 1.57f);
+
+		Tensor correct_gradient_prev(gradient_prev);
+		baseline_conv2D_backward(output, correct_gradient_prev, gradient_next, weights, ActivationType::SIGMOID);
+
+		ml::testing::initForTest(gradient_next, 1.0f);
+		activationBackward(context, gradient_next, gradient_next, output, ActivationType::SIGMOID);
+
+		Tensor weight_matrices = Tensor( { 36, 21, 35 }, "float32", Device::cpu());
+		Tensor gradient_prev_matrices = Tensor( { 36, 2 * 4 * 5, 35 }, "float32", Device::cpu());
+		Tensor gradient_next_matrices = Tensor( { 36, 2 * 4 * 5, 21 }, "float32", Device::cpu());
+
+		winogradWeightTransform(context, weights, weight_matrices, true, false);
+		winogradInputTransform(context, weights.shape(), gradient_next, gradient_next_matrices);
+		gemmBatched(context, 'n', 'n', gradient_prev_matrices, gradient_next_matrices, weight_matrices, 1.0f, 0.0f);
+		winogradOutputTransform(context, weights.shape(), gradient_prev_matrices, gradient_prev, Tensor(), Tensor(), ActivationType::LINEAR);
+		EXPECT_LE(testing::diffForTest(correct_gradient_prev, gradient_prev), 1.0e-4f);
+	}
+	TEST(TestConv2D, winograd_conv2D_3x3_update)
+	{
+		Context context(Device::cpu());
+		Tensor input( { 2, 13, 17, 35 }, "float32", Device::cpu());
+		Tensor gradient_next( { 2, 13, 17, 21 }, "float32", Device::cpu());
+		Tensor weight_update( { 21, 3, 3, 35 }, "float32", Device::cpu());
+		Tensor storage( { 8, 21 }, "float32", Device::cpu());
+		testing::initForTest(input, 0.0f);
+		testing::initForTest(gradient_next, 1.0f);
+		testing::initForTest(weight_update, 1.57f);
+
+		Tensor correct_weight_update(weight_update);
+		baseline_conv2D_update(input, gradient_next, correct_weight_update);
+
+		Tensor weight_update_matrices = Tensor( { 36, 21, 35 }, "float32", Device::cpu());
+		Tensor gradient_prev_matrices = Tensor( { 36, 2 * 4 * 5, 35 }, "float32", Device::cpu());
+		Tensor gradient_next_matrices = Tensor( { 36, 2 * 4 * 5, 21 }, "float32", Device::cpu());
+
+		winogradGradientTransform(context, weight_update.shape(), gradient_next, gradient_next_matrices);
+		winogradInputTransform(context, weight_update.shape(), input, gradient_prev_matrices);
+		gemmBatched(context, 't', 'n', weight_update_matrices, gradient_next_matrices, gradient_prev_matrices, 1.0f, 0.0f);
+		winogradUpdateTransform(context,weight_update_matrices, weight_update);
+
+		EXPECT_LE(testing::diffForTest(correct_weight_update, weight_update), 1.0e-4f);
+	}
 
 } /* namespace ml */

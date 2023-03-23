@@ -28,6 +28,10 @@ namespace
 	{
 		return -target * safe_log(output) - (1.0f - target) * safe_log(1.0f - output);
 	}
+	float square(float x) noexcept
+	{
+		return x * x;
+	}
 }
 
 namespace ml
@@ -144,10 +148,10 @@ namespace ml
 		for (int i = 0; i < elements; i++)
 		{
 			momentum_ptr[i] = momentum_ptr[i] * beta1 + update_ptr[i] * (1.0f - beta1);
-			variance_ptr[i] = variance_ptr[i] * beta2 + update_ptr[i] * update_ptr[i] * (1.0f - beta2);
+			variance_ptr[i] = variance_ptr[i] * beta2 + square(update_ptr[i]) * (1.0f - beta2);
 			weight_ptr[i] -= momentum_ptr[i] * learning_rate / std::sqrt(variance_ptr[i] + 1.0e-8f);
 			weight_ptr[i] = round_small_to_zero(weight_ptr[i]);
-			update_ptr[i] = 0.0;
+			update_ptr[i] = 0.0f;
 		}
 	}
 	void cpu_l2_regularization(mlContext_t context, mlShape_t shape, void *gradient, const void *param, float coefficient, float offset)
