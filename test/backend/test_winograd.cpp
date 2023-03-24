@@ -814,6 +814,64 @@ namespace ml
 		EXPECT_LE(testing::diffForTest(matrices_fp32, matrices_fp16), 1.0e-3f);
 	}
 
+	TEST(TestWinograd5x5_2x2, cpuInputTransform_fp16)
+	{
+		if (Device::numberOfCudaDevices() == 0 or not Device::cuda(0).supportsType(DataType::FLOAT16))
+			GTEST_SKIP();
+
+		const Shape weights_shape( { 35, 5, 5, 1 });
+		Tensor input( { 5, 7, 11, 35 }, DataType::FLOAT32, Device::cpu());
+		testing::initForTest(input, 0.0f);
+
+		Tensor matrices_fp32( { 36, 5 * 4 * 6, 35 }, DataType::FLOAT32, Device::cpu());
+		Tensor matrices_fp16(matrices_fp32.shape(), DataType::FLOAT16, Device::cpu());
+		winogradInputTransform(Context(), weights_shape, input, matrices_fp32);
+
+		input.convertTo(Context(), DataType::FLOAT16);
+		winogradInputTransform(Context(), weights_shape, input, matrices_fp16);
+
+		matrices_fp16.convertTo(Context(), DataType::FLOAT32);
+		EXPECT_LE(testing::diffForTest(matrices_fp32, matrices_fp16), 1.0e-3f);
+	}
+	TEST(TestWinograd5x5_2x2, cpuOutputTransform_fp16)
+	{
+		if (Device::numberOfCudaDevices() == 0 or not Device::cuda(0).supportsType(DataType::FLOAT16))
+			GTEST_SKIP();
+
+		const Shape weights_shape( { 35, 5, 5, 1 });
+
+		Tensor matrices( { 36, 5 * 4 * 6, 35 }, DataType::FLOAT32, Device::cpu());
+		testing::initForTest(matrices, 0.0f);
+
+		Tensor output_fp32( { 5, 7, 11, 35 }, DataType::FLOAT32, Device::cpu());
+		Tensor output_fp16(output_fp32.shape(), DataType::FLOAT16, Device::cpu());
+		winogradOutputTransform(Context(), weights_shape, matrices, output_fp32, Tensor(), Tensor(), ActivationType::LINEAR);
+
+		matrices.convertTo(Context(), DataType::FLOAT16);
+		winogradOutputTransform(Context(), weights_shape, matrices, output_fp16, Tensor(), Tensor(), ActivationType::LINEAR);
+
+		output_fp16.convertTo(Context(), DataType::FLOAT32);
+		EXPECT_LE(testing::diffForTest(output_fp32, output_fp16), 1.0e-3f);
+	}
+	TEST(TestWinograd5x5_2x2, cpuWeightTransform_fp16)
+	{
+		if (Device::numberOfCudaDevices() == 0 or not Device::cuda(0).supportsType(DataType::FLOAT16))
+			GTEST_SKIP();
+
+		Tensor weight( { 31, 3, 3, 35 }, DataType::FLOAT32, Device::cpu());
+		testing::initForTest(weight, 0.0f);
+
+		Tensor matrices_fp32( { 36, 31, 35 }, DataType::FLOAT32, Device::cpu());
+		Tensor matrices_fp16(matrices_fp32.shape(), DataType::FLOAT16, Device::cpu());
+		winogradWeightTransform(Context(), weight, matrices_fp32, false, false);
+
+		weight.convertTo(Context(), DataType::FLOAT16);
+		winogradWeightTransform(Context(), weight, matrices_fp16, false, false);
+
+		matrices_fp16.convertTo(Context(), DataType::FLOAT32);
+		EXPECT_LE(testing::diffForTest(matrices_fp32, matrices_fp16), 1.0e-3f);
+	}
+
 	TEST(TestWinograd3x3_4x4, cudaInputTransform_fp16)
 	{
 		if (Device::numberOfCudaDevices() == 0 or not Device::cuda(0).supportsType(DataType::FLOAT16))
@@ -860,6 +918,64 @@ namespace ml
 			GTEST_SKIP();
 		Context context(Device::cuda(0));
 		Tensor weight( { 31, 3, 3, 35 }, DataType::FLOAT32, Device::cuda(0));
+		testing::initForTest(weight, 0.0f);
+
+		Tensor matrices_fp32( { 36, 31, 35 }, DataType::FLOAT32, Device::cuda(0));
+		Tensor matrices_fp16(matrices_fp32.shape(), DataType::FLOAT16, Device::cuda(0));
+		winogradWeightTransform(context, weight, matrices_fp32, false, false);
+
+		weight.convertTo(context, DataType::FLOAT16);
+		winogradWeightTransform(context, weight, matrices_fp16, false, false);
+
+		matrices_fp16.convertTo(context, DataType::FLOAT32);
+		EXPECT_LE(testing::diffForTest(matrices_fp32, matrices_fp16), 1.0e-3f);
+	}
+
+	TEST(TestWinograd5x5_2x2, cudaInputTransform_fp16)
+	{
+		if (Device::numberOfCudaDevices() == 0 or not Device::cuda(0).supportsType(DataType::FLOAT16))
+			GTEST_SKIP();
+		Context context(Device::cuda(0));
+		const Shape weights_shape( { 35, 5, 5, 1 });
+		Tensor input( { 5, 7, 11, 35 }, DataType::FLOAT32, Device::cuda(0));
+		testing::initForTest(input, 0.0f);
+
+		Tensor matrices_fp32( { 36, 5 * 4 * 6, 35 }, DataType::FLOAT32, Device::cuda(0));
+		Tensor matrices_fp16(matrices_fp32.shape(), DataType::FLOAT16, Device::cuda(0));
+		winogradInputTransform(context, weights_shape, input, matrices_fp32);
+
+		input.convertTo(context, DataType::FLOAT16);
+		winogradInputTransform(context, weights_shape, input, matrices_fp16);
+
+		matrices_fp16.convertTo(context, DataType::FLOAT32);
+		EXPECT_LE(testing::diffForTest(matrices_fp32, matrices_fp16), 1.0e-3f);
+	}
+	TEST(TestWinograd5x5_2x2, cudaOutputTransform_fp16)
+	{
+		if (Device::numberOfCudaDevices() == 0 or not Device::cuda(0).supportsType(DataType::FLOAT16))
+			GTEST_SKIP();
+		Context context(Device::cuda(0));
+		const Shape weights_shape( { 35, 5, 5, 1 });
+
+		Tensor matrices( { 36, 5 * 4 * 6, 35 }, DataType::FLOAT32, Device::cuda(0));
+		testing::initForTest(matrices, 0.0f);
+
+		Tensor output_fp32( { 5, 7, 11, 35 }, DataType::FLOAT32, Device::cuda(0));
+		Tensor output_fp16(output_fp32.shape(), DataType::FLOAT16, Device::cuda(0));
+		winogradOutputTransform(context, weights_shape, matrices, output_fp32, Tensor(), Tensor(), ActivationType::LINEAR);
+
+		matrices.convertTo(context, DataType::FLOAT16);
+		winogradOutputTransform(context, weights_shape, matrices, output_fp16, Tensor(), Tensor(), ActivationType::LINEAR);
+
+		output_fp16.convertTo(context, DataType::FLOAT32);
+		EXPECT_LE(testing::diffForTest(output_fp32, output_fp16), 1.0e-3f);
+	}
+	TEST(TestWinograd5x5_2x2, cudaWeightTransform_fp16)
+	{
+		if (Device::numberOfCudaDevices() == 0 or not Device::cuda(0).supportsType(DataType::FLOAT16))
+			GTEST_SKIP();
+		Context context(Device::cuda(0));
+		Tensor weight( { 31, 5, 5, 35 }, DataType::FLOAT32, Device::cuda(0));
 		testing::initForTest(weight, 0.0f);
 
 		Tensor matrices_fp32( { 36, 31, 35 }, DataType::FLOAT32, Device::cuda(0));

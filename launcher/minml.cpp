@@ -658,6 +658,389 @@ void test_mnist()
 	std::cout << '\n' << '\n';
 }
 
+namespace gemm
+{
+	void* aligned_new(size_t count, size_t alignment)
+	{
+		if (count == 0)
+			return nullptr;
+		else
+			return ::operator new[](count, std::align_val_t(alignment));
+	}
+	void aligned_free(void *ptr, size_t alignment)
+	{
+		if (ptr != nullptr)
+			::operator delete[](ptr, std::align_val_t(alignment));
+	}
+	template<typename T>
+	constexpr bool is_power_of_2(T x) noexcept
+	{
+		return (x > 0) and not (x & (x - 1));
+	}
+
+	template<size_t Alignment>
+	class AlignedPointer
+	{
+			static_assert(is_power_of_2(Alignment), "Alignment must be a power of 2");
+			void *__restrict__ ptr = nullptr;
+		public:
+			AlignedPointer() noexcept = default;
+			AlignedPointer(size_t size) :
+					ptr(aligned_new(size, Alignment))
+			{
+			}
+			AlignedPointer(const AlignedPointer &other) = delete;
+			AlignedPointer(AlignedPointer &&other) noexcept :
+					ptr(other.ptr)
+			{
+				other.ptr = nullptr;
+			}
+			AlignedPointer& operator==(const AlignedPointer &other) = delete;
+			AlignedPointer& operator==(AlignedPointer &&other) noexcept
+			{
+				std::swap(this->ptr, other.ptr);
+				return *this;
+			}
+			~AlignedPointer()
+			{
+				aligned_free(ptr, Alignment);
+			}
+
+			void* get() noexcept
+			{
+				return ptr;
+			}
+			const void* get() const noexcept
+			{
+				return ptr;
+			}
+	};
+
+	enum class Use
+	{
+		MATRIX_A,
+		MATRIX_B,
+		ACCUMULATOR
+	};
+
+	template<typename T>
+	class Fragment
+	{
+			AlignedPointer<4096> m_ptr;
+			int m_rows = 0;
+			int m_columns = 0;
+		public:
+			Fragment() noexcept = default;
+			Fragment(int rows, int columns) :
+					m_ptr(sizeof(T) * rows * columns),
+					m_rows(rows),
+					m_columns(columns)
+			{
+			}
+			int rows() const noexcept
+			{
+				return m_rows;
+			}
+			int columns() const noexcept
+			{
+				return m_columns;
+			}
+			int size() const noexcept
+			{
+				return rows() * columns();
+			}
+			T* data() noexcept
+			{
+//				return reinterpret_cast<T*>(m_ptr);
+			}
+			const T* data() const noexcept
+			{
+//				return reinterpret_cast<const T*>(m_ptr);
+			}
+			T& operator[](int index) noexcept
+			{
+				assert(0 <= index && index < size());
+				return data()[index];
+			}
+			const T& operator[](int index) const noexcept
+			{
+				assert(0 <= index && index < size());
+				return data()[index];
+			}
+			T& at(int row, int col) noexcept
+			{
+				assert(0 <= row && row < rows());
+				assert(0 <= col && col < columns());
+				return data()[row * columns() + col];
+			}
+			const T& at(int row, int col) const noexcept
+			{
+				assert(0 <= row && row < rows());
+				assert(0 <= col && col < columns());
+				return data()[row * columns() + col];
+			}
+	};
+
+	template<int TileM, int TileN, typename DataType, typename ComputeType = DataType>
+	class GemmRuntime
+	{
+		public:
+			void packA(const DataType *__restrict__ A, Fragment<ComputeType> &fragmentA) const
+			{
+			}
+			void packB(const DataType *__restrict__ A, Fragment<ComputeType> &fragmentB) const
+			{
+			}
+			void packC(const DataType *__restrict__ A, Fragment<ComputeType> &fragmentC) const
+			{
+
+			}
+			void run(Fragment<ComputeType> &fragmentC, const Fragment<ComputeType> &fragmentA, const Fragment<ComputeType> &fragmentB, int K) const
+			{
+			}
+	};
+
+	template<>
+	class GemmRuntime<6, 16, float, float>
+	{
+		public:
+			void packA(const float *__restrict__ A, Fragment<float> &fragmentA) const
+			{
+			}
+			void packB(const float *__restrict__ A, Fragment<float> &fragmentB) const
+			{
+			}
+			void packC(const float *__restrict__ A, Fragment<float> &fragmentC) const
+			{
+			}
+			void run(Fragment<float> &fragmentC, const Fragment<float> &fragmentA, const Fragment<float> &fragmentB, int K) const
+			{
+				__m256 acc00 = _mm256_setzero_ps(), acc01 = _mm256_setzero_ps();
+				__m256 acc10 = _mm256_setzero_ps(), acc11 = _mm256_setzero_ps();
+				__m256 acc20 = _mm256_setzero_ps(), acc21 = _mm256_setzero_ps();
+				__m256 acc30 = _mm256_setzero_ps(), acc31 = _mm256_setzero_ps();
+				__m256 acc40 = _mm256_setzero_ps(), acc41 = _mm256_setzero_ps();
+				__m256 acc50 = _mm256_setzero_ps(), acc51 = _mm256_setzero_ps();
+
+				float *ptrC = fragmentC.data();
+				const float *ptrA = fragmentA.data();
+				const float *ptrB = fragmentB.data();
+
+				for (int k = 0; k < K; k++)
+				{
+					__m256 b0 = _mm256_load_ps(ptrB);
+					__m256 b1 = _mm256_load_ps(ptrB + 8);
+					__m256 a0 = _mm256_broadcast_ss(ptrA);
+					__m256 a1 = _mm256_broadcast_ss(ptrA + 1);
+
+					acc00 = _mm256_fmadd_ps(a0, b0, acc00);
+					acc01 = _mm256_fmadd_ps(a0, b1, acc01);
+					acc10 = _mm256_fmadd_ps(a1, b0, acc10);
+					acc11 = _mm256_fmadd_ps(a1, b1, acc11);
+
+					a0 = _mm256_broadcast_ss(ptrA + 2);
+					a1 = _mm256_broadcast_ss(ptrA + 3);
+
+					acc20 = _mm256_fmadd_ps(a0, b0, acc20);
+					acc21 = _mm256_fmadd_ps(a0, b1, acc21);
+					acc30 = _mm256_fmadd_ps(a1, b0, acc30);
+					acc31 = _mm256_fmadd_ps(a1, b1, acc31);
+
+					a0 = _mm256_broadcast_ss(ptrA + 3);
+					a1 = _mm256_broadcast_ss(ptrA + 4);
+
+					acc40 = _mm256_fmadd_ps(a0, b0, acc40);
+					acc41 = _mm256_fmadd_ps(a0, b1, acc41);
+					acc50 = _mm256_fmadd_ps(a1, b0, acc50);
+					acc51 = _mm256_fmadd_ps(a1, b1, acc51);
+				}
+
+				_mm256_store_ps(ptrC + 0, acc00);
+				_mm256_store_ps(ptrC + 8, acc01);
+				_mm256_store_ps(ptrC + 16, acc10);
+				_mm256_store_ps(ptrC + 24, acc11);
+				_mm256_store_ps(ptrC + 32, acc20);
+				_mm256_store_ps(ptrC + 40, acc21);
+				_mm256_store_ps(ptrC + 48, acc30);
+				_mm256_store_ps(ptrC + 56, acc31);
+				_mm256_store_ps(ptrC + 64, acc40);
+				_mm256_store_ps(ptrC + 72, acc41);
+				_mm256_store_ps(ptrC + 80, acc50);
+				_mm256_store_ps(ptrC + 88, acc51);
+			}
+	};
+
+	template<typename T, typename U>
+	T cast_to(U x) noexcept
+	{
+		return static_cast<T>(x);
+	}
+
+	void gemm_def_MxN_fp32(int M, int N, int K, const void *alpha_ptr, const void *__restrict__ lhs_ptr, const void *__restrict__ rhs_ptr,
+			const void *beta_ptr, void *__restrict__ dst_ptr, int dst_stride)
+	{
+		std::unique_ptr<float[]> acc = std::make_unique<float[]>(M * N);
+		for (int i = 0; i < M * N; i++)
+			acc[i] = 0.0f;
+
+		for (int k = 0; k < K; k++)
+			for (int m = 0; m < M; m++)
+			{
+				const float tmp = reinterpret_cast<const float*>(lhs_ptr)[k * M + m];
+				for (int n = 0; n < N; n++)
+					acc[m * N + n] += tmp * reinterpret_cast<const float*>(rhs_ptr)[k * N + n];
+			}
+
+		const float alpha = reinterpret_cast<const float*>(alpha_ptr)[0];
+		if (alpha != 1.0f)
+		{
+			for (int i = 0; i < M * N; i++)
+				acc[i] *= alpha;
+		}
+
+		const float beta = reinterpret_cast<const float*>(beta_ptr)[0];
+		if (beta == 0.0f)
+		{
+			for (int m = 0; m < M; m++)
+				for (int n = 0; n < N; n++)
+					reinterpret_cast<float*>(dst_ptr)[m * dst_stride + n] += acc[m * N + n];
+		}
+		else
+		{
+			for (int m = 0; m < M; m++)
+				for (int n = 0; n < N; n++)
+					reinterpret_cast<float*>(dst_ptr)[m * dst_stride + n] = beta * reinterpret_cast<float*>(dst_ptr)[m * dst_stride + n]
+							+ acc[m * N + n];
+		}
+	}
+
+	void gemm_avx2_fma_6x16_fp32(int M, int N, int K, const void *alpha_ptr, const void *__restrict__ lhs_ptr, const void *__restrict__ rhs_ptr,
+			const void *beta_ptr, void *__restrict__ dst_ptr, int dst_stride)
+	{
+		assert(M == 6);
+		assert(N == 16);
+
+		uint64_t k_iter = K / 4;
+		uint64_t k_left = K % 4;
+		uint64_t stride = dst_stride;
+		asm volatile(
+				"movq  %[stride], %%r12 \n\t" // stride is r12
+				"movq  %[lhs_ptr], %%rax \n\t" // lhs pointer is in rax
+				"movq  %[rhs_ptr], %%rbx \n\t" // rhs pointer is in rbx
+				"shlq $2, %%r12 \n\t"// multiply stride by sizeof(float)
+
+				// Set accumulators to zero.
+				"vpxor %%ymm4, %%ymm4, %%ymm4 \n\t"
+				"vpxor %%ymm5, %%ymm5, %%ymm5 \n\t"
+				"vpxor %%ymm6, %%ymm6, %%ymm6 \n\t"
+				"vpxor %%ymm7, %%ymm7, %%ymm7 \n\t"
+				"vpxor %%ymm8, %%ymm8, %%ymm8 \n\t"
+				"vpxor %%ymm9, %%ymm9, %%ymm9 \n\t"
+				"vpxor %%ymm10, %%ymm10, %%ymm10 \n\t"
+				"vpxor %%ymm11, %%ymm11, %%ymm11 \n\t"
+				"vpxor %%ymm12, %%ymm12, %%ymm12 \n\t"
+				"vpxor %%ymm13, %%ymm13, %%ymm13 \n\t"
+				"vpxor %%ymm14, %%ymm14, %%ymm14 \n\t"
+				"vpxor %%ymm15, %%ymm15, %%ymm15 \n\t"
+
+				"movq  %[k_iter], %%r14 \n\t"// load the number of 4-unrolled iterations
+				"test %%r14, %%r14 \n\t"
+				"je unrolled4 \n\t"
+
+				"unrolled4: \n\t"
+				// iteration 0
+				"vmovaps 0x00(%%rbx), %%ymm2 \n\t"
+				"vmovaps 0x20(%%rbx), %%ymm3 \n\t"
+
+				"vbroadcastss 0x00(%%rax), %%ymm0 \n\t"
+				"vbroadcastss 0x04(%%rax), %%ymm1 \n\t"
+				"vfmadd231ps %%ymm0, %%ymm2, %%ymm4 \n\t"
+				"vfmadd231ps %%ymm0, %%ymm3, %%ymm5 \n\t"
+				"vfmadd231ps %%ymm1, %%ymm2, %%ymm6 \n\t"
+				"vfmadd231ps %%ymm1, %%ymm3, %%ymm7 \n\t"
+
+				"vbroadcastss 0x08(%%rax), %%ymm0 \n\t"
+				"vbroadcastss 0x0C(%%rax), %%ymm1 \n\t"
+				"vfmadd231ps %%ymm0, %%ymm2, %%ymm8 \n\t"
+				"vfmadd231ps %%ymm0, %%ymm3, %%ymm9 \n\t"
+				"vfmadd231ps %%ymm1, %%ymm2, %%ymm10 \n\t"
+				"vfmadd231ps %%ymm1, %%ymm3, %%ymm11 \n\t"
+
+				"vbroadcastss 0x10(%%rax), %%ymm0 \n\t"
+				"vbroadcastss 0x14(%%rax), %%ymm1 \n\t"
+				"vfmadd231ps %%ymm0, %%ymm2, %%ymm12 \n\t"
+				"vfmadd231ps %%ymm0, %%ymm3, %%ymm13 \n\t"
+				"vfmadd231ps %%ymm1, %%ymm2, %%ymm14 \n\t"
+				"vfmadd231ps %%ymm1, %%ymm3, %%ymm15 \n\t"
+				// iteration 1
+
+				:// outputs
+				[lhs_ptr] "+r"(lhs_ptr), [rhs_ptr] "+r"(rhs_ptr), [dst_ptr] "+r"(dst_ptr)
+				:// inputs
+				[k_iter] "r"(k_iter), [k_left] "r"(k_left), [stride] "r"(stride)
+				:// clobbers
+				"cc", "memory", "%ymm0", "%ymm1", "%ymm2", "%ymm3", "%ymm4", "%ymm5", "%ymm6", "%ymm7",
+				"%ymm8", "%ymm9", "%ymm10", "%ymm11", "%ymm12", "%ymm13", "%ymm14", "%ymm15", "%r12",
+				"%r13", "%r14");
+	}
+
+	template<int TileM, int TileN, typename DataType, typename ComputeType = DataType>
+	struct GemmKernel
+	{
+			int total_fma_count = 0;
+			~GemmKernel()
+			{
+				std::cout << "total fma count    = " << total_fma_count << '\n';
+			}
+			void run(DataType *__restrict__ C, const DataType *__restrict__ A, const DataType *__restrict__ B, int M, int N, int K)
+			{
+				ComputeType acc[M * N];
+				for (int i = 0; i < M * N; i++)
+					acc[i] = cast_to<ComputeType>(0.0);
+
+				for (int k = 0; k < K; k++)
+					for (int m = 0; m < M; m++)
+					{
+						const DataType tmp = cast_to<ComputeType>(A[k * M + m]);
+						for (int n = 0; n < N; n++, total_fma_count++)
+							acc[m * N + n] += tmp * cast_to<ComputeType>(B[k * N + n]);
+					}
+
+				for (int m = 0; m < M; m++)
+					for (int n = 0; n < N; n++)
+						C[m * N + n] += acc[m * N + n];
+			}
+	};
+
+	template<typename T>
+	struct MicroKernel
+	{
+			int total_fma_count = 0;
+			~MicroKernel()
+			{
+				std::cout << "total fma count    = " << total_fma_count << '\n';
+			}
+			void run(T *__restrict__ C, const T *__restrict__ A, const T *__restrict__ B, const int M, const int N, const int K)
+			{
+				T acc[M * N];
+				for (int i = 0; i < M * N; i++)
+					acc[i] = static_cast<T>(0.0);
+
+				for (int k = 0; k < K; k++)
+					for (int m = 0; m < M; m++)
+					{
+						const T tmp = A[k * M + m];
+						for (int n = 0; n < N; n++, total_fma_count++)
+							acc[m * N + n] += tmp * B[k * N + n];
+					}
+
+				for (int m = 0; m < M; m++)
+					for (int n = 0; n < N; n++)
+						C[m * N + n] += acc[m * N + n];
+			}
+	};
+}
+
 int main()
 {
 	std::cout << "BEGIN" << std::endl;
