@@ -16,11 +16,14 @@ namespace ml
 	class Dense: public Layer
 	{
 			int m_neurons = 0;
+			bool m_use_weights = true;
 			bool m_use_bias = true;
 		public:
-			Dense(int neurons, const std::string &activation = "linear", bool useBias = true);
+			Dense(int neurons, const std::string &activation = "linear");
 
+			Dense& useWeights(bool b) noexcept;
 			Dense& useBias(bool b) noexcept;
+			bool isUsingWeights() const noexcept;
 			bool isUsingBias() const noexcept;
 
 			void setInputShape(const std::vector<Shape> &shapes);
