@@ -34,6 +34,13 @@ namespace ml
 		m_use_beta = b;
 		return *this;
 	}
+	BatchNormalization& BatchNormalization::historySize(int s) noexcept
+	{
+		if (m_history_size != s)
+			m_running_stats = nullptr;
+		m_history_size = s;
+		return *this;
+	}
 
 	void BatchNormalization::setInputShape(const std::vector<Shape> &shapes)
 	{
@@ -117,6 +124,11 @@ namespace ml
 		m_running_stats->zeroall(context());
 		m_total_steps = 0;
 		m_running_id = 0;
+	}
+	void BatchNormalization::setRegularizer(const Regularizer &regularizer)
+	{
+		getWeights().getRegularizer() = Regularizer(regularizer.getCoefficient(), 1.0f);
+		getBias().getRegularizer() = regularizer;
 	}
 	void BatchNormalization::forward(const std::vector<Tensor> &input, Tensor &output)
 	{

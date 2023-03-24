@@ -27,6 +27,9 @@ namespace ml
 			Regularizer() = default;
 			Regularizer(float coefficient, float offset = 0.0f);
 
+			float getCoefficient() const noexcept;
+			float getOffset() const noexcept;
+
 			void apply(const Context &context, Parameter &param);
 
 			Json serialize(SerializedObject &binary_data) const;

@@ -21,7 +21,14 @@ namespace ml
 			m_offset(offset)
 	{
 	}
-
+	float Regularizer::getCoefficient() const noexcept
+	{
+		return m_coefficient;
+	}
+	float Regularizer::getOffset() const noexcept
+	{
+		return m_offset;
+	}
 	void Regularizer::apply(const Context &context, Parameter &param)
 	{
 		l2Regularization(context, param.getGradient(), param.getParam(), m_coefficient, m_offset);
