@@ -357,10 +357,10 @@ namespace ml
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
-				cpu_sum_over_first_dim(get(context), get_shape(dst), dst.data(), src.data(), beta);
+				cpu_sum_over_first_dim(get(context), get_shape(src), dst.data(), src.data(), beta);
 				break;
 			case DeviceType::CUDA:
-				cuda_sum_over_first_dim(get(context), get_shape(dst), dst.data(), src.data(), beta);
+				cuda_sum_over_first_dim(get(context), get_shape(src), dst.data(), src.data(), beta);
 				break;
 		}
 	}

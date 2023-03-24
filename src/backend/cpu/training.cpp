@@ -86,7 +86,7 @@ namespace ml
 
 		for (int i = 0; i < first_dim; i++)
 			for (int j = 0; j < last_dim; j++)
-				tmp_ptr[j] += src_ptr[i * first_dim + j];
+				tmp_ptr[j] += src_ptr[i * last_dim + j];
 
 		float *dst_ptr = getPointer<float>(dst);
 		if (beta == 0.0f)
