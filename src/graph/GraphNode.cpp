@@ -34,7 +34,7 @@ namespace
 	template<typename T>
 	void removeByValue(std::vector<T> &vec, T value)
 	{
-		int tmp = indexOf(vec, value);
+		const int tmp = indexOf(vec, value);
 		if (tmp == -1)
 			throw std::logic_error("no such value");
 		removeByIndex(vec, tmp);
@@ -64,7 +64,7 @@ namespace ml
 	}
 	void GraphNode::resolveInputShapes()
 	{
-		if (!isInputNode())
+		if (not isInputNode())
 		{
 			std::vector<Shape> input_shapes(numberOfInputs());
 			for (int i = 0; i < numberOfInputs(); i++)

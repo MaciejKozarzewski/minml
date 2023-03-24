@@ -315,18 +315,16 @@ namespace
 	__global__ void kernel_batchnorm_update(const float *running_stat, float *weights, int first_dim, int last_dim, bool use_gamma, bool use_beta)
 	{
 		const int tid = blockIdx.x * blockDim.x + threadIdx.x;
-		float mean_avg = 0.0f, mean_var = 0.0f;
 		if (tid < last_dim)
+		{
+			float mean_avg = 0.0f, mean_var = 0.0f;
 			for (int i = 0; i < first_dim; i++)
 			{
 				mean_avg += running_stat[i * 2 * last_dim + tid];
 				mean_var += running_stat[(i * 2 + 1) * last_dim + tid];
 			}
-
-		if (threadIdx.y == 0 and tid < last_dim)
-		{
-			weights[tid] = mean_avg / first_dim; // running mean average
-			weights[last_dim + tid] = mean_var / first_dim; // running mean variance
+			weights[0 * last_dim + tid] = mean_avg / first_dim; // running mean average
+			weights[1 * last_dim + tid] = mean_var / first_dim; // running mean variance
 			if (not use_gamma)
 				weights[2 * last_dim + tid] = 1.0f; // gamma
 			if (not use_beta)

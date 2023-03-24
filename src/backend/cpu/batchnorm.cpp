@@ -151,7 +151,7 @@ namespace ml
 		float *weights_ptr = getPointer<float>(weights);
 		float *running_stat_ptr = getPointer<float>(running_stats) + 2 * running_stat_idx * last_dim;
 
-		assert(cpu::Context::getWorkspaceSize(context) >= last_dim * sizeof(AvgVarStats<float>));
+		assert(cpu::Context::getWorkspaceSize(context) >= last_dim * sizeof(AvgVarStats<float> ));
 		AvgVarStats<float> *stats = cpu::Context::getWorkspace<AvgVarStats<float>>(context);
 
 		for (int j = 0; j < last_dim; j++)
@@ -166,19 +166,13 @@ namespace ml
 			running_stat_ptr[last_dim + j] = stats[j].get_variance();
 		}
 
-		/* weights rows are:
-		 * mean
-		 * variance
-		 * gamma
-		 * beta
-		 */
-		const float *gamma = weights_ptr + 2 * last_dim;
-		const float *beta = weights_ptr + 3 * last_dim;
 		for (int i = 0; i < first_dim; i++)
 			for (int j = 0; j < last_dim; j++)
 			{
-				float tmp = gamma[j] * (input_ptr[i * last_dim + j] - get_mean(running_stat_ptr, j, last_dim))
-						/ get_stddev(running_stat_ptr, j, last_dim) + beta[j];
+				const float gamma = get_gamma(weights_ptr, j, last_dim);
+				const float beta = get_beta(weights_ptr, j, last_dim);
+				float tmp = gamma * (input_ptr[i * last_dim + j] - get_mean(running_stat_ptr, j, last_dim))
+						/ get_stddev(running_stat_ptr, j, last_dim) + beta;
 				if (act == ACTIVATION_RELU)
 					tmp = std::max(0.0f, tmp);
 				if (act == ACTIVATION_TANH)
@@ -216,11 +210,6 @@ namespace ml
 		 * gamma
 		 * beta
 		 */
-		const float *mean_ptr = running_stat_ptr + 0;
-		const float *variance_ptr = running_stat_ptr + last_dim;
-		const float *beta_ptr = getPointer<float>(weights) + 3 * last_dim;
-		const float *gamma_ptr = getPointer<float>(weights) + 2 * last_dim;
-
 		float *d_sigma = cpu::Context::getWorkspace<float>(context);
 		float *d_mu = cpu::Context::getWorkspace<float>(context) + last_dim;
 		setzero(d_sigma, last_dim);
@@ -237,7 +226,9 @@ namespace ml
 				if (act == ACTIVATION_SIGMOID)
 					gradient_next_ptr[idx] *= output_ptr[idx] * (1.0f - output_ptr[idx]);
 
-				d_sigma[j] += gradient_next_ptr[idx] * (input_ptr[idx] - mean_ptr[j]) / std::sqrt(variance_ptr[j] + epsilon);
+				const float avg = get_mean(running_stat_ptr, j, last_dim);
+				const float stddev = get_stddev(running_stat_ptr, j, last_dim);
+				d_sigma[j] += gradient_next_ptr[idx] * (input_ptr[idx] - avg) / stddev;
 				d_mu[j] += gradient_next_ptr[idx];
 			}
 		for (int j = 0; j < last_dim; j++)
@@ -248,17 +239,19 @@ namespace ml
 
 		for (int j = 0; j < last_dim; j++)
 		{
-			const float stddev = std::sqrt(variance_ptr[j] + epsilon);
-			d_sigma[j] = -gamma_ptr[j] / stddev * d_sigma[j] / first_dim;
-			d_mu[j] = -gamma_ptr[j] / stddev * d_mu[j] / first_dim;
+			const float gamma = get_gamma(getPointer<float>(weights), j, last_dim);
+			const float stddev = get_stddev(running_stat_ptr, j, last_dim);
+			d_sigma[j] = -gamma / stddev * d_sigma[j] / first_dim;
+			d_mu[j] = -gamma / stddev * d_mu[j] / first_dim;
 		}
 		for (int i = 0; i < first_dim; i++)
 			for (int j = 0; j < last_dim; j++)
 			{
 				const int idx = i * last_dim + j;
-				const float stddev = std::sqrt(variance_ptr[j] + epsilon);
-				gradient_prev_ptr[idx] = gamma_ptr[j] / stddev * gradient_next_ptr[idx] + d_sigma[j] * (input_ptr[idx] - mean_ptr[j]) / stddev
-						+ d_mu[j];
+				const float gamma = get_gamma(getPointer<float>(weights), j, last_dim);
+				const float avg = get_mean(running_stat_ptr, j, last_dim);
+				const float stddev = get_stddev(running_stat_ptr, j, last_dim);
+				gradient_prev_ptr[idx] = gamma / stddev * gradient_next_ptr[idx] + d_sigma[j] * (input_ptr[idx] - avg) / stddev + d_mu[j];
 			}
 	}
 	void cpu_batchnorm_update(mlContext_t context, mlShape_t shape, const void *running_stat, void *weights, bool use_gamma, bool use_beta)
@@ -331,5 +324,6 @@ namespace ml
 				getPointer<float>(layer_weights)[i * last_dim + j] *= scale;
 		}
 	}
+
 } /* namespace ml */
 

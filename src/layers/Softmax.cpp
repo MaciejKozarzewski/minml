@@ -80,7 +80,7 @@ namespace ml
 		const Tensor in = input[0].view(shape);
 		Tensor out = output.view(shape);
 
-		activationForward(context(), out, in, m_activation);
+		activationForward(context(), out, in, ActivationType::SOFTMAX);
 	}
 	void Softmax::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next)
 	{

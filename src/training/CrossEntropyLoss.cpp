@@ -19,7 +19,7 @@ namespace ml
 	}
 	float CrossEntropyLoss::getLoss(const Context &context, const Tensor &output, const Tensor &target) const
 	{
-		return m_weight*crossEntropyLoss(context, output, target);
+		return m_weight * crossEntropyLoss(context, output, target);
 	}
 	void CrossEntropyLoss::getGradient(const Context &context, Tensor &gradient, const Tensor &output, const Tensor &target) const
 	{

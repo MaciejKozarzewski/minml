@@ -384,8 +384,6 @@ namespace ml
 		}
 		if (isUsingBias())
 			sumOverFirstDim(context(), getBias().getGradient(), gradient_next, 1.0f);
-		if (gradient_prev.size() == 2)
-			gradient_prev[1].copyFrom(context(), gradient_next);
 	}
 
 	void Conv2D::choose_algorithm()

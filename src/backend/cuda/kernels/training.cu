@@ -41,6 +41,10 @@ namespace
 	{
 		return -target * safe_log(output) - (1.0f - target) * safe_log(1.0f - output);
 	}
+	__device__ float square(float x)
+	{
+		return x * x;
+	}
 
 	__global__ void kernel_loss_gradient(float *gradient, const float *output, const float *target, int elements, float inv_batch_size)
 	{
@@ -83,7 +87,7 @@ namespace
 		for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < elements; i += gridDim.x * blockDim.x)
 		{
 			momentum[i] = momentum[i] * beta1 + update[i] * (1.0f - beta1);
-			variance[i] = variance[i] * beta2 + update[i] * update[i] * (1.0f - beta2);
+			variance[i] = variance[i] * beta2 + square(update[i]) * (1.0f - beta2);
 			const float tmp = -momentum[i] * learning_rate / sqrt(variance[i] + 1.0e-8f);
 			weight[i] = round_small_to_zero(weight[i] + tmp);
 			update[i] = 0.0f;
