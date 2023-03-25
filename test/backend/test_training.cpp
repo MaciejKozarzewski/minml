@@ -23,9 +23,6 @@ namespace ml
 {
 	TEST(TestTraining, cross_entropy_loss)
 	{
-		if (Device::numberOfCudaDevices() == 0)
-			GTEST_SKIP();
-
 		Tensor output( { 12, 34, 56 }, "float32", Device::cpu());
 		Tensor target(output.shape(), "float32", Device::cpu());
 
@@ -37,6 +34,8 @@ namespace ml
 
 		const float cpu_loss = crossEntropyLoss(Context(), output, target);
 
+		if (Device::numberOfCudaDevices() == 0)
+			GTEST_SKIP();
 		Context context(Device::cuda(0));
 		output.moveTo(context.device());
 		target.moveTo(context.device());
@@ -48,9 +47,6 @@ namespace ml
 	}
 	TEST(TestTraining, cross_entropy_gradient)
 	{
-		if (Device::numberOfCudaDevices() == 0)
-			GTEST_SKIP();
-
 		Tensor output( { 12, 34, 56 }, "float32", Device::cpu());
 		Tensor target(output.shape(), "float32", Device::cpu());
 
@@ -63,6 +59,8 @@ namespace ml
 		Tensor cpu_gradient(output.shape(), "float32", Device::cpu());
 		crossEntropyGradient(Context(), cpu_gradient, output, target, 1.23f);
 
+		if (Device::numberOfCudaDevices() == 0)
+			GTEST_SKIP();
 		Context context(Device::cuda(0));
 		output.moveTo(context.device());
 		target.moveTo(context.device());
@@ -75,9 +73,6 @@ namespace ml
 
 	TEST(TestTraining, adam_optimize)
 	{
-		if (Device::numberOfCudaDevices() == 0)
-			GTEST_SKIP();
-
 		const Shape shape( { 12, 34, 56 });
 		Tensor gradient(shape, "float32", Device::cpu());
 
@@ -91,6 +86,9 @@ namespace ml
 			adamOptimize(Context(), cpu_weights, gradient, cpu_momentum, cpu_variance, 1.0e-3f, 0.9f, 0.999f);
 			EXPECT_EQ(testing::normForTest(gradient), 0.0f);
 		}
+
+		if (Device::numberOfCudaDevices() == 0)
+			GTEST_SKIP();
 
 		Context context(Device::cuda(0));
 		gradient.moveTo(context.device());
@@ -113,9 +111,6 @@ namespace ml
 
 	TEST(TestTraining, l2_regularization)
 	{
-		if (Device::numberOfCudaDevices() == 0)
-			GTEST_SKIP();
-
 		const Shape shape( { 12, 34, 56 });
 		Tensor gradient(shape, "float32", Device::cpu());
 		testing::initForTest(gradient, 1.0f);
@@ -125,6 +120,8 @@ namespace ml
 
 		l2Regularization(Context(), gradient, cpu_weights, 0.123f, 0.456f);
 
+		if (Device::numberOfCudaDevices() == 0)
+			GTEST_SKIP();
 		Context context(Device::cuda(0));
 		gradient.moveTo(context.device());
 		Tensor cuda_weights(shape, "float32", context.device());

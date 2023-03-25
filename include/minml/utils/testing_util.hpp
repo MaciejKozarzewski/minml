@@ -17,7 +17,7 @@ namespace ml
 {
 	namespace testing
 	{
-		void initForTest(Tensor &t, double shift);
+		void initForTest(Tensor &t, double shift, double scale = 1.0);
 		double diffForTest(const Tensor &lhs, const Tensor &rhs);
 		double normForTest(const Tensor &tensor);
 		double sumForTest(const Tensor &tensor);

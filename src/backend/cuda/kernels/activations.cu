@@ -132,10 +132,7 @@ namespace
 	__global__ void kernel_relu_backward(float *gradient_prev, const float *gradient_next, const float *output, int length)
 	{
 		for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < length; i += gridDim.x * blockDim.x)
-			if (output[i] == 0.0f)
-				gradient_prev[i] = gradient_next[i] * 0.01f;
-			else
-				gradient_prev[i] = gradient_next[i];
+			gradient_prev[i] = (output[i] == 0.0f) ? 0.0f : gradient_next[i];
 	}
 
 	template<typename T>

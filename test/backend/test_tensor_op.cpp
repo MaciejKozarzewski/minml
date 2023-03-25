@@ -164,9 +164,9 @@ namespace ml
 	TEST(TestTensorOp, sumOverFirstDim)
 	{
 		float beta = 2.1f;
-		Tensor src( { 123, 34 }, DataType::FLOAT32, Device::cpu());
-		Tensor correct( { 34 }, DataType::FLOAT32, Device::cpu());
-		Tensor dst( { 34 }, DataType::FLOAT32, Device::cpu());
+		Tensor src( { 256 * 15 * 15, 64 }, DataType::FLOAT32, Device::cpu());
+		Tensor correct( { 64 }, DataType::FLOAT32, Device::cpu());
+		Tensor dst( { 64 }, DataType::FLOAT32, Device::cpu());
 		testing::initForTest(src, 0.0f);
 		testing::initForTest(correct, 1.0f);
 		testing::initForTest(dst, 1.0f);
@@ -174,7 +174,7 @@ namespace ml
 		baseline_sum_over_first_dim(correct, src, beta);
 
 		sumOverFirstDim(Context(), dst, src, beta);
-		EXPECT_LE(testing::diffForTest(correct, dst), 1.0e-6);
+		EXPECT_LE(testing::diffForTest(correct, dst), 1.0e-4);
 
 		if (Device::numberOfCudaDevices() > 0)
 		{
@@ -184,7 +184,7 @@ namespace ml
 			dst.moveTo(context.device());
 			sumOverFirstDim(context, dst, src, beta);
 			context.synchronize();
-			EXPECT_LE(testing::diffForTest(correct, dst), 1.0e-6);
+			EXPECT_LE(testing::diffForTest(correct, dst), 1.0e-4);
 		}
 	}
 

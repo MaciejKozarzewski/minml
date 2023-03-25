@@ -240,8 +240,8 @@ namespace
 			for (int i = 32 * blockIdx.y + threadIdx.y; i < shape.x; i += 32 * gridDim.y)
 			{
 				const int tmp_idx = i * shape.y + tid;
-				if (act == ACTIVATION_RELU and output[tmp_idx] <= 0.0f)
-					gradient_next[tmp_idx] *= 0.01f;
+				if (act == ACTIVATION_RELU and output[tmp_idx] == 0.0f)
+					gradient_next[tmp_idx] = 0.0f;
 				if (act == ACTIVATION_TANH)
 					gradient_next[tmp_idx] *= (1.0f - output[tmp_idx]) * (1.0f + output[tmp_idx]);
 				if (act == ACTIVATION_SIGMOID)

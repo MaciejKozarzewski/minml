@@ -494,11 +494,16 @@ namespace ml
 	}
 	TEST(TestConv2D, winograd_conv2D_5x5_update)
 	{
+		const int batch_size = 12;
+		const int height = 15;
+		const int width = 15;
+		const int filters_in = 21;
+		const int filters_out = 34;
+
 		Context context(Device::cpu());
-		Tensor input( { 12, 13, 17, 35 }, "float32", Device::cpu());
-		Tensor gradient_next( { 12, 13, 17, 21 }, "float32", Device::cpu());
-		Tensor weight_update( { 21, 5, 5, 35 }, "float32", Device::cpu());
-		Tensor storage( { 8, 21 }, "float32", Device::cpu());
+		Tensor input( { batch_size, height, width, filters_in }, "float32", Device::cpu());
+		Tensor gradient_next( { batch_size, height, width, filters_out }, "float32", Device::cpu());
+		Tensor weight_update( { filters_out, 5, 5, filters_in }, "float32", Device::cpu());
 		testing::initForTest(input, 0.0f);
 		testing::initForTest(gradient_next, 1.0f);
 		testing::initForTest(weight_update, 1.57f);
@@ -506,9 +511,9 @@ namespace ml
 		Tensor correct_weight_update(weight_update);
 		baseline_conv2D_update(input, gradient_next, correct_weight_update);
 
-		Tensor weight_update_matrices( { 36, 21, 35 }, "float32", Device::cpu());
-		Tensor gradient_prev_matrices( { 36, 12 * 7 * 9, 35 }, "float32", Device::cpu());
-		Tensor gradient_next_matrices( { 36, 12 * 7 * 9, 21 }, "float32", Device::cpu());
+		Tensor weight_update_matrices( { 36, filters_out, filters_in }, "float32", Device::cpu());
+		Tensor gradient_prev_matrices( { 36, batch_size * ((height + 1) / 2) * ((width + 1) / 2), filters_in }, "float32", Device::cpu());
+		Tensor gradient_next_matrices( { 36, batch_size * ((height + 1) / 2) * ((width + 1) / 2), filters_out }, "float32", Device::cpu());
 
 		winogradGradientTransform(context, weight_update.shape(), gradient_next, gradient_next_matrices);
 		winogradInputTransform(context, weight_update.shape(), input, gradient_prev_matrices);
@@ -524,7 +529,6 @@ namespace ml
 			input.moveTo(context.device());
 			gradient_next.moveTo(context.device());
 			weight_update.moveTo(context.device());
-			storage.moveTo(context.device());
 			weight_update_matrices.moveTo(context.device());
 			gradient_prev_matrices.moveTo(context.device());
 			gradient_next_matrices.moveTo(context.device());

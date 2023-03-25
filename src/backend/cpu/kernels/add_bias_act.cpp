@@ -157,10 +157,7 @@ namespace
 	void kernel_relu_backward(T *gradient_prev, const T *gradient_next, const T *output, int length)
 	{
 		for (int i = 0; i < length; i++)
-			if (output[i] <= static_cast<T>(0))
-				gradient_prev[i] = gradient_next[i] * static_cast<T>(0.01);
-			else
-				gradient_prev[i] = gradient_next[i];
+			gradient_prev[i] = (output[i] == static_cast<T>(0)) ? static_cast<T>(0) : gradient_next[i];
 	}
 
 	template<typename T>

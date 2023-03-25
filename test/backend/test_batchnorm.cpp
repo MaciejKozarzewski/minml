@@ -38,7 +38,7 @@ namespace
 		for (int b = 0; b < first_dim; b++) // subtract average, also calculate variance
 			for (int f = 0; f < last_dim; f++)
 			{
-				float tmp = input.get( { b, f }) - average.get( { f });
+				const float tmp = input.get( { b, f }) - average.get( { f });
 				stddev.set(stddev.get( { f }) + tmp * tmp, { f });
 			}
 
@@ -147,7 +147,7 @@ namespace
 			for (int j = 0; j < last_dim; j++)
 				stat.set(stat.get( { 0, j }) + running_stat.get( { i, j }), { 0, j });
 			for (int j = 0; j < last_dim; j++)
-				stat.set(stat.get( { 1, j }) + running_stat.get( { i, 34 + j }), { 1, j });
+				stat.set(stat.get( { 1, j }) + running_stat.get( { i, last_dim + j }), { 1, j });
 		}
 		for (int j = 0; j < last_dim; j++)
 		{
@@ -156,7 +156,7 @@ namespace
 		}
 	}
 
-	void addScalarToTensor(Tensor &tensor, float scalar)
+	void add_scalar_so_tensor(Tensor &tensor, float scalar)
 	{
 		for (int i = 0; i < tensor.volume(); i++)
 			reinterpret_cast<float*>(tensor.data())[i] += scalar;
@@ -167,29 +167,33 @@ namespace ml
 {
 	TEST(TestBatchNorm, forward)
 	{
+		const int batch_size = 32;
+		const int height = 1;
+		const int width = 1;
+		const int filters = 128;
 		Context context;
 
-		Tensor input( { 123, 34 }, "float32", Device::cpu());
-		Tensor output( { 123, 34 }, "float32", Device::cpu());
+		Tensor input( { batch_size * height * width, filters }, "float32", Device::cpu());
+		Tensor output(input.shape(), "float32", Device::cpu());
 
-		Tensor weight( { 4, 34 }, "float32", Device::cpu());
-		Tensor average( { 34 }, "float32", Device::cpu());
-		Tensor stddev( { 34 }, "float32", Device::cpu());
+		Tensor weight( { 4, filters }, "float32", Device::cpu());
+		Tensor average( { filters }, "float32", Device::cpu());
+		Tensor stddev( { filters }, "float32", Device::cpu());
 
 		testing::initForTest(input, 0.0f);
 		testing::initForTest(weight, 0.0f);
-		addScalarToTensor(weight, 0.001f);
+		add_scalar_so_tensor(weight, 1.001f);
 
 		Tensor correct(output.shape(), "float32", Device::cpu());
 		baseline_forward(input, correct, weight, average, stddev, ActivationType::SIGMOID);
 
-		Tensor running_stats( { 64, 2 * 34 }, "float32", Device::cpu());
+		Tensor running_stats( { 64, 2 * filters }, "float32", Device::cpu());
 		batchnormForward(context, input, output, weight, running_stats, 0, ActivationType::SIGMOID);
 
 		{
 			EXPECT_LE(testing::diffForTest(correct, output), 1.0e-4f);
-			Tensor avg = running_stats.view( { 34 }, 0 * 34);
-			Tensor dev = running_stats.view( { 34 }, 1 * 34);
+			Tensor avg = running_stats.view( { filters }, 0 * filters);
+			Tensor dev = running_stats.view( { filters }, 1 * filters);
 			EXPECT_LE(testing::diffForTest(average, avg), 1.0e-4f);
 			EXPECT_LE(testing::diffForTest(stddev, dev), 1.0e-4f);
 		}
@@ -204,8 +208,8 @@ namespace ml
 			running_stats.zeroall(context);
 			output.zeroall(context);
 
-			Tensor avg = running_stats.view( { 34 }, 0 * 34);
-			Tensor dev = running_stats.view( { 34 }, 1 * 34);
+			Tensor avg = running_stats.view( { filters }, 0 * filters);
+			Tensor dev = running_stats.view( { filters }, 1 * filters);
 
 			batchnormForward(context, input, output, weight, running_stats, 0, ActivationType::SIGMOID);
 			context.synchronize();
@@ -223,7 +227,7 @@ namespace ml
 
 		testing::initForTest(input, 0.0f);
 		testing::initForTest(weight, 0.0f);
-		addScalarToTensor(weight, 1.1f);
+		add_scalar_so_tensor(weight, 1.1f);
 
 		Tensor correct(output.shape(), "float32", Device::cpu());
 		baseline_inference(input, correct, weight, ActivationType::TANH);
@@ -247,35 +251,39 @@ namespace ml
 	}
 	TEST(TestBatchNorm, backward)
 	{
+		const int batch_size = 256;
+		const int height = 15;
+		const int width = 15;
+		const int filters = 64;
 		Context context;
 
-		Tensor input( { 123, 34 }, "float32", Device::cpu());
-		Tensor output( { 123, 34 }, "float32", Device::cpu());
-		Tensor gradient_prev( { 123, 34 }, "float32", Device::cpu());
-		Tensor gradient_next( { 123, 34 }, "float32", Device::cpu());
+		Tensor input( { batch_size * height * width, filters }, "float32", Device::cpu());
+		Tensor output(input.shape(), "float32", Device::cpu());
+		Tensor gradient_prev(input.shape(), "float32", Device::cpu());
+		Tensor gradient_next(input.shape(), "float32", Device::cpu());
 
-		Tensor weight( { 4, 34 }, "float32", Device::cpu());
-		Tensor average( { 34 }, "float32", Device::cpu());
-		Tensor stddev( { 34 }, "float32", Device::cpu());
+		Tensor weight( { 4, filters }, "float32", Device::cpu());
+		Tensor average( { filters }, "float32", Device::cpu());
+		Tensor stddev( { filters }, "float32", Device::cpu());
 
-		Tensor weight_update( { 4, 34 }, "float32", Device::cpu());
+		Tensor weight_update( { 4, filters }, "float32", Device::cpu());
 
 		testing::initForTest(input, 0.0f);
 		testing::initForTest(gradient_next, 1.57f);
 		testing::initForTest(weight, 0.0f);
-		addScalarToTensor(weight, 1.1f);
+		add_scalar_so_tensor(weight, 1.1f);
 
 		testing::initForTest(weight_update, 0.1f);
 
 		Tensor correct_prev(output.shape(), "float32", Device::cpu());
-		Tensor correct_weight_update( { 4, 34 }, "float32", Device::cpu());
+		Tensor correct_weight_update( { 4, filters }, "float32", Device::cpu());
 		correct_weight_update.copyFrom(Context(), weight_update);
 
 		baseline_forward(input, output, weight, average, stddev, ActivationType::SIGMOID);
 		baseline_backward(input, output, correct_prev, gradient_next, weight, average, stddev, ActivationType::SIGMOID);
 		baseline_update(input, gradient_next, average, stddev, correct_weight_update);
 
-		Tensor running_stats( { 64, 2 * 34 }, "float32", Device::cpu());
+		Tensor running_stats( { 64, 2 * filters }, "float32", Device::cpu());
 		output.zeroall(context);
 		testing::initForTest(gradient_next, 1.57f);
 		batchnormForward(context, input, output, weight, running_stats, 0, ActivationType::SIGMOID);
@@ -311,10 +319,14 @@ namespace ml
 	}
 	TEST(TestBatchNorm, learn)
 	{
+		const int batch_size = 256;
+		const int height = 15;
+		const int width = 15;
+		const int filters = 64;
 		Context context;
-		Tensor correct_weights( { 4, 34 }, "float32", Device::cpu());
-		Tensor weights( { 4, 34 }, "float32", Device::cpu());
-		Tensor running_stat( { 64, 2 * 34 }, "float32", Device::cpu());
+		Tensor correct_weights( { 4, filters }, "float32", Device::cpu());
+		Tensor weights( { 4, filters }, "float32", Device::cpu());
+		Tensor running_stat( { 64, 2 * filters }, "float32", Device::cpu());
 		testing::initForTest(running_stat, 0.0);
 
 		baseline_learn(correct_weights, running_stat, 50);

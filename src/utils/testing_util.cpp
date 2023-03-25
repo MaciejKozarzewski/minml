@@ -16,37 +16,37 @@
 namespace
 {
 	using namespace ml;
-	void init_for_test_fp32(float *ptr, size_t length, float shift)
+	void init_for_test_fp32(float *ptr, size_t length, float shift, float scale)
 	{
 		for (size_t i = 0; i < length; i++)
-			ptr[i] = sin(i / 10.0f + shift);
+			ptr[i] = sin(i / 10.0f + shift) * scale;
 	}
-	void init_for_test_bf16(uint16_t *ptr, size_t length, float shift)
+	void init_for_test_bf16(uint16_t *ptr, size_t length, float shift, float scale)
 	{
 		for (size_t i = 0; i < length; i++)
-			ptr[i] = convert_fp32_to_bf16(sinf(i / 10.0f + shift));
+			ptr[i] = convert_fp32_to_bf16(sinf(i / 10.0f + shift) * scale);
 	}
-	void init_for_test_fp16(uint16_t *ptr, size_t length, float shift)
+	void init_for_test_fp16(uint16_t *ptr, size_t length, float shift, float scale)
 	{
 		for (size_t i = 0; i < length; i++)
-			ptr[i] = convert_fp32_to_fp16(sinf(i / 10.0f + shift));
+			ptr[i] = convert_fp32_to_fp16(sinf(i / 10.0f + shift) * scale);
 	}
 
-	float diff_for_test_fp32(const float *ptr1, const float *ptr2, size_t length)
+	double diff_for_test_fp32(const float *ptr1, const float *ptr2, size_t length)
 	{
 		double result = 0.0;
 		for (size_t i = 0; i < length; i++)
 			result += fabs(ptr1[i] - ptr2[i]);
 		return result / length;
 	}
-	float diff_for_test_bf16(const uint16_t *ptr1, const uint16_t *ptr2, size_t length)
+	double diff_for_test_bf16(const uint16_t *ptr1, const uint16_t *ptr2, size_t length)
 	{
 		double result = 0.0;
 		for (size_t i = 0; i < length; i++)
 			result += fabs(convert_bf16_to_fp32(ptr1[i]) - convert_bf16_to_fp32(ptr2[i]));
 		return result / length;
 	}
-	float diff_for_test_fp16(const uint16_t *ptr1, const uint16_t *ptr2, size_t length)
+	double diff_for_test_fp16(const uint16_t *ptr1, const uint16_t *ptr2, size_t length)
 	{
 		double result = 0.0;
 		for (size_t i = 0; i < length; i++)
@@ -54,21 +54,21 @@ namespace
 		return result / length;
 	}
 
-	float norm_for_test_fp32(const float *ptr, size_t length)
+	double norm_for_test_fp32(const float *ptr, size_t length)
 	{
 		double result = 0.0;
 		for (size_t i = 0; i < length; i++)
 			result += fabs(ptr[i]);
 		return result;
 	}
-	float norm_for_test_bf16(const uint16_t *ptr, size_t length)
+	double norm_for_test_bf16(const uint16_t *ptr, size_t length)
 	{
 		double result = 0.0;
 		for (size_t i = 0; i < length; i++)
 			result += fabs(convert_bf16_to_fp32(ptr[i]));
 		return result;
 	}
-	float norm_for_test_fp16(const uint16_t *ptr, size_t length)
+	double norm_for_test_fp16(const uint16_t *ptr, size_t length)
 	{
 		double result = 0.0;
 		for (size_t i = 0; i < length; i++)
@@ -76,21 +76,21 @@ namespace
 		return result;
 	}
 
-	float sum_for_test_fp32(const float *ptr, size_t length)
+	double sum_for_test_fp32(const float *ptr, size_t length)
 	{
 		double result = 0.0;
 		for (size_t i = 0; i < length; i++)
 			result += ptr[i];
 		return result;
 	}
-	float sum_for_test_bf16(const uint16_t *ptr, size_t length)
+	double sum_for_test_bf16(const uint16_t *ptr, size_t length)
 	{
 		double result = 0.0;
 		for (size_t i = 0; i < length; i++)
 			result += convert_bf16_to_fp32(ptr[i]);
 		return result;
 	}
-	float sum_for_test_fp16(const uint16_t *ptr, size_t length)
+	double sum_for_test_fp16(const uint16_t *ptr, size_t length)
 	{
 		double result = 0.0;
 		for (size_t i = 0; i < length; i++)
@@ -119,19 +119,19 @@ namespace ml
 {
 	namespace testing
 	{
-		void initForTest(Tensor &t, double shift)
+		void initForTest(Tensor &t, double shift, double scale)
 		{
 			Tensor tmp(t.shape(), t.dtype(), Device::cpu());
 			switch (tmp.dtype())
 			{
 				case DataType::BFLOAT16:
-					init_for_test_bf16(reinterpret_cast<uint16_t*>(tmp.data()), tmp.volume(), shift);
+					init_for_test_bf16(reinterpret_cast<uint16_t*>(tmp.data()), tmp.volume(), shift, scale);
 					break;
 				case DataType::FLOAT16:
-					init_for_test_fp16(reinterpret_cast<uint16_t*>(tmp.data()), tmp.volume(), shift);
+					init_for_test_fp16(reinterpret_cast<uint16_t*>(tmp.data()), tmp.volume(), shift, scale);
 					break;
 				case DataType::FLOAT32:
-					init_for_test_fp32(reinterpret_cast<float*>(tmp.data()), tmp.volume(), shift);
+					init_for_test_fp32(reinterpret_cast<float*>(tmp.data()), tmp.volume(), shift, scale);
 					break;
 				case DataType::UNKNOWN:
 					throw DataTypeNotSupported(METHOD_NAME, tmp.dtype());

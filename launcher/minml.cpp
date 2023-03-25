@@ -16,6 +16,7 @@
 #include <minml/layers/BatchNormalization.hpp>
 #include <minml/layers/GlobalBroadcastHW.hpp>
 #include <minml/layers/Add.hpp>
+#include <minml/layers/Softmax.hpp>
 #include <minml/training/Optimizer.hpp>
 #include <minml/utils/random.hpp>
 #include <minml/utils/time_util.hpp>
@@ -484,27 +485,29 @@ void test_mnist()
 	Device::setNumberOfThreads(1);
 	MNIST dataset;
 
-	const int batch_size = 32;
+	const int batch_size = 128;
 
 	Graph model;
 	auto x = model.addInput( { batch_size, 28, 28, 1 });
-	x = model.add(Conv2D(8, 3, "relu"), x);
+//	x = model.add(Conv2D(8, 3, "linear"), x);
 //	x = model.add(BatchNormalization("relu").useGamma(false), x);
-
-//	auto y = model.add(Conv2D(32, 3, "linear"), x);
+//
+//	auto y = model.add(Conv2D(8, 3, "linear"), x);
 //	y = model.add(BatchNormalization("linear").useGamma(false), y);
 //	x = model.add(Add("relu"), { x, y });
 //	x = model.add(Conv2D(31, 1, "relu"), x);
 
-//	x = model.add(Dense(32, "linear").useBias(false), x);
-//	x = model.add(BatchNormalization("relu").useGamma(false), x);
-	x = model.add(Dense(10, "softmax"), x);
+	x = model.add(Dense(32, "linear").useBias(true), x);
+	x = model.add(BatchNormalization("relu").useGamma(true), x);
+	x = model.add(Dense(10, "linear"), x);
+	x = model.add(Softmax( { 1 }), x);
 	model.addOutput(x);
 
 	model.init();
-//	model.setOptimizer(Optimizer(1.0e-3f));
-//	model.setRegularizer(Regularizer(1.0e-5f));
+	model.setOptimizer(Optimizer(1.0e-3f));
+	model.setRegularizer(Regularizer(1.0e-4f));
 //	model.moveTo(Device::cuda(1));
+	model.moveTo(Device::cpu());
 	model.print();
 
 //	model.forward(1);
@@ -534,6 +537,8 @@ void test_mnist()
 	const int steps = 100;
 	for (int e = 0; e < 100; e++)
 	{
+		if (e == 75)
+			model.setLearningRate(1.0e-4f);
 		double loss = 0.0;
 		double acc = 0.0;
 		for (int s = 0; s < steps; s++)
@@ -557,6 +562,7 @@ void test_mnist()
 		if (loss != loss)
 			break;
 	}
+	return;
 	{
 		SerializedObject so;
 		Json json = model.save(so);
@@ -925,8 +931,8 @@ namespace gemm
 		uint64_t stride = dst_stride;
 		asm volatile(
 				"movq  %[stride], %%r12 \n\t" // stride is r12
-				"movq  %[lhs_ptr], %%rax \n\t" // lhs pointer is in rax
-				"movq  %[rhs_ptr], %%rbx \n\t" // rhs pointer is in rbx
+				"movq  %[lhs_ptr], %%rax \n\t"// lhs pointer is in rax
+				"movq  %[rhs_ptr], %%rbx \n\t"// rhs pointer is in rbx
 				"shlq $2, %%r12 \n\t"// multiply stride by sizeof(float)
 
 				// Set accumulators to zero.
@@ -1045,7 +1051,8 @@ int main()
 {
 	std::cout << "BEGIN" << std::endl;
 
-//	test_mnist();
+	test_mnist();
+	return 0;
 	{
 		Graph graph;
 		FileLoader fl("/home/maciek/alphagomoku/minml_test/minml3v7_10x128_opt.bin");

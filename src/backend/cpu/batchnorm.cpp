@@ -216,11 +216,12 @@ namespace ml
 		setzero(d_mu, last_dim);
 
 		for (int i = 0; i < first_dim; i++)
+		{
 			for (int j = 0; j < last_dim; j++)
 			{
 				const int idx = i * last_dim + j;
 				if (act == ACTIVATION_RELU and output_ptr[idx] <= 0.0f)
-					gradient_next_ptr[idx] *= 0.01f;
+					gradient_next_ptr[idx] = 0.0f;
 				if (act == ACTIVATION_TANH)
 					gradient_next_ptr[idx] *= (1.0f - output_ptr[idx]) * (1.0f + output_ptr[idx]);
 				if (act == ACTIVATION_SIGMOID)
@@ -231,6 +232,8 @@ namespace ml
 				d_sigma[j] += gradient_next_ptr[idx] * (input_ptr[idx] - avg) / stddev;
 				d_mu[j] += gradient_next_ptr[idx];
 			}
+		}
+
 		for (int j = 0; j < last_dim; j++)
 		{
 			weights_update_ptr[2 * last_dim + j] += d_sigma[j];
