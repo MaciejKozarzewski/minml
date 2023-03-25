@@ -243,7 +243,7 @@ namespace
 				if (act == ACTIVATION_RELU and output[tmp_idx] <= 0.0f)
 					gradient_next[tmp_idx] *= 0.01f;
 				if (act == ACTIVATION_TANH)
-					gradient_next[tmp_idx] *= (1.0f - square(output[tmp_idx]));
+					gradient_next[tmp_idx] *= (1.0f - output[tmp_idx]) * (1.0f + output[tmp_idx]);
 				if (act == ACTIVATION_SIGMOID)
 					gradient_next[tmp_idx] *= output[tmp_idx] * (1.0f - output[tmp_idx]);
 				d_sigma_acc += gradient_next[tmp_idx] * (input[tmp_idx] - mean) / stddev;

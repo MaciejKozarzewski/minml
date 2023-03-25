@@ -140,7 +140,7 @@ namespace
 	void kernel_tanh_backward(T *gradient_prev, const T *gradient_next, const T *output, int length)
 	{
 		for (int i = 0; i < length; i++)
-			gradient_prev[i] = gradient_next[i] * (1.0f - output[i] * output[i]);
+			gradient_prev[i] = gradient_next[i] * (1.0f - output[i]) * (1.0f + output[i]);
 	}
 
 	template<typename T>

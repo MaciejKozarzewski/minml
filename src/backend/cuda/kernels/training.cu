@@ -23,19 +23,13 @@ namespace cg = cooperative_groups;
 
 namespace
 {
-	template<typename T>
-	__device__ bool is_power_of_2(T x)
-	{
-		return x > 0 && !(x & (x - 1));
-	}
-
 	__device__ float round_small_to_zero(float x)
 	{
 		return (fabsf(x) < 1.0e-6f) ? 0.0f : x;
 	}
 	__device__ float safe_log(float x)
 	{
-		return logf(1.0e-6f + x);
+		return logf(1.0e-8f + x);
 	}
 	__device__ float cross_entropy(float output, float target)
 	{
@@ -51,7 +45,7 @@ namespace
 		for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < elements; i += gridDim.x * blockDim.x)
 			gradient[i] = inv_batch_size * (output[i] - target[i]);
 	}
-	__global__ void kernel_loss_step_1(float *workspace, const float *output, const float *target, int elements, float inv_batch_size)
+	__global__ void kernel_loss_step_1(float *workspace, const float *output, const float *target, int elements)
 	{
 		assert(blockDim.x == 256);
 		__shared__ cg::block_tile_memory<256> btm;
@@ -63,7 +57,7 @@ namespace
 			acc += max(0.0f, cross_entropy(output[i], target[i]) - cross_entropy(target[i], target[i]));
 		const float sum = cg::reduce(tile, acc, cg::plus<float>());
 		if (threadIdx.x == 0)
-			workspace[blockIdx.x] = sum * inv_batch_size;
+			workspace[blockIdx.x] = sum;
 	}
 	__global__ void kernel_loss_step_2(float *workspace, int elements)
 	{
@@ -128,7 +122,12 @@ namespace
 			if (step == 1) // write to temporary storage array
 				dst[blockIdx.y * last_dim + tid] = tmp[0][threadIdx.x];
 			if (step == 2) // write to final destination
-				dst[tid] = beta * dst[tid] + tmp[0][threadIdx.x];
+			{
+				if (beta == 0.0f)
+					dst[tid] = tmp[0][threadIdx.x];
+				else
+					dst[tid] = beta * dst[tid] + tmp[0][threadIdx.x];
+			}
 		}
 	}
 
@@ -212,7 +211,6 @@ namespace ml
 		assert(target != nullptr);
 
 		const int length = volume(shape);
-		const float inv_batch_size = 1.0f / get_first_dim(shape);
 
 		assert(cuda::Context::getWorkspaceSize(context) >= 4096 * sizeof(float));
 
@@ -222,7 +220,7 @@ namespace ml
 		dim3 gridDim = cuda::gridSize<4096>(length, blockDim.x);
 		cudaStream_t stream = cuda::Context::getStream(context);
 
-		kernel_loss_step_1<<<gridDim, blockDim, 0, stream>>>(workspace, getPointer<float>(output), getPointer<float>(target), length, inv_batch_size);
+		kernel_loss_step_1<<<gridDim, blockDim, 0, stream>>>(workspace, getPointer<float>(output), getPointer<float>(target), length);
 		assert(cudaGetLastError() == cudaSuccess);
 
 		kernel_loss_step_2<<<1, blockDim, 0, stream>>>(workspace, gridDim.x);
@@ -232,7 +230,7 @@ namespace ml
 		cudaMemcpyAsync(&result, workspace, sizeof(float), cudaMemcpyDeviceToHost, stream);
 		cudaError_t status = cudaStreamSynchronize(stream);
 		assert(status == cudaSuccess);
-		return result;
+		return result / get_first_dim(shape);
 	}
 	void cuda_cross_entropy_gradient(mlContext_t context, mlShape_t shape, void *gradient, const void *output, const void *target, float weight)
 	{

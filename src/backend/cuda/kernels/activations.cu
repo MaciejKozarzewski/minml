@@ -63,11 +63,11 @@ namespace
 		__shared__ float workspace[1024];
 		__shared__ cg::block_tile_memory<128> btm;
 		cg::thread_block thb = cg::this_thread_block(btm);
-		cg::thread_block_tile < 128 > tile = cg::tiled_partition<128>(thb);
+		cg::thread_block_tile<128> tile = cg::tiled_partition<128>(thb);
 
 		for (int i = blockIdx.x; i < first_dim; i += gridDim.x)
 		{
-			float max_value = -3.4028234663e+38F; // starting with lowest possible fp32 value
+			float max_value = -1e+32f;
 			for (int j = tile.thread_rank(); j < last_dim; j += tile.size())
 			{
 				workspace[j] = static_cast<float>(input[i * last_dim + j]);
@@ -116,7 +116,7 @@ namespace
 	__global__ void kernel_tanh_backward(float *gradient_prev, const float *gradient_next, const float *output, int length)
 	{
 		for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < length; i += gridDim.x * blockDim.x)
-			gradient_prev[i] = gradient_next[i] * (1.0f - output[i] * output[i]);
+			gradient_prev[i] = gradient_next[i] * (1.0f - output[i]) * (1.0f + output[i]);
 	}
 
 	template<typename T>

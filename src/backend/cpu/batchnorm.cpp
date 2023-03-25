@@ -222,7 +222,7 @@ namespace ml
 				if (act == ACTIVATION_RELU and output_ptr[idx] <= 0.0f)
 					gradient_next_ptr[idx] *= 0.01f;
 				if (act == ACTIVATION_TANH)
-					gradient_next_ptr[idx] *= (1.0f - square(output_ptr[idx]));
+					gradient_next_ptr[idx] *= (1.0f - output_ptr[idx]) * (1.0f + output_ptr[idx]);
 				if (act == ACTIVATION_SIGMOID)
 					gradient_next_ptr[idx] *= output_ptr[idx] * (1.0f - output_ptr[idx]);
 
