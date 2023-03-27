@@ -231,7 +231,7 @@ namespace ml
 				Tensor weight_update_matrix = getWeights().getGradient().view(
 						{ getWeightShape().firstDim(), getWeightShape().volumeWithoutFirstDim() });
 				Tensor gradient_matrix = gradient_next.view( { gradient_next.shape().volumeWithoutLastDim(), gradient_next.lastDim() });
-				gemm(context(), 't', 'n', weight_update_matrix, gradient_matrix, input_matrix, 1, 1);
+				gemm(context(), 't', 'n', weight_update_matrix, gradient_matrix, input_matrix, 1, 0);
 
 				break;
 			}
@@ -260,7 +260,7 @@ namespace ml
 			}
 		}
 		if (isUsingBias())
-			sumOverFirstDim(context(), getBias().getGradient(), gradient_next, 1.0f);
+			sumOverFirstDim(context(), getBias().getGradient(), gradient_next, 0);
 	}
 
 	void Conv2D::choose_algorithm()

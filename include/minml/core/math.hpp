@@ -62,7 +62,7 @@ namespace ml
 	void addTensors(const Context &context, Tensor &dst, const Tensor &src1, const Tensor &src2);
 	float crossEntropyLoss(const Context &context, const Tensor &output, const Tensor &target);
 	void crossEntropyGradient(const Context &context, Tensor &gradient, const Tensor &output, const Tensor &target, float weight = 1.0f);
-	void adamOptimize(const Context &context, Tensor &weight, Tensor &update, Tensor &momentum, Tensor &variance, float learning_rate, float beta1,
+	void adamOptimize(const Context &context, Tensor &weight, const Tensor &update, Tensor &momentum, Tensor &variance, float learning_rate, float beta1,
 			float beta2);
 	void l2Regularization(const Context &context, Tensor &gradient, const Tensor &param, float coefficient, float offset);
 

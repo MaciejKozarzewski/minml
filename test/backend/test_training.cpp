@@ -84,7 +84,6 @@ namespace ml
 		{
 			testing::initForTest(gradient, 1.0f + 0.01f * i);
 			adamOptimize(Context(), cpu_weights, gradient, cpu_momentum, cpu_variance, 1.0e-3f, 0.9f, 0.999f);
-			EXPECT_EQ(testing::normForTest(gradient), 0.0f);
 		}
 
 		if (Device::numberOfCudaDevices() == 0)
@@ -101,7 +100,6 @@ namespace ml
 			testing::initForTest(gradient, 1.0f + 0.01f * i);
 			adamOptimize(context, cuda_weights, gradient, cuda_momentum, cuda_variance, 1.0e-3f, 0.9f, 0.999f);
 			context.synchronize();
-			EXPECT_EQ(testing::normForTest(gradient), 0.0f);
 		}
 
 		EXPECT_LE(testing::diffForTest(cpu_momentum, cuda_momentum), 1.0e-4f);

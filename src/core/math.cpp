@@ -399,7 +399,7 @@ namespace ml
 				break;
 		}
 	}
-	void adamOptimize(const Context &context, Tensor &weight, Tensor &update, Tensor &momentum, Tensor &variance, float learning_rate, float beta1,
+	void adamOptimize(const Context &context, Tensor &weight, const Tensor &update, Tensor &momentum, Tensor &variance, float learning_rate, float beta1,
 			float beta2)
 	{
 		switch (context.device().type())

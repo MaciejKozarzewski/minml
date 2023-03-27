@@ -208,7 +208,7 @@ namespace
 
 				for (int i = 0; i < kernel.dim(0); i++)
 					for (int j = 0; j < kernel.dim(1); j++)
-						weight.set(weight.get( { out, i, j, in }) + kernel.get( { i, j }), { out, i, j, in });
+						weight.set(kernel.get( { i, j }), { out, i, j, in });
 			}
 	}
 }
@@ -385,9 +385,8 @@ namespace ml
 			reinterpret_cast<float*>(matrices.data())[2 * i] = static_cast<float>(1 + i);
 			reinterpret_cast<float*>(matrices.data())[2 * i + 1] = static_cast<float>(1 + i);
 		}
-		update.setall(Context(), 1.0f);
 		winograd_update_transform(matrices, update, transform_matrix, 4);
-		Tensor correct2 = toTensor( { { 129.625f, -4.25f, 263.0f }, { -30.5f, 1.0f, -53.0f }, { 470.5f, -8.0f, 877.0f } });
+		Tensor correct2 = toTensor( { { 128.625f, -5.25f, 262.0f }, { -31.5f, 0.0f, -54.0f }, { 469.5f, -9.0f, 876.0f } });
 		extract_update_tile(tile, update, 0, 0);
 		EXPECT_LE(testing::diffForTest(correct2, tile), 1.0e-4f);
 		extract_update_tile(tile, update, 0, 1);

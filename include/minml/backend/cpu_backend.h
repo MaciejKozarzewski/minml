@@ -92,7 +92,7 @@ namespace ml
 		void cpu_sum_over_first_dim(mlContext_t context, mlShape_t shape, void *dst, const void *src, float beta);
 		float cpu_cross_entropy_loss(mlContext_t context, mlShape_t shape, const void *output, const void *target);
 		void cpu_cross_entropy_gradient(mlContext_t context, mlShape_t shape, void *gradient, const void *output, const void *target, float weight);
-		void cpu_adam_optimize(mlContext_t context, mlShape_t shape, void *weight, void *update, void *momentum, void *variance, float learning_rate,
+		void cpu_adam_optimize(mlContext_t context, mlShape_t shape, void *weight, const void *update, void *momentum, void *variance, float learning_rate,
 				float beta1, float beta2);
 		void cpu_l2_regularization(mlContext_t context, mlShape_t shape, void *gradient, const void *param, float coefficient, float offset);
 

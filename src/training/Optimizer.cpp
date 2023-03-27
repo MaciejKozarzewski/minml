@@ -91,6 +91,7 @@ namespace ml
 			learning_rate *= sqrt(1.0f - pow(m_beta2, m_steps)) / (1.0f - pow(m_beta1, m_steps));
 
 		adamOptimize(context, param.getParam(), param.getGradient(), *m_momentum, *m_variance, learning_rate, m_beta1, m_beta2);
+		param.getGradient().zeroall(context);
 	}
 
 	Json Optimizer::serialize(SerializedObject &binary_data) const

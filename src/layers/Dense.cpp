@@ -128,10 +128,10 @@ namespace ml
 			{
 				Tensor tmp = m_workspace.lock()->view(getWeightShape());
 				emulateLowPrecision(context(), tmp, getWeights().getParam());
-				gemm(context(), 'n', 't', output, flatten_input_tensor(input[0]), tmp, 1.0f, 0.0f);
+				gemm(context(), 'n', 't', output, flatten_input_tensor(input[0]), tmp, 1, 0);
 			}
 			else
-				gemm(context(), 'n', 't', output, flatten_input_tensor(input[0]), getWeights().getParam(), 1.0f, 0.0f);
+				gemm(context(), 'n', 't', output, flatten_input_tensor(input[0]), getWeights().getParam(), 1, 0);
 		}
 		else
 			output.copyFrom(context(), flatten_input_tensor(input[0]));
@@ -156,11 +156,11 @@ namespace ml
 			{
 				Tensor tmp = m_workspace.lock()->view(getWeightShape());
 				emulateLowPrecision(context(), tmp, getWeights().getParam());
-				gemm(context(), 'n', 'n', tmp_grad, gradient_next, tmp, 1.0f, 0.0f);
+				gemm(context(), 'n', 'n', tmp_grad, gradient_next, tmp, 1, 0);
 			}
 			else
-				gemm(context(), 'n', 'n', tmp_grad, gradient_next, getWeights().getParam(), 1.0f, 0.0f);
-			gemm(context(), 't', 'n', getWeights().getGradient(), gradient_next, flatten_input_tensor(input[0]), 1.0f, 1.0f);
+				gemm(context(), 'n', 'n', tmp_grad, gradient_next, getWeights().getParam(), 1, 0);
+			gemm(context(), 't', 'n', getWeights().getGradient(), gradient_next, flatten_input_tensor(input[0]), 1, 0);
 		}
 		else
 		{
@@ -169,7 +169,7 @@ namespace ml
 		}
 
 		if (isUsingBias())
-			sumOverFirstDim(context(), getBias().getGradient(), gradient_next, 1.0f);
+			sumOverFirstDim(context(), getBias().getGradient(), gradient_next, 0);
 	}
 
 } /* namespace ml */

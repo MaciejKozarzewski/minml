@@ -367,13 +367,7 @@ namespace
 					{
 						Line<TileSize, T> column;
 						column.load_row(storage, col, TileSize);
-						Line<KernelSize, T> transformed = transform(column);
-
-						Line<KernelSize, T> dst_line;
-						dst_line.load_row(ptr_out, col, in, elements_left, KernelSize);
-						for (int i = 0; i < transformed.length(); i++)
-							transformed[i] += dst_line[i];
-
+						const Line<KernelSize, T> transformed = transform(column);
 						transformed.store_row(ptr_out, col, in, elements_left, KernelSize);
 					}
 				}

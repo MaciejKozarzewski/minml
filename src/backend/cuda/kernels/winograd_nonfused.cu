@@ -239,8 +239,7 @@ namespace
 
 				for (int col = 0; col < KernelSize; col++)
 				{
-					Vector<T> tmp = transform(col, line);
-					tmp += output_wrapper.load(blockIdx.y, row, col, f);
+					const Vector<T> tmp = transform(col, line);
 					output_wrapper.store(tmp, blockIdx.y, row, col, f);
 				}
 			}

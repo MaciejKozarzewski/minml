@@ -75,16 +75,15 @@ namespace
 			workspace[0] = sum;
 	}
 
-	__global__ void kernel_learn_adam(float *weight, float *update, float *momentum, float *variance, int elements, float learning_rate, float beta1,
+	__global__ void kernel_learn_adam(float *weight, const float *gradient, float *momentum, float *variance, int elements, float learning_rate, float beta1,
 			float beta2)
 	{
 		for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < elements; i += gridDim.x * blockDim.x)
 		{
-			momentum[i] = momentum[i] * beta1 + update[i] * (1.0f - beta1);
-			variance[i] = variance[i] * beta2 + square(update[i]) * (1.0f - beta2);
+			momentum[i] = momentum[i] * beta1 + gradient[i] * (1.0f - beta1);
+			variance[i] = variance[i] * beta2 + square(gradient[i]) * (1.0f - beta2);
 			const float tmp = -momentum[i] * learning_rate / sqrt(variance[i] + 1.0e-8f);
 			weight[i] = round_small_to_zero(weight[i] + tmp);
-			update[i] = 0.0f;
 		}
 	}
 
@@ -253,7 +252,7 @@ namespace ml
 				length, inv_batch_size);
 		assert(cudaGetLastError() == cudaSuccess);
 	}
-	void cuda_adam_optimize(mlContext_t context, mlShape_t shape, void *weight, void *update, void *momentum, void *variance, float learning_rate,
+	void cuda_adam_optimize(mlContext_t context, mlShape_t shape, void *weight, const void *update, void *momentum, void *variance, float learning_rate,
 			float beta1, float beta2)
 	{
 		assert(weight != nullptr);
