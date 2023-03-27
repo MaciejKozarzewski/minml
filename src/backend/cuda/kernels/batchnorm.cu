@@ -72,23 +72,25 @@ namespace
 				assert(samples >= static_cast<T>(2));
 				return M2 / (samples - static_cast<T>(1));
 			}
-
-			__device__ void merge_with(const AvgVarStats<T> &rhs) noexcept
+			__device__ T get_stddev() const noexcept
 			{
-				assert(this->samples >= static_cast<T>(0) && rhs.samples >= static_cast<T>(0));
-				if (rhs.samples == static_cast<T>(0))
+				return std::sqrt(static_cast<T>(1.0e-6) + get_variance());
+			}
+			__device__ void merge_with(const AvgVarStats<T> &other) noexcept
+			{
+				if (other.samples == static_cast<T>(0))
 					return;
 				if (this->samples == static_cast<T>(0))
 				{
-					this->samples = rhs.samples;
-					this->M = rhs.M;
-					this->M2 = rhs.M2;
+					this->samples = other.samples;
+					this->M = other.M;
+					this->M2 = other.M2;
 				}
 				else
 				{
-					const T total_samples = this->samples + rhs.samples;
-					const T total_M = (this->samples * this->M + rhs.samples * rhs.M) / total_samples;
-					const T total_M2 = this->M2 + rhs.M2 + square(this->M - rhs.M) * (this->samples * rhs.samples) / total_samples;
+					const T total_samples = this->samples + other.samples;
+					const T total_M = (this->samples * this->M + other.samples * other.M) / total_samples;
+					const T total_M2 = this->M2 + other.M2 + square(this->M - other.M) * (this->samples * other.samples) / total_samples;
 					this->samples = total_samples;
 					this->M = total_M;
 					this->M2 = total_M2;
@@ -107,8 +109,7 @@ namespace
 			__syncthreads();
 		}
 	}
-	__global__ void kernel_batchnorm_forward_avg_var_1(AvgVarStats<float> *__restrict__ workspace, const float *__restrict__ input, int first_dim,
-			int last_dim)
+	__global__ void kernel_batchnorm_forward_avg_var_1(AvgVarStats<float> *workspace, const float *input, int first_dim, int last_dim)
 	{
 		assert(blockDim.x == 32 && blockDim.y == 32);
 		__shared__ AvgVarStats<float> shared_stats[32 * 32]; // 32 x 3 layout will be perfectly interleaved with no bank conflicts
@@ -127,8 +128,8 @@ namespace
 		if (threadIdx.y == 0 and tid < last_dim)
 			workspace[blockIdx.y * last_dim + tid] = shared_stats[threadIdx.x];
 	}
-	__global__ void kernel_batchnorm_forward_avg_var_2(float *__restrict__ running_stat, const AvgVarStats<float> *__restrict__ workspace,
-			int first_dim, int last_dim)
+	__global__ void kernel_batchnorm_forward_avg_var_2(AvgVarStats<float> *running_stat, const AvgVarStats<float> *workspace, int first_dim,
+			int last_dim)
 	{
 		assert(blockDim.x == 32 && blockDim.y == 32);
 		__shared__ AvgVarStats<float> shared_stats[32 * 32]; // 32 x 3 layout will be perfectly interleaved with no bank conflicts
@@ -145,42 +146,35 @@ namespace
 
 		combine_stats(shared_stats);
 		if (threadIdx.y == 0 and tid < last_dim)
-		{
-			running_stat[tid] = shared_stats[threadIdx.x].get_average();
-			running_stat[last_dim + tid] = shared_stats[threadIdx.x].get_variance();
-		}
+			running_stat[tid] = shared_stats[threadIdx.x];
 	}
 
-	__global__ void kernel_batchnorm_forward(const float *weights, const float *input, float *output, const float *running_stats, int2 shape,
-			mlActivationType_t act)
+	__global__ void kernel_batchnorm_forward(const float *weights, const float *input, float *output, const AvgVarStats<float> *running_stats,
+			int2 shape, mlActivationType_t act)
 	{
 		const int tid = blockIdx.x * blockDim.x + threadIdx.x;
-		if (tid < shape.y)
+		const int first_dim = shape.x;
+		const int last_dim = shape.y;
+		if (tid < last_dim)
 		{
-			/* weights rows are:
-			 * mean
-			 * variance
-			 * gamma
-			 * beta
-			 */
-			const float mean = get_mean(running_stats, tid, shape.y);
-			const float stddev = get_stddev(running_stats, tid, shape.y);
-			const float gamma = get_gamma(weights, tid, shape.y);
-			const float beta = get_beta(weights, tid, shape.y);
+			const float mean = running_stats[tid].get_average();
+			const float stddev = running_stats[tid].get_stddev();
+			const float gamma = get_gamma(weights, tid, last_dim);
+			const float beta = get_beta(weights, tid, last_dim);
 
 			const float scale = gamma / stddev;
 			const float shift = -mean * scale + beta;
 
-			for (int i = blockIdx.y * blockDim.y + threadIdx.y; i < shape.x; i += gridDim.y * blockDim.y)
+			for (int i = blockIdx.y * blockDim.y + threadIdx.y; i < first_dim; i += gridDim.y * blockDim.y)
 			{
-				float tmp = input[i * shape.y + tid] * scale + shift;
+				float tmp = input[i * last_dim + tid] * scale + shift;
 				if (act == ACTIVATION_RELU)
 					tmp = max(0.0f, tmp);
 				if (act == ACTIVATION_TANH)
 					tmp = tanh(tmp);
 				if (act == ACTIVATION_SIGMOID)
 					tmp = 1.0f / (1.0f + exp(-tmp));
-				output[i * shape.y + tid] = tmp;
+				output[i * last_dim + tid] = tmp;
 			}
 		}
 	}
@@ -226,7 +220,7 @@ namespace
 		}
 	}
 	__global__ void kernel_batchnorm_backward_delta_1(float *workspace, const float *input, const float *output, float *gradient_next,
-			const float *running_stats, int2 shape, mlActivationType_t act)
+			const AvgVarStats<float> *running_stats, int2 shape, mlActivationType_t act)
 	{
 		__shared__ float d_sigma[32 * 32];
 		__shared__ float d_mu[32 * 32];
@@ -235,8 +229,8 @@ namespace
 		float d_sigma_acc = 0.0f, d_mu_acc = 0.0f;
 		if (tid < shape.y)
 		{
-			const float mean = get_mean(running_stats, tid, shape.y);
-			const float stddev = get_stddev(running_stats, tid, shape.y);
+			const float mean = running_stats[tid].get_average();
+			const float stddev = running_stats[tid].get_stddev();
 			for (int i = 32 * blockIdx.y + threadIdx.y; i < shape.x; i += 32 * gridDim.y)
 			{
 				const int tmp_idx = i * shape.y + tid;
@@ -286,14 +280,14 @@ namespace
 	}
 
 	__global__ void kernel_batchnorm_backward_1(const float *workspace, const float *input, float *gradient_prev, const float *gradient_next,
-			const float *weights, float *weight_update, const float *running_stats, int2 shape)
+			const float *weights, float *weight_update, const AvgVarStats<float> *running_stats, int2 shape)
 	{
 		// avg, stddev, gamma, d_sigma, d_mu
 		const int tid = blockIdx.x * blockDim.x + threadIdx.x;
 		if (tid < shape.y)
 		{
-			const float mean = get_mean(running_stats, tid, shape.y);
-			const float stddev = get_stddev(running_stats, tid, shape.y);
+			const float mean = running_stats[tid].get_average();
+			const float stddev = running_stats[tid].get_stddev();
 			const float gamma = get_gamma(weights, tid, shape.y);
 
 			float d_sigma = workspace[tid];
@@ -312,19 +306,18 @@ namespace
 		}
 	}
 
-	__global__ void kernel_batchnorm_update(const float *running_stat, float *weights, int first_dim, int last_dim, bool use_gamma, bool use_beta)
+	__global__ void kernel_batchnorm_update(const AvgVarStats<float> *running_stat, float *weights, int first_dim, int last_dim, bool use_gamma,
+			bool use_beta)
 	{
 		const int tid = blockIdx.x * blockDim.x + threadIdx.x;
 		if (tid < last_dim)
 		{
-			float mean_avg = 0.0f, mean_var = 0.0f;
+			AvgVarStats<float> stats;
 			for (int i = 0; i < first_dim; i++)
-			{
-				mean_avg += running_stat[i * 2 * last_dim + tid];
-				mean_var += running_stat[(i * 2 + 1) * last_dim + tid];
-			}
-			weights[0 * last_dim + tid] = mean_avg / first_dim; // running mean average
-			weights[1 * last_dim + tid] = mean_var / first_dim; // running mean variance
+				stats.merge_with(running_stat[i * last_dim + tid]);
+			weights[0 * last_dim + tid] = stats.get_average();
+			weights[1 * last_dim + tid] = stats.get_variance();
+
 			if (not use_gamma)
 				weights[2 * last_dim + tid] = 1.0f; // gamma
 			if (not use_beta)
@@ -373,7 +366,7 @@ namespace ml
 		const int workspace_first_dim = std::min((size_t) 256, cuda::Context::getWorkspaceSize(context) / (sizeof(AvgVarStats<float> ) * last_dim));
 		assert(workspace_first_dim > 0);
 
-		float *running_stats_ptr = getPointer<float>(running_stats) + running_stat_idx * 2 * last_dim;
+		AvgVarStats<float> *running_stats_ptr = getPointer<AvgVarStats<float>>(running_stats) + running_stat_idx * last_dim;
 
 		dim3 blockDim(32, 32);
 		dim3 gridDim1((last_dim + 31) / 32, workspace_first_dim);
@@ -404,7 +397,7 @@ namespace ml
 		float *workspace = cuda::Context::getWorkspace<float>(context);
 		const int workspace_first_dim = std::min((size_t) 256, cuda::Context::getWorkspaceSize(context) / (sizeof(float) * last_dim));
 
-		const float *running_stats_ptr = getPointer<float>(running_stats) + running_stat_idx * 2 * last_dim;
+		const AvgVarStats<float> *running_stats_ptr = getPointer<AvgVarStats<float>>(running_stats) + running_stat_idx * last_dim;
 
 		dim3 blockDim(32, 32);
 		dim3 gridDim1((last_dim + 31) / 32, workspace_first_dim);
@@ -431,12 +424,11 @@ namespace ml
 	void cuda_batchnorm_update(mlContext_t context, mlShape_t shape, const void *running_stat, void *weights, bool use_gamma, bool use_beta)
 	{
 		const int first_dim = get_first_dim(shape);
-		const int last_dim = get_last_dim(shape) / 2;
-		int2 dim { first_dim, last_dim };
+		const int last_dim = get_last_dim(shape) / 3;
 
 		dim3 blockDim(256);
 		dim3 gridDim(std::max(1u, (last_dim + blockDim.x - 1) / blockDim.x));
-		kernel_batchnorm_update<<<gridDim, blockDim, 0, cuda::Context::getStream(context)>>>(getPointer<float>(running_stat),
+		kernel_batchnorm_update<<<gridDim, blockDim, 0, cuda::Context::getStream(context)>>>(getPointer<AvgVarStats<float>>(running_stat),
 				getPointer<float>(weights), first_dim, last_dim, use_gamma, use_beta);
 		assert(cudaGetLastError() == cudaSuccess);
 	}

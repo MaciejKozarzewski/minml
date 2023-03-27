@@ -76,15 +76,29 @@ namespace
 				assert(samples >= static_cast<T>(2));
 				return M2 / (samples - static_cast<T>(1));
 			}
-
-			static AvgVarStats merge(const AvgVarStats<T> &lhs, const AvgVarStats<T> &rhs) noexcept
+			T get_stddev() const noexcept
 			{
-				assert(lhs.samples >= static_cast<T>(0) && rhs.samples >= static_cast<T>(0));
-				AvgVarStats result;
-				result.samples = lhs.samples + rhs.samples;
-				result.M = (lhs.samples * lhs.M + rhs.samples * rhs.M) / result.samples;
-				result.M2 = lhs.M2 + rhs.M2 + square(lhs.M - rhs.M) * (lhs.samples * rhs.samples) / result.samples;
-				return result;
+				return std::sqrt(static_cast<T>(epsilon) + get_variance());
+			}
+			void merge_with(const AvgVarStats<T> &other) noexcept
+			{
+				if (other.samples == static_cast<T>(0))
+					return;
+				if (this->samples == static_cast<T>(0))
+				{
+					this->samples = other.samples;
+					this->M = other.M;
+					this->M2 = other.M2;
+				}
+				else
+				{
+					const T total_samples = this->samples + other.samples;
+					const T total_M = (this->samples * this->M + other.samples * other.M) / total_samples;
+					const T total_M2 = this->M2 + other.M2 + square(this->M - other.M) * (this->samples * other.samples) / total_samples;
+					this->samples = total_samples;
+					this->M = total_M;
+					this->M2 = total_M2;
+				}
 			}
 	};
 }
@@ -149,30 +163,22 @@ namespace ml
 		const float *input_ptr = getPointer<float>(input);
 		float *output_ptr = getPointer<float>(output);
 		float *weights_ptr = getPointer<float>(weights);
-		float *running_stat_ptr = getPointer<float>(running_stats) + 2 * running_stat_idx * last_dim;
-
-		assert(cpu::Context::getWorkspaceSize(context) >= last_dim * sizeof(AvgVarStats<float> ));
-		AvgVarStats<float> *stats = cpu::Context::getWorkspace<AvgVarStats<float>>(context);
+		AvgVarStats<float> *running_stat_ptr = getPointer<AvgVarStats<float>>(running_stats) + running_stat_idx * last_dim;
 
 		for (int j = 0; j < last_dim; j++)
-			stats[j] = AvgVarStats<float>();
+			running_stat_ptr[j] = AvgVarStats<float>();
 		for (int i = 0; i < first_dim; i++)
 			for (int j = 0; j < last_dim; j++)
-				stats[j].add(input_ptr[i * last_dim + j]);
-
-		for (int j = 0; j < last_dim; j++)
-		{
-			running_stat_ptr[j] = stats[j].get_average();
-			running_stat_ptr[last_dim + j] = stats[j].get_variance();
-		}
+				running_stat_ptr[j].add(input_ptr[i * last_dim + j]);
 
 		for (int i = 0; i < first_dim; i++)
 			for (int j = 0; j < last_dim; j++)
 			{
+				const float avg = running_stat_ptr[j].get_average();
+				const float stddev = running_stat_ptr[j].get_stddev();
 				const float gamma = get_gamma(weights_ptr, j, last_dim);
 				const float beta = get_beta(weights_ptr, j, last_dim);
-				float tmp = gamma * (input_ptr[i * last_dim + j] - get_mean(running_stat_ptr, j, last_dim))
-						/ get_stddev(running_stat_ptr, j, last_dim) + beta;
+				float tmp = gamma * (input_ptr[i * last_dim + j] - avg) / stddev + beta;
 				if (act == ACTIVATION_RELU)
 					tmp = std::max(0.0f, tmp);
 				if (act == ACTIVATION_TANH)
@@ -200,7 +206,7 @@ namespace ml
 		float *gradient_prev_ptr = getPointer<float>(gradient_prev);
 		float *gradient_next_ptr = getPointer<float>(gradient_next);
 		float *weights_update_ptr = getPointer<float>(weights_update);
-		const float *running_stat_ptr = getPointer<float>(running_stats) + 2 * running_stat_idx * last_dim;
+		const AvgVarStats<float> *running_stat_ptr = getPointer<AvgVarStats<float>>(running_stats) + running_stat_idx * last_dim;
 
 		assert(cpu::Context::getWorkspaceSize(context) >= 2 * last_dim * sizeof(float));
 
@@ -216,7 +222,6 @@ namespace ml
 		setzero(d_mu, last_dim);
 
 		for (int i = 0; i < first_dim; i++)
-		{
 			for (int j = 0; j < last_dim; j++)
 			{
 				const int idx = i * last_dim + j;
@@ -227,12 +232,11 @@ namespace ml
 				if (act == ACTIVATION_SIGMOID)
 					gradient_next_ptr[idx] *= output_ptr[idx] * (1.0f - output_ptr[idx]);
 
-				const float avg = get_mean(running_stat_ptr, j, last_dim);
-				const float stddev = get_stddev(running_stat_ptr, j, last_dim);
+				const float avg = running_stat_ptr[j].get_average();
+				const float stddev = running_stat_ptr[j].get_stddev();
 				d_sigma[j] += gradient_next_ptr[idx] * (input_ptr[idx] - avg) / stddev;
 				d_mu[j] += gradient_next_ptr[idx];
 			}
-		}
 
 		for (int j = 0; j < last_dim; j++)
 		{
@@ -243,7 +247,7 @@ namespace ml
 		for (int j = 0; j < last_dim; j++)
 		{
 			const float gamma = get_gamma(getPointer<float>(weights), j, last_dim);
-			const float stddev = get_stddev(running_stat_ptr, j, last_dim);
+			const float stddev = running_stat_ptr[j].get_stddev();
 			d_sigma[j] = -gamma / stddev * d_sigma[j] / first_dim;
 			d_mu[j] = -gamma / stddev * d_mu[j] / first_dim;
 		}
@@ -252,8 +256,8 @@ namespace ml
 			{
 				const int idx = i * last_dim + j;
 				const float gamma = get_gamma(getPointer<float>(weights), j, last_dim);
-				const float avg = get_mean(running_stat_ptr, j, last_dim);
-				const float stddev = get_stddev(running_stat_ptr, j, last_dim);
+				const float avg = running_stat_ptr[j].get_average();
+				const float stddev = running_stat_ptr[j].get_stddev();
 				gradient_prev_ptr[idx] = gamma / stddev * gradient_next_ptr[idx] + d_sigma[j] * (input_ptr[idx] - avg) / stddev + d_mu[j];
 			}
 	}
@@ -263,36 +267,23 @@ namespace ml
 		assert(weights != nullptr);
 		assert(shape.rank == 2);
 
-		const float *running_stat_ptr = getPointer<float>(running_stat);
-		float *weights_ptr = getPointer<float>(weights);
-
 		const int first_dim = get_first_dim(shape);
-		const int last_dim = get_last_dim(shape) / 2;
+		const int last_dim = get_last_dim(shape) / 3;
 
-		assert(cpu::Context::getWorkspaceSize(context) >= 2 * last_dim * sizeof(float));
-		float *mean_ptr = cpu::Context::getWorkspace<float>(context);
-		float *variance_ptr = cpu::Context::getWorkspace<float>(context) + last_dim;
+		assert(cpu::Context::getWorkspaceSize(context) >= last_dim * sizeof(AvgVarStats<float> ));
+		AvgVarStats<float> *stats = cpu::Context::getWorkspace<AvgVarStats<float>>(context);
 
-		/* weights rows are:
-		 * mean
-		 * variance
-		 * gamma
-		 * beta
-		 */
-		setzero(mean_ptr, last_dim);
-		setzero(variance_ptr, last_dim);
+		const AvgVarStats<float> *running_stat_ptr = getPointer<AvgVarStats<float>>(running_stat);
 		for (int i = 0; i < first_dim; i++)
-		{
 			for (int j = 0; j < last_dim; j++)
-				mean_ptr[j] += running_stat_ptr[i * 2 * last_dim + j];
-			for (int j = 0; j < last_dim; j++)
-				variance_ptr[j] += running_stat_ptr[(i * 2 + 1) * last_dim + j];
-		}
+				stats[j].merge_with(running_stat_ptr[i * last_dim + j]);
 
+		float *weights_ptr = getPointer<float>(weights);
 		for (int j = 0; j < last_dim; j++)
-			weights_ptr[0 * last_dim + j] = mean_ptr[j] / first_dim;
+			weights_ptr[0 * last_dim + j] = stats[j].get_average();
 		for (int j = 0; j < last_dim; j++)
-			weights_ptr[1 * last_dim + j] = variance_ptr[j] / first_dim;
+			weights_ptr[1 * last_dim + j] = stats[j].get_variance();
+
 		if (not use_gamma)
 			for (int j = 0; j < last_dim; j++)
 				weights_ptr[2 * last_dim + j] = 1.0f;

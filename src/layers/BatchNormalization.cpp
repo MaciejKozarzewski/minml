@@ -47,7 +47,7 @@ namespace ml
 		if (shapes.size() != 1)
 			throw IllegalArgument(METHOD_NAME, "BatchNormalization layer expects single input shape");
 		if (m_running_stats == nullptr)
-			m_running_stats = std::make_unique<Tensor>(Shape( { m_history_size, 2 * shapes[0].lastDim() }), dtype(), device());
+			m_running_stats = std::make_unique<Tensor>(Shape( { m_history_size, 3 * shapes[0].lastDim() }), dtype(), device());
 		m_input_shapes = shapes;
 	}
 	Shape BatchNormalization::getOutputShape() const
