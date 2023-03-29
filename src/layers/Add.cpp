@@ -64,5 +64,6 @@ namespace ml
 		for (size_t i = 0; i < gradient_prev.size(); i++)
 			gradient_prev[i].copyFrom(context(), gradient_next);
 	}
+
 } /* namespace ml */
 

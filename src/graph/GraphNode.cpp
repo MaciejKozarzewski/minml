@@ -139,7 +139,7 @@ namespace ml
 
 		getLayer().forward(input, output);
 
-		const bool emulate_low_precision = getLayer().isTrainable() and getLayer().dtype() == DataType::FLOAT32;
+		const bool emulate_low_precision = false; // getLayer().isTrainable() and getLayer().dtype() == DataType::FLOAT32;
 		if (emulate_low_precision)
 			emulateLowPrecision(getLayer().context(), output, output);
 	}

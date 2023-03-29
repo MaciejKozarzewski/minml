@@ -147,7 +147,7 @@ namespace ml
 
 	void Conv2D::forward(const std::vector<Tensor> &input, Tensor &output)
 	{
-		const bool emulate_low_precision = isTrainable() and dtype() == DataType::FLOAT32;
+		const bool emulate_low_precision = false; // isTrainable() and dtype() == DataType::FLOAT32;
 
 		choose_algorithm();
 
@@ -209,7 +209,7 @@ namespace ml
 	void Conv2D::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next)
 	{
 		assert(input.size() == 1 && gradient_prev.size() == 1);
-		const bool emulate_low_precision = isTrainable() and dtype() == DataType::FLOAT32;
+		const bool emulate_low_precision = false; // isTrainable() and dtype() == DataType::FLOAT32;
 		choose_algorithm();
 
 		activationBackward(context(), gradient_next, gradient_next, output, m_activation);

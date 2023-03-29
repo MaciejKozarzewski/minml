@@ -122,7 +122,7 @@ namespace ml
 		assert(input.size() == 1);
 		if (isUsingWeights())
 		{
-			const bool emulate_low_precision = isTrainable() and dtype() == DataType::FLOAT32;
+			const bool emulate_low_precision = false; // isTrainable() and dtype() == DataType::FLOAT32;
 
 			if (emulate_low_precision)
 			{
@@ -149,7 +149,7 @@ namespace ml
 		activationBackward(context(), gradient_next, gradient_next, output, m_activation);
 		if (isUsingWeights())
 		{
-			const bool emulate_low_precision = isTrainable() and dtype() == DataType::FLOAT32;
+			const bool emulate_low_precision = false; // isTrainable() and dtype() == DataType::FLOAT32;
 
 			Tensor tmp_grad = flatten_input_tensor(gradient_prev[0]);
 			if (emulate_low_precision)
