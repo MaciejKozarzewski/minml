@@ -666,6 +666,7 @@ void test_mnist()
 
 namespace gemm
 {
+
 	void* aligned_new(size_t count, size_t alignment)
 	{
 		if (count == 0)
@@ -1047,11 +1048,18 @@ namespace gemm
 	};
 }
 
+#include "../src/backend/cpu/cpu_x86.hpp"
+
 int main()
 {
 	std::cout << "BEGIN" << std::endl;
+	ml::cpu::cpu_x86 prop;
+	prop.print();
 
-	test_mnist();
+	std::cout << "END" << std::endl;
+	{
+	}
+
 	return 0;
 	{
 		Graph graph;
