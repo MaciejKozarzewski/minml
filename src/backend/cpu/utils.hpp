@@ -36,6 +36,8 @@ namespace ml
 		SimdLevel getSimdSupport() noexcept;
 		bool has_hardware_fp16_conversion();
 
+		bool is_aligned(const void *ptr, size_t alignment) noexcept;
+
 		class Context
 		{
 				static constexpr size_t default_workspace_size = 8 * 1024 * 1024; // 8MB
@@ -56,6 +58,16 @@ namespace ml
 				static size_t getWorkspaceSize(mlContext_t context);
 		};
 
+		class WorkspaceAllocator
+		{
+				void *m_ptr = nullptr;
+				size_t m_max_size = 0;
+				size_t m_offset = 0;
+			public:
+				WorkspaceAllocator() noexcept = default;
+				WorkspaceAllocator(mlContext_t context) noexcept;
+				void* get(size_t size, size_t alignment) noexcept;
+		};
 	}
 } /* namespace ml */
 
