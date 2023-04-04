@@ -13,62 +13,65 @@
 #include <cinttypes>
 #include <cassert>
 #include <x86intrin.h>
+
+#include "types.hpp"
+#include "register_type.hpp"
 #include "vector_macros.hpp"
 
 namespace SIMD_NAMESPACE
 {
-	template<typename T, class dummy = T>
+	template<typename T, RegisterType RT = AUTO>
 	class Vector;
 
 	/*
 	 * Bitwise operations.
 	 */
-	template<typename T, typename U = T>
-	static inline Vector<T>& operator&(Vector<T> lhs, U rhs) noexcept
+	template<typename T, RegisterType RT, typename U = T>
+	static inline Vector<T, RT>& operator&(Vector<T, RT> lhs, U rhs) noexcept
 	{
-		return lhs & Vector<U>(rhs);
+		return lhs & Vector<T, RT>(rhs);
 	}
-	template<typename T, typename U = T>
-	static inline Vector<T>& operator&(U lhs, Vector<T> rhs) noexcept
+	template<typename T, RegisterType RT, typename U = T>
+	static inline Vector<T, RT>& operator&(U lhs, Vector<T, RT> rhs) noexcept
 	{
-		return Vector<U>(lhs) & rhs;
+		return Vector<T, RT>(lhs) & rhs;
 	}
-	template<typename T, typename U = T>
-	static inline Vector<T>& operator&=(Vector<T> &lhs, U rhs) noexcept
+	template<typename T, RegisterType RT, typename U = T>
+	static inline Vector<T, RT>& operator&=(Vector<T, RT> &lhs, U rhs) noexcept
 	{
 		lhs = (lhs & rhs);
 		return lhs;
 	}
 
-	template<typename T, typename U = T>
-	static inline Vector<T>& operator|(Vector<T> lhs, U rhs) noexcept
+	template<typename T, RegisterType RT, typename U = T>
+	static inline Vector<T, RT>& operator|(Vector<T, RT> lhs, U rhs) noexcept
 	{
-		return lhs | Vector<U>(rhs);
+		return lhs | Vector<T, RT>(rhs);
 	}
-	template<typename T, typename U = T>
-	static inline Vector<T>& operator|(U lhs, Vector<T> rhs) noexcept
+	template<typename T, RegisterType RT, typename U = T>
+	static inline Vector<T, RT>& operator|(U lhs, Vector<T, RT> rhs) noexcept
 	{
-		return Vector<U>(lhs) | rhs;
+		return Vector<T, RT>(lhs) | rhs;
 	}
-	template<typename T, typename U = T>
-	static inline Vector<T>& operator|=(Vector<T> &lhs, U rhs) noexcept
+	template<typename T, RegisterType RT, typename U = T>
+	static inline Vector<T, RT>& operator|=(Vector<T, RT> &lhs, U rhs) noexcept
 	{
 		lhs = (lhs | rhs);
 		return lhs;
 	}
 
-	template<typename T, typename U = T>
-	static inline Vector<T>& operator^(Vector<T> lhs, U rhs) noexcept
+	template<typename T, RegisterType RT, typename U = T>
+	static inline Vector<T, RT>& operator^(Vector<T, RT> lhs, U rhs) noexcept
 	{
-		return lhs ^ Vector<U>(rhs);
+		return lhs ^ Vector<T, RT>(rhs);
 	}
-	template<typename T, typename U = T>
-	static inline Vector<T>& operator^(U lhs, Vector<T> rhs) noexcept
+	template<typename T, RegisterType RT, typename U = T>
+	static inline Vector<T, RT>& operator^(U lhs, Vector<T, RT> rhs) noexcept
 	{
-		return Vector<U>(lhs) ^ rhs;
+		return Vector<T, RT>(lhs) ^ rhs;
 	}
-	template<typename T, typename U = T>
-	static inline Vector<T>& operator^=(Vector<T> &lhs, U rhs) noexcept
+	template<typename T, RegisterType RT, typename U = T>
+	static inline Vector<T, RT>& operator^=(Vector<T, RT> &lhs, U rhs) noexcept
 	{
 		lhs = (lhs ^ rhs);
 		return lhs;
@@ -77,14 +80,14 @@ namespace SIMD_NAMESPACE
 	/*
 	 * Bitwise shifts.
 	 */
-	template<typename T>
-	static inline Vector<T>& operator>>=(Vector<T> &lhs, T rhs) noexcept
+	template<typename T, RegisterType RT>
+	static inline Vector<T, RT>& operator>>=(Vector<T, RT> &lhs, T rhs) noexcept
 	{
 		lhs = (lhs >> rhs);
 		return lhs;
 	}
-	template<typename T>
-	static inline Vector<T>& operator<<=(Vector<T> &lhs, T rhs) noexcept
+	template<typename T, RegisterType RT>
+	static inline Vector<T, RT>& operator<<=(Vector<T, RT> &lhs, T rhs) noexcept
 	{
 		lhs = (lhs << rhs);
 		return lhs;
@@ -93,44 +96,44 @@ namespace SIMD_NAMESPACE
 	/*
 	 * Compare operations.
 	 */
-	template<typename T, typename U = T>
-	static inline Vector<T> operator<(Vector<T> lhs, U rhs) noexcept
+	template<typename T, RegisterType RT, typename U = T>
+	static inline Vector<T, RT> operator<(Vector<T, RT> lhs, U rhs) noexcept
 	{
-		return lhs < Vector<U>(rhs);
+		return lhs < (Vector<T, RT>(rhs));
 	}
-	template<typename T, typename U = T>
-	static inline Vector<T> operator<(U lhs, Vector<T> rhs) noexcept
+	template<typename T, RegisterType RT, typename U = T>
+	static inline Vector<T, RT> operator<(U lhs, Vector<T, RT> rhs) noexcept
 	{
-		return Vector<U>(lhs) < rhs;
+		return Vector<T, RT>(lhs) < rhs;
 	}
-	template<typename T, typename U = T>
-	static inline Vector<T> operator<=(Vector<T> lhs, U rhs) noexcept
+	template<typename T, RegisterType RT, typename U = T>
+	static inline Vector<T, RT> operator<=(Vector<T, RT> lhs, U rhs) noexcept
 	{
-		return lhs <= Vector<U>(rhs);
+		return lhs <= Vector<T, RT>(rhs);
 	}
-	template<typename T, typename U = T>
-	static inline Vector<T> operator<=(U lhs, Vector<T> rhs) noexcept
+	template<typename T, RegisterType RT, typename U = T>
+	static inline Vector<T, RT> operator<=(U lhs, Vector<T, RT> rhs) noexcept
 	{
-		return Vector<U>(lhs) <= rhs;
+		return Vector<T, RT>(lhs) <= rhs;
 	}
 
-	template<typename T, typename U = T>
-	static inline Vector<T> operator>(Vector<T> lhs, U rhs) noexcept
+	template<typename T, RegisterType RT, typename U = T>
+	static inline Vector<T, RT> operator>(Vector<T, RT> lhs, U rhs) noexcept
 	{
 		return lhs <= rhs;
 	}
-	template<typename T, typename U = T>
-	static inline Vector<T> operator>(U lhs, Vector<T> rhs) noexcept
+	template<typename T, RegisterType RT, typename U = T>
+	static inline Vector<T, RT> operator>(U lhs, Vector<T, RT> rhs) noexcept
 	{
 		return lhs <= rhs;
 	}
-	template<typename T, typename U = T>
-	static inline Vector<T> operator>=(Vector<T> lhs, U rhs) noexcept
+	template<typename T, RegisterType RT, typename U = T>
+	static inline Vector<T, RT> operator>=(Vector<T, RT> lhs, U rhs) noexcept
 	{
 		return lhs < rhs;
 	}
-	template<typename T, typename U = T>
-	static inline Vector<T> operator>=(U lhs, Vector<T> rhs) noexcept
+	template<typename T, RegisterType RT, typename U = T>
+	static inline Vector<T, RT> operator>=(U lhs, Vector<T, RT> rhs) noexcept
 	{
 		return lhs < rhs;
 	}
@@ -138,98 +141,98 @@ namespace SIMD_NAMESPACE
 	/*
 	 * Arithmetic operations
 	 */
-	template<typename T, typename U = T>
-	static inline Vector<T> operator+(Vector<T> lhs, U rhs) noexcept
+	template<typename T, RegisterType RT, typename U = T>
+	static inline Vector<T, RT> operator+(Vector<T, RT> lhs, U rhs) noexcept
 	{
-		return lhs + Vector<U>(rhs);
+		return lhs + Vector<T, RT>(rhs);
 	}
-	template<typename T, typename U = T>
-	static inline Vector<T> operator+(U lhs, Vector<T> rhs) noexcept
+	template<typename T, RegisterType RT, typename U = T>
+	static inline Vector<T, RT> operator+(U lhs, Vector<T, RT> rhs) noexcept
 	{
-		return Vector<U>(lhs) + rhs;
+		return Vector<T, RT>(lhs) + rhs;
 	}
-	template<typename T, typename U = T>
-	static inline Vector<T>& operator+=(Vector<T> &lhs, Vector<U> rhs) noexcept
-	{
-		lhs = lhs + rhs;
-		return lhs;
-	}
-	template<typename T, typename U = T>
-	static inline Vector<T>& operator+=(Vector<T> &lhs, U rhs) noexcept
+	template<typename T, RegisterType RT, typename U = T>
+	static inline Vector<T, RT>& operator+=(Vector<T, RT> &lhs, Vector<U, RT> rhs) noexcept
 	{
 		lhs = lhs + rhs;
 		return lhs;
 	}
-	template<typename T>
-	static inline Vector<T> operator+(Vector<T> x) noexcept
+	template<typename T, RegisterType RT, typename U = T>
+	static inline Vector<T, RT>& operator+=(Vector<T, RT> &lhs, U rhs) noexcept
+	{
+		lhs = lhs + rhs;
+		return lhs;
+	}
+	template<typename T, RegisterType RT>
+	static inline Vector<T, RT> operator+(Vector<T, RT> x) noexcept
 	{
 		return x;
 	}
 
-	template<typename T, typename U = T>
-	static inline Vector<T> operator-(Vector<T> lhs, U rhs) noexcept
+	template<typename T, RegisterType RT, typename U = T>
+	static inline Vector<T, RT> operator-(Vector<T, RT> lhs, U rhs) noexcept
 	{
-		return lhs - Vector<U>(rhs);
+		return lhs - Vector<T, RT>(rhs);
 	}
-	template<typename T, typename U = T>
-	static inline Vector<T> operator-(U lhs, Vector<T> rhs) noexcept
+	template<typename T, RegisterType RT, typename U = T>
+	static inline Vector<T, RT> operator-(U lhs, Vector<T, RT> rhs) noexcept
 	{
-		return Vector<U>(lhs) - rhs;
+		return Vector<T, RT>(lhs) - rhs;
 	}
-	template<typename T, typename U = T>
-	static inline Vector<T>& operator-=(Vector<T> &lhs, Vector<U> rhs) noexcept
+	template<typename T, RegisterType RT, typename U = T>
+	static inline Vector<T, RT>& operator-=(Vector<T, RT> &lhs, Vector<U, RT> rhs) noexcept
 	{
 		lhs = lhs - rhs;
 		return lhs;
 	}
-	template<typename T, typename U = T>
-	static inline Vector<T>& operator-=(Vector<T> &lhs, U rhs) noexcept
+	template<typename T, RegisterType RT, typename U = T>
+	static inline Vector<T, RT>& operator-=(Vector<T, RT> &lhs, U rhs) noexcept
 	{
 		lhs = lhs - rhs;
 		return lhs;
 	}
 
-	template<typename T, typename U = T>
-	static inline Vector<T> operator*(Vector<T> lhs, U rhs) noexcept
+	template<typename T, RegisterType RT, typename U = T>
+	static inline Vector<T, RT> operator*(Vector<T, RT> lhs, U rhs) noexcept
 	{
-		return lhs * Vector<U>(rhs);
+		return lhs * Vector<T, RT>(rhs);
 	}
-	template<typename T, typename U = T>
-	static inline Vector<T> operator*(U lhs, Vector<T> rhs) noexcept
+	template<typename T, RegisterType RT, typename U = T>
+	static inline Vector<T, RT> operator*(U lhs, Vector<T, RT> rhs) noexcept
 	{
-		return Vector<U>(lhs) * rhs;
+		return Vector<T, RT>(lhs) * rhs;
 	}
-	template<typename T, typename U = T>
-	static inline Vector<T>& operator*=(Vector<T> &lhs, Vector<U> rhs) noexcept
+	template<typename T, RegisterType RT, typename U = T>
+	static inline Vector<T, RT>& operator*=(Vector<T, RT> &lhs, Vector<U, RT> rhs) noexcept
 	{
 		lhs = lhs * rhs;
 		return lhs;
 	}
-	template<typename T, typename U = T>
-	static inline Vector<T>& operator*=(Vector<T> &lhs, U rhs) noexcept
+	template<typename T, RegisterType RT, typename U = T>
+	static inline Vector<T, RT>& operator*=(Vector<T, RT> &lhs, U rhs) noexcept
 	{
 		lhs = lhs * rhs;
 		return lhs;
 	}
 
-	template<typename T, typename U>
-	static inline Vector<T> operator/(Vector<U> lhs, T rhs) noexcept
+	template<typename T, RegisterType RT, typename U>
+	static inline Vector<T, RT> operator/(Vector<T, RT> lhs, U rhs) noexcept
 	{
-		return lhs / Vector<U>(rhs);
+		return lhs / Vector<T, RT>(rhs);
 	}
-	template<typename T, typename U>
-	static inline Vector<T> operator/(T lhs, Vector<U> rhs) noexcept
+	template<typename T, RegisterType RT, typename U>
+	static inline Vector<T, RT> operator/(U lhs, Vector<T, RT> rhs) noexcept
 	{
-		return Vector<U>(lhs) / rhs;
+		return Vector<T, RT>(lhs) / rhs;
 	}
-	template<typename T, typename U = T>
-	static inline Vector<T>& operator/=(Vector<T> &lhs, Vector<U> rhs) noexcept
+	template<typename T, RegisterType RT, typename U = T>
+	static inline Vector<T, RT>& operator/=(Vector<T, RT> &lhs, Vector<U, RT> rhs) noexcept
 	{
 		lhs = lhs / rhs;
 		return lhs;
 	}
-	template<typename T, typename U = T>
-	static inline Vector<T>& operator/=(Vector<T> &lhs, U rhs) noexcept
+	template<typename T, RegisterType RT, typename U = T>
+	static inline Vector<T, RT>& operator/=(Vector<T, RT> &lhs, U rhs) noexcept
 	{
 		lhs = lhs / rhs;
 		return lhs;

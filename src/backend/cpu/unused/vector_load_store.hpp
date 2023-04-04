@@ -383,18 +383,6 @@ namespace SIMD_NAMESPACE
 				return combine(partial_load(ptr, num));
 		}
 	}
-	static inline __m128i vector_load(const bfloat16 *ptr, int num) noexcept
-	{
-		assert(ptr != nullptr);
-		assert(num >= 0); // TODO AVX512 adds full support for bfloat16 data
-		return partial_load(reinterpret_cast<const uint16_t*>(ptr), num);
-	}
-	static inline __m128i vector_load(const float16 *ptr, int num) noexcept
-	{
-		assert(ptr != nullptr);
-		assert(num >= 0); // TODO AVX512 adds full support for float16 data
-		return partial_load(reinterpret_cast<const uint16_t*>(ptr), num);
-	}
 	template<typename T, class = typename std::enable_if<std::is_integral<T>::value>::type>
 	static inline __m256i vector_load(const T *ptr, int num) noexcept
 	{
@@ -446,18 +434,6 @@ namespace SIMD_NAMESPACE
 				partial_store(get_low(x), ptr, num);
 		}
 	}
-	static inline void vector_store(__m128i x, bfloat16 *ptr, int num) noexcept
-	{
-		assert(ptr != nullptr);
-		assert(num >= 0);
-		partial_store(x, reinterpret_cast<uint16_t*>(ptr), num);
-	}
-	static inline void vector_store(__m128i x, float16 *ptr, int num) noexcept
-	{
-		assert(ptr != nullptr);
-		assert(num >= 0);
-		partial_store(x, reinterpret_cast<uint16_t*>(ptr), num);
-	}
 	template<typename T, class = typename std::enable_if<std::is_integral<T>::value>::type>
 	static inline void vector_store(__m256i x, T *ptr, int num) noexcept
 	{
@@ -491,18 +467,6 @@ namespace SIMD_NAMESPACE
 		assert(num >= 0);
 		return partial_load(ptr, num);
 	}
-	static inline __m128i vector_load(const bfloat16 *ptr, int num) noexcept
-	{
-		assert(ptr != nullptr);
-		assert(num >= 0); // TODO AVX512 adds full support for bfloat16 data
-		return partial_load(reinterpret_cast<const int16_t*>(ptr), num);
-	}
-	static inline __m128i vector_load(const float16 *ptr, int num) noexcept
-	{
-		assert(ptr != nullptr);
-		assert(num >= 0); // TODO AVX512 adds full support for float16 data
-		return partial_load(reinterpret_cast<const int16_t*>(ptr), num);
-	}
 	template<typename T, class = typename std::enable_if<std::is_integral<T>::value>::type>
 	static inline __m128i vector_load(const T *ptr, int num) noexcept
 	{
@@ -522,18 +486,6 @@ namespace SIMD_NAMESPACE
 		assert(ptr != nullptr);
 		assert(num >= 0);
 		partial_store(x, ptr, num);
-	}
-	static inline void vector_store(__m128i x, bfloat16 *ptr, int num) noexcept
-	{
-		assert(ptr != nullptr);
-		assert(num >= 0);
-		partial_store(x, reinterpret_cast<int16_t*>(ptr), num);
-	}
-	static inline void vector_store(__m128i x, float16 *ptr, int num) noexcept
-	{
-		assert(ptr != nullptr);
-		assert(num >= 0);
-		partial_store(x, reinterpret_cast<int16_t*>(ptr), num);
 	}
 	template<typename T, class = typename std::enable_if<std::is_integral<T>::value>::type>
 	static inline void vector_store(__m128i x, T *ptr, int num) noexcept

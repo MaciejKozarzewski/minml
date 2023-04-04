@@ -11,6 +11,7 @@
 #include <cstring>
 
 #include "vectors.hpp"
+#include "types.hpp"
 
 namespace SIMD_NAMESPACE
 {

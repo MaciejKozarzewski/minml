@@ -34,6 +34,24 @@ namespace ml
 
 		std::string toString(SimdLevel sl);
 		SimdLevel getSimdSupport() noexcept;
+
+		struct ComputeConfig
+		{
+				mlDataType_t data_type;
+				mlDataType_t compute_type;
+		};
+
+		enum class TypeSupport
+		{
+			NONE,
+			EMULATED_CONVERSION,
+			NATIVE_CONVERSION,
+			NATIVE_ARITHMETIC,
+			NATIVE_FMA
+		};
+
+		TypeSupport support_for_type(mlDataType_t dtype);
+
 		bool has_hardware_fp16_conversion();
 
 		bool is_aligned(const void *ptr, size_t alignment) noexcept;

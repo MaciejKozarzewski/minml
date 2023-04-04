@@ -31,16 +31,6 @@ namespace SIMD_NAMESPACE
 	{
 		return register_size() / sizeof(T);
 	}
-	template<>
-	inline constexpr int vector_length<float16>() noexcept
-	{
-		return register_size() / sizeof(float);
-	}
-	template<>
-	inline constexpr int vector_length<bfloat16>() noexcept
-	{
-		return register_size() / sizeof(float);
-	}
 #elif SUPPORTS_SSE2
 	template<typename T>
 	inline constexpr int vector_length() noexcept

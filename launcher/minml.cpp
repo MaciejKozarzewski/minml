@@ -28,6 +28,8 @@
 #include <cmath>
 #include <x86intrin.h>
 
+#include "../src/backend/cpu/vectors/vectors.hpp"
+
 using namespace ml;
 
 class MNIST
@@ -1049,16 +1051,33 @@ namespace gemm
 }
 
 #include "../src/backend/cpu/cpu_x86.hpp"
+#include "../src/backend/cpu/vectors/vectors.hpp"
 
+using namespace SIMD_NAMESPACE;
 int main()
 {
 	std::cout << "BEGIN" << std::endl;
 	ml::cpu::cpu_x86 prop;
 	prop.print();
 
-	std::cout << "END" << std::endl;
 	{
+		float dst[16];
+		std::memset(dst, 0, 16 * sizeof(float));
+
+		float src[16];
+		for (int i = 0; i < 16; i++)
+			src[i] = 1 + i;
+
+		Vector<float, AUTO> vector(src);
+
+		vector = _mm256_unpacklo_ps(vector, vector);
+		vector.store(dst);
+		std::cout << vector.size() << '\n';
+		for (int i = 0; i < 16; i++)
+			std::cout << i << " : " << src[i] << " vs " << dst[i] << '\n';
+
 	}
+	std::cout << "END" << std::endl;
 
 	return 0;
 	{

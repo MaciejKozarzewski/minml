@@ -9,7 +9,7 @@
 #include <minml/backend/backend_utils.hpp>
 
 #include "../vectors/vectors.hpp"
-#include "../vectors/vector_conversion.hpp"
+//#include "../vectors/vector_conversion.hpp"
 
 #include <type_traits>
 
@@ -20,37 +20,37 @@ namespace
 	template<typename T, typename U>
 	void kernel_convert(T *dst, const U *src, const int elements)
 	{
-		VectorConverter<T, U> convert;
-		for (int i = 0; i < elements; i += convert.length)
-		{
-			const int processed_elements = std::min(convert.length, elements - i);
-			const Vector<T> tmp = convert(Vector<U>(src + i, processed_elements));
-			tmp.store(dst + i, processed_elements);
-		}
+//		VectorConverter<T, U> convert;
+//		for (int i = 0; i < elements; i += convert.length)
+//		{
+//			const int processed_elements = std::min(convert.length, elements - i);
+//			const Vector<T> tmp = convert(Vector<U>(src + i, processed_elements));
+//			tmp.store(dst + i, processed_elements);
+//		}
 	}
 
 	template<typename T>
 	void kernel_unpack_input(T *dst, const uint32_t *src, int first_dim, int last_dim)
 	{
-		for (int i = 0; i < first_dim; i++, dst += last_dim)
-		{
-			uint32_t mask = src[i];
-			for (int j = 0; j < last_dim; j++, mask >>= 1)
-				dst[j] = (mask & 1u) ? Vector<T>::scalar_one() : Vector<T>::scalar_zero();
-		}
+//		for (int i = 0; i < first_dim; i++, dst += last_dim)
+//		{
+//			uint32_t mask = src[i];
+//			for (int j = 0; j < last_dim; j++, mask >>= 1)
+//				dst[j] = (mask & 1u) ? Vector<T>::scalar_one() : Vector<T>::scalar_zero();
+//		}
 	}
 
 	template<typename T>
 	void transpose(void *dst, const void *src, int dim0, int dim1, int dim2)
 	{
-		for (int i = 0; i < dim0; i++)
-			for (int j = 0; j < dim1; j++)
-				for (int k = 0; k < dim2; k++)
-				{
-					const int src_idx = (i * dim1 + j) * dim2 + k;
-					const int dst_idx = (i * dim2 + k) * dim1 + j;
-					reinterpret_cast<T*>(dst)[dst_idx] = reinterpret_cast<const T*>(src)[src_idx];
-				}
+//		for (int i = 0; i < dim0; i++)
+//			for (int j = 0; j < dim1; j++)
+//				for (int k = 0; k < dim2; k++)
+//				{
+//					const int src_idx = (i * dim1 + j) * dim2 + k;
+//					const int dst_idx = (i * dim2 + k) * dim1 + j;
+//					reinterpret_cast<T*>(dst)[dst_idx] = reinterpret_cast<const T*>(src)[src_idx];
+//				}
 	}
 }
 

@@ -8,6 +8,8 @@
 #ifndef VECTORS_VECTOR_MACROS_HPP_
 #define VECTORS_VECTOR_MACROS_HPP_
 
+#define __AVX2__
+
 #define NAMESPACE_AVX2 ns_avx2
 #define NAMESPACE_AVX ns_avx
 #define NAMESPACE_SSE41 ns_sse41
@@ -62,9 +64,12 @@
 /* These are intended for use in other source files */
 #define SUPPORTS_AVX512 0
 #define SUPPORTS_AVX2 (SIMD_LEVEL >= 8)
-#define SUPPORTS_FP16 defined(__F16C__)
 #define SUPPORTS_AVX (SIMD_LEVEL >= 7)
 #define SUPPORTS_SSE41 (SIMD_LEVEL >= 5)
 #define SUPPORTS_SSE2 (SIMD_LEVEL >= 2)
+
+#define SUPPORTS_FMA defined(__FMA__)
+#define SUPPORTS_FP16 defined(__F16C__)
+#define SUPPORTS_F16C defined(__F16C__)
 
 #endif /* VECTORS_VECTOR_MACROS_HPP_ */

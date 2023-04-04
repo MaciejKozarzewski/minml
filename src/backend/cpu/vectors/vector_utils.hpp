@@ -13,34 +13,7 @@
 #include <cinttypes>
 #include <x86intrin.h>
 #include "vector_macros.hpp"
-
-struct bfloat16
-{
-		uint16_t m_data;
-
-		friend bool operator==(bfloat16 lhs, bfloat16 rhs) noexcept
-		{
-			return lhs.m_data == rhs.m_data;
-		}
-		friend bool operator!=(bfloat16 lhs, bfloat16 rhs) noexcept
-		{
-			return lhs.m_data != rhs.m_data;
-		}
-};
-
-struct float16
-{
-		uint16_t m_data;
-
-		friend bool operator==(float16 lhs, float16 rhs) noexcept
-		{
-			return lhs.m_data == rhs.m_data;
-		}
-		friend bool operator!=(float16 lhs, float16 rhs) noexcept
-		{
-			return lhs.m_data != rhs.m_data;
-		}
-};
+#include "vector_masks.hpp"
 
 template<typename T, typename U>
 T bitwise_cast(U x) noexcept
@@ -84,140 +57,17 @@ namespace SIMD_NAMESPACE
 		return _mm256_extractf128_si256(reg, 1);
 	}
 
-	static inline __m256d combine(__m128d low, __m128d high = _mm_setzero_pd()) noexcept
+	static inline __m256d combine(__m128d low, __m128d high) noexcept
 	{
 		return _mm256_setr_m128d(low, high);
 	}
-	static inline __m256 combine(__m128 low, __m128 high = _mm_setzero_ps()) noexcept
+	static inline __m256 combine(__m128 low, __m128 high) noexcept
 	{
 		return _mm256_setr_m128(low, high);
 	}
-	static inline __m256i combine(__m128i low, __m128i high = _mm_setzero_si128()) noexcept
+	static inline __m256i combine(__m128i low, __m128i high) noexcept
 	{
 		return _mm256_setr_m128i(low, high);
-	}
-#endif
-
-#if SUPPORTS_AVX
-	template<uint32_t i0, uint32_t i1, uint32_t i2, uint32_t i3, uint32_t i4, uint32_t i5, uint32_t i6, uint32_t i7>
-	inline __m256i constant() noexcept
-	{
-		return _mm256_setr_epi32(i0, i1, i2, i3, i4, i5, i6, i7);
-	}
-	template<uint32_t i0, uint32_t i1>
-	inline __m256i constant() noexcept
-	{
-		return constant<i0, i1, i0, i1, i0, i1, i0, i1>();
-	}
-	template<uint32_t i>
-	inline __m256i constant() noexcept
-	{
-		return constant<i, i, i, i, i, i, i, i>();
-	}
-#elif SUPPORTS_SSE2
-	template<uint32_t i0, uint32_t i1, uint32_t i2, uint32_t i3>
-	inline __m128i constant() noexcept
-	{
-		return _mm_setr_epi32(i0, i1, i2, i3);
-	}
-	template<uint32_t i0, uint32_t i1>
-	inline __m128i constant() noexcept
-	{
-		return constant<i0, i1, i0, i1>();
-	}
-	template<uint32_t i>
-	inline __m128i constant() noexcept
-	{
-		return constant<i, i, i, i>();
-	}
-#else
-	template<uint32_t i>
-	inline uint32_t constant() noexcept
-	{
-		return i;
-	}
-#endif
-
-#if SUPPORTS_SSE41
-	static inline int get_cutoff_mask(int num) noexcept
-	{
-		assert(num > 0);
-		return (1 << num) - 1;
-	}
-#elif SUPPORTS_SSE2
-	static inline __m128d get_cutoff_mask_pd(int num) noexcept
-	{
-		assert(num > 0);
-		switch (num)
-		{
-			case 0:
-				return _mm_setzero_pd();
-			case 1:
-				return _mm_castsi128_pd(_mm_setr_epi32(0xFFFFFFFF, 0xFFFFFFFFu, 0x00000000, 0x00000000u));
-			case 2:
-			default:
-				return _mm_castsi128_pd(_mm_set1_epi32(0xFFFFFFFFu));
-		}
-	}
-	static inline __m128 get_cutoff_mask_ps(int num) noexcept
-	{
-		assert(num > 0);
-		switch (num)
-		{
-			case 0:
-				return _mm_setzero_ps();
-			case 1:
-				return _mm_castsi128_ps(_mm_setr_epi32(0xFFFFFFFFu, 0x00000000u, 0x00000000u, 0x00000000u));
-			case 2:
-				return _mm_castsi128_ps(_mm_setr_epi32(0xFFFFFFFFu, 0xFFFFFFFFu, 0x00000000u, 0x00000000u));
-			case 3:
-				return _mm_castsi128_ps(_mm_setr_epi32(0xFFFFFFFFu, 0xFFFFFFFFu, 0xFFFFFFFFu, 0x00000000u));
-			case 4:
-			default:
-				return _mm_castsi128_ps(_mm_set1_epi32(0xFFFFFFFFu));
-		}
-	}
-	static inline __m128i get_cutoff_mask_i(int num) noexcept
-	{
-		assert(num > 0);
-		switch (num)
-		{
-			case 0:
-				return _mm_setzero_si128();
-			case 1:
-				return _mm_setr_epi8(0xFFu, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u);
-			case 2:
-				return _mm_setr_epi16(0xFFFFu, 0x0000u, 0x0000u, 0x0000u, 0x0000u, 0x0000u, 0x0000u, 0x0000u);
-			case 3:
-				return _mm_setr_epi8(0xFFu, 0xFFu, 0xFFu, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u);
-			case 4:
-				return _mm_setr_epi32(0xFFFFFFFFu, 0x00000000u, 0x00000000u, 0x00000000u);
-			case 5:
-				return _mm_setr_epi8(0xFFu, 0xFFu, 0xFFu, 0xFFu, 0xFFu, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u);
-			case 6:
-				return _mm_setr_epi16(0xFFFFu, 0xFFFFu, 0xFFFFu, 0x0000u, 0x0000u, 0x0000u, 0x0000u, 0x0000u);
-			case 7:
-				return _mm_setr_epi8(0xFFu, 0xFFu, 0xFFu, 0xFFu, 0xFFu, 0xFFu, 0xFFu, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u);
-			case 8:
-				return _mm_setr_epi32(0xFFFFFFFFu, 0xFFFFFFFFu, 0x00000000u, 0x00000000u);
-			case 9:
-				return _mm_setr_epi8(0xFFu, 0xFFu, 0xFFu, 0xFFu, 0xFFu, 0xFFu, 0xFFu, 0xFFu, 0xFFu, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u);
-			case 10:
-				return _mm_setr_epi16(0xFFFFu, 0xFFFFu, 0xFFFFu, 0xFFFFu, 0xFFFFu, 0x0000u, 0x0000u, 0x0000u);
-			case 11:
-				return _mm_setr_epi8(0xFFu, 0xFFu, 0xFFu, 0xFFu, 0xFFu, 0xFFu, 0xFFu, 0xFFu, 0xFFu, 0xFFu, 0xFFu, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u);
-			case 12:
-				return _mm_setr_epi32(0xFFFFFFFFu, 0xFFFFFFFFu, 0xFFFFFFFFu, 0x00000000u);
-			case 13:
-				return _mm_setr_epi8(0xFFu, 0xFFu, 0xFFu, 0xFFu, 0xFFu, 0xFFu, 0xFFu, 0xFFu, 0xFFu, 0xFFu, 0xFFu, 0xFFu, 0xFFu, 0x00u, 0x00u, 0x00u);
-			case 14:
-				return _mm_setr_epi16(0xFFFFu, 0xFFFFu, 0xFFFFu, 0xFFFFu, 0xFFFFu, 0xFFFFu, 0xFFFFu, 0x0000u);
-			case 15:
-				return _mm_setr_epi8(0xFFu, 0xFFu, 0xFFu, 0xFFu, 0xFFu, 0xFFu, 0xFFu, 0xFFu, 0xFFu, 0xFFu, 0xFFu, 0xFFu, 0xFFu, 0xFFu, 0xFFu, 0x00u);
-			case 16:
-			default:
-				return _mm_set1_epi32(0xFFFFFFFFu);
-		}
 	}
 #endif
 
@@ -298,28 +148,26 @@ namespace SIMD_NAMESPACE
 				return data;
 		}
 	}
-#elif SUPPORTS_SSE2
+#elif SUPPORTS_SSE
 	static inline __m128 cutoff_ps(__m128 data, int num, __m128 value) noexcept
 	{
-		assert(num > 0);
 		const __m128 mask = get_cutoff_mask_ps(num);
 		return _mm_or_ps(_mm_and_ps(mask, data), _mm_andnot_ps(mask, value));
 	}
 	static inline __m128d cutoff_pd(__m128d data, int num, __m128d value) noexcept
 	{
-		assert(num > 0);
 		const __m128d mask = get_cutoff_mask_pd(num);
 		return _mm_or_pd(_mm_and_pd(mask, data), _mm_andnot_pd(mask, value));
 	}
 #else
 	static inline float cutoff_ps(float data, int num, float value) noexcept
 	{
-		assert(num > 0);
+		assert(num == 0 || num == 1);
 		return (num == 0) ? value : data;
 	}
 	static inline double cutoff_pd(double data, int num, double value) noexcept
 	{
-		assert(num > 0);
+		assert(num == 0 || num == 1);
 		return (num == 0) ? value : data;
 	}
 #endif

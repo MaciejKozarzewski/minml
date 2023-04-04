@@ -34,7 +34,7 @@ namespace
 	{
 //		if (supports_simd(AVOCADO_DEVICE_SUPPORTS_AVX512_VL_BW_DQ))
 //			return SimdLevel::AVX512VL_BW_DQ;
-		if (cpu_x86::get().supports("avx512") and cpu_x86::get().supports("os_avx512"))
+		if (cpu_x86::get().supports("avx512-f") and cpu_x86::get().supports("os_avx512"))
 			return ml::cpu::SimdLevel::AVX512F;
 		if (cpu_x86::get().supports("avx2") and cpu_x86::get().supports("os_avx") and cpu_x86::get().supports("fma3"))
 			return ml::cpu::SimdLevel::AVX2;
@@ -72,6 +72,36 @@ namespace ml
 			static const SimdLevel supported_simd_level = check_supported_simd_level();
 			return supported_simd_level;
 		}
+
+		TypeSupport support_for_type(mlDataType_t dtype)
+		{
+			static const bool fma3 = cpu_x86::get().supports("fma3");
+			static const bool f16c = cpu_x86::get().supports("f16c");
+			static const bool avx512f = cpu_x86::get().supports("avx512-f");
+			static const bool avx512_bf16 = cpu_x86::get().supports("avx512-bf16");
+			static const bool avx512_fp16 = cpu_x86::get().supports("avx512-fp16");
+
+			switch (dtype)
+			{
+				default:
+				case DTYPE_UNKNOWN:
+					return TypeSupport::NONE;
+				case DTYPE_BFLOAT16:
+					return (avx512f and avx512_bf16) ? TypeSupport::NATIVE_FMA : TypeSupport::EMULATED_CONVERSION;
+				case DTYPE_FLOAT16:
+				{
+					if (avx512_fp16)
+						return TypeSupport::NATIVE_FMA;
+					else
+						return (f16c or avx512f) ? TypeSupport::NATIVE_CONVERSION : TypeSupport::EMULATED_CONVERSION;
+				}
+				case DTYPE_FLOAT32:
+					return fma3 ? TypeSupport::NATIVE_FMA : TypeSupport::NATIVE_ARITHMETIC;
+				case DTYPE_INT32:
+					return TypeSupport::NATIVE_ARITHMETIC;
+			}
+		}
+
 		bool has_hardware_fp16_conversion()
 		{
 			static const bool result = cpu_x86::get().supports("f16c");
