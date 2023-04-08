@@ -82,9 +82,9 @@ namespace
 								if ((pad_h + h + i) >= 0 && (pad_h + h + i) < height && (pad_w + w + j) >= 0 && (pad_w + w + j) < width)
 									for (int in = 0; in < filters_in; in++)
 									{
-										float grad = gradient_next.get( { b, h, w, out });
-										float we = weight.get( { out, i, j, in });
-										float pr = gradient_prev.get( { b, pad_h + h + i, pad_w + w + j, in });
+										const float grad = gradient_next.get( { b, h, w, out });
+										const float we = weight.get( { out, i, j, in });
+										const float pr = gradient_prev.get( { b, pad_h + h + i, pad_w + w + j, in });
 										gradient_prev.set(pr + grad * we, { b, pad_h + h + i, pad_w + w + j, in });
 									}
 	}
@@ -124,7 +124,7 @@ namespace
 
 namespace ml
 {
-	TEST(TestConv2D, explicit_gemm_conv2D_1x1_forward)
+	TEST(TestConv2D, explicit_gemm_conv2D_1x1_forward_fp32)
 	{
 		Context context(Device::cpu());
 		Tensor input( { 12, 13, 17, 35 }, "float32", Device::cpu());
@@ -244,6 +244,130 @@ namespace ml
 			gemm(context, 't', 'n', weight_update_matrix, gradient_next_matrix, input_matrix, 1, 0);
 			context.synchronize();
 			EXPECT_LE(testing::diffForTest(correct_weight_update, weight_update), 1.0e-4f);
+		}
+	}
+
+	TEST(TestConv2D, implicit_gemm_conv2D_1x1_forward_fp32)
+	{
+		Context context(Device::cpu());
+		const int batch_size = 12;
+		const int height = 13;
+		const int width = 17;
+		const int filter_in = 35;
+		const int filter_out = 21;
+
+		Tensor input( { batch_size, height, width, filter_in }, "float32", Device::cpu());
+		Tensor output( { batch_size, height, width, filter_out }, "float32", Device::cpu());
+		Tensor add(output.shape(), "float32", Device::cpu());
+		Tensor weights( { filter_out, 1, 1, filter_in }, "float32", Device::cpu());
+		Tensor bias( { filter_out }, "float32", Device::cpu());
+		testing::initForTest(weights, 0.0f);
+		testing::initForTest(input, 1.0f);
+		testing::initForTest(bias, 1.0f);
+		testing::initForTest(add, 2.0f);
+
+		Tensor correct_output(output.shape(), "float32", Device::cpu());
+		baseline_conv2D_forward(input, correct_output, weights, bias, add, ActivationType::RELU);
+
+//		convolutionImplicitGemmForward(context, input, weights, output, bias, add, ActivationType::SIGMOID);
+//		EXPECT_LE(testing::diffForTest(correct_output, output), 1.0e-4f);
+
+		if (Device::numberOfCudaDevices() > 0)
+		{
+			Context context(Device::cuda(0));
+			input.moveTo(context.device());
+			output.moveTo(context.device());
+			add.moveTo(context.device());
+			weights.moveTo(context.device());
+			bias.moveTo(context.device());
+
+			output.zeroall(context);
+
+			convolutionImplicitGemmForward(context, input, weights, output, bias, add, ActivationType::RELU);
+			context.synchronize();
+			EXPECT_LE(testing::diffForTest(correct_output, output), 1.0e-4f);
+		}
+	}
+	TEST(TestConv2D, implicit_gemm_conv2D_3x3_forward_fp32)
+	{
+		Context context(Device::cpu());
+		const int batch_size = 12;
+		const int height = 13;
+		const int width = 17;
+		const int filter_in = 35;
+		const int filter_out = 21;
+
+		Tensor input( { batch_size, height, width, filter_in }, "float32", Device::cpu());
+		Tensor output( { batch_size, height, width, filter_out }, "float32", Device::cpu());
+		Tensor add(output.shape(), "float32", Device::cpu());
+		Tensor weights( { filter_out, 3, 3, filter_in }, "float32", Device::cpu());
+		Tensor bias( { filter_out }, "float32", Device::cpu());
+		testing::initForTest(weights, 0.0f);
+		testing::initForTest(input, 1.0f);
+		testing::initForTest(bias, 1.0f);
+		testing::initForTest(add, 2.0f);
+
+		Tensor correct_output(output.shape(), "float32", Device::cpu());
+		baseline_conv2D_forward(input, correct_output, weights, bias, add, ActivationType::RELU);
+
+//		convolutionImplicitGemmForward(context, input, weights, output, bias, add, ActivationType::SIGMOID);
+//		EXPECT_LE(testing::diffForTest(correct_output, output), 1.0e-4f);
+
+		if (Device::numberOfCudaDevices() > 0)
+		{
+			Context context(Device::cuda(0));
+			input.moveTo(context.device());
+			output.moveTo(context.device());
+			add.moveTo(context.device());
+			weights.moveTo(context.device());
+			bias.moveTo(context.device());
+
+			output.zeroall(context);
+
+			convolutionImplicitGemmForward(context, input, weights, output, bias, add, ActivationType::RELU);
+			context.synchronize();
+			EXPECT_LE(testing::diffForTest(correct_output, output), 1.0e-4f);
+		}
+	}
+	TEST(TestConv2D, implicit_gemm_conv2D_5x5_forward_fp32)
+	{
+		Context context(Device::cpu());
+		const int batch_size = 12;
+		const int height = 13;
+		const int width = 17;
+		const int filter_in = 35;
+		const int filter_out = 21;
+
+		Tensor input( { batch_size, height, width, filter_in }, "float32", Device::cpu());
+		Tensor output( { batch_size, height, width, filter_out }, "float32", Device::cpu());
+		Tensor add(output.shape(), "float32", Device::cpu());
+		Tensor weights( { filter_out, 5, 5, filter_in }, "float32", Device::cpu());
+		Tensor bias( { filter_out }, "float32", Device::cpu());
+		testing::initForTest(weights, 0.0f);
+		testing::initForTest(input, 1.0f);
+		testing::initForTest(bias, 1.0f);
+		testing::initForTest(add, 2.0f);
+
+		Tensor correct_output(output.shape(), "float32", Device::cpu());
+		baseline_conv2D_forward(input, correct_output, weights, bias, add, ActivationType::RELU);
+
+//		convolutionImplicitGemmForward(context, input, weights, output, bias, add, ActivationType::SIGMOID);
+//		EXPECT_LE(testing::diffForTest(correct_output, output), 1.0e-4f);
+
+		if (Device::numberOfCudaDevices() > 0)
+		{
+			Context context(Device::cuda(0));
+			input.moveTo(context.device());
+			output.moveTo(context.device());
+			add.moveTo(context.device());
+			weights.moveTo(context.device());
+			bias.moveTo(context.device());
+
+			output.zeroall(context);
+
+			convolutionImplicitGemmForward(context, input, weights, output, bias, add, ActivationType::RELU);
+			context.synchronize();
+			EXPECT_LE(testing::diffForTest(correct_output, output), 1.0e-4f);
 		}
 	}
 

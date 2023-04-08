@@ -32,6 +32,13 @@ namespace ml
 		}
 		Context::~Context()
 		{
+#ifdef USE_CUDNN
+			if (m_cudnn_handle != nullptr)
+			{
+				cudnnStatus_t status = cudnnDestroy(m_cudnn_handle);
+				assert(status == CUDNN_STATUS_SUCCESS);
+			}
+#endif
 			if (m_cublas_handle != nullptr)
 			{
 				cublasStatus_t err = cublasDestroy_v2(m_cublas_handle);
@@ -42,6 +49,7 @@ namespace ml
 				cudaError_t status = cudaStreamDestroy(m_cuda_stream);
 				assert(status == cudaSuccess);
 			}
+
 		}
 		int Context::getDeviceIndex(mlContext_t context)
 		{
@@ -67,6 +75,15 @@ namespace ml
 				return 0;
 			else
 				return get(context)->m_workspace_size;
+		}
+		void Context::setWorkspaceSize(mlContext_t context, size_t bytes)
+		{
+			if (context != nullptr and bytes > get(context)->m_workspace_size)
+			{
+				cuda_free(get(context)->m_workspace);
+				get(context)->m_workspace = cuda_malloc(get(context)->m_device_index, bytes);
+				get(context)->m_workspace_size = bytes;
+			}
 		}
 
 		void Context::use(mlContext_t context)
@@ -109,6 +126,25 @@ namespace ml
 				return get(context)->m_cublas_handle;
 			}
 		}
+#ifdef USE_CUDNN
+		cudnnHandle_t Context::getCudnnHandle(mlContext_t context)
+		{
+			if (context == nullptr)
+				return nullptr;
+			else
+			{
+				use(context);
+				if (get(context)->m_cudnn_handle == nullptr)
+				{
+					cudnnStatus_t status = cudnnCreate(&(get(context)->m_cudnn_handle));
+					assert(status == CUDNN_STATUS_SUCCESS);
+					status = cudnnSetStream(get(context)->m_cudnn_handle, getStream(context));
+					assert(status == CUDNN_STATUS_SUCCESS);
+				}
+				return get(context)->m_cudnn_handle;
+			}
+		}
+#endif
 
 	} /* namespace cuda */
 } /* namespace ml */

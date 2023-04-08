@@ -12,6 +12,7 @@
 #include <minml/core/ml_exceptions.hpp>
 #include <minml/utils/json.hpp>
 #include <minml/utils/testing_util.hpp>
+#include <minml/utils/string_util.hpp>
 
 namespace
 {
@@ -156,7 +157,18 @@ namespace ml
 			case ConvolutionAlgorithm::DIRECT:
 				break;
 			case ConvolutionAlgorithm::IMPLICIT_GEMM:
+			{
+				if (device().isCUDA())
+				{
+					if (input.size() == 2)
+						convolutionImplicitGemmForward(context(), input[0], getWeights().getParam(), output, getBias().getParam(), input[1],
+								m_activation);
+					else
+						convolutionImplicitGemmForward(context(), input[0], getWeights().getParam(), output, getBias().getParam(), Tensor(),
+								m_activation);
+				}
 				break;
+			}
 			case ConvolutionAlgorithm::EXPLICIT_GEMM:
 			{
 				assert(m_kernel_size == 1);
@@ -265,10 +277,15 @@ namespace ml
 
 	void Conv2D::choose_algorithm()
 	{
-		if (m_kernel_size == 1)
-			m_algorithm = ConvolutionAlgorithm::EXPLICIT_GEMM;
+		if (not isTrainable() and startsWith(context().device().info(), "NVIDIA RTX"))
+			m_algorithm = ConvolutionAlgorithm::IMPLICIT_GEMM;
 		else
-			m_algorithm = ConvolutionAlgorithm::WINOGRAD_NON_FUSED;
+		{
+			if (m_kernel_size == 1)
+				m_algorithm = ConvolutionAlgorithm::EXPLICIT_GEMM;
+			else
+				m_algorithm = ConvolutionAlgorithm::WINOGRAD_NON_FUSED;
+		}
 	}
 
 } /* namespace ml */

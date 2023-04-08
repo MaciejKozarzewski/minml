@@ -6,6 +6,7 @@
  */
 
 #include <minml/backend/cuda_backend.h>
+#include <minml/backend/backend_utils.hpp>
 #include "utils.hpp"
 
 #include <cuda_runtime_api.h>
@@ -35,7 +36,7 @@ namespace
 
 		T v;
 		std::memcpy(&v, value, sizeof(T));
-		kernel_setall<<<gridDim, blockDim, 0, stream>>>(reinterpret_cast<T*>(dst), length, v);
+		kernel_setall<<<gridDim, blockDim, 0, stream>>>(ml::getPointer<T>(dst), length, v);
 		assert(cudaGetLastError() == cudaSuccess);
 
 		if (stream == 0)
@@ -101,10 +102,12 @@ namespace
 #endif
 	}
 
+#ifndef NDEBUG
 	bool is_aligned(const void *ptr, int bytes) noexcept
 	{
 		return (reinterpret_cast<std::uintptr_t>(ptr) % bytes) == 0;
 	}
+#endif
 }
 
 namespace ml
@@ -170,13 +173,13 @@ namespace ml
 		if (src == nullptr)
 			return nullptr;
 		else
-			return reinterpret_cast<uint8_t*>(src) + offset;
+			return getPointer<uint8_t>(src) + offset;
 	}
 
 	void cuda_memset(mlContext_t context, void *dst, int dst_offset, int dst_count, const void *src, int src_count)
 	{
 		assert(dst != nullptr);
-		void *tmp_dst = reinterpret_cast<uint8_t*>(dst) + dst_offset;
+		void *tmp_dst = getPointer<uint8_t>(dst) + dst_offset;
 		if (src == nullptr)
 		{
 			if (context == nullptr)
@@ -215,12 +218,12 @@ namespace ml
 		assert(src != nullptr);
 		if (context == nullptr)
 		{
-			cudaError_t status = cudaMemcpy(reinterpret_cast<uint8_t*>(dst) + dst_offset, src, count, cudaMemcpyDeviceToDevice);
+			cudaError_t status = cudaMemcpy(getPointer<uint8_t>(dst) + dst_offset, src, count, cudaMemcpyDeviceToDevice);
 			assert(status == cudaSuccess);
 		}
 		else
 		{
-			cudaError_t status = cudaMemcpyAsync(reinterpret_cast<uint8_t*>(dst) + dst_offset, src, count, cudaMemcpyDeviceToDevice,
+			cudaError_t status = cudaMemcpyAsync(getPointer<uint8_t>(dst) + dst_offset, src, count, cudaMemcpyDeviceToDevice,
 					cuda::Context::getStream(context));
 			assert(status == cudaSuccess);
 
@@ -232,12 +235,12 @@ namespace ml
 		assert(src != nullptr);
 		if (context == nullptr)
 		{
-			cudaError_t status = cudaMemcpy(reinterpret_cast<uint8_t*>(dst) + dst_offset, src, count, cudaMemcpyHostToDevice);
+			cudaError_t status = cudaMemcpy(getPointer<uint8_t>(dst) + dst_offset, src, count, cudaMemcpyHostToDevice);
 			assert(status == cudaSuccess);
 		}
 		else
 		{
-			cudaError_t status = cudaMemcpyAsync(reinterpret_cast<uint8_t*>(dst) + dst_offset, src, count, cudaMemcpyHostToDevice,
+			cudaError_t status = cudaMemcpyAsync(getPointer<uint8_t>(dst) + dst_offset, src, count, cudaMemcpyHostToDevice,
 					cuda::Context::getStream(context));
 			assert(status == cudaSuccess);
 
@@ -249,16 +252,17 @@ namespace ml
 		assert(src != nullptr);
 		if (context == nullptr)
 		{
-			cudaError_t status = cudaMemcpy(dst, reinterpret_cast<const uint8_t*>(src) + src_offset, count, cudaMemcpyDeviceToHost);
+			cudaError_t status = cudaMemcpy(dst, getPointer<const uint8_t>(src) + src_offset, count, cudaMemcpyDeviceToHost);
 			assert(status == cudaSuccess);
 		}
 		else
 		{
-			cudaError_t status = cudaMemcpyAsync(dst, reinterpret_cast<const uint8_t*>(src) + src_offset, count, cudaMemcpyDeviceToHost,
+			cudaError_t status = cudaMemcpyAsync(dst, getPointer<const uint8_t>(src) + src_offset, count, cudaMemcpyDeviceToHost,
 					cuda::Context::getStream(context));
 			assert(status == cudaSuccess);
 
 		}
 	}
+
 } /* namespace ml */
 

@@ -810,6 +810,7 @@ namespace
 
 namespace ml
 {
+#ifndef USE_CUDNN
 	void cuda_convolution_implicit_gemm_forward(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, mlShape_t weights_shape,
 			const void *input, const void *weights, void *output, const void *bias, const void *add, mlActivationType_t act)
 	{
@@ -835,5 +836,6 @@ namespace ml
 //				getPointer<float>(output), batch_size, height, width, input_filters, output_filters);
 		assert(cudaGetLastError() == cudaSuccess);
 	}
+#endif
 } /* namespace ml */
 

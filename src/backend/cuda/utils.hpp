@@ -12,6 +12,9 @@
 
 #include <cuda_runtime_api.h>
 #include <cublas_v2.h>
+#ifdef USE_CUDNN
+#  include "cudnn_ops_infer.h"
+#endif
 
 #include <memory>
 #include <algorithm>
@@ -29,6 +32,9 @@ namespace ml
 				size_t m_workspace_size = default_workspace_size;
 				cudaStream_t m_cuda_stream = nullptr;
 				cublasHandle_t m_cublas_handle = nullptr;
+#ifdef USE_CUDNN
+				cudnnHandle_t m_cudnn_handle = nullptr;
+#endif
 				int m_device_index = 0;
 			public:
 				Context(int device_index);
@@ -41,9 +47,13 @@ namespace ml
 					return reinterpret_cast<T*>(getWorkspace(context));
 				}
 				static size_t getWorkspaceSize(mlContext_t context);
+				static void setWorkspaceSize(mlContext_t context, size_t bytes);
 				static void use(mlContext_t context);
 				static cudaStream_t getStream(mlContext_t context);
 				static cublasHandle_t getHandle(mlContext_t context);
+#ifdef USE_CUDNN
+				static cudnnHandle_t getCudnnHandle(mlContext_t context);
+#endif
 		};
 
 		template<unsigned int maxBlocks>
