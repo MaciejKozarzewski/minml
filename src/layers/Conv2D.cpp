@@ -277,14 +277,35 @@ namespace ml
 
 	void Conv2D::choose_algorithm()
 	{
-		if (not isTrainable() and startsWith(context().device().info(), "NVIDIA RTX"))
-			m_algorithm = ConvolutionAlgorithm::IMPLICIT_GEMM;
-		else
+		switch (m_kernel_size)
 		{
-			if (m_kernel_size == 1)
+			case 1:
+			{
+#ifdef USE_CUDNN
+				if (not isTrainable() and startsWith(context().device().info(), "NVIDIA RTX") and dtype() == DataType::FLOAT16)
+					m_algorithm = ConvolutionAlgorithm::IMPLICIT_GEMM;
+				else
+					m_algorithm = ConvolutionAlgorithm::EXPLICIT_GEMM;
+#else
 				m_algorithm = ConvolutionAlgorithm::EXPLICIT_GEMM;
-			else
+#endif
+				break;
+			}
+			case 3:
+			case 5:
+			{
+#ifdef USE_CUDNN
+				if (not isTrainable() and startsWith(context().device().info(), "NVIDIA RTX"))
+					m_algorithm = ConvolutionAlgorithm::IMPLICIT_GEMM;
+				else
+					m_algorithm = ConvolutionAlgorithm::WINOGRAD_NON_FUSED;
+#else
 				m_algorithm = ConvolutionAlgorithm::WINOGRAD_NON_FUSED;
+#endif
+				break;
+			}
+			default:
+				break;
 		}
 	}
 

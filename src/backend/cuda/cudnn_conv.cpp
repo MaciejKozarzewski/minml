@@ -200,7 +200,8 @@ namespace ml
 		const TensorDescriptor yDesc(output_shape, dtype);
 
 		assert(weights_shape.dim[1] == weights_shape.dim[2]); // square kernel
-		const ConvolutionDescriptor convDesc(cuda::Context::getCudnnHandle(context), xDesc, wDesc, yDesc, dtype, weights_shape.dim[1]);
+		const mlDataType_t compute_type = cuda::has_fp16_math(context) ? DTYPE_FLOAT16 : DTYPE_FLOAT32;
+		const ConvolutionDescriptor convDesc(cuda::Context::getCudnnHandle(context), xDesc, wDesc, yDesc, compute_type, weights_shape.dim[1]);
 
 		cuda::Context::setWorkspaceSize(context, convDesc.getWorkspaceSize());
 		cudnnHandle_t handle = cuda::Context::getCudnnHandle(context);
@@ -218,7 +219,7 @@ namespace ml
 					workspace, workspace_size, &beta, yDesc, output);
 			assert(status == CUDNN_STATUS_SUCCESS);
 
-			ml::cuda_activation_forward(context, dtype, output_shape, output, input, act);
+			ml::cuda_activation_forward(context, dtype, output_shape, output, output, act);
 		}
 		else
 		{
