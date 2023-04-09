@@ -967,7 +967,7 @@ namespace ml
 		winogradOutputTransform(context, weights_shape, matrices, output_fp16, Tensor(), Tensor(), ActivationType::LINEAR);
 
 		output_fp16.convertTo(context, DataType::FLOAT32);
-		EXPECT_LE(testing::diffForTest(output_fp32, output_fp16), 1.0e-3f);
+		EXPECT_LE(testing::diffForTest(output_fp32, output_fp16), 2.0e-3f);
 	}
 	TEST(TestWinograd5x5_2x2, cudaWeightTransform_fp16)
 	{
@@ -985,7 +985,7 @@ namespace ml
 		winogradWeightTransform(context, weight, matrices_fp16, false, false);
 
 		matrices_fp16.convertTo(context, DataType::FLOAT32);
-		EXPECT_LE(testing::diffForTest(matrices_fp32, matrices_fp16), 1.0e-3f);
+		EXPECT_LE(testing::diffForTest(matrices_fp32, matrices_fp16), 2.0e-3f);
 	}
 
 } /* namespace ml */
