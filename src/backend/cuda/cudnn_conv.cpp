@@ -151,6 +151,8 @@ namespace
 			{
 				cudnnStatus_t status = cudnnCreateConvolutionDescriptor(&m_desc);
 				assert(status == CUDNN_STATUS_SUCCESS);
+				status = cudnnSetConvolutionMathType(m_desc, CUDNN_TENSOR_OP_MATH);
+				assert(status == CUDNN_STATUS_SUCCESS);
 				const int padding = kernel_size / 2;
 				status = cudnnSetConvolution2dDescriptor(m_desc, padding, padding, 1, 1, 1, 1, CUDNN_CROSS_CORRELATION, convert(dtype));
 				assert(status == CUDNN_STATUS_SUCCESS);
