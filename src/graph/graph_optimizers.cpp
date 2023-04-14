@@ -84,16 +84,16 @@ namespace ml
 		static Add add_layer;
 		bool has_anything_changed = false;
 		for (int i = 0; i < graph.numberOfNodes(); i++)
-			if (graph.getNode(i).getLayer().name() == add_layer.name() && graph.getNode(i).numberOfInputs() == 2)
+			if (graph.getNode(i).getLayer().name() == add_layer.name() and graph.getNode(i).numberOfInputs() == 2)
 			{
 				GraphNode *next = &(graph.getNode(i));
 				GraphNodeID input_index = -1;
-				if (next->getInputNode(0)->getLayer().name() == conv2d.name() || next->getInputNode(0)->getLayer().name() == dense.name())
+				if (next->getInputNode(0)->getLayer().name() == conv2d.name() or next->getInputNode(0)->getLayer().name() == dense.name())
 					input_index = std::max(input_index, graph.getNodeID(next->getInputNode(0)));
-				if (next->getInputNode(1)->getLayer().name() == conv2d.name() || next->getInputNode(1)->getLayer().name() == dense.name())
+				if (next->getInputNode(1)->getLayer().name() == conv2d.name() or next->getInputNode(1)->getLayer().name() == dense.name())
 					input_index = std::max(input_index, graph.getNodeID(next->getInputNode(1)));
 
-				if (input_index != -1 && !next->isOutputNode())
+				if (input_index != -1 and not next->isOutputNode())
 				{
 					GraphNode *prev = &(graph.getNode(input_index));
 					if (can_merge_activations(prev, next))
