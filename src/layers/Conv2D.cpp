@@ -278,12 +278,11 @@ namespace ml
 	void Conv2D::choose_algorithm()
 	{
 #ifdef USE_CUDNN
-		const bool can_use_cudnn = startsWith(context().device().info(), "NVIDIA GeForce RTX") and dtype() == DataType::FLOAT16
-				and m_activation == ActivationType::RELU and not isTrainable();
+		const bool can_use_cudnn = startsWith(context().device().info(), "NVIDIA GeForce RTX") and dtype() == DataType::FLOAT16 and not isTrainable()
+				and m_activation == ActivationType::RELU;
 #else
 		const bool can_use_cudnn = false;
 #endif
-
 		if (can_use_cudnn)
 			m_algorithm = ConvolutionAlgorithm::IMPLICIT_GEMM;
 		else
