@@ -19,27 +19,32 @@ namespace SIMD_NAMESPACE
 		private:
 			Vector<T> data[Length];
 		public:
-			inline void load_row(T **ptr, const int row, const int offset, const int num, int columns) noexcept
+			template<typename U>
+			inline void load_row(U **ptr, const int row, const int offset, const int num, int columns) noexcept
 			{
 				for (int i = 0; i < Length; i++)
 					data[i].load(ptr[row * columns + i] + offset, num);
 			}
-			inline void load_row(const T **ptr, const int row, const int offset, const int num, int columns) noexcept
+			template<typename U>
+			inline void load_row(const U **ptr, const int row, const int offset, const int num, int columns) noexcept
 			{
 				for (int i = 0; i < Length; i++)
 					data[i].load(ptr[row * columns + i] + offset, num);
 			}
-			inline void store_row(T **ptr, const int row, const int offset, const int num, int columns) const noexcept
+			template<typename U>
+			inline void store_row(U **ptr, const int row, const int offset, const int num, int columns) const noexcept
 			{
 				for (int i = 0; i < Length; i++)
 					data[i].store(ptr[row * columns + i] + offset, num);
 			}
-			inline void load_column(const T **ptr, const int col, const int offset, const int num, int columns) noexcept
+			template<typename U>
+			inline void load_column(const U **ptr, const int col, const int offset, const int num, int columns) noexcept
 			{
 				for (int i = 0; i < Length; i++)
 					data[i].load(ptr[i * columns + col] + offset, num);
 			}
-			inline void store_column(T **ptr, const int col, const int offset, const int num, int columns) const noexcept
+			template<typename U>
+			inline void store_column(U **ptr, const int col, const int offset, const int num, int columns) const noexcept
 			{
 				for (int i = 0; i < Length; i++)
 					data[i].store(ptr[i * columns + col] + offset, num);

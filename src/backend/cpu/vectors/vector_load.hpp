@@ -28,7 +28,7 @@ namespace SIMD_NAMESPACE
 			}
 	};
 
-#if SUPPORTS_SSE2
+#if COMPILED_WITH_SSE2
 	template<>
 	struct Loader<XMM>
 	{
@@ -182,7 +182,7 @@ namespace SIMD_NAMESPACE
 	};
 #endif
 
-#if SUPPORTS_AVX
+#if COMPILED_WITH_AVX
 	template<>
 	struct Loader<YMM>
 	{

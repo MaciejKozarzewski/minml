@@ -19,23 +19,19 @@
 #include "vector_store.hpp"
 #include "type_conversions.hpp"
 
-
 namespace SIMD_NAMESPACE
 {
-#if SUPPORTS_AVX
-	namespace internal
-	{
-		static inline __m256 broadcast(float x) noexcept
-		{
-			return _mm256_broadcast_ss(&x);
-		}
-	}
+#if COMPILED_WITH_AVX
 
 	template<>
 	class Vector<float, YMM>
 	{
 		private:
 			__m256 m_data;
+			static inline __m256 broadcast(float x) noexcept
+			{
+				return _mm256_broadcast_ss(&x);
+			}
 		public:
 			Vector() noexcept // @suppress("Class members should be properly initialized")
 			{
@@ -46,27 +42,27 @@ namespace SIMD_NAMESPACE
 				load(src, num);
 			}
 			Vector(double x) noexcept :
-					m_data(internal::broadcast(static_cast<float>(x)))
+					m_data(broadcast(static_cast<float>(x)))
 			{
 			}
 			Vector(float x) noexcept :
-					m_data(internal::broadcast(x))
+					m_data(broadcast(x))
 			{
 			}
 			Vector(float16 x) noexcept :
-					m_data(internal::broadcast(Converter<SCALAR, float16, float>()(x)))
+					m_data(broadcast(Converter<SCALAR, float16, float>()(x)))
 			{
 			}
 			Vector(sw_float16 x) noexcept :
-					m_data(internal::broadcast(Converter<SCALAR, sw_float16, float>()(x)))
+					m_data(broadcast(Converter<SCALAR, sw_float16, float>()(x)))
 			{
 			}
 			Vector(bfloat16 x) noexcept :
-					m_data(internal::broadcast(Converter<SCALAR, bfloat16, float>()(x)))
+					m_data(broadcast(Converter<SCALAR, bfloat16, float>()(x)))
 			{
 			}
 			Vector(sw_bfloat16 x) noexcept :
-					m_data(internal::broadcast(Converter<SCALAR, sw_bfloat16, float>()(x)))
+					m_data(broadcast(Converter<SCALAR, sw_bfloat16, float>()(x)))
 			{
 			}
 			Vector(__m256i raw_bytes) noexcept :
@@ -165,7 +161,7 @@ namespace SIMD_NAMESPACE
 			{
 				assert(0 <= index && index < size());
 				const float x = Converter<SCALAR, T, float>()(value);
-				const __m256 tmp = internal::broadcast(x);
+				const __m256 tmp = broadcast(x);
 				switch (index)
 				{
 					case 0:
@@ -314,11 +310,11 @@ namespace SIMD_NAMESPACE
 	}
 	static inline Vector<float, YMM> operator~(Vector<float, YMM> x) noexcept
 	{
-#if SUPPORTS_AVX2
+#if COMPILED_WITH_AVX2
 		const __m256i y = _mm256_castps_si256(x);
 		const __m256i tmp = _mm256_cmpeq_epi32(y, y);
 #else
-		const __m256i tmp = ymm_constant<0xFFFFFFFFu>()
+		const __m256i tmp = ymm_constant<0xFFFFFFFFu>();
 #endif
 		return _mm256_xor_ps(x, _mm256_castsi256_ps(tmp));
 	}
@@ -422,7 +418,7 @@ namespace SIMD_NAMESPACE
 	/* Calculates a * b + c */
 	static inline Vector<float, YMM> mul_add(Vector<float, YMM> a, Vector<float, YMM> b, Vector<float, YMM> c) noexcept
 	{
-#if SUPPORTS_FMA
+#if COMPILED_WITH_FMA
 		return _mm256_fmadd_ps(a, b, c);
 #else
 		return a * b + c;
@@ -431,7 +427,7 @@ namespace SIMD_NAMESPACE
 	/* Calculates a * b - c */
 	static inline Vector<float, YMM> mul_sub(Vector<float, YMM> a, Vector<float, YMM> b, Vector<float, YMM> c) noexcept
 	{
-#if SUPPORTS_FMA
+#if COMPILED_WITH_FMA
 		return _mm256_fmsub_ps(a, b, c);
 #else
 		return a * b - c;
@@ -440,7 +436,7 @@ namespace SIMD_NAMESPACE
 	/* Calculates - a * b + c */
 	static inline Vector<float, YMM> neg_mul_add(Vector<float, YMM> a, Vector<float, YMM> b, Vector<float, YMM> c) noexcept
 	{
-#if SUPPORTS_FMA
+#if COMPILED_WITH_FMA
 		return _mm256_fnmadd_ps(a, b, c);
 #else
 		return -a * b + c;
@@ -449,7 +445,7 @@ namespace SIMD_NAMESPACE
 	/* Calculates - a * b - c */
 	static inline Vector<float, YMM> neg_mul_sub(Vector<float, YMM> a, Vector<float, YMM> b, Vector<float, YMM> c) noexcept
 	{
-#if SUPPORTS_FMA
+#if COMPILED_WITH_FMA
 		return _mm256_fnmsub_ps(a, b, c);
 #else
 		return -a * b - c;

@@ -22,14 +22,14 @@ namespace SIMD_NAMESPACE
 			template<typename T>
 			void operator()(T *dst, T value, int num) const noexcept
 			{
-				assert(src != nullptr);
+				assert(dst != nullptr);
 				assert(0 <= num && num <= 1);
 				if (num == 1)
 					dst[0] = value;
 			}
 	};
 
-#if SUPPORTS_SSE2
+#if COMPILED_WITH_SSE2
 	template<>
 	struct Storer<XMM>
 	{
@@ -75,7 +75,7 @@ namespace SIMD_NAMESPACE
 			}
 			void operator()(int64_t *dst, __m128i value, const int num) const noexcept
 			{
-				assert(src != nullptr);
+				assert(dst != nullptr);
 				assert(0 <= num && num <= 2);
 				switch (num)
 				{
@@ -96,7 +96,7 @@ namespace SIMD_NAMESPACE
 			}
 			void operator()(int32_t *dst, __m128i value, const int num) const noexcept
 			{
-				assert(src != nullptr);
+				assert(dst != nullptr);
 				assert(0 <= num && num <= 4);
 				switch (num)
 				{
@@ -127,7 +127,7 @@ namespace SIMD_NAMESPACE
 			}
 			void operator()(int16_t *dst, __m128i value, const int num) const noexcept
 			{
-				assert(src != nullptr);
+				assert(dst != nullptr);
 				assert(0 <= num && num <= 8);
 				switch (num)
 				{
@@ -215,7 +215,7 @@ namespace SIMD_NAMESPACE
 	};
 #endif
 
-#if SUPPORTS_AVX
+#if COMPILED_WITH_AVX
 	template<>
 	struct Storer<YMM>
 	{

@@ -1050,6 +1050,49 @@ namespace gemm
 	};
 }
 
+#include "../src/backend/cpu/utils.hpp"
+
+template<typename T>
+std::string print_type()
+{
+	if (std::is_same<T, sw_bfloat16>::value)
+		return "sw_bf16";
+	if (std::is_same<T, bfloat16>::value)
+		return "bf16";
+	if (std::is_same<T, sw_float16>::value)
+		return "sw_fp16";
+	if (std::is_same<T, float16>::value)
+		return "fp16";
+	if (std::is_same<T, float>::value)
+		return "fp32";
+	if (std::is_same<T, int>::value)
+		return "int32";
+	return "none";
+}
+
+template<typename DT, typename CT>
+void some_kernel(const void *input, void *output, int size)
+{
+	std::cout << "data = " << print_type<DT>() << ", compute = " << print_type<CT>() << '\n';
+}
+
+#define CONCAT_IMPL(a, b) a##b
+#define CONCAT(a, b) CONCAT_IMPL(a, b)
+
+//#define CREATE_KERNEL_TABLE(name) static auto name##_table = createFunctionTable(name<float, float>);	\
+//		name##_table.get(ml::cpu::Type::SW_BF16, ml::cpu::Type::FP32) = name<sw_bfloat16, float>;		\
+//		name##_table.get(ml::cpu::Type::BF16, ml::cpu::Type::FP32) = name<bfloat16, float>;				\
+//		name##_table.get(ml::cpu::Type::BF16, ml::cpu::Type::BF16) = name<bfloat16, bfloat16>;			\
+//		name##_table.get(ml::cpu::Type::SW_FP16, ml::cpu::Type::FP32) = name<sw_float16, float>;		\
+//		name##_table.get(ml::cpu::Type::FP16, ml::cpu::Type::FP32) = name<float16, float>;				\
+//		name##_table.get(ml::cpu::Type::FP16, ml::cpu::Type::FP16) = name<float16, float16>;			\
+//		name##_table.get(ml::cpu::Type::FP32, ml::cpu::Type::FP32) = name<float, float>
+//
+//#define REGISTER_KERNEL(name, dtype, ctype) name##_table.get(get_type<dtype>(), get_type<ctype>()) = name<dtype, ctype>
+//#define DISABLE_KERNEL(name, dtype, ctype) name##_table.get(get_type<dtype>(), get_type<ctype>()) = nullptr
+//
+//#define CALL_KERNEL(name, cfg) name##_table.get(cfg.data_type, cfg.compute_type)
+
 #include "../src/backend/cpu/cpu_x86.hpp"
 #include "../src/backend/cpu/vectors/vectors.hpp"
 
@@ -1061,20 +1104,62 @@ int main()
 	prop.print();
 
 	{
-		float dst[16];
-		std::memset(dst, 0, 16 * sizeof(float));
+		Device::setNumberOfThreads(1);
+		const int batch_size = 16;
+		const int filters = 64;
 
-		float src[16];
-		for (int i = 0; i < 16; i++)
-			src[i] = 1 + i;
+		Graph graph;
+		auto x = graph.addInput( { batch_size, 15, 15, filters });
+		for (int i = 0; i < 10; i++)
+			x = graph.add(Conv2D(filters, 3, "linear"), x);
+		graph.addOutput(x);
 
-		Vector<float, AUTO> vector(src);
+		graph.convertTo(DataType::FLOAT16);
+		graph.moveTo(Device::cpu());
+		graph.forward(batch_size);
 
-		vector = _mm256_unpacklo_ps(vector, vector);
-		vector.store(dst);
-		std::cout << vector.size() << '\n';
-		for (int i = 0; i < 16; i++)
-			std::cout << i << " : " << src[i] << " vs " << dst[i] << '\n';
+		std::cout << "starting benchmark\n";
+		const double start = getTime();
+		int repeats = 0;
+		for (; repeats < 10000; repeats++)
+		{
+			graph.forward(batch_size);
+			if ((getTime() - start) > 10.0)
+				break;
+		}
+		const double stop = getTime();
+		const double time = stop - start;
+
+		std::cout << "time = " << time << "s, repeats = " << repeats << '\n';
+		std::cout << "time per convolution = " << 1.0e3 * time / (10 * repeats * batch_size) << "ms\n";
+
+//		ml::cpu::ComputeConfig cfg(ml::cpu::Type::BF16, ml::cpu::Type::FP16);
+//		CREATE_KERNEL_TABLE(some_kernel);
+
+//		REGISTER_KERNEL(some_kernel, float, float);
+//		REGISTER_KERNEL(some_kernel, float16, float);
+//		REGISTER_KERNEL(some_kernel, sw_float16, float);
+
+//		CALL_KERNEL(some_kernel, cfg)(nullptr, nullptr, 0);
+
+//		ADD_FUNCTION(tmp, some_kernel, float, float);
+
+//		tmp.call(cfg, nullptr, nullptr, 0);
+
+//		float dst[16];
+//		std::memset(dst, 0, 16 * sizeof(float));
+//
+//		float src[16];
+//		for (int i = 0; i < 16; i++)
+//			src[i] = 1 + i;
+//
+//		Vector<float, AUTO> vector(src);
+//
+//		vector = _mm256_unpacklo_ps(vector, vector);
+//		vector.store(dst);
+//		std::cout << vector.size() << '\n';
+//		for (int i = 0; i < 16; i++)
+//			std::cout << i << " : " << src[i] << " vs " << dst[i] << '\n';
 
 	}
 	std::cout << "END" << std::endl;

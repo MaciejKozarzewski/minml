@@ -79,7 +79,7 @@ namespace internal
 
 namespace SIMD_NAMESPACE
 {
-#if SUPPORTS_AVX
+#if COMPILED_WITH_AVX
 	static inline __m256d get_cutoff_mask_pd(int num) noexcept
 	{
 		assert(0 <= num && num <= 4);
@@ -95,7 +95,7 @@ namespace SIMD_NAMESPACE
 		assert(0 <= num && num <= 32);
 		return _mm256_load_si256(reinterpret_cast<const __m256i*>(internal::int8_masks[num]));
 	}
-#elif SUPPORTS_SSE
+#elif COMPILED_WITH_SSE2
 	static inline __m128d get_cutoff_mask_pd(int num) noexcept
 	{
 		assert(0 <= num && num <= 2);

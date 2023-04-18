@@ -19,7 +19,7 @@ namespace SIMD_NAMESPACE
 		return i;
 	}
 
-#if SUPPORTS_SSE2
+#if COMPILED_WITH_SSE2
 	template<uint32_t i0, uint32_t i1, uint32_t i2, uint32_t i3>
 	inline __m128i xmm_constant() noexcept
 	{
@@ -37,7 +37,7 @@ namespace SIMD_NAMESPACE
 	}
 #endif
 
-#if SUPPORTS_AVX
+#if COMPILED_WITH_AVX
 	template<uint32_t i0, uint32_t i1, uint32_t i2, uint32_t i3, uint32_t i4, uint32_t i5, uint32_t i6, uint32_t i7>
 	inline __m256i ymm_constant() noexcept
 	{

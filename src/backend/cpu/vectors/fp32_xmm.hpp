@@ -22,11 +22,10 @@
 
 namespace SIMD_NAMESPACE
 {
-#if SUPPORTS_SSE2
+#if COMPILED_WITH_SSE2
 	template<>
 	class Vector<float, XMM>
 	{
-
 		private:
 			__m128 m_data;
 		public:
@@ -140,8 +139,8 @@ namespace SIMD_NAMESPACE
 			template<typename T>
 			void insert(T value, int index) noexcept
 			{
-				assert(index >= 0 && index < length);
-				float tmp[4];
+				assert(0 <= index && index < size());
+				float tmp[size()];
 				store(tmp);
 				tmp[index] = Converter<SCALAR, T, float>()(value);
 				load(tmp);
@@ -159,7 +158,7 @@ namespace SIMD_NAMESPACE
 			}
 			void cutoff(const int num, Vector<float, XMM> value = zero()) noexcept
 			{
-#if SUPPORTS_SSE41
+#if COMPILED_WITH_SSE41
 				switch (num)
 				{
 					case 0:
@@ -177,7 +176,7 @@ namespace SIMD_NAMESPACE
 				}
 #else
 				const __m128 mask = get_cutoff_mask_ps(num);
-				return _mm_or_ps(_mm_and_ps(mask, m_data), _mm_andnot_ps(mask, value));
+				m_data = _mm_or_ps(_mm_and_ps(mask, m_data), _mm_andnot_ps(mask, value));
 #endif
 			}
 
@@ -353,7 +352,7 @@ namespace SIMD_NAMESPACE
 	}
 	static inline Vector<float, XMM> floor(Vector<float, XMM> x) noexcept
 	{
-#if SUPPORTS_SSE41
+#if COMPILED_WITH_SSE41
 		return _mm_floor_ps(x);
 #else
 		float tmp[4];
@@ -365,7 +364,7 @@ namespace SIMD_NAMESPACE
 	}
 	static inline Vector<float, XMM> ceil(Vector<float, XMM> x) noexcept
 	{
-#if SUPPORTS_SSE41
+#if COMPILED_WITH_SSE41
 		return _mm_ceil_ps(x);
 #else
 		float tmp[4];

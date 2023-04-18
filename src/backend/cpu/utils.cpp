@@ -6,8 +6,11 @@
  */
 
 #include "utils.hpp"
+#include "cpu_x86.hpp"
 
 #include <memory>
+#include <stdexcept>
+#include <functional>
 #include <cassert>
 
 namespace
@@ -25,6 +28,28 @@ namespace ml
 		Context::Context() :
 				m_simd_level(getSimdSupport())
 		{
+		}
+
+		bool has_hardware_fp16_conversion()
+		{
+			static const bool result = cpu_x86::get().supports("f16c") or cpu_x86::get().supports("avx512-f");
+			return result;
+		}
+		bool has_hardware_bf16_conversion()
+		{
+			static const bool result = cpu_x86::get().supports("avx512-f") and cpu_x86::get().supports("avx512-bf16");
+			return result;
+		}
+
+		bool has_hardware_fp16_math()
+		{
+			static const bool result = cpu_x86::get().supports("avx512-fp16");
+			return result;
+		}
+		bool has_hardware_bf16_math()
+		{
+			static const bool result = cpu_x86::get().supports("avx512-f") and cpu_x86::get().supports("avx512-bf16");
+			return result;
 		}
 
 		SimdLevel Context::getSimdLevel(mlContext_t context)
@@ -69,6 +94,7 @@ namespace ml
 			m_offset += shift + size;
 			return result;
 		}
+
 	} /* namespace cpu */
 } /* namespace ml */
 

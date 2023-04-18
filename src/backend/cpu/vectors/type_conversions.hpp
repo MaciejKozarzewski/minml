@@ -36,7 +36,7 @@ namespace SIMD_NAMESPACE
 	{
 			float16 operator()(float x) const noexcept
 			{
-#if SUPPORTS_FP16
+#if COMPILED_WITH_F16C
 				return float16 { _cvtss_sh(x, (_MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC)) };
 #else
 				return float16 { 0u };
@@ -48,7 +48,7 @@ namespace SIMD_NAMESPACE
 	{
 			float operator()(float16 x) const noexcept
 			{
-#if SUPPORTS_FP16
+#if COMPILED_WITH_F16C
 				return _cvtsh_ss(x.m_data);
 #else
 				return 0.0f;
@@ -110,7 +110,7 @@ namespace SIMD_NAMESPACE
 	/*
 	 * SSE 128-bit code
 	 */
-#if SUPPORTS_SSE2
+#if COMPILED_WITH_SSE2
 	template<typename T>
 	struct Converter<XMM, T, T>
 	{
@@ -125,7 +125,7 @@ namespace SIMD_NAMESPACE
 	{
 			__m128i operator()(__m128 x) const noexcept
 			{
-#  if SUPPORTS_F16C
+#  if COMPILED_WITH_F16C
 				return _mm_cvtps_ph(x, _MM_FROUND_NO_EXC);
 #  else
 				return _mm_setzero_si128();
@@ -137,7 +137,7 @@ namespace SIMD_NAMESPACE
 	{
 			__m128 operator()(__m128i x) const noexcept
 			{
-#  if SUPPORTS_F16C
+#  if COMPILED_WITH_F16C
 				return _mm_cvtph_ps(x);
 #  else
 				return _mm_setzero_ps();
@@ -182,7 +182,7 @@ namespace SIMD_NAMESPACE
 	{
 			__m128i operator()(__m128 x) const noexcept
 			{
-#  if SUPPORTS_SSE41
+#  if COMPILED_WITH_SSE41
 				__m128i tmp = _mm_srli_epi32(_mm_castps_si128(x), 16); // shift right by 16 bits while shifting in zeros
 				return _mm_packus_epi32(tmp, _mm_setzero_si128()); // pack 32 bits into 16 bits
 #  else
@@ -199,7 +199,7 @@ namespace SIMD_NAMESPACE
 	{
 			__m128 operator()(__m128i x) const noexcept
 			{
-#  if SUPPORTS_SSE41
+#  if COMPILED_WITH_SSE41
 				__m128i tmp = _mm_cvtepu16_epi32(x); // extend 16 bits with zeros to 32 bits
 				tmp = _mm_slli_epi32(tmp, 16); // shift left by 16 bits while shifting in zeros
 #  else
@@ -213,7 +213,7 @@ namespace SIMD_NAMESPACE
 	/*
 	 * AVX 256-bit code
 	 */
-#if SUPPORTS_AVX
+#if COMPILED_WITH_AVX
 	template<typename T>
 	struct Converter<YMM, T, T>
 	{
@@ -228,7 +228,7 @@ namespace SIMD_NAMESPACE
 	{
 			__m128i operator()(__m256 x) const noexcept
 			{
-#  if SUPPORTS_F16C
+#  if COMPILED_WITH_F16C
 				return _mm256_cvtps_ph(x, _MM_FROUND_NO_EXC);
 #  else
 				return _mm_setzero_si128();
@@ -240,7 +240,7 @@ namespace SIMD_NAMESPACE
 	{
 			__m256 operator()(__m128i x) const noexcept
 			{
-#  if SUPPORTS_F16C
+#  if COMPILED_WITH_F16C
 				return _mm256_cvtph_ps(x);
 #  else
 				return _mm256_setzero_ps();
@@ -285,7 +285,7 @@ namespace SIMD_NAMESPACE
 	{
 			__m128i operator()(__m256 x) const noexcept
 			{
-#  if SUPPORTS_AVX2
+#  if COMPILED_WITH_AVX2
 				__m256i tmp = _mm256_srli_epi32(_mm256_castps_si256(x), 16); // shift right by 16 bits while shifting in zeros
 				return _mm_packus_epi32(get_low(tmp), get_high(tmp)); // pack 32 bits into 16 bits
 #  else
@@ -300,7 +300,7 @@ namespace SIMD_NAMESPACE
 	{
 			__m256 operator()(__m128i x) const noexcept
 			{
-#  if SUPPORTS_AVX2
+#  if COMPILED_WITH_AVX2
 				__m256i tmp = _mm256_cvtepu16_epi32(x); // extend 16 bits with zeros to 32 bits
 				tmp = _mm256_slli_epi32(tmp, 16); // shift left by 16 bits while shifting in zeros
 #  else

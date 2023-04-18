@@ -30,7 +30,7 @@ T bitwise_cast(U x) noexcept
 
 namespace SIMD_NAMESPACE
 {
-#if SUPPORTS_AVX
+#if COMPILED_WITH_AVX
 	static inline __m128d get_low(__m256d reg) noexcept
 	{
 		return _mm256_castpd256_pd128(reg);
@@ -71,7 +71,7 @@ namespace SIMD_NAMESPACE
 	}
 #endif
 
-#if SUPPORTS_AVX
+#if COMPILED_WITH_AVX
 	static inline __m256d cutoff_pd(__m256d data, int num, __m256d value) noexcept
 	{
 		assert(num > 0);
@@ -116,7 +116,7 @@ namespace SIMD_NAMESPACE
 				return data;
 		}
 	}
-#elif SUPPORTS_SSE41
+#elif COMPILED_WITH_SSE41
 	static inline __m128 cutoff_ps(__m128 data, int num, __m128 value) noexcept
 	{
 		assert(num > 0);
@@ -148,7 +148,7 @@ namespace SIMD_NAMESPACE
 				return data;
 		}
 	}
-#elif SUPPORTS_SSE
+#elif COMPILED_WITH_SSE
 	static inline __m128 cutoff_ps(__m128 data, int num, __m128 value) noexcept
 	{
 		const __m128 mask = get_cutoff_mask_ps(num);

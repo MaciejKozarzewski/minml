@@ -58,6 +58,12 @@ namespace ml
 
 		typedef void *mlContext_t;
 
+		typedef struct
+		{
+				mlDataType_t data_type;
+				mlDataType_t compute_type;
+		} mlComputeConfig_t;
+
 #ifdef __cplusplus
 	}
 #endif
