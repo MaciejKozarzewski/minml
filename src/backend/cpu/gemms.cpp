@@ -47,8 +47,10 @@ namespace
 		{
 			case DTYPE_FLOAT32:
 			{
+#ifdef USE_OPENBLAS
 				cblas_sgemm(CBLAS_ORDER::CblasRowMajor, op_A, op_B, M, N, K, alpha, getPointer<float>(A), LDA, getPointer<float>(B), LDB, beta,
 						getPointer<float>(C), LDC);
+#endif
 				break;
 			}
 			default:
@@ -84,7 +86,9 @@ namespace
 					const float *A_ptr = getPointer<float>(A) + i * strideA;
 					const float *B_ptr = getPointer<float>(B) + i * strideB;
 					float *C_ptr = getPointer<float>(C) + i * strideC;
+#ifdef USE_OPENBLAS
 					cblas_sgemm(CBLAS_ORDER::CblasRowMajor, op_A, op_B, M, N, K, alpha, A_ptr, LDA, B_ptr, LDB, beta, C_ptr, LDC);
+#endif
 				}
 				break;
 			}

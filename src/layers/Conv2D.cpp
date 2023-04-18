@@ -14,6 +14,8 @@
 #include <minml/utils/testing_util.hpp>
 #include <minml/utils/string_util.hpp>
 
+#include <minml/utils/time_util.hpp>
+
 namespace
 {
 	using namespace ml;
@@ -193,23 +195,72 @@ namespace ml
 			}
 			case ConvolutionAlgorithm::WINOGRAD_NON_FUSED:
 			{
+				struct Timer
+				{
+						std::string m_name;
+						double m_start = 0.0;
+						double m_total_time = 0.0;
+						int m_count = 0;
+						bool m_init = false;
+
+						Timer(const std::string &name) :
+								m_name(name)
+						{
+						}
+						~Timer()
+						{
+							std::cout << m_name << " : " << 1.0e3 * m_total_time / m_count << " ms\n";
+						}
+						void start() noexcept
+						{
+							m_start = getTime();
+						}
+						void stop() noexcept
+						{
+							if (m_init)
+							{
+								m_total_time += getTime() - m_start;
+								m_count++;
+							}
+							else
+								m_init = true;
+						}
+
+				};
+				static Timer output_transform("output transform");
+				static Timer matrix_multiply("gemm            ");
+				static Timer input_transform("input transform ");
+				static Timer weight_transform("weight transform");
+
 				if (m_transformed_weights == nullptr)
 					m_transformed_weights = std::make_unique<Tensor>(get_weight_matrices_shape(getWeightShape()), dtype(), device());
 				if (m_are_weights_transformed == false)
 				{
 					m_are_weights_transformed = true;
+
+					weight_transform.start();
 					winogradWeightTransform(context(), getWeights().getParam(), *m_transformed_weights, false, emulate_low_precision);
+					weight_transform.stop();
 				}
+
 				Tensor input_matrices = m_workspace.lock()->view(get_matrices_shape(m_kernel_size, input[0].shape()));
 				Tensor output_matrices = m_workspace.lock()->view(get_matrices_shape(m_kernel_size, output.shape()), input_matrices.volume());
 
+				input_transform.start();
 				winogradInputTransform(context(), getWeightShape(), input[0], input_matrices);
+				input_transform.stop();
+
+				matrix_multiply.start();
 				gemmBatched(context(), 'n', 't', output_matrices, input_matrices, *m_transformed_weights, 1, 0);
+				matrix_multiply.stop();
+
+				output_transform.start();
 				if (input.size() == 1)
 					winogradOutputTransform(context(), getWeightShape(), output_matrices, output, getBias().getParam(),
 							Tensor(Shape(), dtype(), device()), m_activation);
 				else
 					winogradOutputTransform(context(), getWeightShape(), output_matrices, output, getBias().getParam(), input[1], m_activation);
+				output_transform.stop();
 				break;
 			}
 			case ConvolutionAlgorithm::WINOGRAD_FUSED:

@@ -34,7 +34,14 @@ namespace ml
 
 		std::string toString(SimdLevel sl);
 		SimdLevel getSimdSupport() noexcept;
+
 		bool has_hardware_fp16_conversion();
+		bool has_hardware_bf16_conversion();
+
+		bool has_hardware_fp16_math();
+		bool has_hardware_bf16_math();
+
+		bool is_aligned(const void *ptr, size_t alignment) noexcept;
 
 		class Context
 		{
@@ -56,6 +63,16 @@ namespace ml
 				static size_t getWorkspaceSize(mlContext_t context);
 		};
 
+		class WorkspaceAllocator
+		{
+				void *m_ptr = nullptr;
+				size_t m_max_size = 0;
+				size_t m_offset = 0;
+			public:
+				WorkspaceAllocator() noexcept = default;
+				WorkspaceAllocator(mlContext_t context) noexcept;
+				void* get(size_t size, size_t alignment) noexcept;
+		};
 	}
 } /* namespace ml */
 

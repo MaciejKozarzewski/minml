@@ -7,6 +7,8 @@
 
 #include "../kernel_definitions.hpp"
 #include <minml/backend/backend_utils.hpp>
+#include "../ComputeConfig.hpp"
+#include "activations.hpp"
 
 #include "../vectors/vectors.hpp"
 
@@ -18,28 +20,31 @@ namespace
 	using namespace ml;
 	using namespace SIMD_NAMESPACE;
 
-	template<typename T>
-	void kernel_softmax_3_channels(T *dst, const T *src, int first_dim)
+	template<typename DT, typename CT>
+	void kernel_softmax_3_channels(void *dst, const void *src, int first_dim)
 	{
 		assert(dst != nullptr);
 		assert(src != nullptr);
+		const DT *src_ptr = getPointer<DT>(src);
+		DT *dst_ptr = getPointer<DT>(dst);
+
 		const int volume = first_dim * 3;
-		constexpr int stride = Vector<T>::length * 3;
+		constexpr int stride = Vector<CT>::size() * 3;
 
 		float workspace[stride];
 		for (int i = 0; i < volume; i += stride)
 		{
 			int remaining_elements = volume - i;
-			for (int j = 0; j < 3; j++, remaining_elements -= Vector<T>::length)
+			for (int j = 0; j < 3; j++, remaining_elements -= Vector<CT>::size())
 				if (remaining_elements > 0)
 				{
-					const Vector<T> tmp(src + j * Vector<T>::length, remaining_elements);
-					tmp.store(workspace + j * Vector<T>::length);
+					const Vector<CT> tmp(src_ptr + j * Vector<CT>::size(), std::min(Vector<CT>::size(), remaining_elements));
+					tmp.store(workspace + j * Vector<CT>::size());
 				}
 				else
-					Vector<T>::zero().store(workspace + j * Vector<T>::length);
+					Vector<CT>::zero().store(workspace + j * Vector<CT>::size());
 
-			for (int j = 0; j < Vector<T>::length; j++)
+			for (int j = 0; j < Vector<CT>::size(); j++)
 			{
 				float x0 = workspace[j * 3 + 0];
 				float x1 = workspace[j * 3 + 1];
@@ -57,134 +62,188 @@ namespace
 			}
 
 			remaining_elements = volume - i;
-			for (int j = 0; j < 3; j++, remaining_elements -= Vector<T>::length)
+			for (int j = 0; j < 3; j++, remaining_elements -= Vector<CT>::size())
 				if (remaining_elements > 0)
 				{
-					const Vector<T> tmp(workspace + j * Vector<T>::length);
-					tmp.store(dst + j * Vector<T>::length, remaining_elements);
+					const Vector<CT> tmp(workspace + j * Vector<CT>::size());
+					tmp.store(dst_ptr + j * Vector<CT>::size(), std::min(Vector<CT>::size(), remaining_elements));
 				}
-			src += stride;
-			dst += stride;
+			src_ptr += stride;
+			dst_ptr += stride;
 		}
 	}
 
-	template<typename T>
-	void kernel_softmax(T *dst, const T *src, int first_dim, int last_dim, float *workspace)
+	template<typename DT, typename CT>
+	void kernel_softmax(void *dst, const void *src, int first_dim, int last_dim, void *workspace)
 	{
 		assert(dst != nullptr);
 		assert(src != nullptr);
+		const DT *src_ptr = getPointer<DT>(src);
+		DT *dst_ptr = getPointer<DT>(dst);
+		CT *workspace_ptr = getPointer<CT>(workspace);
+
 		for (int i = 0; i < first_dim; i++)
 		{
-			const Vector<T> first(src[0]);
+			const Vector<CT> first(src_ptr[0]);
 
-			Vector<T> max_value = first;
-			for (int j = 0; j < last_dim; j += Vector<T>::length)
+			Vector<CT> max_value = first;
+			for (int j = 0; j < last_dim; j += Vector<CT>::size())
 			{
-				Vector<T> tmp(src + j, last_dim - j);
-				tmp.cutoff(last_dim - j, first);
+				const int elements = std::min(Vector<CT>::size(), last_dim - j);
+				Vector<CT> tmp(src_ptr + j, elements);
+				tmp.cutoff(elements, first);
 				max_value = max(max_value, tmp);
-				tmp.store(workspace + j);
+				tmp.store(workspace_ptr + j);
 			}
 			max_value = horizontal_max(max_value);
 
-			Vector<T> sum = Vector<T>::zero();
-			for (int j = 0; j < last_dim; j += Vector<T>::length)
+			Vector<CT> sum = Vector<CT>::zero();
+			for (int j = 0; j < last_dim; j += Vector<CT>::size())
 			{
-				Vector<T> tmp(workspace + j, last_dim - j);
+				const int elements = std::min(Vector<CT>::size(), last_dim - j);
+				Vector<CT> tmp(workspace_ptr + j, elements);
 				tmp = exp(tmp - max_value);
-				tmp.cutoff(last_dim - j, Vector<T>::zero());
+				tmp.cutoff(elements, Vector<CT>::zero());
 				sum += tmp;
-				tmp.store(workspace + j, last_dim - j);
+				tmp.store(workspace_ptr + j);
 			}
 
-			sum = Vector<T>::one() / Vector<T>(horizontal_add(sum));
-			for (int j = 0; j < last_dim; j += Vector<T>::length)
+			sum = Vector<CT>::one() / Vector<CT>(horizontal_add(sum));
+			for (int j = 0; j < last_dim; j += Vector<CT>::size())
 			{
-				Vector<T> tmp(workspace + j, last_dim - j);
+				const int elements = std::min(Vector<CT>::size(), last_dim - j);
+				Vector<CT> tmp(workspace_ptr + j, elements);
 				tmp *= sum;
-				tmp.store(dst + j, last_dim - j);
+				tmp.store(dst_ptr + j, elements);
 			}
-			src += last_dim;
-			dst += last_dim;
+			src_ptr += last_dim;
+			dst_ptr += last_dim;
 		}
 	}
 
-	template<typename T>
-	void kernel_sigmoid(T *dst, const T *src, int length)
+	template<typename DT, typename CT>
+	void kernel_sigmoid(void *dst, const void *src, int length)
 	{
-		for (int i = 0; i < length; i += Vector<T>::length)
+		assert(dst != nullptr);
+		assert(src != nullptr);
+		const DT *src_ptr = getPointer<DT>(src);
+		DT *dst_ptr = getPointer<DT>(dst);
+
+		for (int i = 0; i < length; i += Vector<CT>::size())
 		{
-			Vector<T> tmp(src + i, length - i);
-			tmp = Vector<T>::one() / (Vector<T>::one() + exp(-tmp));
-			tmp.store(dst + i, length - i);
+			const int elements = std::min(Vector<CT>::size(), length - i);
+			Vector<CT> tmp(src_ptr + i, elements);
+			tmp = Vector<CT>::one() / (Vector<CT>::one() + exp(-tmp));
+			tmp.store(dst_ptr + i, elements);
 		}
 	}
-	template<typename T>
-	void kernel_sigmoid_backward(T *gradient_prev, const T *gradient_next, const T *output, int length)
+	void kernel_sigmoid_backward(float *gradient_prev, const float *gradient_next, const float *output, int length)
 	{
 		for (int i = 0; i < length; i++)
 			gradient_prev[i] = gradient_next[i] * output[i] * (1.0f - output[i]);
 	}
 
-	template<typename T>
-	void kernel_tanh(T *dst, const T *src, int length)
+	template<typename DT, typename CT>
+	void kernel_tanh(void *dst, const void *src, int length)
 	{
-		for (int i = 0; i < length; i += Vector<T>::length)
+		assert(dst != nullptr);
+		assert(src != nullptr);
+		const DT *src_ptr = getPointer<DT>(src);
+		DT *dst_ptr = getPointer<DT>(dst);
+
+		for (int i = 0; i < length; i += Vector<CT>::size())
 		{
-			Vector<T> tmp(src + i, length - i);
+			const int elements = std::min(Vector<CT>::size(), length - i);
+			Vector<CT> tmp(src_ptr + i, elements);
 			tmp = tanh(tmp);
-			tmp.store(dst + i, length - i);
+			tmp.store(dst_ptr + i, elements);
 		}
 	}
-	template<typename T>
-	void kernel_tanh_backward(T *gradient_prev, const T *gradient_next, const T *output, int length)
+	void kernel_tanh_backward(float *gradient_prev, const float *gradient_next, const float *output, int length)
 	{
 		for (int i = 0; i < length; i++)
 			gradient_prev[i] = gradient_next[i] * (1.0f - output[i]) * (1.0f + output[i]);
 	}
 
-	template<typename T>
-	void kernel_relu(T *dst, const T *src, int length)
+	template<typename DT, typename CT>
+	void kernel_relu(void *dst, const void *src, int length)
 	{
-		for (int i = 0; i < length; i += Vector<T>::length)
+		assert(dst != nullptr);
+		assert(src != nullptr);
+		const DT *src_ptr = getPointer<DT>(src);
+		DT *dst_ptr = getPointer<DT>(dst);
+
+		for (int i = 0; i < length; i += Vector<CT>::size())
 		{
-			Vector<T> tmp(src + i, length - i);
-			tmp = max(Vector<T>::zero(), tmp);
-			tmp.store(dst + i, length - i);
+			const int elements = std::min(Vector<CT>::size(), length - i);
+			Vector<CT> tmp(src_ptr + i, elements);
+			tmp = max(Vector<CT>::zero(), tmp);
+			tmp.store(dst_ptr + i, elements);
 		}
 	}
-	template<typename T>
-	void kernel_relu_backward(T *gradient_prev, const T *gradient_next, const T *output, int length)
+	void kernel_relu_backward(float *gradient_prev, const float *gradient_next, const float *output, int length)
 	{
 		for (int i = 0; i < length; i++)
-			gradient_prev[i] = (output[i] == static_cast<T>(0)) ? static_cast<T>(0) : gradient_next[i];
+			gradient_prev[i] = (output[i] == 0.0f) ? 0.0f : gradient_next[i];
 	}
 
-	template<typename T>
-	void kernel_add_bias_act(mlShape_t shape, T *input, const T *bias, mlActivationType_t act)
+	template<typename DT, typename CT, mlActivationType_t ACT>
+	void kernel_add_bias_act(mlShape_t shape, void *input, const void *bias)
 	{
 		assert(input != nullptr);
 		assert(bias != nullptr);
+		DT *input_ptr = getPointer<DT>(input);
+		const DT *bias_ptr = getPointer<DT>(bias);
+
 		const int first_dim = volume_without_last_dim(shape);
 		const int last_dim = get_last_dim(shape);
 
 		for (int i = 0; i < first_dim; i++)
 		{
-			T *ptr = input + i * last_dim;
-			for (int j = 0; j < last_dim; j += Vector<T>::length)
+			for (int j = 0; j < last_dim; j += Vector<CT>::size())
 			{
-				Vector<T> tmp(ptr + j, last_dim - j);
-				Vector<T> b(bias + j, last_dim - j);
-				tmp += b;
-				if (act == ACTIVATION_RELU)
-					tmp = max(Vector<T>::zero(), tmp);
-				if (act == ACTIVATION_TANH)
-					tmp = tanh(tmp);
-				if (act == ACTIVATION_SIGMOID)
-					tmp = Vector<T>::one() / (Vector<T>::one() + exp(-tmp));
-				tmp.store(ptr + j, last_dim - j);
+				const int elements = std::min(Vector<CT>::size(), last_dim - j);
+				Vector<CT> tmp(input_ptr + j, elements);
+				Vector<CT> b(bias_ptr + j, elements);
+				tmp = activation_forward(ACT, tmp + b);
+				tmp.store(input_ptr + j, elements);
 			}
+			input_ptr += last_dim;
 		}
+	}
+
+	template<typename DT, typename CT>
+	void launch_add_bias_act(mlShape_t shape, void *input, const void *bias, mlActivationType_t act)
+	{
+		switch (act)
+		{
+			default:
+			case ACTIVATION_LINEAR:
+				kernel_add_bias_act<DT, CT, ACTIVATION_LINEAR>(shape, input, bias);
+				break;
+			case ACTIVATION_SIGMOID:
+				kernel_add_bias_act<DT, CT, ACTIVATION_SIGMOID>(shape, input, bias);
+				break;
+			case ACTIVATION_TANH:
+				kernel_add_bias_act<DT, CT, ACTIVATION_TANH>(shape, input, bias);
+				break;
+			case ACTIVATION_RELU:
+				kernel_add_bias_act<DT, CT, ACTIVATION_RELU>(shape, input, bias);
+				break;
+		}
+	}
+	template<typename DT, typename CT>
+	void launch_softmax(mlContext_t context, mlShape_t shape, void *output, const void *input)
+	{
+		const int first_dim = get_first_dim(shape);
+		const int last_dim = get_last_dim(shape);
+
+		assert(cpu::Context::getWorkspaceSize(context) >= sizeof(float) * last_dim);
+		float *workspace = cpu::Context::getWorkspace<float>(context);
+		if (last_dim == 3)
+			kernel_softmax_3_channels<DT, CT>(output, input, first_dim);
+		else
+			kernel_softmax<DT, CT>(output, input, first_dim, last_dim, workspace);
 	}
 }
 
@@ -201,89 +260,32 @@ namespace SIMD_NAMESPACE
 				break;
 			case ACTIVATION_SIGMOID:
 			{
-				switch (dtype)
-				{
-					case DTYPE_BFLOAT16:
-						kernel_sigmoid(getPointer<bfloat16>(output), getPointer<bfloat16>(input), volume(shape));
-						break;
-					case DTYPE_FLOAT16:
-						kernel_sigmoid(getPointer<float16>(output), getPointer<float16>(input), volume(shape));
-						break;
-					case DTYPE_FLOAT32:
-						kernel_sigmoid(getPointer<float>(output), getPointer<float>(input), volume(shape));
-						break;
-					default:
-						break;
-				}
+				const ml::cpu::ComputeConfig cfg = ml::cpu::ComputeConfig::getBest(dtype);
+				CREATE_KERNEL_TABLE(kernel_sigmoid);
+				CALL_KERNEL(kernel_sigmoid, cfg)(output, input, volume(shape));
 				break;
 			}
 			case ACTIVATION_TANH:
 			{
-				switch (dtype)
-				{
-					case DTYPE_BFLOAT16:
-						kernel_tanh(getPointer<bfloat16>(output), getPointer<bfloat16>(input), volume(shape));
-						break;
-					case DTYPE_FLOAT16:
-						kernel_tanh(getPointer<float16>(output), getPointer<float16>(input), volume(shape));
-						break;
-					case DTYPE_FLOAT32:
-						kernel_tanh(getPointer<float>(output), getPointer<float>(input), volume(shape));
-						break;
-					default:
-						break;
-				}
+				const ml::cpu::ComputeConfig cfg = ml::cpu::ComputeConfig::getBest(dtype);
+				CREATE_KERNEL_TABLE(kernel_tanh);
+				CALL_KERNEL(kernel_tanh, cfg)(output, input, volume(shape));
 				break;
 			}
 			case ACTIVATION_RELU:
 			{
-				switch (dtype)
-				{
-					case DTYPE_BFLOAT16:
-						kernel_relu(getPointer<bfloat16>(output), getPointer<bfloat16>(input), volume(shape));
-						break;
-					case DTYPE_FLOAT16:
-						kernel_relu(getPointer<float16>(output), getPointer<float16>(input), volume(shape));
-						break;
-					case DTYPE_FLOAT32:
-						kernel_relu(getPointer<float>(output), getPointer<float>(input), volume(shape));
-						break;
-					default:
-						break;
-				}
+				const ml::cpu::ComputeConfig cfg = ml::cpu::ComputeConfig::getBest(dtype);
+				CREATE_KERNEL_TABLE(kernel_relu);
+				CALL_KERNEL(kernel_relu, cfg)(output, input, volume(shape));
 				break;
 			}
 			case ACTIVATION_SOFTMAX:
 			{
-				assert(shape.rank == 2);
-				const int first_dim = get_first_dim(shape);
-				const int last_dim = get_last_dim(shape);
+				ml::cpu::ComputeConfig cfg = ml::cpu::ComputeConfig::getBest(dtype);
+				cfg.compute_type = ml::cpu::Type::FP32;
 
-				assert(cpu::Context::getWorkspaceSize(context) >= sizeof(float) * last_dim);
-				float *workspace = cpu::Context::getWorkspace<float>(context);
-				switch (dtype)
-				{
-					case DTYPE_BFLOAT16:
-						if (last_dim == 3)
-							kernel_softmax_3_channels(getPointer<bfloat16>(output), getPointer<bfloat16>(input), first_dim);
-						else
-							kernel_softmax(getPointer<bfloat16>(output), getPointer<bfloat16>(input), first_dim, last_dim, workspace);
-						break;
-					case DTYPE_FLOAT16:
-						if (last_dim == 3)
-							kernel_softmax_3_channels(getPointer<float16>(output), getPointer<float16>(input), first_dim);
-						else
-							kernel_softmax(getPointer<float16>(output), getPointer<float16>(input), first_dim, last_dim, workspace);
-						break;
-					case DTYPE_FLOAT32:
-						if (last_dim == 3)
-							kernel_softmax_3_channels(getPointer<float>(output), getPointer<float>(input), first_dim);
-						else
-							kernel_softmax(getPointer<float>(output), getPointer<float>(input), first_dim, last_dim, workspace);
-						break;
-					default:
-						break;
-				}
+				CREATE_KERNEL_TABLE(launch_softmax);
+				CALL_KERNEL(launch_softmax, cfg)(context, shape, output, input);
 				break;
 			}
 		}
@@ -313,20 +315,10 @@ namespace SIMD_NAMESPACE
 
 	void cpu_kernel_add_bias_act(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *input, const void *bias, mlActivationType_t act)
 	{
-		switch (dtype)
-		{
-			case DTYPE_BFLOAT16:
-				kernel_add_bias_act(shape, getPointer<bfloat16>(input), getPointer<bfloat16>(bias), act);
-				break;
-			case DTYPE_FLOAT16:
-				kernel_add_bias_act(shape, getPointer<float16>(input), getPointer<float16>(bias), act);
-				break;
-			case DTYPE_FLOAT32:
-				kernel_add_bias_act(shape, getPointer<float>(input), getPointer<float>(bias), act);
-				break;
-			default:
-				break;
-		}
+		const ml::cpu::ComputeConfig cfg = ml::cpu::ComputeConfig::getBest(dtype);
+
+		CREATE_KERNEL_TABLE(launch_add_bias_act);
+		CALL_KERNEL(launch_add_bias_act, cfg)(shape, input, bias, act);
 	}
 }
 

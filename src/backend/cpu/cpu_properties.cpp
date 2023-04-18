@@ -30,29 +30,29 @@ namespace
 {
 	using namespace ml;
 	using namespace ml::cpu;
-	ml::cpu::SimdLevel check_supported_simd_level()
+	SimdLevel check_supported_simd_level()
 	{
 //		if (supports_simd(AVOCADO_DEVICE_SUPPORTS_AVX512_VL_BW_DQ))
 //			return SimdLevel::AVX512VL_BW_DQ;
-		if (cpu_x86::get().supports("avx512") and cpu_x86::get().supports("os_avx512"))
-			return ml::cpu::SimdLevel::AVX512F;
+		if (cpu_x86::get().supports("avx512-f") and cpu_x86::get().supports("os_avx512"))
+			return SimdLevel::AVX512F;
 		if (cpu_x86::get().supports("avx2") and cpu_x86::get().supports("os_avx") and cpu_x86::get().supports("fma3"))
-			return ml::cpu::SimdLevel::AVX2;
+			return SimdLevel::AVX2;
 		if (cpu_x86::get().supports("avx") and cpu_x86::get().supports("os_avx"))
-			return ml::cpu::SimdLevel::AVX;
+			return SimdLevel::AVX;
 //		if (supports_simd(AVOCADO_DEVICE_SUPPORTS_SSE42))
 //			return SimdLevel::SSE42;
 		if (cpu_x86::get().supports("sse4.1"))
-			return ml::cpu::SimdLevel::SSE41;
+			return SimdLevel::SSE41;
 //		if (supports_simd(AVOCADO_DEVICE_SUPPORTS_SSSE3))
 //			return SimdLevel::SSSE3;
 //		if (supports_simd(AVOCADO_DEVICE_SUPPORTS_SSE3))
 //			return SimdLevel::SSE3;
 		if (cpu_x86::get().supports("sse2"))
-			return ml::cpu::SimdLevel::SSE2;
+			return SimdLevel::SSE2;
 //		if (supports_simd(AVOCADO_DEVICE_SUPPORTS_SSE))
 //			return SimdLevel::SSE;
-		return ml::cpu::SimdLevel::NONE;
+		return SimdLevel::NONE;
 	}
 	std::string get_device_info()
 	{
@@ -71,11 +71,6 @@ namespace ml
 		{
 			static const SimdLevel supported_simd_level = check_supported_simd_level();
 			return supported_simd_level;
-		}
-		bool has_hardware_fp16_conversion()
-		{
-			static const bool result = cpu_x86::get().supports("f16c");
-			return result;
 		}
 
 		std::string toString(SimdLevel sl)

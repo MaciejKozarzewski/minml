@@ -199,13 +199,13 @@ namespace ml
 
 	DataType typeFromString(const std::string &str)
 	{
-		if (str == "bfloat16" || str == "BFLOAT16")
+		if (str == "bf16" or str == "bfloat16" or str == "BFLOAT16")
 			return DataType::BFLOAT16;
-		if (str == "float16" || str == "FLOAT16")
+		if (str == "fp16" or str == "float16" or str == "FLOAT16")
 			return DataType::FLOAT16;
-		if (str == "float32" || str == "FLOAT32")
+		if (str == "fp32" or str == "float32" or str == "FLOAT32")
 			return DataType::FLOAT32;
-		if (str == "int32" || str == "INT32")
+		if (str == "int32" or str == "INT32")
 			return DataType::INT32;
 		throw DataTypeNotSupported(METHOD_NAME, "unknown data type '" + str + "'");
 	}

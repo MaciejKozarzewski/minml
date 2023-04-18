@@ -9,7 +9,6 @@
 #include <minml/backend/backend_utils.hpp>
 
 #include "../vectors/vectors.hpp"
-#include "../vectors/vector_conversion.hpp"
 
 #include <type_traits>
 
@@ -20,13 +19,31 @@ namespace
 	template<typename T, typename U>
 	void kernel_convert(T *dst, const U *src, const int elements)
 	{
-		VectorConverter<T, U> convert;
-		for (int i = 0; i < elements; i += convert.length)
+		for (int i = 0; i < elements; i += Vector<float>::size())
 		{
-			const int processed_elements = std::min(convert.length, elements - i);
-			const Vector<T> tmp = convert(Vector<U>(src + i, processed_elements));
+			const int processed_elements = std::min(Vector<float>::size(), elements - i);
+			const Vector<float> tmp(src + i, processed_elements);
 			tmp.store(dst + i, processed_elements);
 		}
+	}
+
+	template<typename T>
+	T one_or_zero(bool b) noexcept;
+
+	template<>
+	float one_or_zero(bool b) noexcept
+	{
+		return b ? 1.0f : 0.0f;
+	}
+	template<>
+	float16 one_or_zero(bool b) noexcept
+	{
+		return b ? float16 { 0x3c00 } : float16 { 0u };
+	}
+	template<>
+	bfloat16 one_or_zero(bool b) noexcept
+	{
+		return b ? bfloat16 { 0x3f80 } : bfloat16 { 0u };
 	}
 
 	template<typename T>
@@ -36,7 +53,7 @@ namespace
 		{
 			uint32_t mask = src[i];
 			for (int j = 0; j < last_dim; j++, mask >>= 1)
-				dst[j] = (mask & 1u) ? Vector<T>::scalar_one() : Vector<T>::scalar_zero();
+				dst[j] = one_or_zero<T>(mask & 1u);
 		}
 	}
 
@@ -93,11 +110,21 @@ namespace SIMD_NAMESPACE
 				switch (src_dtype)
 				{
 					case DTYPE_FLOAT16:
-						kernel_convert(getPointer<bfloat16>(dst), getPointer<float16>(src), elements);
+					{
+						if (cpu::has_hardware_bf16_conversion())
+							kernel_convert(getPointer<bfloat16>(dst), getPointer<float16>(src), elements);
+						else
+							kernel_convert(getPointer<sw_bfloat16>(dst), getPointer<float16>(src), elements);
 						break;
+					}
 					case DTYPE_FLOAT32:
-						kernel_convert(getPointer<bfloat16>(dst), getPointer<float>(src), elements);
+					{
+						if (cpu::has_hardware_bf16_conversion())
+							kernel_convert(getPointer<bfloat16>(dst), getPointer<float>(src), elements);
+						else
+							kernel_convert(getPointer<sw_bfloat16>(dst), getPointer<float>(src), elements);
 						break;
+					}
 					default:
 						break;
 				}
@@ -108,11 +135,31 @@ namespace SIMD_NAMESPACE
 				switch (src_dtype)
 				{
 					case DTYPE_BFLOAT16:
-						kernel_convert(getPointer<float16>(dst), getPointer<bfloat16>(src), elements);
+					{
+						if (cpu::has_hardware_bf16_conversion())
+						{
+							if (cpu::has_hardware_fp16_conversion())
+								kernel_convert(getPointer<float16>(dst), getPointer<bfloat16>(src), elements);
+							else
+								kernel_convert(getPointer<sw_float16>(dst), getPointer<bfloat16>(src), elements);
+						}
+						else
+						{
+							if (cpu::has_hardware_fp16_conversion())
+								kernel_convert(getPointer<float16>(dst), getPointer<sw_bfloat16>(src), elements);
+							else
+								kernel_convert(getPointer<sw_float16>(dst), getPointer<sw_bfloat16>(src), elements);
+						}
 						break;
+					}
 					case DTYPE_FLOAT32:
-						kernel_convert(getPointer<float16>(dst), getPointer<float>(src), elements);
+					{
+						if (cpu::has_hardware_fp16_conversion())
+							kernel_convert(getPointer<float16>(dst), getPointer<float>(src), elements);
+						else
+							kernel_convert(getPointer<sw_float16>(dst), getPointer<float>(src), elements);
 						break;
+					}
 					default:
 						break;
 				}
@@ -123,11 +170,21 @@ namespace SIMD_NAMESPACE
 				switch (src_dtype)
 				{
 					case DTYPE_BFLOAT16:
-						kernel_convert(getPointer<float>(dst), getPointer<bfloat16>(src), elements);
+					{
+						if (cpu::has_hardware_bf16_conversion())
+							kernel_convert(getPointer<float>(dst), getPointer<bfloat16>(src), elements);
+						else
+							kernel_convert(getPointer<float>(dst), getPointer<sw_bfloat16>(src), elements);
 						break;
+					}
 					case DTYPE_FLOAT16:
-						kernel_convert(getPointer<float>(dst), getPointer<float16>(src), elements);
+					{
+						if (cpu::has_hardware_fp16_conversion())
+							kernel_convert(getPointer<float>(dst), getPointer<float16>(src), elements);
+						else
+							kernel_convert(getPointer<float>(dst), getPointer<sw_float16>(src), elements);
 						break;
+					}
 					default:
 						break;
 				}
