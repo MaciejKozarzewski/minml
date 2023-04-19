@@ -9,6 +9,7 @@
 #include <minml/backend/backend_utils.hpp>
 
 #include "../utils.hpp"
+#include "../vectors/vectors.cuh"
 
 #include <cuda_runtime_api.h>
 #include <cuda_runtime.h>
@@ -23,6 +24,8 @@ namespace cg = cooperative_groups;
 
 namespace
 {
+	using namespace vectors;
+
 	__device__ float round_small_to_zero(float x)
 	{
 		return (fabsf(x) < 1.0e-6f) ? 0.0f : x;
@@ -75,8 +78,8 @@ namespace
 			workspace[0] = sum;
 	}
 
-	__global__ void kernel_learn_adam(float *weight, const float *gradient, float *momentum, float *variance, int elements, float learning_rate, float beta1,
-			float beta2)
+	__global__ void kernel_learn_adam(float *weight, const float *gradient, float *momentum, float *variance, int elements, float learning_rate,
+			float beta1, float beta2)
 	{
 		for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < elements; i += gridDim.x * blockDim.x)
 		{
@@ -130,15 +133,28 @@ namespace
 		}
 	}
 
-	__global__ void kernel_add_tensors(float *dst, const float *src0, const float *src1, int elements)
+	template<typename T>
+	__global__ void kernel_add_tensors(T *dst, const T *src0, const T *src1, int elements)
 	{
-		for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < elements; i += gridDim.x * blockDim.x)
-			dst[i] = src0[i] + src1[i];
+		for (int i = (blockIdx.x * blockDim.x + threadIdx.x) * vector_length<T>(); i < elements; i += gridDim.x * blockDim.x * vector_length<T>())
+		{
+			const int tmp = elements - i;
+			const Vector<T> x0(src0 + i, tmp);
+			const Vector<T> x1(src1 + i, tmp);
+			const Vector<T> y = x0 + x1;
+			y.store(dst + i, tmp);
+		}
 	}
-	__global__ void kernel_add_tensors(float *dst, const float *src, int elements)
+	template<typename T>
+	__global__ void kernel_add_tensors(T *dst, const T *src, int elements)
 	{
-		for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < elements; i += gridDim.x * blockDim.x)
-			dst[i] += src[i];
+		for (int i = (blockIdx.x * blockDim.x + threadIdx.x) * vector_length<T>(); i < elements; i += gridDim.x * blockDim.x * vector_length<T>())
+		{
+			const int tmp = elements - i;
+			const Vector<T> x(src + i, tmp);
+			const Vector<T> y = Vector<T>(dst + i, tmp) + x;
+			y.store(dst + i, tmp);
+		}
 	}
 
 	__global__ void kernel_emulate_low_precision(uint32_t *dst, const uint32_t *src, int elements)
@@ -160,7 +176,7 @@ namespace ml
 				getPointer<uint32_t>(src), length);
 		assert(cudaGetLastError() == cudaSuccess);
 	}
-	void cuda_add_tensors(mlContext_t context, mlShape_t shape, void *dst, const void *src1, const void *src2)
+	void cuda_add_tensors(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *dst, const void *src1, const void *src2)
 	{
 		assert(dst != nullptr);
 		assert(src1 != nullptr);
@@ -173,11 +189,36 @@ namespace ml
 
 		if (dst == src1)
 		{ // in place addition
-			kernel_add_tensors<<<gridDim, blockDim, 0, stream>>>(getPointer<float>(dst), getPointer<float>(src2), length);
+			switch (dtype)
+			{
+				case DTYPE_BFLOAT16:
+					kernel_add_tensors<<<gridDim, blockDim, 0, stream>>>(getPointer<__nv_bfloat16 >(dst), getPointer<__nv_bfloat16 >(src2), length);
+					break;
+				case DTYPE_FLOAT16:
+					kernel_add_tensors<<<gridDim, blockDim, 0, stream>>>(getPointer<half>(dst), getPointer<half>(src2), length);
+					break;
+				case DTYPE_FLOAT32:
+					kernel_add_tensors<<<gridDim, blockDim, 0, stream>>>(getPointer<float>(dst), getPointer<float>(src2), length);
+					break;
+			}
 		}
 		else
 		{
-			kernel_add_tensors<<<gridDim, blockDim, 0, stream>>>(getPointer<float>(dst), getPointer<float>(src1), getPointer<float>(src2), length);
+			switch (dtype)
+			{
+				case DTYPE_BFLOAT16:
+					kernel_add_tensors<<<gridDim, blockDim, 0, stream>>>(getPointer<__nv_bfloat16 >(dst), getPointer<__nv_bfloat16 >(src1),
+							getPointer<__nv_bfloat16 >(src2), length);
+					break;
+				case DTYPE_FLOAT16:
+					kernel_add_tensors<<<gridDim, blockDim, 0, stream>>>(getPointer<half>(dst), getPointer<half>(src1), getPointer<half>(src2),
+							length);
+					break;
+				case DTYPE_FLOAT32:
+					kernel_add_tensors<<<gridDim, blockDim, 0, stream>>>(getPointer<float>(dst), getPointer<float>(src1), getPointer<float>(src2),
+							length);
+					break;
+			}
 		}
 		assert(cudaGetLastError() == cudaSuccess);
 	}
@@ -252,8 +293,8 @@ namespace ml
 				length, inv_batch_size);
 		assert(cudaGetLastError() == cudaSuccess);
 	}
-	void cuda_adam_optimize(mlContext_t context, mlShape_t shape, void *weight, const void *update, void *momentum, void *variance, float learning_rate,
-			float beta1, float beta2)
+	void cuda_adam_optimize(mlContext_t context, mlShape_t shape, void *weight, const void *update, void *momentum, void *variance,
+			float learning_rate, float beta1, float beta2)
 	{
 		assert(weight != nullptr);
 		assert(update != nullptr);

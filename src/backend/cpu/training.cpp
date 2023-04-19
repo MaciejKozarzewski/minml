@@ -45,7 +45,7 @@ namespace ml
 			reinterpret_cast<uint32_t*>(dst)[i] = tmp & 0xFFFFF000u;
 		}
 	}
-	void cpu_add_tensors(mlContext_t context, mlShape_t shape, void *dst, const void *src1, const void *src2)
+	void cpu_add_tensors(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *dst, const void *src1, const void *src2)
 	{
 		assert(dst != nullptr);
 		assert(src1 != nullptr);
