@@ -14,6 +14,7 @@
 #include <cublas_v2.h>
 #ifdef USE_CUDNN
 #  include "cudnn_ops_infer.h"
+#  include <cublasLt.h>
 #endif
 
 #include <memory>
@@ -34,6 +35,7 @@ namespace ml
 				cublasHandle_t m_cublas_handle = nullptr;
 #ifdef USE_CUDNN
 				cudnnHandle_t m_cudnn_handle = nullptr;
+				cublasLtHandle_t m_cublas_lt_handle = nullptr;
 #endif
 				int m_device_index = 0;
 			public:
@@ -53,6 +55,7 @@ namespace ml
 				static cublasHandle_t getHandle(mlContext_t context);
 #ifdef USE_CUDNN
 				static cudnnHandle_t getCudnnHandle(mlContext_t context);
+				static cublasLtHandle_t getCublasLtHandle(mlContext_t context);
 #endif
 		};
 

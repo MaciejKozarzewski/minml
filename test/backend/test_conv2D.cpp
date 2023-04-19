@@ -259,7 +259,7 @@ namespace ml
 		Tensor input( { batch_size, height, width, filter_in }, "float16", Device::cpu());
 		Tensor output( { batch_size, height, width, filter_out }, "float16", Device::cpu());
 		Tensor add(output.shape(), "float16", Device::cpu());
-		Tensor weights( { filter_out, 3, 3, filter_in }, "float16", Device::cpu());
+		Tensor weights( { filter_out, 1, 1, filter_in }, "float16", Device::cpu());
 		Tensor bias( { filter_out }, "float16", Device::cpu());
 		testing::initForTest(weights, 0.0f);
 		testing::initForTest(input, 1.0f);

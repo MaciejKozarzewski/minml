@@ -101,9 +101,19 @@ namespace ml
 		switch (device.type())
 		{
 			case DeviceType::CPU:
-				return cpu_malloc(count);
+			{
+				void *result = cpu_malloc(count);
+				if (count > 0 and result == nullptr)
+					throw std::runtime_error("cpu malloc failed to allocate " + std::to_string(count) + " bytes");
+				return result;
+			}
 			case DeviceType::CUDA:
-				return cuda_malloc(device.index(), count);
+			{
+				void *result = cuda_malloc(device.index(), count);
+				if (count > 0 and result == nullptr)
+					throw std::runtime_error("cuda malloc failed to allocate " + std::to_string(count) + " bytes");
+				return result;
+			}
 			default:
 				return nullptr;
 		}

@@ -45,6 +45,8 @@ namespace ml
 		const int LDC = get_last_dim(shape_C);
 
 		cublasHandle_t handle = cuda::Context::getHandle(context);
+		cublasStatus_t err = cublasSetMathMode(handle, CUBLAS_DEFAULT_MATH);
+		assert(err == CUBLAS_STATUS_SUCCESS);
 		switch (dtype)
 		{
 			case DTYPE_BFLOAT16: // ABC [bfloat16]
@@ -112,6 +114,8 @@ namespace ml
 		const int strideC = volume_without_first_dim(shape_C);
 
 		cublasHandle_t handle = cuda::Context::getHandle(context);
+		cublasStatus_t err = cublasSetMathMode(handle, CUBLAS_DEFAULT_MATH);
+		assert(err == CUBLAS_STATUS_SUCCESS);
 		switch (dtype)
 		{
 			case DTYPE_BFLOAT16:

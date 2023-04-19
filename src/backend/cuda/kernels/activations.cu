@@ -174,7 +174,11 @@ namespace ml
 		switch (act)
 		{
 			case ACTIVATION_LINEAR:
+			{
+				if (output != input)
+					ml::cuda_memcpy_within_device(context, output, 0, input, size_of(dtype) * volume(shape));
 				break;
+			}
 			case ACTIVATION_SIGMOID:
 			{
 				dim3 blockDim(256);
@@ -297,7 +301,11 @@ namespace ml
 		switch (act)
 		{
 			case ACTIVATION_LINEAR:
+			{
+				if (gradient_prev != gradient_next)
+					ml::cuda_memcpy_within_device(context, gradient_prev, 0, gradient_next, sizeof(float) * volume(shape));
 				break;
+			}
 			case ACTIVATION_SIGMOID:
 			{
 				dim3 blockDim(256);

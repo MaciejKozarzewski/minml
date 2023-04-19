@@ -190,7 +190,6 @@ namespace ml
 					addBiasAct(context(), output, getBias().getParam(), m_activation);
 				else
 					activationForward(context(), output, output, m_activation);
-
 				break;
 			}
 			case ConvolutionAlgorithm::WINOGRAD_NON_FUSED:

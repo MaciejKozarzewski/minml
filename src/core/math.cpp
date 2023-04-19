@@ -369,10 +369,10 @@ namespace ml
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
-				cpu_add_tensors(get(context), get_shape(dst), dst.data(), src1.data(), src2.data());
+				cpu_add_tensors(get(context), get(dst.dtype()), get_shape(dst), dst.data(), src1.data(), src2.data());
 				break;
 			case DeviceType::CUDA:
-				cuda_add_tensors(get(context), get_shape(dst), dst.data(), src1.data(), src2.data());
+				cuda_add_tensors(get(context), get(dst.dtype()), get_shape(dst), dst.data(), src1.data(), src2.data());
 				break;
 		}
 	}

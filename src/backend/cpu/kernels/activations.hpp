@@ -37,7 +37,7 @@ namespace ml
 {
 	namespace cpu
 	{
-		float activation_forward(ml::mlActivationType_t act, float input) noexcept
+		static inline float activation_forward(ml::mlActivationType_t act, float input) noexcept
 		{
 			switch (act)
 			{
@@ -52,7 +52,7 @@ namespace ml
 					return std::max(0.0f, input);
 			}
 		}
-		float activation_backward(ml::mlActivationType_t act, float gradient, float output) noexcept
+		static inline float activation_backward(ml::mlActivationType_t act, float gradient, float output) noexcept
 		{
 			switch (act)
 			{

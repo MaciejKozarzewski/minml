@@ -38,6 +38,11 @@ namespace ml
 				cudnnStatus_t status = cudnnDestroy(m_cudnn_handle);
 				assert(status == CUDNN_STATUS_SUCCESS);
 			}
+			if (m_cublas_lt_handle != nullptr)
+			{
+				cublasStatus_t err = cublasLtDestroy(m_cublas_lt_handle);
+				assert(err == CUBLAS_STATUS_SUCCESS);
+			}
 #endif
 			if (m_cublas_handle != nullptr)
 			{
@@ -142,6 +147,21 @@ namespace ml
 					assert(status == CUDNN_STATUS_SUCCESS);
 				}
 				return get(context)->m_cudnn_handle;
+			}
+		}
+		cublasLtHandle_t Context::getCublasLtHandle(mlContext_t context)
+		{
+			if (context == nullptr)
+				return nullptr;
+			else
+			{
+				use(context);
+				if (get(context)->m_cublas_lt_handle == nullptr)
+				{
+					cublasStatus_t status = cublasLtCreate(&(get(context)->m_cublas_lt_handle));
+					assert(status == CUBLAS_STATUS_SUCCESS);
+				}
+				return get(context)->m_cublas_lt_handle;
 			}
 		}
 #endif

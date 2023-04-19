@@ -16,11 +16,13 @@
 #include "cudnn_cnn_infer.h"
 
 #include <cassert>
+#include <cstring>
+#include <iostream>
 
 namespace
 {
 	using namespace ml;
-	cudnnDataType_t convert(mlDataType_t dtype) noexcept
+	cudnnDataType_t cudnn_convert(mlDataType_t dtype) noexcept
 	{
 		switch (dtype)
 		{
@@ -35,6 +37,40 @@ namespace
 				return CUDNN_DATA_FLOAT;
 			case DTYPE_INT32:
 				return CUDNN_DATA_INT32;
+		}
+	}
+	cudaDataType_t cuda_convert(mlDataType_t dtype) noexcept
+	{
+		switch (dtype)
+		{
+			default:
+			case DTYPE_UNKNOWN:
+				return CUDA_R_32F;
+			case DTYPE_BFLOAT16:
+				return CUDA_R_16BF;
+			case DTYPE_FLOAT16:
+				return CUDA_R_16F;
+			case DTYPE_FLOAT32:
+				return CUDA_R_32F;
+			case DTYPE_INT32:
+				return CUDA_R_32I;
+		}
+	}
+	cublasComputeType_t cublasLt_convert(mlDataType_t dtype) noexcept
+	{
+		switch (dtype)
+		{
+			default:
+			case DTYPE_UNKNOWN:
+				return CUBLAS_COMPUTE_32F;
+			case DTYPE_BFLOAT16:
+				return CUBLAS_COMPUTE_32F;
+			case DTYPE_FLOAT16:
+				return CUBLAS_COMPUTE_16F;
+			case DTYPE_FLOAT32:
+				return CUBLAS_COMPUTE_32F;
+			case DTYPE_INT32:
+				return CUBLAS_COMPUTE_32F;
 		}
 	}
 
@@ -64,7 +100,7 @@ namespace
 				assert(shape.rank == 4);
 				cudnnStatus_t status = cudnnCreateTensorDescriptor(&m_desc);
 				assert(status == CUDNN_STATUS_SUCCESS);
-				status = cudnnSetTensor4dDescriptor(m_desc, CUDNN_TENSOR_NHWC, convert(dtype), shape.dim[0], shape.dim[3], shape.dim[1],
+				status = cudnnSetTensor4dDescriptor(m_desc, CUDNN_TENSOR_NHWC, cudnn_convert(dtype), shape.dim[0], shape.dim[3], shape.dim[1],
 						shape.dim[2]);
 				assert(status == CUDNN_STATUS_SUCCESS);
 			}
@@ -93,7 +129,7 @@ namespace
 				assert(shape.rank == 4);
 				cudnnStatus_t status = cudnnCreateFilterDescriptor(&m_desc);
 				assert(status == CUDNN_STATUS_SUCCESS);
-				status = cudnnSetFilter4dDescriptor(m_desc, convert(dtype), CUDNN_TENSOR_NHWC, shape.dim[0], shape.dim[3], shape.dim[1],
+				status = cudnnSetFilter4dDescriptor(m_desc, cudnn_convert(dtype), CUDNN_TENSOR_NHWC, shape.dim[0], shape.dim[3], shape.dim[1],
 						shape.dim[2]);
 				assert(status == CUDNN_STATUS_SUCCESS);
 			}
@@ -121,7 +157,7 @@ namespace
 			{
 				cudnnStatus_t status = cudnnCreateActivationDescriptor(&m_desc);
 				assert(status == CUDNN_STATUS_SUCCESS);
-				status = cudnnSetActivationDescriptor(m_desc, convert(act), CUDNN_PROPAGATE_NAN, 0.0f);
+				status = cudnnSetActivationDescriptor(m_desc, convert(act), CUDNN_NOT_PROPAGATE_NAN, 0.0f);
 				assert(status == CUDNN_STATUS_SUCCESS);
 			}
 			ActivationDescriptor(const ActivationDescriptor &other) = delete;
@@ -154,7 +190,7 @@ namespace
 				status = cudnnSetConvolutionMathType(m_desc, CUDNN_TENSOR_OP_MATH);
 				assert(status == CUDNN_STATUS_SUCCESS);
 				const int padding = kernel_size / 2;
-				status = cudnnSetConvolution2dDescriptor(m_desc, padding, padding, 1, 1, 1, 1, CUDNN_CROSS_CORRELATION, convert(dtype));
+				status = cudnnSetConvolution2dDescriptor(m_desc, padding, padding, 1, 1, 1, 1, CUDNN_CROSS_CORRELATION, cudnn_convert(dtype));
 				assert(status == CUDNN_STATUS_SUCCESS);
 
 				cudnnConvolutionFwdAlgoPerf_t perf;
@@ -188,6 +224,73 @@ namespace
 			}
 	};
 
+	class MatrixLayout
+	{
+			cublasLtMatrixLayout_t m_layout = 0;
+		public:
+			MatrixLayout() noexcept = default;
+			MatrixLayout(int rows, int cols, mlDataType_t dtype)
+			{
+				cublasStatus_t status = cublasLtMatrixLayoutCreate(&m_layout, cuda_convert(dtype), cols, rows, cols);
+				assert(status == CUBLAS_STATUS_SUCCESS);
+			}
+			MatrixLayout(const MatrixLayout &other) = delete;
+			MatrixLayout(MatrixLayout &&other) noexcept = delete;
+			MatrixLayout& operator=(const MatrixLayout &other) = delete;
+			MatrixLayout& operator=(MatrixLayout &&other) noexcept = delete;
+			~MatrixLayout() noexcept
+			{
+				cublasStatus_t status = cublasLtMatrixLayoutDestroy(m_layout);
+				assert(status == CUBLAS_STATUS_SUCCESS);
+			}
+			operator cublasLtMatrixLayout_t() const noexcept
+			{
+				return m_layout;
+			}
+	};
+
+	class MatMulDescriptor
+	{
+			cublasLtMatmulDesc_t m_desc = 0;
+		public:
+			MatMulDescriptor() noexcept = default;
+			MatMulDescriptor(mlDataType_t dtype, const void *bias, mlActivationType_t act)
+			{
+				assert(act == ACTIVATION_LINEAR or ACTIVATION_RELU);
+				cublasStatus_t status = cublasLtMatmulDescCreate(&m_desc, cublasLt_convert(dtype), cuda_convert(DTYPE_FLOAT32));
+				assert(status == CUBLAS_STATUS_SUCCESS);
+
+				int32_t tmp = CUBLAS_OP_T;
+				status = cublasLtMatmulDescSetAttribute(m_desc, CUBLASLT_MATMUL_DESC_TRANSA, &tmp, sizeof(tmp));
+				assert(status == CUBLAS_STATUS_SUCCESS);
+
+				uint32_t epilogue;
+				if (bias != nullptr)
+				{
+					status = cublasLtMatmulDescSetAttribute(m_desc, CUBLASLT_MATMUL_DESC_BIAS_POINTER, &bias, sizeof(bias));
+					assert(status == CUBLAS_STATUS_SUCCESS);
+					epilogue = (act == ACTIVATION_RELU) ? CUBLASLT_EPILOGUE_RELU_BIAS : CUBLASLT_EPILOGUE_BIAS;
+				}
+				else
+					epilogue = (act == ACTIVATION_RELU) ? CUBLASLT_EPILOGUE_RELU : CUBLASLT_EPILOGUE_DEFAULT;
+
+				status = cublasLtMatmulDescSetAttribute(m_desc, CUBLASLT_MATMUL_DESC_EPILOGUE, &epilogue, sizeof(epilogue));
+				assert(status == CUBLAS_STATUS_SUCCESS);
+			}
+			MatMulDescriptor(const MatMulDescriptor &other) = delete;
+			MatMulDescriptor(MatMulDescriptor &&other) noexcept = delete;
+			MatMulDescriptor& operator=(const MatMulDescriptor &other) = delete;
+			MatMulDescriptor& operator=(MatMulDescriptor &&other) noexcept = delete;
+			~MatMulDescriptor() noexcept
+			{
+				cublasStatus_t status = cublasLtMatmulDescDestroy(m_desc);
+				assert(status == CUBLAS_STATUS_SUCCESS);
+			}
+			operator cublasLtMatmulDesc_t() const noexcept
+			{
+				return m_desc;
+			}
+	};
 }
 
 namespace ml
@@ -197,45 +300,81 @@ namespace ml
 	{
 		const mlShape_t output_shape = make_shape( { input_shape.dim[0], input_shape.dim[1], input_shape.dim[2], weights_shape.dim[0] });
 
-		const TensorDescriptor xDesc(input_shape, dtype);
-		const FilterDescriptor wDesc(weights_shape, dtype);
-		const TensorDescriptor yDesc(output_shape, dtype);
-
 		assert(weights_shape.dim[1] == weights_shape.dim[2]); // square kernel
-		const mlDataType_t compute_type = cuda::has_fp16_math(context) ? DTYPE_FLOAT16 : DTYPE_FLOAT32;
-		const ConvolutionDescriptor convDesc(cuda::Context::getCudnnHandle(context), xDesc, wDesc, yDesc, compute_type, weights_shape.dim[1]);
 
-		cuda::Context::setWorkspaceSize(context, convDesc.getWorkspaceSize());
-		cudnnHandle_t handle = cuda::Context::getCudnnHandle(context);
 		const size_t workspace_size = cuda::Context::getWorkspaceSize(context);
 		void *workspace = cuda::Context::getWorkspace(context);
+		if (weights_shape.dim[1] == 1)
+		{ // 1x1 convolution
+			const MatrixLayout Adesc(volume_without_last_dim(input_shape), get_last_dim(input_shape), dtype);
+			const MatrixLayout Bdesc(get_first_dim(weights_shape), volume_without_first_dim(weights_shape), dtype);
+			const MatrixLayout Cdesc(volume_without_last_dim(output_shape), get_last_dim(output_shape), dtype);
+			const MatrixLayout Ddesc(volume_without_last_dim(output_shape), get_last_dim(output_shape), dtype);
+			const MatMulDescriptor computeDesc(dtype, bias, act);
 
-		const float alpha1 = 1.0f;
-		if (bias == nullptr)
-		{
-			const float beta = (add == nullptr) ? 0.0f : 1.0f;
-			if (add != nullptr)
-				cuda_memcpy_within_device(context, output, 0, add, size_of(dtype) * volume(output_shape));
+			uint32_t alpha, beta;
+			if (dtype == DTYPE_FLOAT32)
+			{
+				const float a = 1.0f;
+				const float b = (add == nullptr) ? 0.0f : 1.0f;
+				std::memcpy(&alpha, &a, sizeof(float));
+				std::memcpy(&beta, &b, sizeof(float));
+			}
+			else
+			{
+				const half a = 1.0f;
+				const half b = (add == nullptr) ? 0.0f : 1.0f;
+				std::memcpy(&alpha, &a, sizeof(half));
+				std::memcpy(&beta, &b, sizeof(half));
+			}
 
-			cudnnStatus_t status = cudnnConvolutionForward(handle, &alpha1, xDesc, input, wDesc, weights, convDesc, convDesc.getAlgorithm(),
-					workspace, workspace_size, &beta, yDesc, output);
-			assert(status == CUDNN_STATUS_SUCCESS);
+			const void *C = (add == nullptr) ? output : add;
 
-			ml::cuda_activation_forward(context, dtype, output_shape, output, output, act);
+			cublasLtHandle_t handle = cuda::Context::getCublasLtHandle(context);
+			cudaStream_t stream = cuda::Context::getStream(context);
+			cublasStatus_t status = cublasLtMatmul(handle, computeDesc, &alpha, weights, Bdesc, input, Adesc, &beta, C, Cdesc, output, Ddesc, nullptr,
+					workspace, workspace_size, stream);
+			assert(status == CUBLAS_STATUS_SUCCESS);
 		}
 		else
 		{
-			const mlShape_t bias_shape = make_shape( { 1, 1, 1, weights_shape.dim[0] });
-			const TensorDescriptor biasDesc(bias_shape, dtype);
-			const TensorDescriptor zDesc(output_shape, dtype);
+			const TensorDescriptor xDesc(input_shape, dtype);
+			const FilterDescriptor wDesc(weights_shape, dtype);
+			const TensorDescriptor yDesc(output_shape, dtype);
 
-			const ActivationDescriptor activationDesc(act);
+			const mlDataType_t compute_type = cuda::has_fp16_math(context) ? DTYPE_FLOAT16 : DTYPE_FLOAT32;
+			const ConvolutionDescriptor convDesc(cuda::Context::getCudnnHandle(context), xDesc, wDesc, yDesc, compute_type, weights_shape.dim[1]);
 
-			const void *zData = (add == nullptr) ? output : add;
-			const float alpha2 = (add == nullptr) ? 0.0f : 1.0f;
-			cudnnStatus_t status = cudnnConvolutionBiasActivationForward(handle, &alpha1, xDesc, input, wDesc, weights, convDesc,
-					convDesc.getAlgorithm(), workspace, workspace_size, &alpha2, zDesc, zData, biasDesc, bias, activationDesc, yDesc, output);
-			assert(status == CUDNN_STATUS_SUCCESS);
+			cuda::Context::setWorkspaceSize(context, convDesc.getWorkspaceSize());
+			cudnnHandle_t handle = cuda::Context::getCudnnHandle(context);
+
+			const float alpha1 = 1.0f;
+			if (bias == nullptr)
+			{
+				const float beta = (add == nullptr) ? 0.0f : 1.0f;
+				if (add != nullptr)
+					cuda_memcpy_within_device(context, output, 0, add, size_of(dtype) * volume(output_shape));
+
+				cudnnStatus_t status = cudnnConvolutionForward(handle, &alpha1, xDesc, input, wDesc, weights, convDesc, convDesc.getAlgorithm(),
+						workspace, workspace_size, &beta, yDesc, output);
+				assert(status == CUDNN_STATUS_SUCCESS);
+
+				ml::cuda_activation_forward(context, dtype, output_shape, output, output, act);
+			}
+			else
+			{
+				const mlShape_t bias_shape = make_shape( { 1, 1, 1, weights_shape.dim[0] });
+				const TensorDescriptor biasDesc(bias_shape, dtype);
+				const TensorDescriptor zDesc(output_shape, dtype);
+
+				const ActivationDescriptor activationDesc(act);
+
+				const void *zData = (add == nullptr) ? output : add;
+				const float alpha2 = (add == nullptr) ? 0.0f : 1.0f;
+				cudnnStatus_t status = cudnnConvolutionBiasActivationForward(handle, &alpha1, xDesc, input, wDesc, weights, convDesc,
+						convDesc.getAlgorithm(), workspace, workspace_size, &alpha2, zDesc, zData, biasDesc, bias, activationDesc, yDesc, output);
+				assert(status == CUDNN_STATUS_SUCCESS);
+			}
 		}
 	}
 }

@@ -53,6 +53,10 @@ namespace vectors
 			{
 			}
 #elif __CUDA_ARCH__ >= FP16_STORAGE_MIN_ARCH
+			HOST_DEVICE Vector(half2 x)
+			{
+				assert(false);
+			}
 			HOST_DEVICE Vector(half x) :
 					m_data(x)
 			{
@@ -62,6 +66,10 @@ namespace vectors
 			{
 			}
 #else
+			HOST_DEVICE Vector(half2 x)
+			{
+				assert(false);
+			}
 			HOST_DEVICE Vector(half x)
 			{
 				assert(false);
@@ -209,6 +217,10 @@ namespace vectors
 			{
 				return m_data;
 			}
+			HOST_DEVICE operator half2() const
+			{
+				return half2{};
+			}
 			HOST_DEVICE Vector<half> operator-() const
 			{
 				return Vector<half>(-m_data);
@@ -246,6 +258,10 @@ namespace vectors
 			{
 				assert(false);
 				return 0.0f;
+			}
+			HOST_DEVICE operator half2() const
+			{
+				return half2 { };
 			}
 			HOST_DEVICE Vector<half> operator-() const
 			{

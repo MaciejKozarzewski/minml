@@ -5,6 +5,7 @@
  *      Author: Maciej Kozarzewski
  */
 
+#include <minml/backend/cpu_backend.h>
 #include "../kernel_definitions.hpp"
 #include <minml/backend/backend_utils.hpp>
 #include "../ComputeConfig.hpp"
@@ -257,7 +258,11 @@ namespace SIMD_NAMESPACE
 		switch (act)
 		{
 			case ACTIVATION_LINEAR:
+			{
+				if (output != input)
+					cpu_memcpy(context, output, 0, input, 0, size_of(dtype) * volume(shape));
 				break;
+			}
 			case ACTIVATION_SIGMOID:
 			{
 				const ml::cpu::ComputeConfig cfg = ml::cpu::ComputeConfig::getBest(dtype);
@@ -296,7 +301,11 @@ namespace SIMD_NAMESPACE
 		switch (act)
 		{
 			case ACTIVATION_LINEAR:
+			{
+				if (gradient_prev != gradient_next)
+					cpu_memcpy(context, gradient_prev, 0, gradient_next, 0, sizeof(float) * volume(shape));
 				break;
+			}
 			case ACTIVATION_SIGMOID:
 				kernel_sigmoid_backward(getPointer<float>(gradient_prev), getPointer<float>(gradient_next), getPointer<float>(output), volume(shape));
 				break;
