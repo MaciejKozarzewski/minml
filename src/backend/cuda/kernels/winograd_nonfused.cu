@@ -122,6 +122,47 @@ namespace
 			}
 		}
 	}
+	template<int KernelSize, int TransformSize>
+	__global__ void kernel_transform_input_vect(half *__restrict__ matrices, const half *__restrict__ input, int batch_size, int height, int width,
+			int input_filters)
+	{
+		constexpr int TileSize = KernelSize + TransformSize - 1;
+		constexpr int Padding = KernelSize / 2;
+		assert(input_filters % 2 == 0);
+		input_filters /= 2;
+
+		Tile<Vector<half>, TileSize, TileSize> tile;
+		for (int f = threadIdx.x; f < input_filters; f += blockDim.x)
+		{
+			Indexer<4> input_indexer(batch_size, height, width, input_filters);
+			for (int col = 0; col < tile.columns(); col++)
+				for (int row = 0; row < tile.rows(); row++)
+				{
+					const int h = TransformSize * blockIdx.x - Padding + row;
+					const int w = TransformSize * blockIdx.y - Padding + col;
+					if (0 <= h and h < height and 0 <= w and w < width)
+						tile.at(col, row) = reinterpret_cast<const half2*>(input)[input_indexer.at(blockIdx.z, h, w, f)];
+					else
+						tile.at(col, row) = vector_zero<half>();
+				}
+
+			const int tile_index = (blockIdx.z * gridDim.x + blockIdx.x) * gridDim.y + blockIdx.y;
+			Indexer<4> matrices_indexer(TileSize, TileSize, gridDim.x * gridDim.y * gridDim.z, input_filters);
+			const Transform<TransformType::INPUT, KernelSize, TransformSize, Vector<half>> transform;
+			for (int row = 0; row < TileSize; row++)
+			{
+				Line<Vector<half>, TileSize> line;
+				for (int col = 0; col < TileSize; col++)
+					line[col] = transform(row, tile.get_row(col)); // tile is stored as transposed (column-major)
+
+				for (int col = 0; col < TileSize; col++)
+				{
+					const Vector<half> tmp = transform(col, line);
+					reinterpret_cast<half2*>(matrices)[matrices_indexer.at(row, col, tile_index, f)] = static_cast<half2>(tmp);
+				}
+			}
+		}
+	}
 
 	template<int KernelSize, int TransformSize, typename T>
 	__global__ void kernel_transform_output(const T *__restrict__ matrices, T *__restrict__ output, const T *__restrict__ add,
@@ -293,9 +334,9 @@ namespace
 
 		if (kernel_size == 3)
 		{
-			if (transform_size == 2)
-				kernel_transform_weights<3, 2> <<<gridSize, blockSize, 0, stream>>>(getPointer<T>(matrices), getPointer<T>(weights), filters_out,
-						filters_in, invert, low_precision);
+//			if (transform_size == 2)
+//				kernel_transform_weights<3, 2> <<<gridSize, blockSize, 0, stream>>>(getPointer<T>(matrices), getPointer<T>(weights), filters_out,
+//						filters_in, invert, low_precision);
 			if (transform_size == 4)
 				kernel_transform_weights<3, 4> <<<gridSize, blockSize, 0, stream>>>(getPointer<T>(matrices), getPointer<T>(weights), filters_out,
 						filters_in, invert, low_precision);
@@ -329,17 +370,27 @@ namespace
 
 		if (kernel_size == 3)
 		{
-			if (transform_size == 2)
-				kernel_transform_input<3, 2> <<<gridSize, blockSize, 0, stream>>>(getPointer<T>(matrices), getPointer<T>(input), batch_size, height,
-						width, filters);
+//			if (transform_size == 2)
+//				kernel_transform_input<3, 2> <<<gridSize, blockSize, 0, stream>>>(getPointer<T>(matrices), getPointer<T>(input), batch_size, height,
+//						width, filters);
 			if (transform_size == 4)
-				kernel_transform_input<3, 4> <<<gridSize, blockSize, 0, stream>>>(getPointer<T>(matrices), getPointer<T>(input), batch_size, height,
-						width, filters);
+			{
+				if (filters % 2 == 0 and cuda::has_fp16_math(context) and std::is_same<T, half>::value)
+					kernel_transform_input_vect<3, 4> <<<gridSize, blockSize, 0, stream>>>(getPointer<half>(matrices), getPointer<half>(input),
+							batch_size, height, width, filters);
+				else
+					kernel_transform_input<3, 4> <<<gridSize, blockSize, 0, stream>>>(getPointer<T>(matrices), getPointer<T>(input), batch_size,
+							height, width, filters);
+			}
 		}
 		if (kernel_size == 5)
 		{
-			kernel_transform_input<5, 2> <<<gridSize, blockSize, 0, stream>>>(getPointer<T>(matrices), getPointer<T>(input), batch_size, height,
-					width, filters);
+			if (filters % 2 == 0 and cuda::has_fp16_math(context) and std::is_same<T, half>::value)
+				kernel_transform_input_vect<5, 2> <<<gridSize, blockSize, 0, stream>>>(getPointer<half>(matrices), getPointer<half>(input),
+						batch_size, height, width, filters);
+			else
+				kernel_transform_input<5, 2> <<<gridSize, blockSize, 0, stream>>>(getPointer<T>(matrices), getPointer<T>(input), batch_size, height,
+						width, filters);
 		}
 
 		assert(cudaGetLastError() == cudaSuccess);
@@ -367,9 +418,9 @@ namespace
 
 		if (kernel_size == 3)
 		{
-			if (transform_size == 2)
-				kernel_transform_output<3, 2> <<<gridSize, blockSize, 0, stream>>>(getPointer<T>(matrices), getPointer<T>(output), getPointer<T>(add),
-						getPointer<T>(bias), act, batch_size, height, width, filters);
+//			if (transform_size == 2)
+//				kernel_transform_output<3, 2> <<<gridSize, blockSize, 0, stream>>>(getPointer<T>(matrices), getPointer<T>(output), getPointer<T>(add),
+//						getPointer<T>(bias), act, batch_size, height, width, filters);
 			if (transform_size == 4)
 				kernel_transform_output<3, 4> <<<gridSize, blockSize, 0, stream>>>(getPointer<T>(matrices), getPointer<T>(output), getPointer<T>(add),
 						getPointer<T>(bias), act, batch_size, height, width, filters);
@@ -456,9 +507,9 @@ namespace ml
 
 		if (kernel_size == 3)
 		{
-			if (transform_size == 2)
-				kernel_transform_gradient<3, 2> <<<gridSize, blockSize, 0, stream>>>(getPointer<float>(matrices), getPointer<float>(gradient),
-						batch_size, height, width, filters);
+//			if (transform_size == 2)
+//				kernel_transform_gradient<3, 2> <<<gridSize, blockSize, 0, stream>>>(getPointer<float>(matrices), getPointer<float>(gradient),
+//						batch_size, height, width, filters);
 			if (transform_size == 4)
 				kernel_transform_gradient<3, 4> <<<gridSize, blockSize, 0, stream>>>(getPointer<float>(matrices), getPointer<float>(gradient),
 						batch_size, height, width, filters);
@@ -485,9 +536,9 @@ namespace ml
 
 		if (kernel_size == 3)
 		{
-			if (transform_size == 2)
-				kernel_transform_update<3, 2> <<<gridSize, blockSize, 0, stream>>>(getPointer<float>(matrices), getPointer<float>(update),
-						filters_out, filters_in);
+//			if (transform_size == 2)
+//				kernel_transform_update<3, 2> <<<gridSize, blockSize, 0, stream>>>(getPointer<float>(matrices), getPointer<float>(update),
+//						filters_out, filters_in);
 			if (transform_size == 4)
 				kernel_transform_update<3, 4> <<<gridSize, blockSize, 0, stream>>>(getPointer<float>(matrices), getPointer<float>(update),
 						filters_out, filters_in);
