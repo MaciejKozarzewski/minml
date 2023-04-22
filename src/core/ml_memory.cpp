@@ -15,6 +15,8 @@
 
 #include <cstring>
 #include <memory>
+#include <thread>
+#include <chrono>
 
 namespace
 {
@@ -102,17 +104,27 @@ namespace ml
 		{
 			case DeviceType::CPU:
 			{
-				void *result = cpu_malloc(count);
-				if (count > 0 and result == nullptr)
-					throw std::runtime_error("cpu malloc failed to allocate " + std::to_string(count) + " bytes");
-				return result;
+				for (int i = 0; i < 10; i++)
+				{
+					void *result = cpu_malloc(count);
+					if (count > 0 and result == nullptr)
+						std::this_thread::sleep_for(std::chrono::milliseconds(100));
+					else
+						return result;
+				}
+				throw std::runtime_error("cpu malloc failed to allocate " + std::to_string(count) + " bytes");
 			}
 			case DeviceType::CUDA:
 			{
-				void *result = cuda_malloc(device.index(), count);
-				if (count > 0 and result == nullptr)
-					throw std::runtime_error("cuda malloc failed to allocate " + std::to_string(count) + " bytes");
-				return result;
+				for (int i = 0; i < 10; i++)
+				{
+					void *result = cuda_malloc(device.index(), count);
+					if (count > 0 and result == nullptr)
+						std::this_thread::sleep_for(std::chrono::milliseconds(100));
+					else
+						return result;
+				}
+				throw std::runtime_error("cuda malloc failed to allocate " + std::to_string(count) + " bytes");
 			}
 			default:
 				return nullptr;
