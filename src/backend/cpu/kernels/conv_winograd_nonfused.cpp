@@ -8,6 +8,7 @@
 #include "../kernel_definitions.hpp"
 #include <minml/backend/backend_utils.hpp>
 
+#include "activations.hpp"
 #include "winograd_transforms.hpp"
 #include "../helpers/indexers.hpp"
 #include "../vectors/vectors.hpp"
@@ -252,15 +253,24 @@ namespace
 							for (int i = 0; i < transformed.length(); i++)
 								transformed[i] += z_line[i];
 						}
-						if (activation == ACTIVATION_RELU)
-							for (int i = 0; i < transformed.length(); i++)
-								transformed[i] = max(Vector<CT>::zero(), transformed[i]);
-						if (activation == ACTIVATION_TANH)
-							for (int i = 0; i < transformed.length(); i++)
-								transformed[i] = tanh(transformed[i]);
-						if (activation == ACTIVATION_SIGMOID)
-							for (int i = 0; i < transformed.length(); i++)
-								transformed[i] = Vector<CT>::one() / (Vector<CT>::one() + exp(-transformed[i]));
+						switch (activation)
+						{
+							default:
+							case ACTIVATION_LINEAR:
+								break;
+							case ACTIVATION_SIGMOID:
+								for (int i = 0; i < transformed.length(); i++)
+									transformed[i] = activation_forward(ACTIVATION_SIGMOID, transformed[i]);
+								break;
+							case ACTIVATION_TANH:
+								for (int i = 0; i < transformed.length(); i++)
+									transformed[i] = activation_forward(ACTIVATION_TANH, transformed[i]);
+								break;
+							case ACTIVATION_RELU:
+								for (int i = 0; i < transformed.length(); i++)
+									transformed[i] = activation_forward(ACTIVATION_RELU, transformed[i]);
+								break;
+						}
 
 						transformed.store_row(ptr_out, col, out, elements_left, TileSize);
 					}
@@ -486,87 +496,20 @@ namespace SIMD_NAMESPACE
 		const ml::cpu::ComputeConfig cfg = ml::cpu::ComputeConfig::getBest(dtype);
 		CREATE_KERNEL_TABLE(launch_weight_transform);
 		CALL_KERNEL(launch_weight_transform, cfg)(context, weight_shape, weights, matrices, invert, low_precision);
-
-//		switch (dtype)
-//		{
-//			case DTYPE_BFLOAT16:
-//			{
-//				if (cpu::has_hardware_bf16_conversion())
-//					launch_weight_transform<bfloat16, float>(context, weight_shape, weights, matrices, invert, low_precision);
-//				else
-//					launch_weight_transform<sw_bfloat16, float>(context, weight_shape, weights, matrices, invert, low_precision);
-//				break;
-//			}
-//			case DTYPE_FLOAT16:
-//			{
-//				if (cpu::has_hardware_fp16_conversion())
-//					launch_weight_transform<float16, float>(context, weight_shape, weights, matrices, invert, low_precision);
-//				else
-//					launch_weight_transform<sw_float16, float>(context, weight_shape, weights, matrices, invert, low_precision);
-//				break;
-//			}
-//			case DTYPE_FLOAT32:
-//				launch_weight_transform<float, float>(context, weight_shape, weights, matrices, invert, low_precision);
-//				break;
-//			default:
-//				break;
-//		}
 	}
 	void cpu_kernel_winograd_input_transform(mlContext_t context, mlDataType_t dtype, mlShape_t weight_shape, mlShape_t input_shape,
 			const void *input, void *matrices)
 	{
-		switch (dtype)
-		{
-			case DTYPE_BFLOAT16:
-			{
-				if (cpu::has_hardware_bf16_conversion())
-					launch_input_transform<bfloat16, float>(context, weight_shape, input_shape, input, matrices);
-				else
-					launch_input_transform<sw_bfloat16, float>(context, weight_shape, input_shape, input, matrices);
-				break;
-			}
-			case DTYPE_FLOAT16:
-			{
-				if (cpu::has_hardware_fp16_conversion())
-					launch_input_transform<float16, float>(context, weight_shape, input_shape, input, matrices);
-				else
-					launch_input_transform<sw_float16, float>(context, weight_shape, input_shape, input, matrices);
-				break;
-			}
-			case DTYPE_FLOAT32:
-				launch_input_transform<float, float>(context, weight_shape, input_shape, input, matrices);
-				break;
-			default:
-				break;
-		}
+		const ml::cpu::ComputeConfig cfg = ml::cpu::ComputeConfig::getBest(dtype);
+		CREATE_KERNEL_TABLE(launch_input_transform);
+		CALL_KERNEL(launch_input_transform, cfg)(context, weight_shape, input_shape, input, matrices);
 	}
 	void cpu_kernel_winograd_output_transform(mlContext_t context, mlDataType_t dtype, mlShape_t weight_shape, mlShape_t output_shape,
 			const void *matrices, void *output, const void *bias, const void *add, mlActivationType_t act)
 	{
-		switch (dtype)
-		{
-			case DTYPE_BFLOAT16:
-			{
-				if (cpu::has_hardware_bf16_conversion())
-					launch_output_transform<bfloat16, float>(context, weight_shape, output_shape, matrices, output, bias, add, act);
-				else
-					launch_output_transform<sw_bfloat16, float>(context, weight_shape, output_shape, matrices, output, bias, add, act);
-				break;
-			}
-			case DTYPE_FLOAT16:
-			{
-				if (cpu::has_hardware_fp16_conversion())
-					launch_output_transform<float16, float>(context, weight_shape, output_shape, matrices, output, bias, add, act);
-				else
-					launch_output_transform<sw_float16, float>(context, weight_shape, output_shape, matrices, output, bias, add, act);
-				break;
-			}
-			case DTYPE_FLOAT32:
-				launch_output_transform<float, float>(context, weight_shape, output_shape, matrices, output, bias, add, act);
-				break;
-			default:
-				break;
-		}
+		const ml::cpu::ComputeConfig cfg = ml::cpu::ComputeConfig::getBest(dtype);
+		CREATE_KERNEL_TABLE(launch_output_transform);
+		CALL_KERNEL(launch_output_transform, cfg)(context, weight_shape, output_shape, matrices, output, bias, add, act);
 	}
 	void cpu_kernel_winograd_gradient_transform(mlContext_t context, mlDataType_t dtype, mlShape_t weight_shape, mlShape_t gradient_shape,
 			const void *gradient, void *matrices)
