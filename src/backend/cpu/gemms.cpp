@@ -54,7 +54,7 @@ namespace
 				break;
 			}
 			default:
-				assert(false);
+				break;
 		}
 	}
 	void openblas_gemm_batched(mlDataType_t dtype, mlShape_t shape_C, void *C, mlShape_t shape_A, const void *A, mlShape_t shape_B, const void *B,
@@ -93,7 +93,7 @@ namespace
 				break;
 			}
 			default:
-				assert(false);
+				break;
 		}
 	}
 #endif
