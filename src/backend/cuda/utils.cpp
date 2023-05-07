@@ -54,7 +54,7 @@ namespace ml
 				cudaError_t status = cudaStreamDestroy(m_cuda_stream);
 				assert(status == cudaSuccess);
 			}
-
+			cuda_free(m_workspace);
 		}
 		int Context::getDeviceIndex(mlContext_t context)
 		{
