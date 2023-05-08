@@ -64,7 +64,7 @@ namespace ml
 		throw LogicError(METHOD_NAME, "unknown nonlinearity '" + str + "'");
 	}
 
-	Layer::Layer(const std::string &activation, DataType dtype) :
+	Layer::Layer(std::string activation, DataType dtype) :
 			m_dtype(dtype),
 			m_activation(activationFromString(activation))
 	{

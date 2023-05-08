@@ -19,7 +19,7 @@ namespace ml
 			bool m_use_weights = true;
 			bool m_use_bias = true;
 		public:
-			Dense(int neurons, const std::string &activation = "linear");
+			Dense(int neurons, std::string activation = "linear");
 
 			Dense& useWeights(bool b) noexcept;
 			Dense& useBias(bool b) noexcept;

@@ -16,7 +16,7 @@ namespace ml
 	class GlobalBroadcastHW: public Layer
 	{
 		public:
-			GlobalBroadcastHW();
+			GlobalBroadcastHW(std::string activation = "linear");
 
 			void setInputShape(const std::vector<Shape> &shapes);
 			Shape getOutputShape() const;

@@ -35,7 +35,7 @@ namespace ml
 			bool m_are_weights_transformed = false;
 
 		public:
-			Conv2D(int filters, int kernelSize, const std::string &activation = "linear", bool useBias = true);
+			Conv2D(int filters, int kernelSize, std::string activation = "linear", bool useBias = true);
 
 			Conv2D& useBias(bool b) noexcept;
 			bool isUsingBias() const noexcept;

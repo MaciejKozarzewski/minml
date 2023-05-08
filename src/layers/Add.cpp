@@ -13,7 +13,7 @@
 
 namespace ml
 {
-	Add::Add(const std::string &activation) :
+	Add::Add(std::string activation) :
 			Layer(activation)
 	{
 	}

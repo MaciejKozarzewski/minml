@@ -16,7 +16,7 @@
 
 namespace ml
 {
-	BatchNormalization::BatchNormalization(const std::string &activation, bool useGamma, bool useBeta, int historySize) :
+	BatchNormalization::BatchNormalization(std::string activation, bool useGamma, bool useBeta, int historySize) :
 			Layer(std::string(activation))
 	{
 		m_use_gamma = useGamma;

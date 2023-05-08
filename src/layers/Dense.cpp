@@ -24,7 +24,7 @@ namespace
 
 namespace ml
 {
-	Dense::Dense(int neurons, const std::string &activation) :
+	Dense::Dense(int neurons, std::string activation) :
 			Layer(activation),
 			m_neurons(neurons),
 			m_use_weights(true),

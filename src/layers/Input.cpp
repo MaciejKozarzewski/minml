@@ -13,7 +13,7 @@
 
 namespace ml
 {
-	Input::Input(const Shape &input_shape) :
+	Input::Input(Shape input_shape) :
 			Layer()
 	{
 		m_input_shapes.push_back(input_shape);

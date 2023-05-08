@@ -14,8 +14,8 @@
 
 namespace ml
 {
-	GlobalBroadcastHW::GlobalBroadcastHW() :
-			Layer()
+	GlobalBroadcastHW::GlobalBroadcastHW(std::string activation) :
+			Layer(activation)
 	{
 	}
 
@@ -48,7 +48,7 @@ namespace ml
 	}
 	std::unique_ptr<Layer> GlobalBroadcastHW::clone(const Json &config) const
 	{
-		std::unique_ptr<GlobalBroadcastHW> result = std::make_unique<GlobalBroadcastHW>();
+		std::unique_ptr<GlobalBroadcastHW> result = std::make_unique<GlobalBroadcastHW>(config["nonlinearity"]);
 		result->m_dtype = typeFromString(config["dtype"].getString());
 		return result;
 	}
@@ -77,21 +77,26 @@ namespace ml
 
 		Tensor input_view = input[0].view( { batch_size, hw, channels });
 		transpose_021(context(), input_view, tmp_in);
+		tmp_out.copyFrom(context(), tmp_in); // skip connection from input to output
 
 		tmp_in.reshape( { batch_size * channels, hw });
 		tmp_out.reshape( { batch_size * channels, hw });
-		gemm(context(), 'n', 't', tmp_out, tmp_in, tmp_w, 1.0f, 0.0f);
+		gemm(context(), 'n', 't', tmp_out, tmp_in, tmp_w, 1.0f, 1.0f);
 
 		tmp_in.reshape(tmp_shape);
 		tmp_out.reshape(tmp_shape);
 		Tensor output_view = output.view( { batch_size, hw, channels });
 		transpose_021(context(), tmp_out, output_view);
+
+		activationForward(context(), output, output, m_activation);
 	}
 	void GlobalBroadcastHW::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev,
 			Tensor &gradient_next)
 	{
 		assert(input.size() == 1);
 		const bool emulate_low_precision = false; //isTrainable() and dtype() == DataType::FLOAT32;
+
+		activationBackward(context(), gradient_next, gradient_next, output, m_activation);
 
 		Tensor tmp_w;
 		if (emulate_low_precision)
@@ -125,7 +130,9 @@ namespace ml
 
 		tmp_in.reshape( { batch_size * channels, hw });
 		tmp_out.reshape( { batch_size * channels, hw });
-		gemm(context(), 't', 'n', getWeights().getGradient(), tmp_out, tmp_in, 1.0f, 1.0f);
+		gemm(context(), 't', 'n', getWeights().getGradient(), tmp_out, tmp_in, 1.0f, 0.0f);
+
+		addTensors(context(), gradient_prev[0], gradient_prev[0], gradient_next);
 	}
 
 } /* namespace ml */

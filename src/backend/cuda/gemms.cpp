@@ -52,8 +52,8 @@ namespace ml
 			case DTYPE_BFLOAT16: // ABC [bfloat16]
 			{
 				const cublasComputeType_t ct = cuda::has_bf16_math(context) ? CUBLAS_COMPUTE_32F : CUBLAS_COMPUTE_32F_FAST_16BF;
-				float _alpha = alpha;
-				float _beta = beta;
+				const float _alpha = alpha;
+				const float _beta = beta;
 				cublasStatus_t status = cublasGemmEx(handle, op_B, op_A, M, N, K, &_alpha, getPointer<void>(B), CUDA_R_16BF, LDB, getPointer<void>(A),
 						CUDA_R_16BF, LDA, &_beta, getPointer<void>(C), CUDA_R_16BF, LDC, ct, CUBLAS_GEMM_DEFAULT);
 				assert(status == CUBLAS_STATUS_SUCCESS);
@@ -63,8 +63,8 @@ namespace ml
 			{
 				if (cuda::has_fp16_math(context))
 				{
-					half _alpha = alpha;
-					half _beta = beta;
+					const half _alpha = alpha;
+					const half _beta = beta;
 					cublasStatus_t status = cublasHgemm(handle, op_B, op_A, M, N, K, &_alpha, getPointer<half>(B), LDB, getPointer<half>(A), LDA,
 							&_beta, getPointer<half>(C), LDC);
 					assert(status == CUBLAS_STATUS_SUCCESS);
@@ -72,8 +72,8 @@ namespace ml
 				}
 				else
 				{
-					float _alpha = alpha;
-					float _beta = beta;
+					const float _alpha = alpha;
+					const float _beta = beta;
 					cublasStatus_t status = cublasGemmEx(handle, op_B, op_A, M, N, K, &_alpha, getPointer<void>(B), CUDA_R_16F, LDB,
 							getPointer<void>(A), CUDA_R_16F, LDA, &_beta, getPointer<void>(C), CUDA_R_16F, LDC, CUBLAS_COMPUTE_32F,
 							CUBLAS_GEMM_DEFAULT);
@@ -83,8 +83,8 @@ namespace ml
 			}
 			case DTYPE_FLOAT32: // ABC [float32]
 			{
-				float _alpha = alpha;
-				float _beta = beta;
+				const float _alpha = alpha;
+				const float _beta = beta;
 				cublasStatus_t status = cublasSgemm(handle, op_B, op_A, M, N, K, &_alpha, getPointer<float>(B), LDB, getPointer<float>(A), LDA,
 						&_beta, getPointer<float>(C), LDC);
 				assert(status == CUBLAS_STATUS_SUCCESS);
@@ -121,8 +121,8 @@ namespace ml
 			case DTYPE_BFLOAT16:
 			{
 				const cublasComputeType_t ct = cuda::has_bf16_math(context) ? CUBLAS_COMPUTE_32F : CUBLAS_COMPUTE_32F_FAST_16BF;
-				float _alpha = alpha;
-				float _beta = beta;
+				const float _alpha = alpha;
+				const float _beta = beta;
 				cublasStatus_t status = cublasGemmStridedBatchedEx(handle, op_B, op_A, M, N, K, &_alpha, getPointer<void>(B), CUDA_R_16BF, LDB,
 						strideB, getPointer<void>(A), CUDA_R_16BF, LDA, strideA, &_beta, getPointer<void>(C), CUDA_R_16BF, LDC, strideC, batch, ct,
 						CUBLAS_GEMM_DEFAULT);
@@ -133,8 +133,8 @@ namespace ml
 			{
 				if (cuda::has_fp16_math(context))
 				{
-					half _alpha = alpha;
-					half _beta = beta;
+					const half _alpha = alpha;
+					const half _beta = beta;
 					cublasStatus_t status = cublasHgemmStridedBatched(handle, op_B, op_A, M, N, K, &_alpha, getPointer<half>(B), LDB, strideB,
 							getPointer<half>(A), LDA, strideA, &_beta, getPointer<half>(C), LDC, strideC, batch);
 					assert(status == CUBLAS_STATUS_SUCCESS);
@@ -142,8 +142,8 @@ namespace ml
 				}
 				else
 				{
-					float _alpha = alpha;
-					float _beta = beta;
+					const float _alpha = alpha;
+					const float _beta = beta;
 					cublasStatus_t status = cublasGemmStridedBatchedEx(handle, op_B, op_A, M, N, K, &_alpha, getPointer<void>(B), CUDA_R_16F, LDB,
 							strideB, getPointer<void>(A), CUDA_R_16F, LDA, strideA, &_beta, getPointer<void>(C), CUDA_R_16F, LDC, strideC, batch,
 							CUBLAS_COMPUTE_32F, CUBLAS_GEMM_DEFAULT);
@@ -153,8 +153,8 @@ namespace ml
 			}
 			case DTYPE_FLOAT32:
 			{
-				float _alpha = alpha;
-				float _beta = beta;
+				const float _alpha = alpha;
+				const float _beta = beta;
 				cublasStatus_t status = cublasSgemmStridedBatched(handle, op_B, op_A, M, N, K, &_alpha, getPointer<float>(B), LDB, strideB,
 						getPointer<float>(A), LDA, strideA, &_beta, getPointer<float>(C), LDC, strideC, batch);
 				assert(status == CUBLAS_STATUS_SUCCESS);

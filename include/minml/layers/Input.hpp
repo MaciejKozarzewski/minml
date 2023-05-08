@@ -16,7 +16,7 @@ namespace ml
 	class Input: public Layer
 	{
 		public:
-			Input(const Shape &input_shape = Shape());
+			Input(Shape input_shape = Shape());
 
 			void setInputShape(const std::vector<Shape> &shapes);
 			Shape getOutputShape() const;
@@ -31,7 +31,5 @@ namespace ml
 	};
 
 } /* namespace ml */
-
-
 
 #endif /* MINML_LAYERS_INPUT_HPP_ */

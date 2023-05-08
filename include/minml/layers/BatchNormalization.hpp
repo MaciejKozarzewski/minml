@@ -23,7 +23,7 @@ namespace ml
 			bool m_use_beta = true;
 
 		public:
-			BatchNormalization(const std::string &activation = "linear", bool useGamma = true, bool useBeta = true, int historySize = 64);
+			BatchNormalization(std::string activation = "linear", bool useGamma = true, bool useBeta = true, int historySize = 64);
 
 			BatchNormalization& useGamma(bool b) noexcept;
 			BatchNormalization& useBeta(bool b) noexcept;
@@ -49,7 +49,5 @@ namespace ml
 	};
 
 } /* namespace ml */
-
-
 
 #endif /* MINML_LAYERS_BATCHNORMALIZATION_HPP_ */

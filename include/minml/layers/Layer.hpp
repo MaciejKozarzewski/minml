@@ -55,7 +55,7 @@ namespace ml
 			DataType m_dtype = DataType::FLOAT32;
 			ActivationType m_activation;
 		public:
-			Layer(const std::string &activation = "linear", DataType dtype = DataType::FLOAT32);
+			Layer(std::string activation = "linear", DataType dtype = DataType::FLOAT32);
 
 			Layer(const Layer &other) = delete;
 			Layer(Layer &&other) = delete;

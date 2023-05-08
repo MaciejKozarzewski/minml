@@ -16,7 +16,7 @@ namespace ml
 	class Add: public Layer
 	{
 		public:
-			Add(const std::string &activation = "linear");
+			Add(std::string activation = "linear");
 
 			void setInputShape(const std::vector<Shape> &shapes);
 			Shape getOutputShape() const;
@@ -30,7 +30,5 @@ namespace ml
 	};
 
 } /* namespace ml */
-
-
 
 #endif /* MINML_LAYERS_ADD_HPP_ */
