@@ -127,7 +127,10 @@ namespace ml
 			case DTYPE_BFLOAT16:
 				return false;
 			case DTYPE_FLOAT16:
-				return false;
+			{
+				static const bool result = cpu_x86::get().supports("avx2") and cpu_x86::get().supports("fma") and cpu_x86::get().supports("f16c");
+				return result;
+			}
 			case DTYPE_FLOAT32:
 				return true;
 			default:

@@ -30,6 +30,11 @@ namespace ml
 		{
 		}
 
+		bool is_aligned(const void *ptr, size_t alignment) noexcept
+		{
+			return (reinterpret_cast<std::uintptr_t>(ptr) % alignment) == 0;
+		}
+
 		bool has_hardware_fp16_conversion()
 		{
 			static const bool result = cpu_x86::get().supports("f16c") or cpu_x86::get().supports("avx512-f");
@@ -87,12 +92,14 @@ namespace ml
 		void* WorkspaceAllocator::get(size_t size, size_t alignment) noexcept
 		{
 			assert(m_ptr != nullptr);
-			const size_t shift = reinterpret_cast<std::uintptr_t>(m_ptr) % alignment;
+			uint8_t *ptr = reinterpret_cast<uint8_t*>(m_ptr) + m_offset;
+
+			const size_t remainder = reinterpret_cast<std::uintptr_t>(ptr) % alignment;
+			const size_t shift = (remainder == 0) ? 0 : (alignment - remainder);
 			assert(m_offset + shift + size <= m_max_size);
 
-			void *result = reinterpret_cast<uint8_t*>(m_ptr) + m_offset + shift;
 			m_offset += shift + size;
-			return result;
+			return ptr + shift;
 		}
 
 	} /* namespace cpu */

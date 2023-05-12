@@ -46,6 +46,26 @@ static constexpr int register_size() noexcept
 	}
 }
 
+template<RegisterType RT>
+static constexpr int number_of_registers() noexcept
+{
+	switch (RT)
+	{
+		case SCALAR:
+			return 1;
+		case XMM:
+			return 16;
+		case YMM:
+			return 16;
+		case ZMM:
+			return 32;
+		case TMM:
+			return 8;
+		default:
+			return 0;
+	}
+}
+
 template<typename T, RegisterType RT>
 static constexpr int vector_size() noexcept
 {
