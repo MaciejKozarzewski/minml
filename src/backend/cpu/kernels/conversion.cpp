@@ -9,8 +9,10 @@
 #include <minml/backend/backend_utils.hpp>
 
 #include "../vectors/vectors.hpp"
+#include "../tiles/tile_transpose.hpp"
 
 #include <type_traits>
+#include <iostream>
 
 namespace
 {
@@ -57,17 +59,192 @@ namespace
 		}
 	}
 
-	template<typename T>
-	void transpose(void *dst, const void *src, int dim0, int dim1, int dim2)
+	struct TileSize
 	{
+			int rows, columns;
+	};
+
+	template<typename T>
+	constexpr TileSize get_tile_size() noexcept
+	{
+		if constexpr (std::is_same<T, float>::value)
+		{
+#if SUPPORTS_AVX
+			return TileSize( { 8, 8 });
+#elif SUPPORTS_SSE2
+			return TileSize( { 4, 4 });
+#else
+			return TileSize( { 1, 1 });
+#endif
+		}
+		if constexpr (std::is_same<T, uint16_t>::value)
+		{
+#if SUPPORTS_AVX2
+			return TileSize( { 8, 16});
+#elif SUPPORTS_SSE2
+			return TileSize( { 8, 8 });
+#else
+			return TileSize( { 1, 1});
+#endif
+		}
+		return TileSize( { 1, 1 });
+	}
+
+	template<typename T>
+	void def_transpose(const T *src, int src_stride, TileSize size, T *dst, int dst_stride)
+	{
+		for (int i = 0; i < size.rows; i++)
+			for (int j = 0; j < size.columns; j++)
+				dst[j * dst_stride + i] = src[i * src_stride + j];
+	}
+	template<typename T>
+	void kernel_transpose_021(T *dst, const T *src, int dim0, int dim1, int dim2)
+	{
+		constexpr TileSize tile_size = get_tile_size<T>();
+
 		for (int i = 0; i < dim0; i++)
-			for (int j = 0; j < dim1; j++)
-				for (int k = 0; k < dim2; k++)
+		{
+			const int tmp_dim1 = dim1 - dim1 % tile_size.rows;
+			const int tmp_dim2 = dim2 - dim2 % tile_size.columns;
+
+			// first loop over bulk of full tiles
+			for (int j = 0; j < tmp_dim1; j += tile_size.rows)
+				for (int k = 0; k < tmp_dim2; k += tile_size.columns)
 				{
-					const int src_idx = (i * dim1 + j) * dim2 + k;
-					const int dst_idx = (i * dim2 + k) * dim1 + j;
-					reinterpret_cast<T*>(dst)[dst_idx] = reinterpret_cast<const T*>(src)[src_idx];
+					const int src_stride = dim2;
+					const int dst_stride = dim1;
+					const T *src_ptr = src + j * src_stride + k;
+					T *dst_ptr = dst + k * dst_stride + j;
+
+					if constexpr (std::is_same<T, float>::value)
+					{
+#if SUPPORTS_AVX
+						__m256 tile[8];
+						for (int i = 0; i < 8; i++)
+							tile[i] = _mm256_loadu_ps(src_ptr + i * src_stride);
+
+						__m256 tmp[8];
+						tmp[0] = _mm256_unpacklo_ps(tile[0], tile[1]);
+						tmp[1] = _mm256_unpackhi_ps(tile[0], tile[1]);
+						tmp[2] = _mm256_unpacklo_ps(tile[2], tile[3]);
+						tmp[3] = _mm256_unpackhi_ps(tile[2], tile[3]);
+						tmp[4] = _mm256_unpacklo_ps(tile[4], tile[5]);
+						tmp[5] = _mm256_unpackhi_ps(tile[4], tile[5]);
+						tmp[6] = _mm256_unpacklo_ps(tile[6], tile[7]);
+						tmp[7] = _mm256_unpackhi_ps(tile[6], tile[7]);
+
+						tile[0] = _mm256_shuffle_ps(tmp[0], tmp[2], _MM_SHUFFLE(1,0,1,0));
+						tile[1] = _mm256_shuffle_ps(tmp[0], tmp[2], _MM_SHUFFLE(3,2,3,2));
+						tile[2] = _mm256_shuffle_ps(tmp[1], tmp[3], _MM_SHUFFLE(1,0,1,0));
+						tile[3] = _mm256_shuffle_ps(tmp[1], tmp[3], _MM_SHUFFLE(3,2,3,2));
+						tile[4] = _mm256_shuffle_ps(tmp[4], tmp[6], _MM_SHUFFLE(1,0,1,0));
+						tile[5] = _mm256_shuffle_ps(tmp[4], tmp[6], _MM_SHUFFLE(3,2,3,2));
+						tile[6] = _mm256_shuffle_ps(tmp[5], tmp[7], _MM_SHUFFLE(1,0,1,0));
+						tile[7] = _mm256_shuffle_ps(tmp[5], tmp[7], _MM_SHUFFLE(3,2,3,2));
+
+						tmp[0] = _mm256_permute2f128_ps(tile[0], tile[4], 0x20);
+						tmp[1] = _mm256_permute2f128_ps(tile[1], tile[5], 0x20);
+						tmp[2] = _mm256_permute2f128_ps(tile[2], tile[6], 0x20);
+						tmp[3] = _mm256_permute2f128_ps(tile[3], tile[7], 0x20);
+						tmp[4] = _mm256_permute2f128_ps(tile[0], tile[4], 0x31);
+						tmp[5] = _mm256_permute2f128_ps(tile[1], tile[5], 0x31);
+						tmp[6] = _mm256_permute2f128_ps(tile[2], tile[6], 0x31);
+						tmp[7] = _mm256_permute2f128_ps(tile[3], tile[7], 0x31);
+
+						for (int i = 0; i < 8; i++)
+							_mm256_storeu_ps(dst_ptr + i * dst_stride, tmp[i]);
+#elif SUPPORTS_SSE2
+						__m128 tile[4];
+						for (int i = 0; i < 4; i++)
+							tile[i] = _mm_loadu_ps(src_ptr + i * src_stride);
+						_MM_TRANSPOSE4_PS(tile[0], tile[1], tile[2], tile[3]);
+						for (int i = 0; i < 4; i++)
+							_mm_storeu_ps(dst_ptr + i * dst_stride, tile[i]);
+#endif
+					}
+					if constexpr (std::is_same<T, uint16_t>::value)
+					{
+#if SUPPORTS_AVX2
+						__m256i tile[8];
+						for (int i = 0; i < 8; i++)
+						tile[i] = _mm256_loadu_si256((const __m256i*) (src_ptr + i * src_stride));
+
+						__m256i tmp[8];
+						tmp[0] = _mm256_unpacklo_epi16(tile[0], tile[1]);
+						tmp[1] = _mm256_unpackhi_epi16(tile[0], tile[1]);
+						tmp[2] = _mm256_unpacklo_epi16(tile[2], tile[3]);
+						tmp[3] = _mm256_unpackhi_epi16(tile[2], tile[3]);
+						tmp[4] = _mm256_unpacklo_epi16(tile[4], tile[5]);
+						tmp[5] = _mm256_unpackhi_epi16(tile[4], tile[5]);
+						tmp[6] = _mm256_unpacklo_epi16(tile[6], tile[7]);
+						tmp[7] = _mm256_unpackhi_epi16(tile[6], tile[7]);
+
+						tile[0] = _mm256_unpacklo_epi32(tmp[0], tmp[2]);
+						tile[1] = _mm256_unpackhi_epi32(tmp[0], tmp[2]);
+						tile[2] = _mm256_unpacklo_epi32(tmp[1], tmp[3]);
+						tile[3] = _mm256_unpackhi_epi32(tmp[1], tmp[3]);
+						tile[4] = _mm256_unpacklo_epi32(tmp[4], tmp[6]);
+						tile[5] = _mm256_unpackhi_epi32(tmp[4], tmp[6]);
+						tile[6] = _mm256_unpacklo_epi32(tmp[5], tmp[7]);
+						tile[7] = _mm256_unpackhi_epi32(tmp[5], tmp[7]);
+
+						tmp[0] = _mm256_unpacklo_epi64(tile[0], tile[4]);
+						tmp[1] = _mm256_unpackhi_epi64(tile[0], tile[4]);
+						tmp[2] = _mm256_unpacklo_epi64(tile[1], tile[5]);
+						tmp[3] = _mm256_unpackhi_epi64(tile[1], tile[5]);
+						tmp[4] = _mm256_unpacklo_epi64(tile[2], tile[6]);
+						tmp[5] = _mm256_unpackhi_epi64(tile[2], tile[6]);
+						tmp[6] = _mm256_unpacklo_epi64(tile[3], tile[7]);
+						tmp[7] = _mm256_unpackhi_epi64(tile[3], tile[7]);
+
+						for (int i = 0; i < 8; i++)
+							_mm_storeu_si128((__m128i*) (dst_ptr + i * dst_stride), _mm256_castsi256_si128(tmp[i]));
+						for (int i = 0; i < 8; i++)
+							_mm_storeu_si128((__m128i*) (dst_ptr + (8 + i) * dst_stride), _mm256_extracti128_si256(tmp[i], 1));
+#elif SUPPORTS_SSE2
+						__m128i tile[8];
+						for (int i = 0; i < 8; i++)
+							tile[i] = _mm_loadu_si128((const __m128i*) (src_ptr + i * src_stride));
+
+						__m128i tmp[8];
+						tmp[0] = _mm_unpacklo_epi16(tile[0], tile[1]);
+						tmp[1] = _mm_unpackhi_epi16(tile[0], tile[1]);
+						tmp[2] = _mm_unpacklo_epi16(tile[2], tile[3]);
+						tmp[3] = _mm_unpackhi_epi16(tile[2], tile[3]);
+						tmp[4] = _mm_unpacklo_epi16(tile[4], tile[5]);
+						tmp[5] = _mm_unpackhi_epi16(tile[4], tile[5]);
+						tmp[6] = _mm_unpacklo_epi16(tile[6], tile[7]);
+						tmp[7] = _mm_unpackhi_epi16(tile[6], tile[7]);
+
+						tile[0] = _mm_unpacklo_epi32(tmp[0], tmp[2]);
+						tile[1] = _mm_unpackhi_epi32(tmp[0], tmp[2]);
+						tile[2] = _mm_unpacklo_epi32(tmp[1], tmp[3]);
+						tile[3] = _mm_unpackhi_epi32(tmp[1], tmp[3]);
+						tile[4] = _mm_unpacklo_epi32(tmp[4], tmp[6]);
+						tile[5] = _mm_unpackhi_epi32(tmp[4], tmp[6]);
+						tile[6] = _mm_unpacklo_epi32(tmp[5], tmp[7]);
+						tile[7] = _mm_unpackhi_epi32(tmp[5], tmp[7]);
+
+						tmp[0] = _mm_unpacklo_epi64(tile[0], tile[4]);
+						tmp[1] = _mm_unpackhi_epi64(tile[0], tile[4]);
+						tmp[2] = _mm_unpacklo_epi64(tile[1], tile[5]);
+						tmp[3] = _mm_unpackhi_epi64(tile[1], tile[5]);
+						tmp[4] = _mm_unpacklo_epi64(tile[2], tile[6]);
+						tmp[5] = _mm_unpackhi_epi64(tile[2], tile[6]);
+						tmp[6] = _mm_unpacklo_epi64(tile[3], tile[7]);
+						tmp[7] = _mm_unpackhi_epi64(tile[3], tile[7]);
+
+						for (int i = 0; i < 8; i++)
+							_mm_storeu_si128((__m128i*) (dst_ptr + i * dst_stride), tmp[i]);
+#endif
+					}
 				}
+			def_transpose(src + tmp_dim2, dim2, TileSize( { tmp_dim1, dim2 - tmp_dim2 }), dst + tmp_dim2 * dim1, dim1); // rightmost panel (without lower right corner)
+			def_transpose(src + tmp_dim1 * dim2, dim2, TileSize( { dim1 - tmp_dim1, dim2 }), dst + tmp_dim1, dim1); // bottom panel
+
+			src += dim1 * dim2;
+			dst += dim1 * dim2;
+		}
 	}
 }
 
@@ -202,11 +379,11 @@ namespace SIMD_NAMESPACE
 		{
 			case DTYPE_BFLOAT16:
 			case DTYPE_FLOAT16:
-				transpose<uint16_t>(getPointer<uint16_t>(output), getPointer<uint16_t>(input), shape.dim[0], shape.dim[1], shape.dim[2]);
+				kernel_transpose_021<uint16_t>(getPointer<uint16_t>(output), getPointer<uint16_t>(input), shape.dim[0], shape.dim[1], shape.dim[2]);
 				break;
 			case DTYPE_FLOAT32:
 			case DTYPE_INT32:
-				transpose<uint32_t>(getPointer<uint32_t>(output), getPointer<uint32_t>(input), shape.dim[0], shape.dim[1], shape.dim[2]);
+				kernel_transpose_021<float>(getPointer<float>(output), getPointer<float>(input), shape.dim[0], shape.dim[1], shape.dim[2]);
 				break;
 			default:
 				break;
