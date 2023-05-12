@@ -12,11 +12,25 @@
 #include <minml/core/ml_exceptions.hpp>
 #include <minml/utils/json.hpp>
 
+#include <minml/utils/time_util.hpp>
+
 namespace ml
 {
-	GlobalBroadcastHW::GlobalBroadcastHW(std::string activation) :
+	GlobalBroadcastHW::GlobalBroadcastHW(std::string activation, bool use_bias) :
 			Layer(activation)
 	{
+		m_use_bias = use_bias;
+	}
+	GlobalBroadcastHW& GlobalBroadcastHW::useBias(bool b) noexcept
+	{
+		if (b != m_use_bias)
+			m_bias = nullptr;
+		m_use_bias = b;
+		return *this;
+	}
+	bool GlobalBroadcastHW::isUsingBias() const noexcept
+	{
+		return m_use_bias;
 	}
 
 	void GlobalBroadcastHW::setInputShape(const std::vector<Shape> &shapes)
@@ -36,7 +50,20 @@ namespace ml
 		const int hw = getInputShape()[1] * getInputShape()[2];
 		return Shape( { hw, hw });
 	}
+	Shape GlobalBroadcastHW::getBiasShape() const
+	{
+		if (isUsingBias())
+			return Shape( { getInputShape()[1] * getInputShape()[2] });
+		else
+			return Shape();
+	}
 
+	Json GlobalBroadcastHW::getConfig() const
+	{
+		Json result = Layer::getConfig();
+		result["use_bias"] = m_use_bias;
+		return result;
+	}
 	std::string GlobalBroadcastHW::name() const
 	{
 		return "GlobalBroadcastHW";
@@ -48,13 +75,50 @@ namespace ml
 	}
 	std::unique_ptr<Layer> GlobalBroadcastHW::clone(const Json &config) const
 	{
-		std::unique_ptr<GlobalBroadcastHW> result = std::make_unique<GlobalBroadcastHW>(config["nonlinearity"]);
+		std::unique_ptr<GlobalBroadcastHW> result = std::make_unique<GlobalBroadcastHW>(config["nonlinearity"], config["use_bias"]);
 		result->m_dtype = typeFromString(config["dtype"].getString());
 		return result;
 	}
 
 	void GlobalBroadcastHW::forward(const std::vector<Tensor> &input, Tensor &output)
 	{
+		struct Timer
+		{
+				std::string m_name;
+				double m_start = 0.0;
+				double m_total_time = 0.0;
+				int m_count = 0;
+				bool m_init = false;
+
+				Timer(const std::string &name) :
+						m_name(name)
+				{
+				}
+				~Timer()
+				{
+					std::cout << m_name << " : " << 1.0e3 * m_total_time / m_count << " ms\n";
+				}
+				void start() noexcept
+				{
+					m_start = getTime();
+				}
+				void stop() noexcept
+				{
+					if (m_init)
+					{
+						m_total_time += getTime() - m_start;
+						m_count++;
+					}
+					else
+						m_init = true;
+				}
+
+		};
+		static Timer transpose("transpose  ");
+		static Timer copying("copying    ");
+		static Timer matrix_multiply("gemm       ");
+		static Timer nonlinearity("activation ");
+
 		assert(input.size() == 1);
 		const bool emulate_low_precision = false; //isTrainable() and dtype() == DataType::FLOAT32;
 
@@ -76,19 +140,33 @@ namespace ml
 		Tensor tmp_out = m_workspace.lock()->view(tmp_shape, tmp_w.volume() + tmp_in.volume());
 
 		Tensor input_view = input[0].view( { batch_size, hw, channels });
+		transpose.start();
 		transpose_021(context(), input_view, tmp_in);
+		transpose.stop();
+
+		copying.start();
 		tmp_out.copyFrom(context(), tmp_in); // skip connection from input to output
+		copying.stop();
 
 		tmp_in.reshape( { batch_size * channels, hw });
 		tmp_out.reshape( { batch_size * channels, hw });
+		matrix_multiply.start();
 		gemm(context(), 'n', 't', tmp_out, tmp_in, tmp_w, 1.0f, 1.0f);
+		matrix_multiply.stop();
 
 		tmp_in.reshape(tmp_shape);
 		tmp_out.reshape(tmp_shape);
 		Tensor output_view = output.view( { batch_size, hw, channels });
+		transpose.start();
 		transpose_021(context(), tmp_out, output_view);
+		transpose.stop();
 
-		activationForward(context(), output, output, m_activation);
+		nonlinearity.start();
+		if (isUsingBias())
+			addBiasAct(context(), output, getBias().getParam(), m_activation);
+		else
+			activationForward(context(), output, output, m_activation);
+		nonlinearity.stop();
 	}
 	void GlobalBroadcastHW::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev,
 			Tensor &gradient_next)
@@ -97,6 +175,8 @@ namespace ml
 		const bool emulate_low_precision = false; //isTrainable() and dtype() == DataType::FLOAT32;
 
 		activationBackward(context(), gradient_next, gradient_next, output, m_activation);
+		if (isUsingBias())
+			sumOverFirstDim(context(), getBias().getGradient(), gradient_next, 0.0f);
 
 		Tensor tmp_w;
 		if (emulate_low_precision)
