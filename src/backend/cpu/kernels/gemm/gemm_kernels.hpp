@@ -13,7 +13,8 @@ namespace ml
 	class Fragment;
 	class Matrix;
 	struct Position2D;
-	enum class MatrixOp;
+	enum class MatrixOp
+	;
 }
 
 namespace ml
@@ -54,6 +55,12 @@ namespace ml
 			const Fragment &C) noexcept;
 	void gemm_avx2_fma_6x16_fp16_fp32(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr,
 			const Fragment &C) noexcept;
+
+	void gemm_avx2_fma_5x16_fp32(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr,
+			const Fragment &C) noexcept;
+	void gemm_avx2_fma_6x16_fp16(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr,
+			const Fragment &C) noexcept;
+
 	void pack_avx2_fma_6xK_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept;
 	void pack_avx2_fma_16xK_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept;
 

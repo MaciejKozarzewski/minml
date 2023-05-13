@@ -70,8 +70,21 @@ namespace ml
 				size_t m_offset = 0;
 			public:
 				WorkspaceAllocator() noexcept = default;
-				WorkspaceAllocator(mlContext_t context) noexcept;
-				void* get(size_t size, size_t alignment) noexcept;
+				WorkspaceAllocator(mlContext_t context) noexcept :
+						m_ptr(cpu::Context::getWorkspace(context)),
+						m_max_size(cpu::Context::getWorkspaceSize(context))
+				{
+				}
+				void* get(size_t size, size_t alignment) noexcept
+				{
+					uint8_t *ptr = reinterpret_cast<uint8_t*>(m_ptr) + m_offset;
+
+					const size_t remainder = reinterpret_cast<std::uintptr_t>(ptr) % alignment;
+					const size_t shift = (remainder == 0) ? 0 : (alignment - remainder);
+
+					m_offset += shift + size;
+					return ptr + shift;
+				}
 		};
 	}
 } /* namespace ml */

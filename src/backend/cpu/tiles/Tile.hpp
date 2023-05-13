@@ -14,10 +14,10 @@
 namespace SIMD_NAMESPACE
 {
 
-	template<typename T, RegisterType RT, int Rows, int Columns = vector_size<T, RT>()>
+	template<typename T, RegisterType RT, int Rows, int Columns>
 	class Tile
 	{
-			Vector<T, RT> m_data[Rows];
+			Vector<T, RT> m_data[Rows * ((Columns + vector_size<T, RT>() - 1) / vector_size<T, RT>())];
 		public:
 			void zeroall() noexcept
 			{

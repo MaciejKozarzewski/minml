@@ -22,6 +22,8 @@
 #include <minml/utils/time_util.hpp>
 #include <minml/utils/file_util.hpp>
 
+#include <minml/backend/cpu_backend.h>
+
 #include <iostream>
 #include <fstream>
 #include <memory>
@@ -1135,33 +1137,43 @@ namespace gemm
 				"vpxor %%ymm0, %%ymm0, %%ymm0 \n\t"
 				"ucomiss %%xmm0, %%xmm1 \n\t"// set ZF if beta == 0.
 				"je BETAZERO%= \n\t"
-				// beta != 0 case
-				"vfmadd231ps 0x00(%%rcx), %%ymm1, %%ymm4 \n\t"
-				"vfmadd231ps 0x20(%%rcx), %%ymm1, %%ymm5 \n\t"
+				"vmovups 0x00(%%rcx), %%ymm2 \n\t"
+				"vmovups 0x20(%%rcx), %%ymm3 \n\t"
+				"vfmadd231ps %%ymm2, %%ymm1, %%ymm4 \n\t"
+				"vfmadd231ps %%ymm3, %%ymm1, %%ymm5 \n\t"
 				"add %%r12, %%rcx \n\t"// add stride
 
-				"vfmadd231ps 0x00(%%rcx), %%ymm1, %%ymm6 \n\t"
-				"vfmadd231ps 0x20(%%rcx), %%ymm1, %%ymm7 \n\t"
+				"vmovups 0x00(%%rcx), %%ymm2 \n\t"
+				"vmovups 0x20(%%rcx), %%ymm3 \n\t"
+				"vfmadd231ps %%ymm2, %%ymm1, %%ymm6 \n\t"
+				"vfmadd231ps %%ymm3, %%ymm1, %%ymm7 \n\t"
 				"add %%r12, %%rcx \n\t"// add stride
 
-				"vfmadd231ps 0x00(%%rcx), %%ymm1, %%ymm8 \n\t"
-				"vfmadd231ps 0x20(%%rcx), %%ymm1, %%ymm9 \n\t"
+				"vmovups 0x00(%%rcx), %%ymm2 \n\t"
+				"vmovups 0x20(%%rcx), %%ymm3 \n\t"
+				"vfmadd231ps %%ymm2, %%ymm1, %%ymm8 \n\t"
+				"vfmadd231ps %%ymm3, %%ymm1, %%ymm9 \n\t"
 				"add %%r12, %%rcx \n\t"// add stride
 
-				"vfmadd231ps 0x00(%%rcx), %%ymm1, %%ymm10 \n\t"
-				"vfmadd231ps 0x20(%%rcx), %%ymm1, %%ymm11 \n\t"
+				"vmovups 0x00(%%rcx), %%ymm2 \n\t"
+				"vmovups 0x20(%%rcx), %%ymm3 \n\t"
+				"vfmadd231ps %%ymm2, %%ymm1, %%ymm10 \n\t"
+				"vfmadd231ps %%ymm3, %%ymm1, %%ymm11 \n\t"
 				"add %%r12, %%rcx \n\t"// add stride
 
-				"vfmadd231ps 0x00(%%rcx), %%ymm1, %%ymm12 \n\t"
-				"vfmadd231ps 0x20(%%rcx), %%ymm1, %%ymm13 \n\t"
+				"vmovups 0x00(%%rcx), %%ymm2 \n\t"
+				"vmovups 0x20(%%rcx), %%ymm3 \n\t"
+				"vfmadd231ps %%ymm2, %%ymm1, %%ymm12 \n\t"
+				"vfmadd231ps %%ymm3, %%ymm1, %%ymm13 \n\t"
 				"add %%r12, %%rcx \n\t"// add stride
 
-				"vfmadd231ps 0x00(%%rcx), %%ymm1, %%ymm14 \n\t"
-				"vfmadd231ps 0x20(%%rcx), %%ymm1, %%ymm15 \n\t"
+				"vmovups 0x00(%%rcx), %%ymm2 \n\t"
+				"vmovups 0x20(%%rcx), %%ymm3 \n\t"
+				"vfmadd231ps %%ymm2, %%ymm1, %%ymm14 \n\t"
+				"vfmadd231ps %%ymm3, %%ymm1, %%ymm15 \n\t"
 				"movq %[dst_ptr], %%rcx \n\t"// dst pointer is in rcx
 
 				"BETAZERO%=: \n\t"
-				// beta == 0 case
 				"vmovups %%ymm4, 0x00(%%rcx) \n\t"
 				"vmovups %%ymm5, 0x20(%%rcx) \n\t"
 				"add %%r12, %%rcx \n\t"// add stride
@@ -1577,114 +1589,134 @@ namespace gemm
 				"UNROLLED4%=: \n\t"
 				// iteration 0
 				"movaps 0x00(%%rax), %%xmm0 \n\t"
-				"movaps 0x00(%%rbx), %%xmm6 \n\t"
-				"movaps 0x10(%%rbx), %%xmm7 \n\t"
+				"movaps 0x10(%%rax), %%xmm1 \n\t"
+				"movaps 0x00(%%rbx), %%xmm2 \n\t"
 
-				"pshufd $0x55, %%xmm0, %%xmm1 \n\t"
-				"pshufd $0xAA, %%xmm0, %%xmm2 \n\t"
-				"mulps %%xmm6, %%xmm4 \n\t"
-				"mulps %%xmm7, %%xmm5 \n\t"
-				"mulps %%xmm6, %%xmm1 \n\t"
-				"mulps %%xmm7, %%xmm2 \n\t"
+				"pshufd $0x00, %%xmm0, %%xmm4 \n\t"
+				"pshufd $0x55, %%xmm0, %%xmm5 \n\t"
+				"pshufd $0xAA, %%xmm0, %%xmm6 \n\t"
+				"pshufd $0xFF, %%xmm0, %%xmm7 \n\t"
+
+				"mulps %%xmm2, %%xmm4 \n\t"
+				"mulps %%xmm2, %%xmm5 \n\t"
+				"mulps %%xmm2, %%xmm6 \n\t"
+				"mulps %%xmm2, %%xmm7 \n\t"
+				"addps %%xmm4, %%xmm8 \n\t"
+				"addps %%xmm5, %%xmm9 \n\t"
+				"addps %%xmm6, %%xmm10 \n\t"
+				"addps %%xmm7, %%xmm11 \n\t"
+
+				"pshufd $0x00, %%xmm1, %%xmm4 \n\t"
+				"pshufd $0x55, %%xmm1, %%xmm5 \n\t"
+				"pshufd $0xAA, %%xmm1, %%xmm6 \n\t"
+				"pshufd $0xFF, %%xmm1, %%xmm7 \n\t"
+				"mulps %%xmm2, %%xmm4 \n\t"
+				"mulps %%xmm2, %%xmm5 \n\t"
+				"mulps %%xmm2, %%xmm6 \n\t"
+				"mulps %%xmm2, %%xmm7 \n\t"
 				"addps %%xmm4, %%xmm12 \n\t"
 				"addps %%xmm5, %%xmm13 \n\t"
-				"addps %%xmm1, %%xmm14 \n\t"
-				"addps %%xmm2, %%xmm15 \n\t"
-
-				"pshufd $0xFF, %%xmm0, %%xmm3 \n\t"
-				"pshufd $0x00, %%xmm0, %%xmm0 \n\t"
-				"mulps %%xmm6, %%xmm4 \n\t"
-				"mulps %%xmm7, %%xmm5 \n\t"
-				"mulps %%xmm6, %%xmm0 \n\t"
-				"mulps %%xmm7, %%xmm3 \n\t"
-				"addps %%xmm4, %%xmm12 \n\t"
-				"addps %%xmm5, %%xmm13 \n\t"
-				"addps %%xmm0, %%xmm14 \n\t"
-				"addps %%xmm3, %%xmm15 \n\t"
+				"addps %%xmm6, %%xmm14 \n\t"
+				"addps %%xmm7, %%xmm15 \n\t"
 
 				// iteration 1
-				"movaps 0x10(%%rax), %%xmm0 \n\t"
-				"movaps 0x20(%%rbx), %%xmm6 \n\t"
-				"movaps 0x30(%%rbx), %%xmm7 \n\t"
+				"movaps 0x20(%%rax), %%xmm0 \n\t"
+				"movaps 0x30(%%rax), %%xmm1 \n\t"
+				"movaps 0x10(%%rbx), %%xmm2 \n\t"
 
-				"pshufd $0x55, %%xmm0, %%xmm1 \n\t"
-				"pshufd $0xAA, %%xmm0, %%xmm2 \n\t"
-				"mulps %%xmm6, %%xmm4 \n\t"
-				"mulps %%xmm7, %%xmm5 \n\t"
-				"mulps %%xmm6, %%xmm1 \n\t"
-				"mulps %%xmm7, %%xmm2 \n\t"
+				"pshufd $0x00, %%xmm0, %%xmm4 \n\t"
+				"pshufd $0x55, %%xmm0, %%xmm5 \n\t"
+				"pshufd $0xAA, %%xmm0, %%xmm6 \n\t"
+				"pshufd $0xFF, %%xmm0, %%xmm7 \n\t"
+
+				"mulps %%xmm2, %%xmm4 \n\t"
+				"mulps %%xmm2, %%xmm5 \n\t"
+				"mulps %%xmm2, %%xmm6 \n\t"
+				"mulps %%xmm2, %%xmm7 \n\t"
+				"addps %%xmm4, %%xmm8 \n\t"
+				"addps %%xmm5, %%xmm9 \n\t"
+				"addps %%xmm6, %%xmm10 \n\t"
+				"addps %%xmm7, %%xmm11 \n\t"
+
+				"pshufd $0x00, %%xmm1, %%xmm4 \n\t"
+				"pshufd $0x55, %%xmm1, %%xmm5 \n\t"
+				"pshufd $0xAA, %%xmm1, %%xmm6 \n\t"
+				"pshufd $0xFF, %%xmm1, %%xmm7 \n\t"
+				"mulps %%xmm2, %%xmm4 \n\t"
+				"mulps %%xmm2, %%xmm5 \n\t"
+				"mulps %%xmm2, %%xmm6 \n\t"
+				"mulps %%xmm2, %%xmm7 \n\t"
 				"addps %%xmm4, %%xmm12 \n\t"
 				"addps %%xmm5, %%xmm13 \n\t"
-				"addps %%xmm1, %%xmm14 \n\t"
-				"addps %%xmm2, %%xmm15 \n\t"
-
-				"pshufd $0xFF, %%xmm0, %%xmm3 \n\t"
-				"pshufd $0x00, %%xmm0, %%xmm0 \n\t"
-				"mulps %%xmm6, %%xmm4 \n\t"
-				"mulps %%xmm7, %%xmm5 \n\t"
-				"mulps %%xmm6, %%xmm0 \n\t"
-				"mulps %%xmm7, %%xmm3 \n\t"
-				"addps %%xmm4, %%xmm12 \n\t"
-				"addps %%xmm5, %%xmm13 \n\t"
-				"addps %%xmm0, %%xmm14 \n\t"
-				"addps %%xmm3, %%xmm15 \n\t"
+				"addps %%xmm6, %%xmm14 \n\t"
+				"addps %%xmm7, %%xmm15 \n\t"
 
 				// iteration 2
-				"movaps 0x20(%%rax), %%xmm0 \n\t"
-				"movaps 0x40(%%rbx), %%xmm6 \n\t"
-				"movaps 0x50(%%rbx), %%xmm7 \n\t"
+				"movaps 0x40(%%rax), %%xmm0 \n\t"
+				"movaps 0x50(%%rax), %%xmm1 \n\t"
+				"movaps 0x20(%%rbx), %%xmm2 \n\t"
 
-				"pshufd $0x55, %%xmm0, %%xmm1 \n\t"
-				"pshufd $0xAA, %%xmm0, %%xmm2 \n\t"
-				"mulps %%xmm6, %%xmm4 \n\t"
-				"mulps %%xmm7, %%xmm5 \n\t"
-				"mulps %%xmm6, %%xmm1 \n\t"
-				"mulps %%xmm7, %%xmm2 \n\t"
+				"pshufd $0x00, %%xmm0, %%xmm4 \n\t"
+				"pshufd $0x55, %%xmm0, %%xmm5 \n\t"
+				"pshufd $0xAA, %%xmm0, %%xmm6 \n\t"
+				"pshufd $0xFF, %%xmm0, %%xmm7 \n\t"
+
+				"mulps %%xmm2, %%xmm4 \n\t"
+				"mulps %%xmm2, %%xmm5 \n\t"
+				"mulps %%xmm2, %%xmm6 \n\t"
+				"mulps %%xmm2, %%xmm7 \n\t"
+				"addps %%xmm4, %%xmm8 \n\t"
+				"addps %%xmm5, %%xmm9 \n\t"
+				"addps %%xmm6, %%xmm10 \n\t"
+				"addps %%xmm7, %%xmm11 \n\t"
+
+				"pshufd $0x00, %%xmm1, %%xmm4 \n\t"
+				"pshufd $0x55, %%xmm1, %%xmm5 \n\t"
+				"pshufd $0xAA, %%xmm1, %%xmm6 \n\t"
+				"pshufd $0xFF, %%xmm1, %%xmm7 \n\t"
+				"mulps %%xmm2, %%xmm4 \n\t"
+				"mulps %%xmm2, %%xmm5 \n\t"
+				"mulps %%xmm2, %%xmm6 \n\t"
+				"mulps %%xmm2, %%xmm7 \n\t"
 				"addps %%xmm4, %%xmm12 \n\t"
 				"addps %%xmm5, %%xmm13 \n\t"
-				"addps %%xmm1, %%xmm14 \n\t"
-				"addps %%xmm2, %%xmm15 \n\t"
-
-				"pshufd $0xFF, %%xmm0, %%xmm3 \n\t"
-				"pshufd $0x00, %%xmm0, %%xmm0 \n\t"
-				"mulps %%xmm6, %%xmm4 \n\t"
-				"mulps %%xmm7, %%xmm5 \n\t"
-				"mulps %%xmm6, %%xmm0 \n\t"
-				"mulps %%xmm7, %%xmm3 \n\t"
-				"addps %%xmm4, %%xmm12 \n\t"
-				"addps %%xmm5, %%xmm13 \n\t"
-				"addps %%xmm0, %%xmm14 \n\t"
-				"addps %%xmm3, %%xmm15 \n\t"
+				"addps %%xmm6, %%xmm14 \n\t"
+				"addps %%xmm7, %%xmm15 \n\t"
 
 				// iteration 3
-				"movaps 0x30(%%rax), %%xmm0 \n\t"
-				"movaps 0x60(%%rbx), %%xmm6 \n\t"
-				"movaps 0x70(%%rbx), %%xmm7 \n\t"
+				"movaps 0x60(%%rax), %%xmm0 \n\t"
+				"movaps 0x70(%%rax), %%xmm1 \n\t"
+				"movaps 0x30(%%rbx), %%xmm2 \n\t"
 
-				"pshufd $0x55, %%xmm0, %%xmm1 \n\t"
-				"pshufd $0xAA, %%xmm0, %%xmm2 \n\t"
-				"mulps %%xmm6, %%xmm4 \n\t"
-				"mulps %%xmm7, %%xmm5 \n\t"
-				"mulps %%xmm6, %%xmm1 \n\t"
-				"mulps %%xmm7, %%xmm2 \n\t"
+				"pshufd $0x00, %%xmm0, %%xmm4 \n\t"
+				"pshufd $0x55, %%xmm0, %%xmm5 \n\t"
+				"pshufd $0xAA, %%xmm0, %%xmm6 \n\t"
+				"pshufd $0xFF, %%xmm0, %%xmm7 \n\t"
+
+				"mulps %%xmm2, %%xmm4 \n\t"
+				"mulps %%xmm2, %%xmm5 \n\t"
+				"mulps %%xmm2, %%xmm6 \n\t"
+				"mulps %%xmm2, %%xmm7 \n\t"
+				"addps %%xmm4, %%xmm8 \n\t"
+				"addps %%xmm5, %%xmm9 \n\t"
+				"addps %%xmm6, %%xmm10 \n\t"
+				"addps %%xmm7, %%xmm11 \n\t"
+
+				"pshufd $0x00, %%xmm1, %%xmm4 \n\t"
+				"pshufd $0x55, %%xmm1, %%xmm5 \n\t"
+				"pshufd $0xAA, %%xmm1, %%xmm6 \n\t"
+				"pshufd $0xFF, %%xmm1, %%xmm7 \n\t"
+				"mulps %%xmm2, %%xmm4 \n\t"
+				"mulps %%xmm2, %%xmm5 \n\t"
+				"mulps %%xmm2, %%xmm6 \n\t"
+				"mulps %%xmm2, %%xmm7 \n\t"
 				"addps %%xmm4, %%xmm12 \n\t"
 				"addps %%xmm5, %%xmm13 \n\t"
-				"addps %%xmm1, %%xmm14 \n\t"
-				"addps %%xmm2, %%xmm15 \n\t"
+				"addps %%xmm6, %%xmm14 \n\t"
+				"addps %%xmm7, %%xmm15 \n\t"
 
-				"pshufd $0xFF, %%xmm0, %%xmm3 \n\t"
-				"pshufd $0x00, %%xmm0, %%xmm0 \n\t"
-				"mulps %%xmm6, %%xmm4 \n\t"
-				"mulps %%xmm7, %%xmm5 \n\t"
-				"mulps %%xmm6, %%xmm0 \n\t"
-				"mulps %%xmm7, %%xmm3 \n\t"
-				"addps %%xmm4, %%xmm12 \n\t"
-				"addps %%xmm5, %%xmm13 \n\t"
-				"addps %%xmm0, %%xmm14 \n\t"
-				"addps %%xmm3, %%xmm15 \n\t"
-
-				"add $0x40, %%rax \n\t"
-				"add $0x80, %%rbx \n\t"
+				"add $0x80, %%rax \n\t"
+				"add $0x40, %%rbx \n\t"
 				"dec %%r14 \n\t"
 				"jne UNROLLED4%= \n\t"
 
@@ -1832,7 +1864,7 @@ namespace gemm
 	}
 
 	__attribute__((noinline)) void gemm_avx2_fma_6x16_fp16_fp32(int M, int N, int K, const void *alpha_ptr, const void *__restrict__ lhs_ptr,
-			const void *__restrict__ rhs_ptr, const void *beta_ptr, void *__restrict__ dst_ptr, int dst_stride)
+			const void *__restrict__ rhs_ptr, const void *beta_ptr, void *__restrict__ dst_ptr, int dst_stride, void *__restrict__ workspace)
 	{
 		assert(alpha_ptr != nullptr);
 		assert(beta_ptr != nullptr);
@@ -1846,13 +1878,69 @@ namespace gemm
 		uint64_t k_iter = K / 4;
 		uint64_t k_left = K % 4;
 		uint64_t stride = dst_stride;
+		float alpha = reinterpret_cast<const float*>(alpha_ptr)[0];
+		float beta = reinterpret_cast<const float*>(beta_ptr)[0];
+		if (beta != 0.0f)
+			alpha /= beta;
+		const float *_alpha = &alpha;
 
 		asm volatile(
-				"movq %[lhs_ptr], %%rax \n\t" // lhs pointer is in rax
-				"movq %[rhs_ptr], %%rbx \n\t"// rhs pointer is in rbx
-				"vmovaps 0x00(%%rbx), %%ymm2 \n\t"
-				"vmovaps 0x20(%%rbx), %%ymm3 \n\t"
+				"movq %[beta_ptr], %%rbx \n\t" // load address of beta
+				"vbroadcastss 0x0(%%rbx), %%ymm1 \n\t"
+				"vpxor %%ymm0, %%ymm0, %%ymm0 \n\t"
+				"ucomiss %%xmm0, %%xmm1 \n\t"// set ZF if beta == 0.
+				"je ZEROACC%= \n\t"
+				// load and convert dst
+				"movq %[stride], %%r12 \n\t"// stride is r12
+				"shlq $1, %%r12 \n\t"// multiply stride by sizeof(float16)
+				"movq %[dst_ptr], %%rcx \n\t"// dst pointer is in rcx
 
+				"movups 0x00(%%rcx), %%xmm4 \n\t"
+				"movups 0x10(%%rcx), %%xmm5 \n\t"
+				"add %%r12, %%rcx \n\t"// add stride
+				"movups 0x00(%%rcx), %%xmm6 \n\t"
+				"movups 0x10(%%rcx), %%xmm7 \n\t"
+				"add %%r12, %%rcx \n\t"// add stride
+				"movups 0x00(%%rcx), %%xmm8 \n\t"
+				"movups 0x10(%%rcx), %%xmm9 \n\t"
+				"add %%r12, %%rcx \n\t"// add stride
+				"movups 0x00(%%rcx), %%xmm10 \n\t"
+				"movups 0x10(%%rcx), %%xmm11 \n\t"
+				"add %%r12, %%rcx \n\t"// add stride
+				"movups 0x00(%%rcx), %%xmm12 \n\t"
+				"movups 0x10(%%rcx), %%xmm13 \n\t"
+				"add %%r12, %%rcx \n\t"// add stride
+				"movups 0x00(%%rcx), %%xmm14 \n\t"
+				"movups 0x10(%%rcx), %%xmm15 \n\t"
+
+				"vcvtph2ps %%xmm4, %%ymm4 \n\t"
+				"vcvtph2ps %%xmm5, %%ymm5 \n\t"
+				"vcvtph2ps %%xmm6, %%ymm6 \n\t"
+				"vcvtph2ps %%xmm7, %%ymm7 \n\t"
+				"vcvtph2ps %%xmm8, %%ymm8 \n\t"
+				"vcvtph2ps %%xmm9, %%ymm9 \n\t"
+				"vcvtph2ps %%xmm10, %%ymm10 \n\t"
+				"vcvtph2ps %%xmm11, %%ymm11 \n\t"
+				"vcvtph2ps %%xmm12, %%ymm12 \n\t"
+				"vcvtph2ps %%xmm13, %%ymm13 \n\t"
+				"vcvtph2ps %%xmm14, %%ymm14 \n\t"
+				"vcvtph2ps %%xmm15, %%ymm15 \n\t"
+
+				"vmulps %%ymm1, %%ymm4, %%ymm4 \n\t"
+				"vmulps %%ymm1, %%ymm5, %%ymm5 \n\t"
+				"vmulps %%ymm1, %%ymm6, %%ymm6 \n\t"
+				"vmulps %%ymm1, %%ymm7, %%ymm7 \n\t"
+				"vmulps %%ymm1, %%ymm8, %%ymm8 \n\t"
+				"vmulps %%ymm1, %%ymm9, %%ymm9 \n\t"
+				"vmulps %%ymm1, %%ymm10, %%ymm10 \n\t"
+				"vmulps %%ymm1, %%ymm11, %%ymm11 \n\t"
+				"vmulps %%ymm1, %%ymm12, %%ymm12 \n\t"
+				"vmulps %%ymm1, %%ymm13, %%ymm13 \n\t"
+				"vmulps %%ymm1, %%ymm14, %%ymm14 \n\t"
+				"vmulps %%ymm1, %%ymm15, %%ymm15 \n\t"
+				"jmp LOOPSTART%= \n\t"
+
+				"ZEROACC%=: \n\t"
 				// Set accumulators to zero.
 				"vpxor %%ymm4, %%ymm4, %%ymm4 \n\t"
 				"vpxor %%ymm5, %%ymm5, %%ymm5 \n\t"
@@ -1867,12 +1955,19 @@ namespace gemm
 				"vpxor %%ymm14, %%ymm14, %%ymm14 \n\t"
 				"vpxor %%ymm15, %%ymm15, %%ymm15 \n\t"
 
+				"LOOPSTART%=: \n\t"
+
+				"movq %[lhs_ptr], %%rax \n\t"// lhs pointer is in rax
+				"movq %[rhs_ptr], %%rbx \n\t"// rhs pointer is in rbx
 				"movq %[k_iter], %%r14 \n\t"// load the number of 4-unrolled iterations
 				"test %%r14, %%r14 \n\t"
 				"je FINALLOOP%= \n\t"
 
 				"UNROLLED4%=: \n\t"
 				// iteration 0
+
+				"vmovaps 0x00(%%rbx), %%ymm2 \n\t"
+				"vmovaps 0x20(%%rbx), %%ymm3 \n\t"
 
 				"vbroadcastss 0x00(%%rax), %%ymm0 \n\t"
 				"vbroadcastss 0x04(%%rax), %%ymm1 \n\t"
@@ -2017,9 +2112,7 @@ namespace gemm
 				"EPILOGUE%=: \n\t"
 
 				"movq %[alpha_ptr], %%rax \n\t"// load address of alpha
-				"movq %[beta_ptr], %%rbx \n\t"// load address of beta
 				"vbroadcastss 0x0(%%rax), %%ymm0 \n\t"
-				"vbroadcastss 0x0(%%rbx), %%ymm1 \n\t"
 
 				// scale by alpha
 				"vmulps %%ymm0, %%ymm4, %%ymm4 \n\t"
@@ -2040,60 +2133,6 @@ namespace gemm
 				"shlq $1, %%r12 \n\t"// multiply stride by sizeof(float16)
 				"movq %[dst_ptr], %%rcx \n\t"// dst pointer is in rcx
 
-				"vpxor %%ymm0, %%ymm0, %%ymm0 \n\t"
-				"ucomiss %%xmm0, %%xmm1 \n\t"// set ZF if beta == 0.
-				"je BETAZERO%= \n\t"
-				// beta != 0 case
-				"movups 0x00(%%rcx), %%xmm2 \n\t"
-				"movups 0x10(%%rcx), %%xmm3 \n\t"
-				"vcvtph2ps %%xmm2, %%ymm2 \n\t"
-				"vcvtph2ps %%xmm3, %%ymm3 \n\t"
-				"vfmadd231ps %%ymm2, %%ymm1, %%ymm4 \n\t"
-				"vfmadd231ps %%ymm3, %%ymm1, %%ymm5 \n\t"
-				"add %%r12, %%rcx \n\t"// add stride
-
-				"movups 0x00(%%rcx), %%xmm2 \n\t"
-				"movups 0x10(%%rcx), %%xmm3 \n\t"
-				"vcvtph2ps %%xmm2, %%ymm2 \n\t"
-				"vcvtph2ps %%xmm3, %%ymm3 \n\t"
-				"vfmadd231ps %%ymm2, %%ymm1, %%ymm6 \n\t"
-				"vfmadd231ps %%ymm3, %%ymm1, %%ymm7 \n\t"
-				"add %%r12, %%rcx \n\t"// add stride
-
-				"movups 0x00(%%rcx), %%xmm2 \n\t"
-				"movups 0x10(%%rcx), %%xmm3 \n\t"
-				"vcvtph2ps %%xmm2, %%ymm2 \n\t"
-				"vcvtph2ps %%xmm3, %%ymm3 \n\t"
-				"vfmadd231ps %%ymm2, %%ymm1, %%ymm8 \n\t"
-				"vfmadd231ps %%ymm3, %%ymm1, %%ymm9 \n\t"
-				"add %%r12, %%rcx \n\t"// add stride
-
-				"movups 0x00(%%rcx), %%xmm2 \n\t"
-				"movups 0x10(%%rcx), %%xmm3 \n\t"
-				"vcvtph2ps %%xmm2, %%ymm2 \n\t"
-				"vcvtph2ps %%xmm3, %%ymm3 \n\t"
-				"vfmadd231ps %%ymm2, %%ymm1, %%ymm10 \n\t"
-				"vfmadd231ps %%ymm3, %%ymm1, %%ymm11 \n\t"
-				"add %%r12, %%rcx \n\t"// add stride
-
-				"movups 0x00(%%rcx), %%xmm2 \n\t"
-				"movups 0x10(%%rcx), %%xmm3 \n\t"
-				"vcvtph2ps %%xmm2, %%ymm2 \n\t"
-				"vcvtph2ps %%xmm3, %%ymm3 \n\t"
-				"vfmadd231ps %%ymm2, %%ymm1, %%ymm12 \n\t"
-				"vfmadd231ps %%ymm3, %%ymm1, %%ymm13 \n\t"
-				"add %%r12, %%rcx \n\t"// add stride
-
-				"movups 0x00(%%rcx), %%xmm2 \n\t"
-				"movups 0x10(%%rcx), %%xmm3 \n\t"
-				"vcvtph2ps %%xmm2, %%ymm2 \n\t"
-				"vcvtph2ps %%xmm3, %%ymm3 \n\t"
-				"vfmadd231ps %%ymm2, %%ymm1, %%ymm14 \n\t"
-				"vfmadd231ps %%ymm3, %%ymm1, %%ymm15 \n\t"
-				"movq %[dst_ptr], %%rcx \n\t"// dst pointer is in rcx
-
-				"BETAZERO%=: \n\t"
-				// beta == 0 case
 				"vcvtps2ph $0x03, %%ymm4, %%xmm4 \n\t"
 				"vcvtps2ph $0x03, %%ymm5, %%xmm5 \n\t"
 				"vcvtps2ph $0x03, %%ymm6, %%xmm6 \n\t"
@@ -2130,7 +2169,6 @@ namespace gemm
 				"movups %%xmm14, 0x00(%%rcx) \n\t"
 				"movups %%xmm15, 0x10(%%rcx) \n\t"
 
-				"END%=: \n\t"
 				"vzeroupper \n\t"
 
 				:// outputs
@@ -2141,7 +2179,7 @@ namespace gemm
 				[k_iter] "m"(k_iter),
 				[k_left] "m"(k_left),
 				[stride] "m"(stride),
-				[alpha_ptr] "m"(alpha_ptr),
+				[alpha_ptr] "m"(_alpha),
 				[beta_ptr] "m"(beta_ptr)
 				:// clobbers
 				"cc", "memory", "%ymm0", "%ymm1", "%ymm2", "%ymm3", "%ymm4", "%ymm5", "%ymm6", "%ymm7",
@@ -2503,15 +2541,185 @@ void some_kernel(const void *input, void *output, int size)
 
 #include "../src/backend/cpu/cpu_x86.hpp"
 #include "../src/backend/cpu/vectors/vectors.hpp"
-
 using namespace SIMD_NAMESPACE;
+
+mlShape_t create_shape(int rows, int cols)
+{
+	mlShape_t result;
+	result.rank = 2;
+	result.dim[0] = rows;
+	result.dim[1] = cols;
+	return result;
+}
+
+template<typename DataType, typename ComputeType = float>
+void baseline_gemm(mlShape_t shape_D, void *D, float alpha, char opA, mlShape_t shape_A, const void *A, char opB, mlShape_t shape_B, const void *B,
+		float beta, mlShape_t shape_C, const void *C)
+{
+	const int M = (opA == 't') ? shape_A.dim[1] : shape_A.dim[0];
+	const int N = (opB == 't') ? shape_B.dim[0] : shape_B.dim[1];
+	const int K = (opA == 't') ? shape_A.dim[0] : shape_A.dim[1];
+
+	const int strides_a[2] = { (opA == 'n') ? K : 1, (opA == 'n') ? 1 : M };
+	const int strides_b[2] = { (opB == 'n') ? N : 1, (opB == 'n') ? 1 : K };
+	const int strides_c[2] = { N, 1 };
+
+	for (int m = 0; m < M; m++)
+		for (int n = 0; n < N; n++)
+		{
+			ComputeType tmp = static_cast<ComputeType>(0);
+			for (int k = 0; k < K; k++)
+			{
+				const ComputeType a = reinterpret_cast<const DataType*>(A)[m * strides_a[0] + k * strides_a[1]];
+				const ComputeType b = reinterpret_cast<const DataType*>(B)[k * strides_b[0] + n * strides_b[1]];
+				tmp += a * b;
+			}
+			tmp = alpha * tmp;
+			if (beta != 0.0f)
+			{
+				const ComputeType c = reinterpret_cast<const DataType*>(C)[m * strides_c[0] + n * strides_c[1]];
+				tmp += beta * c;
+			}
+			reinterpret_cast<DataType*>(D)[m * strides_c[0] + n * strides_c[1]] = tmp;
+		}
+}
+
 int main()
 {
 	std::cout << "BEGIN" << std::endl;
+
 	{
-		constexpr int m = 8;
-		constexpr int n = 4;
-		constexpr int max_k = 1;
+		Device::setNumberOfThreads(1);
+		const char op_a = 'n';
+		const char op_b = 't';
+
+		const int M = 120;
+		const int N = 128;
+		const int K = 128;
+
+		mlShape_t shape_a = (op_a == 'n') ? create_shape(M, K) : create_shape(K, M);
+		mlShape_t shape_b = (op_b == 'n') ? create_shape(K, N) : create_shape(N, K);
+		mlShape_t shape_c = create_shape(M, N);
+		mlShape_t shape_d = create_shape(M, N);
+
+		std::unique_ptr<float[]> matrix_a = std::make_unique<float[]>(M * K);
+		std::unique_ptr<float[]> matrix_b = std::make_unique<float[]>(K * N);
+		std::unique_ptr<float[]> matrix_c = std::make_unique<float[]>(M * N);
+		std::unique_ptr<float[]> matrix_d = std::make_unique<float[]>(M * N);
+
+		for (int i = 0; i < M * K; i++)
+			matrix_a[i] = randFloat();
+		for (int i = 0; i < K * N; i++)
+			matrix_b[i] = randFloat();
+
+		const float alpha = 1.0f;
+		const float beta = 0.0f;
+
+//		for (int row = 0; row < shape_a.dim[0]; row++)
+//		{
+//			for (int col = 0; col < shape_a.dim[1]; col++)
+//				std::cout << matrix_a[row * shape_a.dim[1] + col] << ' ';
+//			std::cout << '\n';
+//		}
+
+		mlContext_t context = cpu_create_context();
+		cpu_gemm_v2(context, DTYPE_FLOAT32, shape_d, matrix_d.get(), alpha, op_a, shape_a, matrix_a.get(), op_b, shape_b, matrix_b.get(), beta,
+				shape_c, matrix_c.get());
+//		cpu_gemm(context, DTYPE_FLOAT32, shape_d, matrix_d.get(), shape_a, matrix_a.get(), shape_b, matrix_b.get(), op_a, op_b, alpha, beta);
+
+		const double repeats = 1.0e7;
+		const double start = getTime();
+		int i = 0;
+		for (; i < repeats; i++)
+		{
+			cpu_gemm_v2(context, DTYPE_FLOAT32, shape_d, matrix_d.get(), alpha, op_a, shape_a, matrix_a.get(), op_b, shape_b, matrix_b.get(), beta,
+					shape_d, matrix_d.get());
+//			cpu_gemm(context, DTYPE_FLOAT32, shape_d, matrix_d.get(), shape_a, matrix_a.get(), shape_b, matrix_b.get(), op_a, op_b, alpha, beta);
+			if ((getTime() - start) > 30.0)
+				break;
+		}
+		const double stop = getTime();
+		std::cout << 1.0e6 * (stop - start) / i << " us (" << i << " repeats)\n";
+		const double flops = (double) i * (M * N * K) / (stop - start);
+		std::cout << flops / 1.0e9 << " GFLOPS\n";
+
+//		cpu_gemm_v2(context, DTYPE_FLOAT32, shape_d, matrix_d.get(), alpha, op_a, shape_a, matrix_a.get(), op_b, shape_b, matrix_b.get(), beta,
+//				shape_c, matrix_c.get());
+
+		std::unique_ptr<float[]> correct_d = std::make_unique<float[]>(M * N);
+
+		baseline_gemm<float, float>(shape_d, correct_d.get(), alpha, op_a, shape_a, matrix_a.get(), op_b, shape_b, matrix_b.get(), beta, shape_c,
+				matrix_c.get());
+
+//		std::cout << "Correct\n";
+//		for (int row = 0; row < M; row++)
+//		{
+//			for (int col = 0; col < N; col++)
+//				std::cout << correct_d[row * N + col] << ' ';
+//			std::cout << '\n';
+//		}
+//		std::cout << "-------------------------------------------\n";
+//		std::cout << "Actual\n";
+//		for (int row = 0; row < M; row++)
+//		{
+//			for (int col = 0; col < N; col++)
+//				std::cout << matrix_d[row * N + col] << ' ';
+//			std::cout << '\n';
+//		}
+
+		double diff = 0.0;
+		for (int i = 0; i < M * N; i++)
+		{
+			diff += std::fabs(matrix_d[i] - correct_d[i]);
+			if (std::fabs(matrix_d[i] - correct_d[i]) > 1.0e-3)
+			{
+				std::cout << "correct = " << correct_d[i] << ", got = " << matrix_d[i] << " at " << (i / N) << ", " << (i % N) << '\n';
+				break;
+			}
+		}
+		std::cout << "\ndiff = " << diff / (M * N) << '\n';
+
+		cpu_destroy_context(context);
+		return 0;
+	}
+
+//	{
+//		Device::setNumberOfThreads(1);
+//		const int batch_size = 8;
+//		const int filters = 128;
+//
+//		Graph graph;
+//		auto x = graph.addInput( { batch_size, 15, 15, filters });
+//		for (int i = 0; i < 20; i++)
+//			x = graph.add(GlobalBroadcastHW("relu", true), x);
+//		graph.addOutput(x);
+//
+////		graph.convertTo(DataType::FLOAT16);
+//		graph.moveTo(Device::cpu());
+//		graph.forward(batch_size);
+//
+//		std::cout << "starting benchmark\n";
+//		const double start = getTime();
+//		int repeats = 0;
+//		for (; repeats < 100000; repeats++)
+//		{
+//			graph.forward(batch_size);
+//			if ((getTime() - start) > 20.0)
+//				break;
+//		}
+//		const double stop = getTime();
+//		const double time = stop - start;
+//
+//		std::cout << "time = " << time << "s, repeats = " << repeats << '\n';
+//		std::cout << "time per convolution = " << 1.0e3 * time / (10 * repeats * batch_size) << "ms\n";
+//		return 0;
+//	}
+//	std::cout << "END" << std::endl;
+
+	{
+		constexpr int m = 6;
+		constexpr int n = 16;
+		constexpr int max_k = 320;
 		float *A = reinterpret_cast<float*>(gemm::aligned_new(2880 * m * max_k * 4, 4096));
 		float *B = reinterpret_cast<float*>(gemm::aligned_new(2880 * n * max_k * 4, 4096));
 		float *C = reinterpret_cast<float*>(gemm::aligned_new(2880 * m * n * 4, 4096));
@@ -2524,8 +2732,8 @@ int main()
 		for (int i = 0; i < 2880 * m * n; i++)
 			C[i] = randFloat();
 
-		const float alpha = 1.0f;
-		const float beta = 0.1f;
+		const float alpha = 1.1f;
+		const float beta = 0.0f;
 
 		float C2[m * n];
 		for (int i = 0; i < m * n; i++)
@@ -2534,22 +2742,29 @@ int main()
 
 		const double repeats = 1.0e7;
 		const double start = getTime();
-//		for (int i = 0; i < repeats; i++)
+		for (int i = 0; i < repeats; i++)
 		{
-			const int tmp = 0; //i % 384;
+			const int tmp = 0; // i % 384;
 //			gemm::gemm_avx2_fma_6x16_fp32(m, n, max_k, &alpha, A + tmp * m * max_k, B + tmp * n * max_k, &beta, C + tmp * m * n, n);
-//			gemm::gemm_avx2_fma_6x16_fp16_fp32(m, n, max_k, &alpha, A + tmp * m * max_k, B + tmp * n * max_k, &beta, C + tmp * m * n, n);
+			gemm::gemm_avx2_fma_6x16_fp16_fp32(m, n, max_k, &alpha, A + tmp * m * max_k, B + tmp * n * max_k, &beta, C + tmp * m * n, n, workspace);
 
 //			gemm::gemm_avx_8x8_fp32(m, n, max_k, &alpha, A + tmp * m * max_k, B + tmp * n * max_k, &beta, C + tmp * m * n, n);
 
-			gemm::gemm_sse2_8x4_fp32(m, n, max_k, &alpha, A + tmp * m * max_k, B + tmp * n * max_k, &beta, C + tmp * m * n, n);
+//			gemm::gemm_sse2_8x4_fp32(m, n, max_k, &alpha, A + tmp * m * max_k, B + tmp * n * max_k, &beta, C + tmp * m * n, n);
 
-//			gemm::gemm_avx2_fma_5x16_fp32(5, 16, max_k, &alpha, A + tmp * 6 * max_k, B + tmp * 16 * max_k, &beta, C + tmp * 6 * 16, 16);
+//			gemm::gemm_def_MxN_fp32(m, n, max_k, &alpha, A + 0 * m * max_k, B + 0 * n * max_k, &beta, C, n);
+
+//			gemm::gemm_avx2_fma_5x16_fp32(m, n, max_k, &alpha, A + tmp * m * max_k, B + tmp * n * max_k, &beta, C + tmp * m * n, n);
 		}
 		const double stop = getTime();
 		std::cout << 1.0e6 * (stop - start) / repeats << " us" << '\n';
 		const double flops = repeats * (m * n * max_k) / (stop - start);
 		std::cout << flops / 1.0e9 << " GFLOPS\n";
+
+		double diff = 0.0;
+		for (int i = 0; i < m * n; i++)
+			diff += std::fabs(C[i] - C2[i]);
+		std::cout << "diff = " << diff / (m * n) << '\n';
 
 		for (int i = 0; i < m; i++)
 		{

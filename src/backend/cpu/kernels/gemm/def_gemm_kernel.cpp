@@ -15,6 +15,7 @@
 #include <x86intrin.h>
 #include <cinttypes>
 #include <cassert>
+#include <iostream>
 
 namespace
 {
@@ -170,7 +171,6 @@ namespace
 		}
 		else
 		{
-
 			for (int m = 0; m < M; m++)
 				for (int n = 0; n < N; n++)
 					D.at<T>(m, n) = convert<float, T>(beta * convert<T, float>(C.at<T>(m, n)) + acc[m * N + n]);
@@ -188,11 +188,9 @@ namespace
 
 		if (src_op == MatrixOp::NORMAL)
 		{ // pack K x M fragment
-			const int max_rows = std::min(K, src.rows() - src_row);
-			const int max_cols = std::min(M, src.columns() - src_col);
-			for (int k = 0; k < max_rows; k++)
+			for (int k = 0; k < K; k++)
 			{
-				for (int m = 0; m < max_cols; m++)
+				for (int m = 0; m < M; m++)
 					dst_ptr[m] = convert<SrcT, DstT>(src_ptr[m]);
 				src_ptr += src.stride();
 				dst_ptr += dst.stride();
@@ -200,15 +198,21 @@ namespace
 		}
 		else
 		{ // pack M x K fragment
-			const int max_rows = std::min(M, src.rows() - src_row);
-			const int max_cols = std::min(K, src.columns() - src_col);
-			for (int k = 0; k < max_cols; k++)
+			for (int m = 0; m < M; m++)
 			{
-				for (int m = 0; m < max_rows; m++)
-					dst_ptr[m] = convert<SrcT, DstT>(src_ptr[m * src.stride()]);
-				src_ptr += 1;
-				dst_ptr += dst.stride();
+				for (int k = 0; k < K; k++)
+					dst_ptr[k * dst.stride()] = convert<SrcT, DstT>(src_ptr[k]);
+				src_ptr += src.stride();
+				dst_ptr += 1;
 			}
+
+//			for (int k = 0; k < K; k++)
+//			{
+//				for (int m = 0; m < M; m++)
+//					dst_ptr[m] = convert<SrcT, DstT>(src_ptr[m * src.stride()]);
+//				src_ptr += 1;
+//				dst_ptr += dst.stride();
+//			}
 		}
 	}
 
