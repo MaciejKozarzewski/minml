@@ -56,7 +56,7 @@ namespace
 //			case cpu::SimdLevel::AVX:
 //				return TileDimensions { 8, 8, 256 };
 //			case cpu::SimdLevel::AVX2:
-		return TileDimensions { 6, 16, 256 };
+		return TileDimensions { 6, 16, 1024 };
 //			case cpu::SimdLevel::AVX512F:
 //			case cpu::SimdLevel::AVX512VL_BW_DQ:
 //				return TileDimensions { 12, 32, 256 };
@@ -70,7 +70,7 @@ namespace
 		const uint64_t cache_L2 = 256 * 1024; // [bytes]
 		const uint64_t cache_L3 = 6 * 1024 * 1024; // [bytes]
 
-		return TileDimensions { 192, 192, micro_kernel.K };
+		return TileDimensions { 480, 512, micro_kernel.K };
 	}
 
 	class ArrayOfFragments
@@ -305,7 +305,7 @@ namespace ml
 //									gemm_def_MxN_fp32(D_fragment, &tmp_alpha, *A_frag_iter, *B_frag_iter, &tmp_beta, C_fragment);
 //									gemm_sse2_8x4_fp32(D_fragment, &tmp_alpha, *A_frag_iter, *B_frag_iter, &tmp_beta, C_fragment);
 //									gemm_avx_8x8_fp32(D_fragment, &tmp_alpha, *A_frag_iter, *B_frag_iter, &tmp_beta, C_fragment);
-									gemm_avx2_fma_6x16_fp32(D_fragment, &tmp_alpha, *A_frag_iter, *B_frag_iter, &tmp_beta, C_fragment);
+									gemm_avx2_fma_6x16_fp16_fp32(D_fragment, &tmp_alpha, *A_frag_iter, *B_frag_iter, &tmp_beta, C_fragment);
 //									gemm_avx2_fma_5x16_fp32(D_fragment, &tmp_alpha, *A_frag_iter, *B_frag_iter, &tmp_beta, C_fragment);
 									micro_kernel_count++;
 
@@ -380,7 +380,7 @@ namespace ml
 
 				const Position2D pos = get_position(k, m, op_A);
 //				pack_def_MxK_fp32(fragment, matrix_A, pos, op_A);
-				pack_avx2_fma_6xK_fp32(fragment, matrix_A, pos, op_A);
+				pack_avx2_fma_6xK_fp16_fp32(fragment, matrix_A, pos, op_A);
 //				print_fragment<float>(fragment);
 //				exit(0);
 			}
@@ -394,7 +394,7 @@ namespace ml
 
 				const Position2D pos = get_position(k, n, op_B);
 //				pack_def_MxK_fp32(fragment, matrix_B, pos, op_B);
-				pack_avx2_fma_16xK_fp32(fragment, matrix_B, pos, op_B);
+				pack_avx2_fma_16xK_fp16_fp32(fragment, matrix_B, pos, op_B);
 			}
 			void pack_fragment_C(Fragment &fragment, int m, int n)
 			{
@@ -413,7 +413,7 @@ namespace ml
 					pack_c_count++;
 					fragment = edge_C_fragment;
 					fragment.set_size(Size2D(rows_to_pack, cols_to_pack), inner_tile.N);
-					pack_def_MxK_fp32(fragment, matrix_C, Position2D(m, n), MatrixOp::NORMAL);
+					pack_def_MxK_fp16(fragment, matrix_C, Position2D(m, n), MatrixOp::NORMAL);
 				}
 			}
 			void pack_fragment_D(Fragment &fragment, int m, int n)
@@ -433,7 +433,7 @@ namespace ml
 					pack_d_count++;
 					fragment = edge_D_fragment;
 					fragment.set_size(Size2D(rows_to_pack, cols_to_pack), inner_tile.N);
-					pack_def_MxK_fp32(fragment, matrix_D, Position2D(m, n), MatrixOp::NORMAL);
+					pack_def_MxK_fp16(fragment, matrix_D, Position2D(m, n), MatrixOp::NORMAL);
 				}
 			}
 			void unpack_fragment_D(Fragment &fragment, int m, int n)
@@ -445,7 +445,7 @@ namespace ml
 				if (not is_tile_full)
 				{
 					unpack_d_count++;
-					unpack_def_MxK_fp32(matrix_D, Position2D(m, n), fragment);
+					unpack_def_MxK_fp16(matrix_D, Position2D(m, n), fragment);
 				}
 			}
 	};

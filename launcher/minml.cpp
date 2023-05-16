@@ -2584,9 +2584,192 @@ void baseline_gemm(mlShape_t shape_D, void *D, float alpha, char opA, mlShape_t 
 		}
 }
 
+#include "../src/backend/cpu/kernels/gemm/utilities.hpp"
+#include "../src/backend/cpu/kernels/gemm/Fragment.hpp"
+#include "../src/backend/cpu/kernels/gemm/Matrix.hpp"
+#include "../src/backend/cpu/kernels/gemm/gemm_kernels.hpp"
+#include "../src/backend/cpu/kernels/gemm/gemm_traits.hpp"
+
+void test_packing()
+{
+	constexpr ml::MatrixOp op = MatrixOp::NORMAL;
+	constexpr int M = 16;
+	constexpr int K = 1024;
+
+	std::unique_ptr<uint16_t[]> src = std::make_unique<uint16_t[]>(1024 * 1024);
+	for (int i = 0; i < 1024 * 1024; i++)
+//		src[i] = (i / 1024) + (i % 1024) * 0.01f;
+		src[i] = float_to_half(randFloat());
+
+	constexpr size_t size_in_bytes = sizeof(float) * M * K;
+	void *dst1 = gemm::aligned_new(size_in_bytes, 4096);
+	void *dst2 = gemm::aligned_new(size_in_bytes, 4096);
+	std::memset(dst1, 0, size_in_bytes);
+	std::memset(dst2, 0, size_in_bytes);
+
+	Fragment correct(dst1, DTYPE_FLOAT32);
+	Fragment fragment(dst2, DTYPE_FLOAT32);
+	correct.mark_as_packed_with_size( { K, M }, M);
+	fragment.mark_as_packed_with_size( { K, M }, M);
+
+	Matrix matrix(src.get(), DTYPE_FLOAT16, 1024, 1024, 1024);
+
+	pack_def_MxK_fp16_fp32(correct, matrix, { 0, 0 }, op);
+	pack_avx2_fma_16xK_fp16_fp32(fragment, matrix, { 0, 0 }, op);
+
+	std::cout << "Correct\n";
+	for (int k = 0; k < K; k++)
+	{
+		for (int m = 0; m < M; m++)
+			std::cout << correct.at<float>(k, m) << ' ';
+//			std::cout << half_to_float(correct.at<uint16_t>(k, m)) << ' ';
+		std::cout << '\n';
+	}
+	std::cout << "-------------------------------------------\n";
+	std::cout << "Actual\n";
+	for (int k = 0; k < K; k++)
+	{
+		for (int m = 0; m < M; m++)
+			std::cout << fragment.at<float>(k, m) << ' ';
+//			std::cout << half_to_float(fragment.at<uint16_t>(k, m)) << ' ';
+		std::cout << '\n';
+	}
+
+	double diff = 0.0;
+	for (int k = 0; k < K; k++)
+		for (int m = 0; m < M; m++)
+			diff += std::fabs(correct.at<float>(k, m) - fragment.at<float>(k, m));
+//			diff += std::fabs(half_to_float(correct.at<uint16_t>(k, m)) - half_to_float(fragment.at<uint16_t>(k, m)));
+	std::cout << "\ndiff = " << diff / (M * K) << '\n';
+
+	const double repeats = 1.0e8;
+	const double start = getTime();
+	int i = 0;
+	for (; i < repeats; i++)
+	{
+		pack_avx2_fma_16xK_fp16_fp32(fragment, matrix, { 0, 0 }, op);
+		if ((getTime() - start) > 10.0)
+			break;
+	}
+	const double stop = getTime();
+	std::cout << 1.0e6 * (stop - start) / i << " us (" << i << " repeats)\n";
+
+	gemm::aligned_free(dst1, 4096);
+	gemm::aligned_free(dst2, 4096);
+}
+
+void test_microkernel()
+{
+	constexpr int M = 10;
+	constexpr int N = 8;
+	constexpr int K = 1024;
+
+	std::unique_ptr<float[]> matrix_c = std::make_unique<float[]>(1024 * 1024);
+	std::unique_ptr<float[]> matrix_d = std::make_unique<float[]>(1024 * 1024);
+	std::unique_ptr<float[]> correct_d = std::make_unique<float[]>(1024 * 1024);
+
+	constexpr size_t size_in_bytes_lhs = sizeof(float) * M * K;
+	constexpr size_t size_in_bytes_rhs = sizeof(float) * N * K;
+	void *lhs = gemm::aligned_new(size_in_bytes_lhs, 4096);
+	void *rhs = gemm::aligned_new(size_in_bytes_rhs, 4096);
+	std::memset(lhs, 0, size_in_bytes_lhs);
+	std::memset(rhs, 0, size_in_bytes_rhs);
+
+	Fragment fragment_a(lhs, DTYPE_FLOAT32);
+	Fragment fragment_b(rhs, DTYPE_FLOAT32);
+	Fragment fragment_c(matrix_c.get(), DTYPE_FLOAT32);
+	Fragment fragment_d(matrix_d.get(), DTYPE_FLOAT32);
+	Fragment correct_fragment_d(correct_d.get(), fragment_d.dtype());
+	fragment_a.mark_as_packed_with_size( { K, M }, M);
+	fragment_b.mark_as_packed_with_size( { K, N }, N);
+	fragment_c.mark_as_packed_with_size( { M, N }, 1024);
+	fragment_d.mark_as_packed_with_size( { M, N }, 1024);
+	correct_fragment_d.mark_as_packed_with_size( { M, N }, 1024);
+
+	if (fragment_c.dtype() == DTYPE_FLOAT16)
+		for (int m = 0; m < M; m++)
+			for (int n = 0; n < N; n++)
+				fragment_c.at<uint16_t>(m, n) = float_to_half(randFloat() - 0.5f);
+	else
+		for (int m = 0; m < M; m++)
+			for (int n = 0; n < N; n++)
+				fragment_c.at<float>(m, n) = randFloat() - 0.5f;
+
+	for (int k = 0; k < K; k++)
+	{
+		if (fragment_a.dtype() == DTYPE_FLOAT16)
+			for (int m = 0; m < M; m++)
+				fragment_a.at<uint16_t>(k, m) = float_to_half(randFloat() - 0.5f);
+		else
+			for (int m = 0; m < M; m++)
+				fragment_a.at<float>(k, m) = randFloat() - 0.5f;
+
+		if (fragment_b.dtype() == DTYPE_FLOAT16)
+			for (int n = 0; n < N; n++)
+				fragment_b.at<uint16_t>(k, n) = float_to_half(randFloat() - 0.5f);
+		else
+			for (int n = 0; n < N; n++)
+				fragment_b.at<float>(k, n) = randFloat() - 0.5f;
+	}
+
+	const float alpha = 1.0f;
+	const float beta = 0.0f;
+
+	gemm_def_MxN_fp32(correct_fragment_d, &alpha, fragment_a, fragment_b, &beta, fragment_c);
+//	gemm_avx2_fma_24x4_fp32(fragment_d, &alpha, fragment_a, fragment_b, &beta, fragment_c);
+	gemm_avx_10x8_fp32(fragment_d, &alpha, fragment_a, fragment_b, &beta, fragment_c);
+
+	std::cout << "Correct\n";
+	for (int m = 0; m < M; m++)
+	{
+		for (int n = 0; n < N; n++)
+//			std::cout << half_to_float(correct_fragment_d.at<uint16_t>(m, n)) << ' ';
+			std::cout << correct_fragment_d.at<float>(m, n) << ' ';
+		std::cout << '\n';
+	}
+	std::cout << "-------------------------------------------\n";
+	std::cout << "Actual\n";
+	for (int m = 0; m < M; m++)
+	{
+		for (int n = 0; n < N; n++)
+//			std::cout << half_to_float(fragment_d.at<uint16_t>(m, n)) << ' ';
+			std::cout << fragment_d.at<float>(m, n) << ' ';
+		std::cout << '\n';
+	}
+
+	double diff = 0.0;
+//	for (int m = 0; m < M; m++)
+//		for (int n = 0; n < N; n++)
+//			diff += std::fabs(half_to_float(correct_fragment_d.at<uint16_t>(m, n)) - half_to_float(fragment_d.at<uint16_t>(m, n)));
+	for (int m = 0; m < M; m++)
+		for (int n = 0; n < N; n++)
+			diff += std::fabs(correct_fragment_d.at<float>(m, n) - fragment_d.at<float>(m, n));
+	std::cout << "\ndiff = " << diff / (M * K) << '\n';
+
+	const double repeats = 1.0e8;
+	const double start = getTime();
+	int i = 0;
+	for (; i < repeats; i++)
+	{
+		gemm_avx_10x8_fp32(fragment_d, &alpha, fragment_a, fragment_b, &beta, fragment_c);
+		if ((getTime() - start) > 15.0)
+			break;
+	}
+	const double stop = getTime();
+	std::cout << 1.0e6 * (stop - start) / i << " us (" << i << " repeats)\n";
+	const double flops = (double) i * (M * N * K) / (stop - start);
+	std::cout << flops / 1.0e9 << " GFLOPS\n";
+
+	gemm::aligned_free(lhs, 4096);
+	gemm::aligned_free(rhs, 4096);
+}
+
 int main()
 {
 	std::cout << "BEGIN" << std::endl;
+//	test_packing();
+	test_microkernel();
+	return 0;
 
 	{
 		Device::setNumberOfThreads(1);
@@ -2608,9 +2791,9 @@ int main()
 		std::unique_ptr<float[]> matrix_d = std::make_unique<float[]>(M * N);
 
 		for (int i = 0; i < M * K; i++)
-			matrix_a[i] = randFloat();
+			matrix_a[i] = 0; //randFloat();
 		for (int i = 0; i < K * N; i++)
-			matrix_b[i] = randFloat();
+			matrix_b[i] = 0; //randFloat();
 
 		const float alpha = 1.0f;
 		const float beta = 0.0f;
@@ -2632,10 +2815,10 @@ int main()
 		int i = 0;
 		for (; i < repeats; i++)
 		{
-			cpu_gemm_v2(context, DTYPE_FLOAT32, shape_d, matrix_d.get(), alpha, op_a, shape_a, matrix_a.get(), op_b, shape_b, matrix_b.get(), beta,
-					shape_d, matrix_d.get());
-//			cpu_gemm(context, DTYPE_FLOAT32, shape_d, matrix_d.get(), shape_a, matrix_a.get(), shape_b, matrix_b.get(), op_a, op_b, alpha, beta);
-			if ((getTime() - start) > 30.0)
+//			cpu_gemm_v2(context, DTYPE_FLOAT32, shape_d, matrix_d.get(), alpha, op_a, shape_a, matrix_a.get(), op_b, shape_b, matrix_b.get(), beta,
+//					shape_d, matrix_d.get());
+			cpu_gemm(context, DTYPE_FLOAT32, shape_d, matrix_d.get(), shape_a, matrix_a.get(), shape_b, matrix_b.get(), op_a, op_b, alpha, beta);
+			if ((getTime() - start) > 10.0)
 				break;
 		}
 		const double stop = getTime();

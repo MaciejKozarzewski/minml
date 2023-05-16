@@ -9,6 +9,7 @@
 #include "Matrix.hpp"
 #include "gemm_kernels.hpp"
 #include "utilities.hpp"
+#include "gemm_traits.hpp"
 #include "../../utils.hpp"
 #include "../../vectors/types.hpp"
 
@@ -130,7 +131,7 @@ namespace
 		return bf16_to_fp32(x.m_data);
 	}
 
-	template<typename T>
+	template<typename DT, typename AT, typename BT, typename CT>
 	void kernel_gemm_fp32(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C) noexcept
 	{
 		assert(A.rows() == B.rows());
@@ -145,9 +146,9 @@ namespace
 		for (int k = 0; k < K; k++)
 			for (int m = 0; m < M; m++)
 			{
-				const float tmp = A.at<float>(k, m);
+				const float tmp = convert<AT, float>(A.at<AT>(k, m));
 				for (int n = 0; n < N; n++)
-					acc[m * N + n] += tmp * B.at<float>(k, n);
+					acc[m * N + n] += tmp * convert<BT, float>(B.at<BT>(k, n));
 			}
 
 		assert(alpha_ptr != nullptr);
@@ -167,13 +168,13 @@ namespace
 		{
 			for (int m = 0; m < M; m++)
 				for (int n = 0; n < N; n++)
-					D.at<T>(m, n) = convert<float, T>(acc[m * N + n]);
+					D.at<DT>(m, n) = convert<float, DT>(acc[m * N + n]);
 		}
 		else
 		{
 			for (int m = 0; m < M; m++)
 				for (int n = 0; n < N; n++)
-					D.at<T>(m, n) = convert<float, T>(beta * convert<T, float>(C.at<T>(m, n)) + acc[m * N + n]);
+					D.at<DT>(m, n) = convert<float, DT>(beta * convert<CT, float>(C.at<CT>(m, n)) + acc[m * N + n]);
 		}
 	}
 
@@ -205,14 +206,6 @@ namespace
 				src_ptr += src.stride();
 				dst_ptr += 1;
 			}
-
-//			for (int k = 0; k < K; k++)
-//			{
-//				for (int m = 0; m < M; m++)
-//					dst_ptr[m] = convert<SrcT, DstT>(src_ptr[m * src.stride()]);
-//				src_ptr += 1;
-//				dst_ptr += dst.stride();
-//			}
 		}
 	}
 
@@ -239,44 +232,97 @@ namespace
 
 namespace ml
 {
-
+	std::vector<MicroKernel> get_def_microkernels()
+	{
+		std::vector<MicroKernel> result;
+		result.emplace_back(gemm_def_MxN_fp32, 4, 4, DTYPE_FLOAT32, DTYPE_FLOAT32, DTYPE_FLOAT32, DTYPE_FLOAT32);
+		result.emplace_back(gemm_def_MxN_fp16_fp32, 4, 4, DTYPE_FLOAT16, DTYPE_FLOAT32, DTYPE_FLOAT32, DTYPE_FLOAT16);
+		result.emplace_back(gemm_def_MxN_bf16_fp32, 4, 4, DTYPE_BFLOAT16, DTYPE_FLOAT32, DTYPE_FLOAT32, DTYPE_BFLOAT16);
+		return result;
+	}
+	std::vector<Packing> get_def_packing()
+	{
+		const int max_int = std::numeric_limits<int>::max();
+		std::vector<Packing> result;
+		result.emplace_back(pack_def_MxK_fp32, 0, max_int, DTYPE_FLOAT32, DTYPE_FLOAT32);
+		result.emplace_back(pack_def_MxK_fp16_fp32, 0, max_int, DTYPE_FLOAT16, DTYPE_FLOAT32);
+		result.emplace_back(pack_def_MxK_fp16, 0, max_int, DTYPE_FLOAT16, DTYPE_FLOAT16);
+		result.emplace_back(pack_def_MxK_bf16_fp32, 0, max_int, DTYPE_BFLOAT16, DTYPE_FLOAT32);
+		result.emplace_back(pack_def_MxK_bf16, 0, max_int, DTYPE_BFLOAT16, DTYPE_BFLOAT16);
+		return result;
+	}
+	std::vector<Unpacking> get_def_unpacking()
+	{
+		std::vector<Unpacking> result;
+		result.emplace_back(unpack_def_MxK_fp32, DTYPE_FLOAT32, DTYPE_FLOAT32);
+		result.emplace_back(unpack_def_MxK_fp16, DTYPE_FLOAT16, DTYPE_FLOAT16);
+		result.emplace_back(unpack_def_MxK_bf16, DTYPE_BFLOAT16, DTYPE_BFLOAT16);
+		return result;
+	}
 	/*
 	 * Computes D = alpha * A * B + beta * C
 	 * C and D may point to the same object
 	 */
 	void gemm_def_MxN_fp32(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C) noexcept
 	{
-		kernel_gemm_fp32<float>(D, alpha_ptr, A, B, beta_ptr, C);
+		kernel_gemm_fp32<float, float, float, float>(D, alpha_ptr, A, B, beta_ptr, C);
 	}
 	void gemm_def_MxN_fp16_fp32(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr,
 			const Fragment &C) noexcept
 	{
-		kernel_gemm_fp32<float16>(D, alpha_ptr, A, B, beta_ptr, C);
+		assert(D.dtype() == DTYPE_FLOAT16);
+		assert(C.dtype() == DTYPE_FLOAT16);
+		assert(A.dtype() == DTYPE_FLOAT16 || A.dtype() == DTYPE_FLOAT32);
+		assert(B.dtype() == DTYPE_FLOAT16 || B.dtype() == DTYPE_FLOAT32);
+		if (A.dtype() == DTYPE_FLOAT16)
+		{
+			if (B.dtype() == DTYPE_FLOAT16)
+				kernel_gemm_fp32<float16, float16, float16, float16>(D, alpha_ptr, A, B, beta_ptr, C);
+			else
+				kernel_gemm_fp32<float16, float16, float, float16>(D, alpha_ptr, A, B, beta_ptr, C);
+		}
+		else
+		{
+			if (B.dtype() == DTYPE_FLOAT16)
+				kernel_gemm_fp32<float16, float, float16, float16>(D, alpha_ptr, A, B, beta_ptr, C);
+			else
+				kernel_gemm_fp32<float16, float, float, float16>(D, alpha_ptr, A, B, beta_ptr, C);
+		}
 	}
 	void gemm_def_MxN_bf16_fp32(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr,
 			const Fragment &C) noexcept
 	{
-		kernel_gemm_fp32<bfloat16>(D, alpha_ptr, A, B, beta_ptr, C);
+		kernel_gemm_fp32<bfloat16, float, float, bfloat16>(D, alpha_ptr, A, B, beta_ptr, C);
 	}
 
 	void pack_def_MxK_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept
 	{
+		assert(dst.dtype() == DTYPE_FLOAT32);
+		assert(src.dtype() == DTYPE_FLOAT32);
 		kernel_pack<float, float>(dst, src, src_pos.row, src_pos.column, src_op);
 	}
 	void pack_def_MxK_fp16_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept
 	{
+		assert(dst.dtype() == DTYPE_FLOAT32);
+		assert(src.dtype() == DTYPE_FLOAT16);
 		kernel_pack<float16, float>(dst, src, src_pos.row, src_pos.column, src_op);
 	}
 	void pack_def_MxK_fp16(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept
 	{
+		assert(dst.dtype() == DTYPE_FLOAT16);
+		assert(src.dtype() == DTYPE_FLOAT16);
 		kernel_pack<float16, float16>(dst, src, src_pos.row, src_pos.column, src_op);
 	}
 	void pack_def_MxK_bf16_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept
 	{
+		assert(dst.dtype() == DTYPE_FLOAT32);
+		assert(src.dtype() == DTYPE_BFLOAT16);
 		kernel_pack<bfloat16, float>(dst, src, src_pos.row, src_pos.column, src_op);
 	}
 	void pack_def_MxK_bf16(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept
 	{
+		assert(dst.dtype() == DTYPE_BFLOAT16);
+		assert(src.dtype() == DTYPE_BFLOAT16);
 		kernel_pack<bfloat16, bfloat16>(dst, src, src_pos.row, src_pos.column, src_op);
 	}
 
