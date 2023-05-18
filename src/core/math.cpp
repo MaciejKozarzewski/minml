@@ -230,6 +230,14 @@ namespace ml
 		}
 	}
 
+	void gemm(const Context &context, Tensor &D, float alpha, char opA, const Tensor &A, char opB, const Tensor &B, float beta, const Tensor &C)
+	{
+	}
+	void gemmBatched(const Context &context, Tensor &D, float alpha, char opA, const Tensor &A, char opB, const Tensor &B, float beta,
+			const Tensor &C)
+	{
+	}
+
 	void addBiasAct(const Context &context, Tensor &input, const Tensor &bias, ActivationType act)
 	{
 		switch (context.device().type())
@@ -399,8 +407,8 @@ namespace ml
 				break;
 		}
 	}
-	void adamOptimize(const Context &context, Tensor &weight, const Tensor &update, Tensor &momentum, Tensor &variance, float learning_rate, float beta1,
-			float beta2)
+	void adamOptimize(const Context &context, Tensor &weight, const Tensor &update, Tensor &momentum, Tensor &variance, float learning_rate,
+			float beta1, float beta2)
 	{
 		switch (context.device().type())
 		{

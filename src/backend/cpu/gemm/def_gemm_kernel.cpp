@@ -9,12 +9,12 @@
 #include "Matrix.hpp"
 #include "gemm_kernels.hpp"
 #include "utilities.hpp"
-#include "gemm_traits.hpp"
-#include "../../utils.hpp"
-#include "../../vectors/types.hpp"
+#include "../utils.hpp"
+#include "../vectors/types.hpp"
 
 #include <x86intrin.h>
 #include <cinttypes>
+#include <cstring>
 #include <cassert>
 #include <iostream>
 
@@ -184,6 +184,9 @@ namespace
 		const int M = dst.columns();
 		const int K = dst.rows();
 
+		if (M != dst.stride())
+			std::memset(dst.data(), 0, size_of(dst.dtype()) * K * dst.stride()); // zero-fill the edges
+
 		const SrcT *src_ptr = reinterpret_cast<const SrcT*>(src.pointer_at(src_row, src_col));
 		DstT *dst_ptr = dst.data<DstT>();
 
@@ -232,33 +235,6 @@ namespace
 
 namespace ml
 {
-	std::vector<MicroKernel> get_def_microkernels()
-	{
-		std::vector<MicroKernel> result;
-		result.emplace_back(gemm_def_MxN_fp32, 4, 4, DTYPE_FLOAT32, DTYPE_FLOAT32, DTYPE_FLOAT32, DTYPE_FLOAT32);
-		result.emplace_back(gemm_def_MxN_fp16_fp32, 4, 4, DTYPE_FLOAT16, DTYPE_FLOAT32, DTYPE_FLOAT32, DTYPE_FLOAT16);
-		result.emplace_back(gemm_def_MxN_bf16_fp32, 4, 4, DTYPE_BFLOAT16, DTYPE_FLOAT32, DTYPE_FLOAT32, DTYPE_BFLOAT16);
-		return result;
-	}
-	std::vector<Packing> get_def_packing()
-	{
-		const int max_int = std::numeric_limits<int>::max();
-		std::vector<Packing> result;
-		result.emplace_back(pack_def_MxK_fp32, 0, max_int, DTYPE_FLOAT32, DTYPE_FLOAT32);
-		result.emplace_back(pack_def_MxK_fp16_fp32, 0, max_int, DTYPE_FLOAT16, DTYPE_FLOAT32);
-		result.emplace_back(pack_def_MxK_fp16, 0, max_int, DTYPE_FLOAT16, DTYPE_FLOAT16);
-		result.emplace_back(pack_def_MxK_bf16_fp32, 0, max_int, DTYPE_BFLOAT16, DTYPE_FLOAT32);
-		result.emplace_back(pack_def_MxK_bf16, 0, max_int, DTYPE_BFLOAT16, DTYPE_BFLOAT16);
-		return result;
-	}
-	std::vector<Unpacking> get_def_unpacking()
-	{
-		std::vector<Unpacking> result;
-		result.emplace_back(unpack_def_MxK_fp32, DTYPE_FLOAT32, DTYPE_FLOAT32);
-		result.emplace_back(unpack_def_MxK_fp16, DTYPE_FLOAT16, DTYPE_FLOAT16);
-		result.emplace_back(unpack_def_MxK_bf16, DTYPE_BFLOAT16, DTYPE_BFLOAT16);
-		return result;
-	}
 	/*
 	 * Computes D = alpha * A * B + beta * C
 	 * C and D may point to the same object

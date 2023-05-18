@@ -5,8 +5,9 @@ target_sources(MinML PRIVATE 	batchnorm.cpp
 				cpu_properties.cpp
 				cpu_x86.cpp
 				dispatcher.cpp
-				gemms.cpp
+				openblas_gemm.cpp
 				training.cpp
 				utils.cpp)
 								
 add_subdirectory("kernels")
+add_subdirectory("gemm")

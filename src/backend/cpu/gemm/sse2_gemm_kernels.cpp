@@ -8,8 +8,8 @@
 #include "Fragment.hpp"
 #include "Matrix.hpp"
 #include "gemm_kernels.hpp"
-#include "../../utils.hpp"
-#include "../../vectors/vectors.hpp"
+#include "../utils.hpp"
+#include "../vectors/vectors.hpp"
 
 #include <x86intrin.h>
 #include <cinttypes>

@@ -24,13 +24,19 @@ namespace ml
 			bool m_is_packed = false;
 		public:
 			Fragment() noexcept = default;
-			Fragment(const void *ptr, mlDataType_t dtype) noexcept :
-					Fragment(const_cast<void*>(ptr), dtype)
+			Fragment(mlDataType_t dtype, int stride) noexcept :
+					m_dtype(dtype),
+					m_stride(stride)
 			{
 			}
-			Fragment(void *ptr, mlDataType_t dtype) noexcept :
+			Fragment(const void *ptr, mlDataType_t dtype, int stride) noexcept :
+					Fragment(const_cast<void*>(ptr), dtype, stride)
+			{
+			}
+			Fragment(void *ptr, mlDataType_t dtype, int stride) noexcept :
 					m_data(ptr),
-					m_dtype(dtype)
+					m_dtype(dtype),
+					m_stride(stride)
 			{
 				assert(ptr != nullptr);
 			}
@@ -99,9 +105,9 @@ namespace ml
 				m_size = size;
 				m_stride = stride;
 			}
-			void mark_as_packed_with_size(Size2D size, int stride) noexcept
+			void mark_as_packed_with_size(Size2D size) noexcept
 			{
-				set_size(size, stride);
+				m_size = size;
 				m_is_packed = true;
 			}
 	};

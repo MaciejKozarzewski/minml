@@ -1,4 +1,3 @@
-add_subdirectory("gemm")
 
 set(kernelsrc 	add_bias_act.cpp
 		conv_explicit_gemm.cpp
