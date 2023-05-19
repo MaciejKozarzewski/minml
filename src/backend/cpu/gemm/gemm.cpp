@@ -116,7 +116,7 @@ namespace
 		result[1].perf_estimator = PerfEstimator(-692.08, 46.66);
 
 		// 6x16 fp16/fp32
-		result[2].type_configuration = { DTYPE_FLOAT32, DTYPE_FLOAT16, DTYPE_FLOAT16, DTYPE_FLOAT16, DTYPE_FLOAT16 };
+		result[2].type_configuration = { DTYPE_FLOAT16, DTYPE_FLOAT16, DTYPE_FLOAT16, DTYPE_FLOAT16, DTYPE_FLOAT32 };
 		result[2].inner_tile = { 6, 16, 1024 };
 		result[2].gemm_kernel = gemm_avx2_fma_6x16_fp16_fp32;
 		result[2].a_packing = pack_avx2_fma_6xK_fp16_fp32;
@@ -129,7 +129,7 @@ namespace
 		result[2].perf_estimator = PerfEstimator(-819.13, 60.28);
 
 		// 24x4 fp16/fp32
-		result[3].type_configuration = { DTYPE_FLOAT32, DTYPE_FLOAT16, DTYPE_FLOAT16, DTYPE_FLOAT16, DTYPE_FLOAT16 };
+		result[3].type_configuration = { DTYPE_FLOAT16, DTYPE_FLOAT16, DTYPE_FLOAT16, DTYPE_FLOAT16, DTYPE_FLOAT32 };
 		result[3].inner_tile = { 24, 4, 512 };
 		result[3].gemm_kernel = gemm_avx2_fma_24x4_fp16_fp32;
 		result[3].a_packing = pack_avx2_fma_24xK_fp16_fp32;
@@ -173,7 +173,8 @@ namespace
 	{
 		assert(shape_A.rank == 2 || shape_A.rank == 3);
 		assert(shape_B.rank == 2 || shape_B.rank == 3);
-		const TypeConfiguration tc { DTYPE_FLOAT32, dtype, dtype, dtype, dtype };
+		const TypeConfiguration tc { dtype, dtype, dtype, dtype, DTYPE_FLOAT32 };
+
 		const int M = (opA == 'n') ? shape_A.dim[shape_A.rank - 2] : shape_A.dim[shape_A.rank - 1];
 		const int N = (opB == 'n') ? shape_B.dim[shape_B.rank - 1] : shape_B.dim[shape_B.rank - 2];
 		const int K = (opA == 'n') ? shape_A.dim[shape_A.rank - 1] : shape_A.dim[shape_A.rank - 2];
@@ -183,6 +184,7 @@ namespace
 
 		float max_gflops = std::numeric_limits<float>::lowest();
 		for (auto iter = table.begin(); iter < table.end(); iter++)
+		{
 			if (iter->can_work_with_types(tc))
 			{
 				const float gflops = iter->get_expected_gflops(M, N, K);
@@ -192,6 +194,7 @@ namespace
 					max_gflops = gflops;
 				}
 			}
+		}
 		return result;
 	}
 

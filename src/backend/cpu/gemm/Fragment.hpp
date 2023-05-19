@@ -25,8 +25,8 @@ namespace ml
 		public:
 			Fragment() noexcept = default;
 			Fragment(mlDataType_t dtype, int stride) noexcept :
-					m_dtype(dtype),
-					m_stride(stride)
+					m_stride(stride),
+					m_dtype(dtype)
 			{
 			}
 			Fragment(const void *ptr, mlDataType_t dtype, int stride) noexcept :
@@ -35,8 +35,8 @@ namespace ml
 			}
 			Fragment(void *ptr, mlDataType_t dtype, int stride) noexcept :
 					m_data(ptr),
-					m_dtype(dtype),
-					m_stride(stride)
+					m_stride(stride),
+					m_dtype(dtype)
 			{
 				assert(ptr != nullptr);
 			}

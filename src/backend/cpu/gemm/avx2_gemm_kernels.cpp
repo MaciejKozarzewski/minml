@@ -1581,6 +1581,9 @@ namespace ml
 
 				"UNROLLED1%=: \n\t"
 				// iteration 0
+				"vmovaps 0x00(%%rbx), %%ymm2 \n\t"
+				"vmovaps 0x20(%%rbx), %%ymm3 \n\t"
+
 				"vbroadcastss 0x00(%%rax), %%ymm0 \n\t"
 				"vbroadcastss 0x04(%%rax), %%ymm1 \n\t"
 				"vfmadd231ps %%ymm0, %%ymm2, %%ymm4 \n\t"
@@ -1603,9 +1606,6 @@ namespace ml
 				"vfmadd231ps %%ymm1, %%ymm3, %%ymm15 \n\t"
 				"add $0x18, %%rax \n\t"
 				"add $0x40, %%rbx \n\t"
-
-				"vmovaps 0x00(%%rbx), %%ymm2 \n\t"
-				"vmovaps 0x20(%%rbx), %%ymm3 \n\t"
 
 				"dec %%r14 \n\t"
 				"jne UNROLLED1%= \n\t"
@@ -2423,613 +2423,6 @@ namespace ml
 				"%ymm8", "%ymm9", "%ymm10", "%ymm11", "%ymm12", "%ymm13", "%ymm14", "%ymm15", "%rax", "%rbx", "%rcx", "%r14");
 	}
 
-	void gemm_avx2_fma_5x16_fp32(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr,
-			const Fragment &C) noexcept
-	{
-		assert(A.rows() == B.rows());
-		assert(A.stride() == 5);
-		assert(B.stride() == 16);
-		assert(D.rows() == A.columns());
-		assert(D.columns() == B.columns());
-
-		assert(alpha_ptr != nullptr);
-		assert(beta_ptr != nullptr);
-		assert(cpu::is_aligned(B.data(), register_size<YMM>()));
-
-		const float *A_ptr = A.data<float>();
-		const float *B_ptr = B.data<float>();
-		const float *C_ptr = C.data<float>();
-		float *D_ptr = D.data<float>();
-
-		const int K = A.rows();
-		uint64_t k_iter = K / 4;
-		uint64_t k_left = K % 4;
-		const uint64_t C_stride = C.stride() * sizeof(float);
-		const uint64_t D_stride = D.stride() * sizeof(float);
-		asm volatile(
-				"movq %[A_ptr], %%rax \n\t" // lhs pointer is in rax
-				"movq %[B_ptr], %%rbx \n\t"// rhs pointer is in rbx
-
-				// Set accumulators to zero.
-				"vpxor %%ymm6, %%ymm6, %%ymm6 \n\t"
-				"vpxor %%ymm7, %%ymm7, %%ymm7 \n\t"
-				"vpxor %%ymm8, %%ymm8, %%ymm8 \n\t"
-				"vpxor %%ymm9, %%ymm9, %%ymm9 \n\t"
-				"vpxor %%ymm10, %%ymm10, %%ymm10 \n\t"
-				"vpxor %%ymm11, %%ymm11, %%ymm11 \n\t"
-				"vpxor %%ymm12, %%ymm12, %%ymm12 \n\t"
-				"vpxor %%ymm13, %%ymm13, %%ymm13 \n\t"
-				"vpxor %%ymm14, %%ymm14, %%ymm14 \n\t"
-				"vpxor %%ymm15, %%ymm15, %%ymm15 \n\t"
-
-				"movq %[k_iter], %%r14 \n\t"// load the number of 4-unrolled iterations
-				"test %%r14, %%r14 \n\t"
-				"je FINALLOOP%= \n\t"
-
-				"UNROLLED4%=: \n\t"
-				// iteration 0
-				"vmovaps 0x00(%%rbx), %%ymm4 \n\t"
-				"vmovaps 0x20(%%rbx), %%ymm5 \n\t"
-
-				"vbroadcastss 0x00(%%rax), %%ymm0 \n\t"
-				"vbroadcastss 0x04(%%rax), %%ymm1 \n\t"
-				"vbroadcastss 0x08(%%rax), %%ymm2 \n\t"
-				"vbroadcastss 0x0C(%%rax), %%ymm3 \n\t"
-				"vfmadd231ps %%ymm0, %%ymm4, %%ymm6 \n\t"
-				"vfmadd231ps %%ymm0, %%ymm5, %%ymm7 \n\t"
-				"vfmadd231ps %%ymm1, %%ymm4, %%ymm8 \n\t"
-				"vfmadd231ps %%ymm1, %%ymm5, %%ymm9 \n\t"
-				"vbroadcastss 0x10(%%rax), %%ymm0 \n\t"
-				"vbroadcastss 0x14(%%rax), %%ymm1 \n\t"
-				"vfmadd231ps %%ymm2, %%ymm4, %%ymm10 \n\t"
-				"vfmadd231ps %%ymm2, %%ymm5, %%ymm11 \n\t"
-				"vfmadd231ps %%ymm3, %%ymm4, %%ymm12 \n\t"
-				"vfmadd231ps %%ymm3, %%ymm5, %%ymm13 \n\t"
-				"vbroadcastss 0x18(%%rax), %%ymm2 \n\t"
-				"vbroadcastss 0x1C(%%rax), %%ymm3 \n\t"
-				"vfmadd231ps %%ymm0, %%ymm4, %%ymm14 \n\t"
-				"vfmadd231ps %%ymm0, %%ymm5, %%ymm15 \n\t"
-
-				"vmovaps 0x40(%%rbx), %%ymm4 \n\t"
-				"vmovaps 0x60(%%rbx), %%ymm5 \n\t"
-
-				"vfmadd231ps %%ymm1, %%ymm4, %%ymm6 \n\t"
-				"vfmadd231ps %%ymm1, %%ymm5, %%ymm7 \n\t"
-				"vbroadcastss 0x20(%%rax), %%ymm0 \n\t"
-				"vbroadcastss 0x24(%%rax), %%ymm1 \n\t"
-				"vfmadd231ps %%ymm2, %%ymm4, %%ymm8 \n\t"
-				"vfmadd231ps %%ymm2, %%ymm5, %%ymm9 \n\t"
-				"vfmadd231ps %%ymm3, %%ymm4, %%ymm10 \n\t"
-				"vfmadd231ps %%ymm3, %%ymm5, %%ymm11 \n\t"
-				"vbroadcastss 0x28(%%rax), %%ymm2 \n\t"
-				"vbroadcastss 0x2C(%%rax), %%ymm3 \n\t"
-
-				"vfmadd231ps %%ymm0, %%ymm4, %%ymm12 \n\t"
-				"vfmadd231ps %%ymm0, %%ymm5, %%ymm13 \n\t"
-				"vfmadd231ps %%ymm1, %%ymm4, %%ymm14 \n\t"
-				"vfmadd231ps %%ymm1, %%ymm5, %%ymm15 \n\t"
-
-				"vbroadcastss 0x30(%%rax), %%ymm0 \n\t"
-				"vbroadcastss 0x34(%%rax), %%ymm1 \n\t"
-				"vmovaps 0x80(%%rbx), %%ymm4 \n\t"
-				"vmovaps 0xA0(%%rbx), %%ymm5 \n\t"
-
-				"vfmadd231ps %%ymm2, %%ymm4, %%ymm6 \n\t"
-				"vfmadd231ps %%ymm2, %%ymm5, %%ymm7 \n\t"
-				"vfmadd231ps %%ymm3, %%ymm4, %%ymm8 \n\t"
-				"vfmadd231ps %%ymm3, %%ymm5, %%ymm9 \n\t"
-
-				"vbroadcastss 0x38(%%rax), %%ymm2 \n\t"
-				"vbroadcastss 0x3C(%%rax), %%ymm3 \n\t"
-				"vfmadd231ps %%ymm0, %%ymm4, %%ymm10 \n\t"
-				"vfmadd231ps %%ymm0, %%ymm5, %%ymm11 \n\t"
-				"vfmadd231ps %%ymm1, %%ymm4, %%ymm12 \n\t"
-				"vfmadd231ps %%ymm1, %%ymm5, %%ymm13 \n\t"
-				"vbroadcastss 0x40(%%rax), %%ymm0 \n\t"
-				"vbroadcastss 0x44(%%rax), %%ymm1 \n\t"
-				"vfmadd231ps %%ymm2, %%ymm4, %%ymm14 \n\t"
-				"vfmadd231ps %%ymm2, %%ymm5, %%ymm15 \n\t"
-
-				"vmovaps 0xC0(%%rbx), %%ymm4 \n\t"
-				"vmovaps 0xE0(%%rbx), %%ymm5 \n\t"
-
-				"vfmadd231ps %%ymm3, %%ymm4, %%ymm6 \n\t"
-				"vfmadd231ps %%ymm3, %%ymm5, %%ymm7 \n\t"
-
-				"vbroadcastss 0x48(%%rax), %%ymm2 \n\t"
-				"vbroadcastss 0x4C(%%rax), %%ymm3 \n\t"
-				"vfmadd231ps %%ymm0, %%ymm4, %%ymm8 \n\t"
-				"vfmadd231ps %%ymm0, %%ymm5, %%ymm9 \n\t"
-				"vfmadd231ps %%ymm1, %%ymm4, %%ymm10 \n\t"
-				"vfmadd231ps %%ymm1, %%ymm5, %%ymm11 \n\t"
-				"vfmadd231ps %%ymm2, %%ymm4, %%ymm12 \n\t"
-				"vfmadd231ps %%ymm2, %%ymm5, %%ymm13 \n\t"
-				"vfmadd231ps %%ymm3, %%ymm4, %%ymm14 \n\t"
-				"vfmadd231ps %%ymm3, %%ymm5, %%ymm15 \n\t"
-
-				"add $0x50, %%rax \n\t"
-				"add $0x100, %%rbx \n\t"
-				"dec %%r14 \n\t"
-				"jne UNROLLED4%= \n\t"
-
-				"FINALLOOP%=: \n\t"
-				"movq %[k_left], %%r14 \n\t"// load the number of 1-unrolled iterations
-				"test %%r14, %%r14 \n\t"
-				"je EPILOGUE%= \n\t"
-
-				"UNROLLED1%=: \n\t"
-				// iteration 0
-				"vmovaps 0x00(%%rbx), %%ymm2 \n\t"
-				"vmovaps 0x20(%%rbx), %%ymm3 \n\t"
-
-				"vbroadcastss 0x00(%%rax), %%ymm0 \n\t"
-				"vbroadcastss 0x04(%%rax), %%ymm1 \n\t"
-				"vbroadcastss 0x08(%%rax), %%ymm2 \n\t"
-				"vbroadcastss 0x0C(%%rax), %%ymm3 \n\t"
-				"vfmadd231ps %%ymm0, %%ymm4, %%ymm6 \n\t"
-				"vfmadd231ps %%ymm0, %%ymm5, %%ymm7 \n\t"
-				"vbroadcastss 0x10(%%rax), %%ymm0 \n\t"
-				"vfmadd231ps %%ymm1, %%ymm4, %%ymm8 \n\t"
-				"vfmadd231ps %%ymm1, %%ymm5, %%ymm9 \n\t"
-				"vfmadd231ps %%ymm2, %%ymm4, %%ymm10 \n\t"
-				"vfmadd231ps %%ymm2, %%ymm5, %%ymm11 \n\t"
-				"vfmadd231ps %%ymm3, %%ymm4, %%ymm12 \n\t"
-				"vfmadd231ps %%ymm3, %%ymm5, %%ymm13 \n\t"
-				"vfmadd231ps %%ymm0, %%ymm4, %%ymm14 \n\t"
-				"vfmadd231ps %%ymm0, %%ymm5, %%ymm15 \n\t"
-
-				"add $0x14, %%rax \n\t"
-				"add $0x40, %%rbx \n\t"
-				"dec %%r14 \n\t"
-				"jne UNROLLED1%= \n\t"
-
-				"EPILOGUE%=: \n\t"
-
-				"movq %[alpha_ptr], %%rax \n\t"// load address of alpha
-				"movq %[beta_ptr], %%rbx \n\t"// load address of beta
-				"vbroadcastss 0x0(%%rax), %%ymm0 \n\t"
-				"vbroadcastss 0x0(%%rbx), %%ymm1 \n\t"
-
-				// scale by alpha
-				"vmulps %%ymm0, %%ymm6, %%ymm6 \n\t"
-				"vmulps %%ymm0, %%ymm7, %%ymm7 \n\t"
-				"vmulps %%ymm0, %%ymm8, %%ymm8 \n\t"
-				"vmulps %%ymm0, %%ymm9, %%ymm9 \n\t"
-				"vmulps %%ymm0, %%ymm10, %%ymm10 \n\t"
-				"vmulps %%ymm0, %%ymm11, %%ymm11 \n\t"
-				"vmulps %%ymm0, %%ymm12, %%ymm12 \n\t"
-				"vmulps %%ymm0, %%ymm13, %%ymm13 \n\t"
-				"vmulps %%ymm0, %%ymm14, %%ymm14 \n\t"
-				"vmulps %%ymm0, %%ymm15, %%ymm15 \n\t"
-
-				// load destination pointer and stride
-				"vpxor %%ymm0, %%ymm0, %%ymm0 \n\t"
-				"vucomiss %%xmm0, %%xmm1 \n\t"// set ZF if beta == 0.
-				"je BETAZERO%= \n\t"
-				"movq %[C_stride], %%r14 \n\t"// C stride is r14
-				"movq %[C_ptr], %%rcx \n\t"// C pointer is in rcx
-
-				"vmovups 0x00(%%rcx), %%ymm2 \n\t"
-				"vmovups 0x20(%%rcx), %%ymm3 \n\t"
-				"vfmadd231ps %%ymm2, %%ymm1, %%ymm4 \n\t"
-				"vfmadd231ps %%ymm3, %%ymm1, %%ymm5 \n\t"
-				"add %%r14, %%rcx \n\t"// add stride
-
-				"vmovups 0x00(%%rcx), %%ymm2 \n\t"
-				"vmovups 0x20(%%rcx), %%ymm3 \n\t"
-				"vfmadd231ps %%ymm2, %%ymm1, %%ymm6 \n\t"
-				"vfmadd231ps %%ymm3, %%ymm1, %%ymm7 \n\t"
-				"add %%r14, %%rcx \n\t"// add stride
-
-				"vmovups 0x00(%%rcx), %%ymm2 \n\t"
-				"vmovups 0x20(%%rcx), %%ymm3 \n\t"
-				"vfmadd231ps %%ymm2, %%ymm1, %%ymm8 \n\t"
-				"vfmadd231ps %%ymm3, %%ymm1, %%ymm9 \n\t"
-				"add %%r14, %%rcx \n\t"// add stride
-
-				"vmovups 0x00(%%rcx), %%ymm2 \n\t"
-				"vmovups 0x20(%%rcx), %%ymm3 \n\t"
-				"vfmadd231ps %%ymm2, %%ymm1, %%ymm10 \n\t"
-				"vfmadd231ps %%ymm3, %%ymm1, %%ymm11 \n\t"
-				"add %%r14, %%rcx \n\t"// add stride
-
-				"vmovups 0x00(%%rcx), %%ymm2 \n\t"
-				"vmovups 0x20(%%rcx), %%ymm3 \n\t"
-				"vfmadd231ps %%ymm2, %%ymm1, %%ymm12 \n\t"
-				"vfmadd231ps %%ymm3, %%ymm1, %%ymm13 \n\t"
-				"add %%r14, %%rcx \n\t"// add stride
-
-				"vmovups 0x00(%%rcx), %%ymm2 \n\t"
-				"vmovups 0x20(%%rcx), %%ymm3 \n\t"
-				"vfmadd231ps %%ymm2, %%ymm1, %%ymm14 \n\t"
-				"vfmadd231ps %%ymm3, %%ymm1, %%ymm15 \n\t"
-
-				"BETAZERO%=: \n\t"
-				"movq %[D_stride], %%r14 \n\t"// D stride is r14
-				"movq %[D_ptr], %%rcx \n\t"// D pointer is in rcx
-
-				"vmovups %%ymm4, 0x00(%%rcx) \n\t"
-				"vmovups %%ymm5, 0x20(%%rcx) \n\t"
-				"add %%r14, %%rcx \n\t"// add stride
-
-				"vmovups %%ymm6, 0x00(%%rcx) \n\t"
-				"vmovups %%ymm7, 0x20(%%rcx) \n\t"
-				"add %%r14, %%rcx \n\t"// add stride
-
-				"vmovups %%ymm8, 0x00(%%rcx) \n\t"
-				"vmovups %%ymm9, 0x20(%%rcx) \n\t"
-				"add %%r14, %%rcx \n\t"// add stride
-
-				"vmovups %%ymm10, 0x00(%%rcx) \n\t"
-				"vmovups %%ymm11, 0x20(%%rcx) \n\t"
-				"add %%r14, %%rcx \n\t"// add stride
-
-				"vmovups %%ymm12, 0x00(%%rcx) \n\t"
-				"vmovups %%ymm13, 0x20(%%rcx) \n\t"
-				"add %%r14, %%rcx \n\t"// add stride
-
-				"vmovups %%ymm14, 0x00(%%rcx) \n\t"
-				"vmovups %%ymm15, 0x20(%%rcx) \n\t"
-
-				"vzeroupper \n\t"
-
-				:// outputs
-				:// inputs
-				[A_ptr] "m"(A_ptr),
-				[B_ptr] "m"(B_ptr),
-				[C_ptr] "m"(C_ptr),
-				[D_ptr] "m"(D_ptr),
-				[k_iter] "m"(k_iter),
-				[k_left] "m"(k_left),
-				[C_stride] "m"(C_stride),
-				[D_stride] "m"(D_stride),
-				[alpha_ptr] "m"(alpha_ptr),
-				[beta_ptr] "m"(beta_ptr)
-				:// clobbers
-				"cc", "memory", "%ymm0", "%ymm1", "%ymm2", "%ymm3", "%ymm4", "%ymm5", "%ymm6", "%ymm7",
-				"%ymm8", "%ymm9", "%ymm10", "%ymm11", "%ymm12", "%ymm13", "%ymm14", "%ymm15", "%rax", "%rbx", "%rcx", "%r14");
-	}
-
-	void gemm_avx2_fma_6x16_fp16(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr,
-			const Fragment &C) noexcept
-	{
-		assert(A.rows() == B.rows());
-		assert(A.stride() == 6);
-		assert(B.stride() == 16);
-		assert(D.rows() == A.columns());
-		assert(D.columns() == B.columns());
-
-		assert(alpha_ptr != nullptr);
-		assert(beta_ptr != nullptr);
-		assert(cpu::is_aligned(B.data(), register_size<YMM>()));
-
-		const float *A_ptr = A.data<float>();
-		const float *B_ptr = B.data<float>();
-		const float *C_ptr = C.data<float>();
-		float *D_ptr = D.data<float>();
-
-		const int K = A.rows();
-		uint64_t k_iter = K / 4;
-		uint64_t k_left = K % 4;
-		const uint64_t C_stride = C.stride() * sizeof(float16);
-		const uint64_t D_stride = D.stride() * sizeof(float16);
-
-		alignas(32) float workspace[4 * 6 + 4 * 16];
-		float *a_storage = workspace;
-		float *b_storage = workspace + 4 * 6;
-
-		asm volatile(
-				"movq %[beta_ptr], %%rbx \n\t" // load address of beta
-				"vbroadcastss 0x0(%%rbx), %%ymm1 \n\t"
-				"vpxor %%ymm0, %%ymm0, %%ymm0 \n\t"
-				"vucomiss %%xmm0, %%xmm1 \n\t"// set ZF if beta == 0.
-				"je ZEROACC%= \n\t"
-				// load and convert dst
-				"movq %[C_stride], %%r14 \n\t"// C stride is r14
-				"movq %[C_ptr], %%rcx \n\t"// C pointer is in rcx
-
-				"vmovups 0x00(%%rcx), %%xmm4 \n\t"
-				"vmovups 0x10(%%rcx), %%xmm5 \n\t"
-				"add %%r14, %%rcx \n\t"// add stride
-				"vmovups 0x00(%%rcx), %%xmm6 \n\t"
-				"vmovups 0x10(%%rcx), %%xmm7 \n\t"
-				"add %%r14, %%rcx \n\t"// add stride
-				"vmovups 0x00(%%rcx), %%xmm8 \n\t"
-				"vmovups 0x10(%%rcx), %%xmm9 \n\t"
-				"add %%r14, %%rcx \n\t"// add stride
-				"vmovups 0x00(%%rcx), %%xmm10 \n\t"
-				"vmovups 0x10(%%rcx), %%xmm11 \n\t"
-				"add %%r14, %%rcx \n\t"// add stride
-				"vmovups 0x00(%%rcx), %%xmm12 \n\t"
-				"vmovups 0x10(%%rcx), %%xmm13 \n\t"
-				"add %%r14, %%rcx \n\t"// add stride
-				"vmovups 0x00(%%rcx), %%xmm14 \n\t"
-				"vmovups 0x10(%%rcx), %%xmm15 \n\t"
-
-				"vcvtph2ps %%xmm4, %%ymm4 \n\t"
-				"vcvtph2ps %%xmm5, %%ymm5 \n\t"
-				"vcvtph2ps %%xmm6, %%ymm6 \n\t"
-				"vcvtph2ps %%xmm7, %%ymm7 \n\t"
-				"vcvtph2ps %%xmm8, %%ymm8 \n\t"
-				"vcvtph2ps %%xmm9, %%ymm9 \n\t"
-				"vcvtph2ps %%xmm10, %%ymm10 \n\t"
-				"vcvtph2ps %%xmm11, %%ymm11 \n\t"
-				"vcvtph2ps %%xmm12, %%ymm12 \n\t"
-				"vcvtph2ps %%xmm13, %%ymm13 \n\t"
-				"vcvtph2ps %%xmm14, %%ymm14 \n\t"
-				"vcvtph2ps %%xmm15, %%ymm15 \n\t"
-
-				"vmulps %%ymm1, %%ymm4, %%ymm4 \n\t"
-				"vmulps %%ymm1, %%ymm5, %%ymm5 \n\t"
-				"vmulps %%ymm1, %%ymm6, %%ymm6 \n\t"
-				"vmulps %%ymm1, %%ymm7, %%ymm7 \n\t"
-				"vmulps %%ymm1, %%ymm8, %%ymm8 \n\t"
-				"vmulps %%ymm1, %%ymm9, %%ymm9 \n\t"
-				"vmulps %%ymm1, %%ymm10, %%ymm10 \n\t"
-				"vmulps %%ymm1, %%ymm11, %%ymm11 \n\t"
-				"vmulps %%ymm1, %%ymm12, %%ymm12 \n\t"
-				"vmulps %%ymm1, %%ymm13, %%ymm13 \n\t"
-				"vmulps %%ymm1, %%ymm14, %%ymm14 \n\t"
-				"vmulps %%ymm1, %%ymm15, %%ymm15 \n\t"
-				"jmp LOOPSTART%= \n\t"
-
-				"ZEROACC%=: \n\t"
-				// Set accumulators to zero.
-				"vpxor %%ymm4, %%ymm4, %%ymm4 \n\t"
-				"vpxor %%ymm5, %%ymm5, %%ymm5 \n\t"
-				"vpxor %%ymm6, %%ymm6, %%ymm6 \n\t"
-				"vpxor %%ymm7, %%ymm7, %%ymm7 \n\t"
-				"vpxor %%ymm8, %%ymm8, %%ymm8 \n\t"
-				"vpxor %%ymm9, %%ymm9, %%ymm9 \n\t"
-				"vpxor %%ymm10, %%ymm10, %%ymm10 \n\t"
-				"vpxor %%ymm11, %%ymm11, %%ymm11 \n\t"
-				"vpxor %%ymm12, %%ymm12, %%ymm12 \n\t"
-				"vpxor %%ymm13, %%ymm13, %%ymm13 \n\t"
-				"vpxor %%ymm14, %%ymm14, %%ymm14 \n\t"
-				"vpxor %%ymm15, %%ymm15, %%ymm15 \n\t"
-
-				"LOOPSTART%=: \n\t"
-				"movq %[A_ptr], %%rax \n\t"// lhs pointer is in rax
-				"movq %[B_ptr], %%rbx \n\t"// rhs pointer is in rbx
-
-				"movq %[a_storage], %%r8 \n\t"// lhs pointer is in r8
-				"movq %[b_storage], %%r9 \n\t"// rhs pointer is in r9
-
-				"movq %[k_iter], %%r14 \n\t"// load the number of 4-unrolled iterations
-				"test %%r14, %%r14 \n\t"
-				"je FINALLOOP%= \n\t"
-
-				"UNROLLED4%=: \n\t"
-				// iteration 0
-				// convert 4x6 fp16 into fp32 (fragment A)
-				"vcvtph2ps 0x00(%%rax), %%ymm2 \n\t"
-				"vcvtph2ps 0x10(%%rax), %%ymm1 \n\t"
-				"vcvtph2ps 0x20(%%rax), %%ymm0 \n\t"
-				"vmovaps %%ymm2, 0x00(%%r8) \n\t"
-				"vmovaps %%ymm1, 0x20(%%r8) \n\t"
-				"vmovaps %%ymm0, 0x40(%%r8) \n\t"
-
-				// start actual iterations
-				"vcvtph2ps 0x00(%%rbx), %%ymm2 \n\t"
-				"vcvtph2ps 0x10(%%rbx), %%ymm3 \n\t"
-
-				"vbroadcastss 0x00(%%r8), %%ymm0 \n\t"
-				"vbroadcastss 0x04(%%r8), %%ymm1 \n\t"
-				"vfmadd231ps %%ymm0, %%ymm2, %%ymm4 \n\t"
-				"vfmadd231ps %%ymm0, %%ymm3, %%ymm5 \n\t"
-				"vfmadd231ps %%ymm1, %%ymm2, %%ymm6 \n\t"
-				"vfmadd231ps %%ymm1, %%ymm3, %%ymm7 \n\t"
-
-				"vbroadcastss 0x08(%%r8), %%ymm0 \n\t"
-				"vbroadcastss 0x0C(%%r8), %%ymm1 \n\t"
-				"vfmadd231ps %%ymm0, %%ymm2, %%ymm8 \n\t"
-				"vfmadd231ps %%ymm0, %%ymm3, %%ymm9 \n\t"
-				"vfmadd231ps %%ymm1, %%ymm2, %%ymm10 \n\t"
-				"vfmadd231ps %%ymm1, %%ymm3, %%ymm11 \n\t"
-
-				"vbroadcastss 0x10(%%r8), %%ymm0 \n\t"
-				"vbroadcastss 0x14(%%r8), %%ymm1 \n\t"
-				"vfmadd231ps %%ymm0, %%ymm2, %%ymm12 \n\t"
-				"vfmadd231ps %%ymm0, %%ymm3, %%ymm13 \n\t"
-				"vfmadd231ps %%ymm1, %%ymm2, %%ymm14 \n\t"
-				"vfmadd231ps %%ymm1, %%ymm3, %%ymm15 \n\t"
-
-				// iteration 1
-				"vcvtph2ps 0x20(%%rbx), %%ymm2 \n\t"
-				"vcvtph2ps 0x30(%%rbx), %%ymm3 \n\t"
-
-				"vbroadcastss 0x18(%%r8), %%ymm0 \n\t"
-				"vbroadcastss 0x1C(%%r8), %%ymm1 \n\t"
-				"vfmadd231ps %%ymm0, %%ymm2, %%ymm4 \n\t"
-				"vfmadd231ps %%ymm0, %%ymm3, %%ymm5 \n\t"
-				"vfmadd231ps %%ymm1, %%ymm2, %%ymm6 \n\t"
-				"vfmadd231ps %%ymm1, %%ymm3, %%ymm7 \n\t"
-
-				"vbroadcastss 0x20(%%r8), %%ymm0 \n\t"
-				"vbroadcastss 0x24(%%r8), %%ymm1 \n\t"
-				"vfmadd231ps %%ymm0, %%ymm2, %%ymm8 \n\t"
-				"vfmadd231ps %%ymm0, %%ymm3, %%ymm9 \n\t"
-				"vfmadd231ps %%ymm1, %%ymm2, %%ymm10 \n\t"
-				"vfmadd231ps %%ymm1, %%ymm3, %%ymm11 \n\t"
-
-				"vbroadcastss 0x28(%%r8), %%ymm0 \n\t"
-				"vbroadcastss 0x2C(%%r8), %%ymm1 \n\t"
-				"vfmadd231ps %%ymm0, %%ymm2, %%ymm12 \n\t"
-				"vfmadd231ps %%ymm0, %%ymm3, %%ymm13 \n\t"
-				"vfmadd231ps %%ymm1, %%ymm2, %%ymm14 \n\t"
-				"vfmadd231ps %%ymm1, %%ymm3, %%ymm15 \n\t"
-
-				// iteration 2
-				"vcvtph2ps 0x40(%%rbx), %%ymm2 \n\t"
-				"vcvtph2ps 0x50(%%rbx), %%ymm3 \n\t"
-
-				"vbroadcastss 0x30(%%r8), %%ymm0 \n\t"
-				"vbroadcastss 0x34(%%r8), %%ymm1 \n\t"
-				"vfmadd231ps %%ymm0, %%ymm2, %%ymm4 \n\t"
-				"vfmadd231ps %%ymm0, %%ymm3, %%ymm5 \n\t"
-				"vfmadd231ps %%ymm1, %%ymm2, %%ymm6 \n\t"
-				"vfmadd231ps %%ymm1, %%ymm3, %%ymm7 \n\t"
-
-				"vbroadcastss 0x38(%%r8), %%ymm0 \n\t"
-				"vbroadcastss 0x3C(%%r8), %%ymm1 \n\t"
-				"vfmadd231ps %%ymm0, %%ymm2, %%ymm8 \n\t"
-				"vfmadd231ps %%ymm0, %%ymm3, %%ymm9 \n\t"
-				"vfmadd231ps %%ymm1, %%ymm2, %%ymm10 \n\t"
-				"vfmadd231ps %%ymm1, %%ymm3, %%ymm11 \n\t"
-
-				"vbroadcastss 0x40(%%r8), %%ymm0 \n\t"
-				"vbroadcastss 0x44(%%r8), %%ymm1 \n\t"
-				"vfmadd231ps %%ymm0, %%ymm2, %%ymm12 \n\t"
-				"vfmadd231ps %%ymm0, %%ymm3, %%ymm13 \n\t"
-				"vfmadd231ps %%ymm1, %%ymm2, %%ymm14 \n\t"
-				"vfmadd231ps %%ymm1, %%ymm3, %%ymm15 \n\t"
-
-				// iteration 3
-				"vcvtph2ps 0x60(%%rbx), %%ymm2 \n\t"
-				"vcvtph2ps 0x70(%%rbx), %%ymm3 \n\t"
-
-				"vbroadcastss 0x48(%%r8), %%ymm0 \n\t"
-				"vbroadcastss 0x4C(%%r8), %%ymm1 \n\t"
-				"vfmadd231ps %%ymm0, %%ymm2, %%ymm4 \n\t"
-				"vfmadd231ps %%ymm0, %%ymm3, %%ymm5 \n\t"
-				"vfmadd231ps %%ymm1, %%ymm2, %%ymm6 \n\t"
-				"vfmadd231ps %%ymm1, %%ymm3, %%ymm7 \n\t"
-
-				"vbroadcastss 0x50(%%r8), %%ymm0 \n\t"
-				"vbroadcastss 0x54(%%r8), %%ymm1 \n\t"
-				"vfmadd231ps %%ymm0, %%ymm2, %%ymm8 \n\t"
-				"vfmadd231ps %%ymm0, %%ymm3, %%ymm9 \n\t"
-				"vfmadd231ps %%ymm1, %%ymm2, %%ymm10 \n\t"
-				"vfmadd231ps %%ymm1, %%ymm3, %%ymm11 \n\t"
-
-				"vbroadcastss 0x58(%%r8), %%ymm0 \n\t"
-				"vbroadcastss 0x5C(%%r8), %%ymm1 \n\t"
-				"vfmadd231ps %%ymm0, %%ymm2, %%ymm12 \n\t"
-				"vfmadd231ps %%ymm0, %%ymm3, %%ymm13 \n\t"
-				"vfmadd231ps %%ymm1, %%ymm2, %%ymm14 \n\t"
-				"vfmadd231ps %%ymm1, %%ymm3, %%ymm15 \n\t"
-
-				"add $0x30, %%rax \n\t"
-				"add $0x80, %%rbx \n\t"
-
-				"dec %%r14 \n\t"
-				"jne UNROLLED4%= \n\t"
-
-				"FINALLOOP%=: \n\t"
-				"movq %[k_left], %%r14 \n\t"// load the number of 1-unrolled iterations
-				"test %%r14, %%r14 \n\t"
-				"je EPILOGUE%= \n\t"
-
-				"UNROLLED1%=: \n\t"
-				// iteration 0
-				"vcvtph2ps 0x00(%%rbx), %%ymm2 \n\t"
-				"vcvtph2ps 0x10(%%rbx), %%ymm3 \n\t"
-				"vcvtph2ps 0x0(%%rax), %%ymm0 \n\t"
-				"vmovaps %%ymm0, 0x0(%%r8) \n\t"
-
-				"vbroadcastss 0x00(%%r8), %%ymm0 \n\t"
-				"vbroadcastss 0x04(%%r8), %%ymm1 \n\t"
-				"vfmadd231ps %%ymm0, %%ymm2, %%ymm4 \n\t"
-				"vfmadd231ps %%ymm0, %%ymm3, %%ymm5 \n\t"
-				"vfmadd231ps %%ymm1, %%ymm2, %%ymm6 \n\t"
-				"vfmadd231ps %%ymm1, %%ymm3, %%ymm7 \n\t"
-
-				"vbroadcastss 0x08(%%r8), %%ymm0 \n\t"
-				"vbroadcastss 0x0C(%%r8), %%ymm1 \n\t"
-				"vfmadd231ps %%ymm0, %%ymm2, %%ymm8 \n\t"
-				"vfmadd231ps %%ymm0, %%ymm3, %%ymm9 \n\t"
-				"vfmadd231ps %%ymm1, %%ymm2, %%ymm10 \n\t"
-				"vfmadd231ps %%ymm1, %%ymm3, %%ymm11 \n\t"
-
-				"vbroadcastss 0x10(%%r8), %%ymm0 \n\t"
-				"vbroadcastss 0x14(%%r8), %%ymm1 \n\t"
-				"vfmadd231ps %%ymm0, %%ymm2, %%ymm12 \n\t"
-				"vfmadd231ps %%ymm0, %%ymm3, %%ymm13 \n\t"
-				"vfmadd231ps %%ymm1, %%ymm2, %%ymm14 \n\t"
-				"vfmadd231ps %%ymm1, %%ymm3, %%ymm15 \n\t"
-				"add $0x18, %%rax \n\t"
-				"add $0x40, %%rbx \n\t"
-
-				"dec %%r14 \n\t"
-				"jne UNROLLED1%= \n\t"
-
-				"EPILOGUE%=: \n\t"
-
-				"movq %[alpha_ptr], %%rax \n\t"// load address of alpha
-				"vbroadcastss 0x0(%%rax), %%ymm0 \n\t"
-
-				// scale by alpha
-				"vmulps %%ymm0, %%ymm4, %%ymm4 \n\t"
-				"vmulps %%ymm0, %%ymm5, %%ymm5 \n\t"
-				"vmulps %%ymm0, %%ymm6, %%ymm6 \n\t"
-				"vmulps %%ymm0, %%ymm7, %%ymm7 \n\t"
-				"vmulps %%ymm0, %%ymm8, %%ymm8 \n\t"
-				"vmulps %%ymm0, %%ymm9, %%ymm9 \n\t"
-				"vmulps %%ymm0, %%ymm10, %%ymm10 \n\t"
-				"vmulps %%ymm0, %%ymm11, %%ymm11 \n\t"
-				"vmulps %%ymm0, %%ymm12, %%ymm12 \n\t"
-				"vmulps %%ymm0, %%ymm13, %%ymm13 \n\t"
-				"vmulps %%ymm0, %%ymm14, %%ymm14 \n\t"
-				"vmulps %%ymm0, %%ymm15, %%ymm15 \n\t"
-
-				// convert back to fp16
-				"vcvtps2ph $0x03, %%ymm4, %%xmm4 \n\t"
-				"vcvtps2ph $0x03, %%ymm5, %%xmm5 \n\t"
-				"vcvtps2ph $0x03, %%ymm6, %%xmm6 \n\t"
-				"vcvtps2ph $0x03, %%ymm7, %%xmm7 \n\t"
-				"vcvtps2ph $0x03, %%ymm8, %%xmm8 \n\t"
-				"vcvtps2ph $0x03, %%ymm9, %%xmm9 \n\t"
-				"vcvtps2ph $0x03, %%ymm10, %%xmm10 \n\t"
-				"vcvtps2ph $0x03, %%ymm11, %%xmm11 \n\t"
-				"vcvtps2ph $0x03, %%ymm12, %%xmm12 \n\t"
-				"vcvtps2ph $0x03, %%ymm13, %%xmm13 \n\t"
-				"vcvtps2ph $0x03, %%ymm14, %%xmm14 \n\t"
-				"vcvtps2ph $0x03, %%ymm15, %%xmm15 \n\t"
-
-				// load destination pointer and stride
-				"movq %[D_stride], %%r14 \n\t"// D stride is r14
-				"movq %[D_ptr], %%rcx \n\t"// D pointer is in rcx
-
-				"vmovups %%xmm4, 0x00(%%rcx) \n\t"
-				"vmovups %%xmm5, 0x10(%%rcx) \n\t"
-				"add %%r14, %%rcx \n\t"// add stride
-				"vmovups %%xmm6, 0x00(%%rcx) \n\t"
-				"vmovups %%xmm7, 0x10(%%rcx) \n\t"
-				"add %%r14, %%rcx \n\t"// add stride
-				"vmovups %%xmm8, 0x00(%%rcx) \n\t"
-				"vmovups %%xmm9, 0x10(%%rcx) \n\t"
-				"add %%r14, %%rcx \n\t"// add stride
-				"vmovups %%xmm10, 0x00(%%rcx) \n\t"
-				"vmovups %%xmm11, 0x10(%%rcx) \n\t"
-				"add %%r14, %%rcx \n\t"// add stride
-				"vmovups %%xmm12, 0x00(%%rcx) \n\t"
-				"vmovups %%xmm13, 0x10(%%rcx) \n\t"
-				"add %%r14, %%rcx \n\t"// add stride
-				"vmovups %%xmm14, 0x00(%%rcx) \n\t"
-				"vmovups %%xmm15, 0x10(%%rcx) \n\t"
-
-				"vzeroupper \n\t"
-
-				:// outputs
-				:// inputs
-				[a_storage] "m"(a_storage),
-				[b_storage] "m"(b_storage),
-				[A_ptr] "m"(A_ptr),
-				[B_ptr] "m"(B_ptr),
-				[C_ptr] "m"(C_ptr),
-				[D_ptr] "m"(D_ptr),
-				[k_iter] "m"(k_iter),
-				[k_left] "m"(k_left),
-				[C_stride] "m"(C_stride),
-				[D_stride] "m"(D_stride),
-				[alpha_ptr] "m"(alpha_ptr),
-				[beta_ptr] "m"(beta_ptr)
-				:// clobbers
-				"cc", "memory", "%ymm0", "%ymm1", "%ymm2", "%ymm3", "%ymm4", "%ymm5", "%ymm6", "%ymm7",
-				"%ymm8", "%ymm9", "%ymm10", "%ymm11", "%ymm12", "%ymm13", "%ymm14", "%ymm15", "%rax", "%rbx", "%rcx", "%r8", "%r9", "%r14");
-
-	}
-
 	void pack_avx2_fma_6xK_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept
 	{
 		assert(dst.stride() == 6);
@@ -3312,8 +2705,8 @@ namespace ml
 		uint64_t k_iter = dst.rows() / 8;
 		uint64_t k_left = dst.rows() % 8;
 		const uint64_t src_stride = src.stride() * sizeof(float);
-		const float *src_ptr = reinterpret_cast<const float*>(src.pointer_at(src_pos.row, src_pos.column));
-		float *dst_ptr = dst.data<float>();
+		const void *src_ptr = src.pointer_at(src_pos.row, src_pos.column);
+		void *dst_ptr = dst.data();
 
 		if (src_op == MatrixOp::NORMAL)
 		{
@@ -3625,8 +3018,8 @@ namespace ml
 		assert(ml::cpu::is_aligned(dst.data(), register_size<YMM>()));
 
 		const uint64_t src_stride = src.stride() * sizeof(float);
-		const float *src_ptr = reinterpret_cast<const float*>(src.pointer_at(src_pos.row, src_pos.column));
-		float *dst_ptr = dst.data<float>();
+		const void *src_ptr = src.pointer_at(src_pos.row, src_pos.column);
+		void *dst_ptr = dst.data();
 
 		if (src_op == MatrixOp::NORMAL)
 		{
@@ -4004,14 +3397,14 @@ namespace ml
 		assert(dst.stride() == 4);
 		assert(ml::cpu::is_aligned(dst.data(), register_size<XMM>()));
 
+		uint64_t k_iter = dst.rows() / 8;
+		uint64_t k_left = dst.rows() % 8;
 		const uint64_t src_stride = src.stride() * sizeof(float16);
 		const void *src_ptr = src.pointer_at(src_pos.row, src_pos.column);
 		void *dst_ptr = dst.data();
 
 		if (src_op == MatrixOp::NORMAL)
 		{
-			uint64_t k_iter = dst.rows() / 8;
-			uint64_t k_left = dst.rows() % 8;
 			asm volatile(
 					"movq %[src_ptr], %%rax \n\t" // src pointer is in rax
 					"movq %[dst_ptr], %%rbx \n\t"// dst pointer is in rbx
@@ -4022,21 +3415,21 @@ namespace ml
 					"je FINALLOOP%= \n\t"
 
 					"UNROLLED8%=: \n\t"
-					"movsd 0x00(%%rax), %%xmm0 \n\t"
+					"vmovsd 0x00(%%rax), %%xmm0 \n\t"
 					"add %%r12, %%rax \n\t"// add stride to src pointer
-					"movsd 0x00(%%rax), %%xmm1 \n\t"
+					"vmovsd 0x00(%%rax), %%xmm1 \n\t"
 					"add %%r12, %%rax \n\t"// add stride to src pointer
-					"movsd 0x00(%%rax), %%xmm2 \n\t"
+					"vmovsd 0x00(%%rax), %%xmm2 \n\t"
 					"add %%r12, %%rax \n\t"// add stride to src pointer
-					"movsd 0x00(%%rax), %%xmm3 \n\t"
+					"vmovsd 0x00(%%rax), %%xmm3 \n\t"
 					"add %%r12, %%rax \n\t"// add stride to src pointer
-					"movsd 0x00(%%rax), %%xmm4 \n\t"
+					"vmovsd 0x00(%%rax), %%xmm4 \n\t"
 					"add %%r12, %%rax \n\t"// add stride to src pointer
-					"movsd 0x00(%%rax), %%xmm5 \n\t"
+					"vmovsd 0x00(%%rax), %%xmm5 \n\t"
 					"add %%r12, %%rax \n\t"// add stride to src pointer
-					"movsd 0x00(%%rax), %%xmm6 \n\t"
+					"vmovsd 0x00(%%rax), %%xmm6 \n\t"
 					"add %%r12, %%rax \n\t"// add stride to src pointer
-					"movsd 0x00(%%rax), %%xmm7 \n\t"
+					"vmovsd 0x00(%%rax), %%xmm7 \n\t"
 					"add %%r12, %%rax \n\t"// add stride to src pointer
 
 					"vcvtph2ps %%xmm0, %%xmm0 \n\t"
@@ -4048,14 +3441,14 @@ namespace ml
 					"vcvtph2ps %%xmm6, %%xmm6 \n\t"
 					"vcvtph2ps %%xmm7, %%xmm7 \n\t"
 
-					"movaps %%xmm0, 0x00(%%rbx) \n\t"
-					"movaps %%xmm1, 0x10(%%rbx) \n\t"
-					"movaps %%xmm2, 0x20(%%rbx) \n\t"
-					"movaps %%xmm3, 0x30(%%rbx) \n\t"
-					"movaps %%xmm4, 0x40(%%rbx) \n\t"
-					"movaps %%xmm5, 0x50(%%rbx) \n\t"
-					"movaps %%xmm6, 0x60(%%rbx) \n\t"
-					"movaps %%xmm7, 0x70(%%rbx) \n\t"
+					"vmovaps %%xmm0, 0x00(%%rbx) \n\t"
+					"vmovaps %%xmm1, 0x10(%%rbx) \n\t"
+					"vmovaps %%xmm2, 0x20(%%rbx) \n\t"
+					"vmovaps %%xmm3, 0x30(%%rbx) \n\t"
+					"vmovaps %%xmm4, 0x40(%%rbx) \n\t"
+					"vmovaps %%xmm5, 0x50(%%rbx) \n\t"
+					"vmovaps %%xmm6, 0x60(%%rbx) \n\t"
+					"vmovaps %%xmm7, 0x70(%%rbx) \n\t"
 
 					"add $(4*8*4), %%rbx \n\t"// add stride to dst pointer
 
@@ -4068,9 +3461,9 @@ namespace ml
 					"je EPILOGUE%= \n\t"
 
 					"UNROLLED1%=: \n\t"
-					"movsd 0x00(%%rax), %%xmm0 \n\t"
+					"vmovsd 0x00(%%rax), %%xmm0 \n\t"
 					"vcvtph2ps %%xmm0, %%xmm0 \n\t"
-					"movaps %%xmm0, 0x00(%%rbx) \n\t"
+					"vmovaps %%xmm0, 0x00(%%rbx) \n\t"
 
 					"add %%r12, %%rax \n\t"// add stride to src pointer
 					"add $(4*1*4), %%rbx \n\t"// add stride to dst pointer
@@ -4095,8 +3488,6 @@ namespace ml
 		}
 		else
 		{
-			uint64_t k_iter = dst.rows() / 8;
-			uint64_t k_left = dst.rows() % 8;
 			asm volatile(
 					"movq %[src_ptr], %%rax \n\t" // src pointer is in rax
 					"movq %[dst_ptr], %%rbx \n\t"// dst pointer is in rbx
@@ -4107,71 +3498,47 @@ namespace ml
 					"je FINALLOOP%= \n\t"
 
 					"UNROLLED4%=: \n\t"
-					// first 8x8 tile
 					"movq %%rax, %%r13 \n\t"// tmp src pointer is in r13
 
-					"movsd 0x0(%%r13), %%xmm0 \n\t"
-					"movsd 0x8(%%r13), %%xmm10 \n\t"
+					// load 4x8 fp16
+					"vmovups 0x0(%%r13), %%xmm0 \n\t"
 					"add %%r12, %%r13 \n\t"// add stride to src pointer
-					"movsd 0x0(%%r13), %%xmm1 \n\t"
-					"movsd 0x8(%%r13), %%xmm11 \n\t"
+					"vmovups 0x0(%%r13), %%xmm1 \n\t"
 					"add %%r12, %%r13 \n\t"// add stride to src pointer
-					"movsd 0x0(%%r13), %%xmm2 \n\t"
-					"movsd 0x8(%%r13), %%xmm12 \n\t"
+					"vmovups 0x0(%%r13), %%xmm2 \n\t"
 					"add %%r12, %%r13 \n\t"// add stride to src pointer
-					"movsd 0x0(%%r13), %%xmm3 \n\t"
-					"movsd 0x8(%%r13), %%xmm13 \n\t"
+					"vmovups 0x0(%%r13), %%xmm3 \n\t"
 
-					"vcvtph2ps %%xmm0, %%xmm0 \n\t"
-					"vcvtph2ps %%xmm10, %%xmm10 \n\t"
-					"vcvtph2ps %%xmm11, %%xmm1 \n\t"
-					"vcvtph2ps %%xmm11, %%xmm11 \n\t"
-					"vcvtph2ps %%xmm2, %%xmm2 \n\t"
-					"vcvtph2ps %%xmm12, %%xmm12 \n\t"
-					"vcvtph2ps %%xmm3, %%xmm3 \n\t"
-					"vcvtph2ps %%xmm13, %%xmm13 \n\t"
+					"vcvtph2ps %%xmm0, %%ymm0 \n\t"
+					"vcvtph2ps %%xmm1, %%ymm1 \n\t"
+					"vcvtph2ps %%xmm2, %%ymm2 \n\t"
+					"vcvtph2ps %%xmm3, %%ymm3 \n\t"
 
-					"movaps %%xmm0, %%xmm4 \n\t"
-					"movaps %%xmm2, %%xmm5 \n\t"
-					"movaps %%xmm10, %%xmm14 \n\t"
-					"movaps %%xmm12, %%xmm15 \n\t"
-
-					// transpose 8x4
-					// first shuffle
-					"unpcklps %%xmm1, %%xmm4 \n\t"
-					"unpcklps %%xmm3, %%xmm5 \n\t"
-					"unpckhps %%xmm1, %%xmm0 \n\t"
-					"unpckhps %%xmm3, %%xmm2 \n\t"
-					"unpcklps %%xmm11, %%xmm14 \n\t"
-					"unpcklps %%xmm13, %%xmm15 \n\t"
-					"unpckhps %%xmm11, %%xmm10 \n\t"
-					"unpckhps %%xmm13, %%xmm12 \n\t"
-
-					"movaps %%xmm4, %%xmm1 \n\t"
-					"movaps %%xmm0, %%xmm3 \n\t"
-					"movaps %%xmm14, %%xmm11 \n\t"
-					"movaps %%xmm10, %%xmm13 \n\t"
-
+					"vunpcklps %%ymm1, %%ymm0, %%ymm6 \n\t"// a0 b0 a1 b1 a4 b4 a5 b5
+					"vunpckhps %%ymm1, %%ymm0, %%ymm7 \n\t"// a2 b2 a3 b3 a6 b6 a7 b7
+					"vunpcklps %%ymm3, %%ymm2, %%ymm8 \n\t"// c0 d0 c1 d1 c4 d4 c5 d5
+					"vunpckhps %%ymm3, %%ymm2, %%ymm9 \n\t"// c2 d2 c3 d3 c6 d6 c7 d7
 					// second shuffle
-					"movlhps %%xmm5, %%xmm4 \n\t"
-					"movlhps %%xmm2, %%xmm3 \n\t"
-					"movhlps %%xmm1, %%xmm5 \n\t"
-					"movhlps %%xmm0, %%xmm2 \n\t"
-					"movlhps %%xmm15, %%xmm14 \n\t"
-					"movlhps %%xmm12, %%xmm13 \n\t"
-					"movhlps %%xmm11, %%xmm15 \n\t"
-					"movhlps %%xmm10, %%xmm12 \n\t"
+					"vunpcklpd %%ymm8, %%ymm6, %%ymm12 \n\t"// a0 b0 c0 d0 a4 b4 c4 d4
+					"vunpckhpd %%ymm8, %%ymm6, %%ymm13 \n\t"// a1 b1 c1 d1 a5 b5 c5 d5
+					"vunpcklpd %%ymm9, %%ymm7, %%ymm14 \n\t"// a2 b2 c2 d2 a6 b6 c6 d6
+					"vunpckhpd %%ymm9, %%ymm7, %%ymm15 \n\t"// a3 b3 c3 d3 a7 b7 c7 d7
 
-					"movaps %%xmm4, (4*4*0)(%%rbx) \n\t"
-					"movaps %%xmm5, (4*4*1)(%%rbx) \n\t"
-					"movaps %%xmm3, (4*4*2)(%%rbx) \n\t"
-					"movaps %%xmm2, (4*4*3)(%%rbx) \n\t"
-					"movaps %%xmm14, (4*4*4)(%%rbx) \n\t"
-					"movaps %%xmm15, (4*4*5)(%%rbx) \n\t"
-					"movaps %%xmm13, (4*4*6)(%%rbx) \n\t"
-					"movaps %%xmm12, (4*4*7)(%%rbx) \n\t"
+					"vextractf128 $0x1, %%ymm12, %%xmm0 \n\t"// a4 b4 c4 d4
+					"vextractf128 $0x1, %%ymm13, %%xmm1 \n\t"// a5 b5 c5 d5
+					"vextractf128 $0x1, %%ymm14, %%xmm2 \n\t"// a6 b6 c6 d6
+					"vextractf128 $0x1, %%ymm15, %%xmm3 \n\t"// a7 b7 c7 d7
 
-					"add $(4*8), %%rax \n\t"// add stride to src pointer
+					"vmovaps %%xmm12, (4*0*4)(%%rbx) \n\t"// a0 b0 c0 d0
+					"vmovaps %%xmm13, (4*1*4)(%%rbx) \n\t"// a1 b1 c1 d1
+					"vmovaps %%xmm14, (4*2*4)(%%rbx) \n\t"// a2 b2 c2 d2
+					"vmovaps %%xmm15, (4*3*4)(%%rbx) \n\t"// a3 b3 c3 d3
+					"vmovaps %%xmm0, (4*4*4)(%%rbx) \n\t"// a4 b4 c4 d4
+					"vmovaps %%xmm1, (4*5*4)(%%rbx) \n\t"// a5 b5 c5 d5
+					"vmovaps %%xmm2, (4*6*4)(%%rbx) \n\t"// a6 b6 c6 d6
+					"vmovaps %%xmm3, (4*7*4)(%%rbx) \n\t"// a7 b7 c7 d7
+
+					"add $(2*8), %%rax \n\t"// add stride to src pointer
 					"add $(4*8*4), %%rbx \n\t"// add stride to dst pointer
 
 					"dec %%r14 \n\t"
@@ -4198,7 +3565,7 @@ namespace ml
 					"vmovq %%rcx, %%xmm3 \n\t"
 
 					"vcvtph2ps %%xmm0, %%xmm0 \n\t"
-					"vcvtph2ps %%xmm11, %%xmm1 \n\t"
+					"vcvtph2ps %%xmm1, %%xmm1 \n\t"
 					"vcvtph2ps %%xmm2, %%xmm2 \n\t"
 					"vcvtph2ps %%xmm3, %%xmm3 \n\t"
 
@@ -4207,7 +3574,7 @@ namespace ml
 					"vmovss %%xmm2, (4*2)(%%rbx) \n\t"
 					"vmovss %%xmm3, (4*3)(%%rbx) \n\t"
 
-					"add $(4*1), %%rax \n\t"// add stride to src pointer
+					"add $(2*1), %%rax \n\t"// add stride to src pointer
 					"add $(4*4*1), %%rbx \n\t"// add stride to dst pointer
 
 					"dec %%r14 \n\t"
@@ -4494,8 +3861,8 @@ namespace ml
 		uint64_t k_iter = dst.rows() / 8;
 		uint64_t k_left = dst.rows() % 8;
 		const uint64_t src_stride = src.stride() * sizeof(float16);
-		const float *src_ptr = reinterpret_cast<const float*>(src.pointer_at(src_pos.row, src_pos.column));
-		float *dst_ptr = dst.data<float>();
+		const void *src_ptr = src.pointer_at(src_pos.row, src_pos.column);
+		void *dst_ptr = dst.data();
 
 		if (src_op == MatrixOp::NORMAL)
 		{
@@ -4871,9 +4238,9 @@ namespace ml
 		assert(dst.stride() == 24);
 		assert(ml::cpu::is_aligned(dst.data(), register_size<YMM>()));
 
-		const uint64_t src_stride = src.stride() * sizeof(float);
-		const float *src_ptr = reinterpret_cast<const float*>(src.pointer_at(src_pos.row, src_pos.column));
-		float *dst_ptr = dst.data<float>();
+		const uint64_t src_stride = src.stride() * sizeof(float16);
+		const void *src_ptr = src.pointer_at(src_pos.row, src_pos.column);
+		void *dst_ptr = dst.data();
 
 		if (src_op == MatrixOp::NORMAL)
 		{
@@ -5179,7 +4546,7 @@ namespace ml
 					"vmovaps %%ymm14, (2*4*8+4*6*24)(%%rbx) \n\t"
 					"vmovaps %%ymm15, (2*4*8+4*7*24)(%%rbx) \n\t"
 
-					"add $(4*8), %%rax \n\t"// add stride to src pointer
+					"add $(2*8), %%rax \n\t"// add stride to src pointer
 					"add $(4*24*8), %%rbx \n\t"// add stride to dst pointer
 
 					"dec %%r14 \n\t"
@@ -5193,37 +4560,53 @@ namespace ml
 					"UNROLLED1%=: \n\t"
 					"movq %%rax, %%r13 \n\t"// tmp src pointer is in r13
 
-					"vmovss 0x0(%%r13), %%xmm0 \n\t"
+					"movzw 0x0(%%r13), %%rcx \n\t"
+					"vmovq %%rcx, %%xmm0 \n\t"
 					"add %%r12, %%r13 \n\t"// add stride to src pointer
-					"vmovss 0x0(%%r13), %%xmm1 \n\t"
+					"movzw 0x0(%%r13), %%rcx \n\t"
+					"vmovq %%rcx, %%xmm1 \n\t"
 					"add %%r12, %%r13 \n\t"// add stride to src pointer
-					"vmovss 0x0(%%r13), %%xmm2 \n\t"
+					"movzw 0x0(%%r13), %%rcx \n\t"
+					"vmovq %%rcx, %%xmm2 \n\t"
 					"add %%r12, %%r13 \n\t"// add stride to src pointer
-					"vmovss 0x0(%%r13), %%xmm3 \n\t"
+					"movzw 0x0(%%r13), %%rcx \n\t"
+					"vmovq %%rcx, %%xmm3 \n\t"
 					"add %%r12, %%r13 \n\t"// add stride to src pointer
-					"vmovss 0x0(%%r13), %%xmm4 \n\t"
+					"movzw 0x0(%%r13), %%rcx \n\t"
+					"vmovq %%rcx, %%xmm4 \n\t"
 					"add %%r12, %%r13 \n\t"// add stride to src pointer
-					"vmovss 0x0(%%r13), %%xmm5 \n\t"
+					"movzw 0x0(%%r13), %%rcx \n\t"
+					"vmovq %%rcx, %%xmm5 \n\t"
 					"add %%r12, %%r13 \n\t"// add stride to src pointer
-					"vmovss 0x0(%%r13), %%xmm6 \n\t"
+					"movzw 0x0(%%r13), %%rcx \n\t"
+					"vmovq %%rcx, %%xmm6 \n\t"
 					"add %%r12, %%r13 \n\t"// add stride to src pointer
-					"vmovss 0x0(%%r13), %%xmm7 \n\t"
+					"movzw 0x0(%%r13), %%rcx \n\t"
+					"vmovq %%rcx, %%xmm7 \n\t"
 					"add %%r12, %%r13 \n\t"// add stride to src pointer
-					"vmovss 0x0(%%r13), %%xmm8 \n\t"
+					"movzw 0x0(%%r13), %%rcx \n\t"
+					"vmovq %%rcx, %%xmm8 \n\t"
 					"add %%r12, %%r13 \n\t"// add stride to src pointer
-					"vmovss 0x0(%%r13), %%xmm9 \n\t"
+					"movzw 0x0(%%r13), %%rcx \n\t"
+					"vmovq %%rcx, %%xmm9 \n\t"
 					"add %%r12, %%r13 \n\t"// add stride to src pointer
-					"vmovss 0x0(%%r13), %%xmm10 \n\t"
+					"movzw 0x0(%%r13), %%rcx \n\t"
+					"vmovq %%rcx, %%xmm10 \n\t"
 					"add %%r12, %%r13 \n\t"// add stride to src pointer
-					"vmovss 0x0(%%r13), %%xmm11 \n\t"
+					"movzw 0x0(%%r13), %%rcx \n\t"
+					"vmovq %%rcx, %%xmm11 \n\t"
 					"add %%r12, %%r13 \n\t"// add stride to src pointer
-					"vmovss 0x0(%%r13), %%xmm12 \n\t"
+					"movzw 0x0(%%r13), %%rcx \n\t"
+					"vmovq %%rcx, %%xmm12 \n\t"
 					"add %%r12, %%r13 \n\t"// add stride to src pointer
-					"vmovss 0x0(%%r13), %%xmm13 \n\t"
+					"movzw 0x0(%%r13), %%rcx \n\t"
+					"vmovq %%rcx, %%xmm13 \n\t"
 					"add %%r12, %%r13 \n\t"// add stride to src pointer
-					"vmovss 0x0(%%r13), %%xmm14 \n\t"
+					"movzw 0x0(%%r13), %%rcx \n\t"
+					"vmovq %%rcx, %%xmm14 \n\t"
 					"add %%r12, %%r13 \n\t"// add stride to src pointer
-					"vmovss 0x0(%%r13), %%xmm15 \n\t"
+					"movzw 0x0(%%r13), %%rcx \n\t"
+					"vmovq %%rcx, %%xmm15 \n\t"
 					"add %%r12, %%r13 \n\t"// add stride to src pointer
 
 					// convert fp16 -> fp32
@@ -5261,21 +4644,29 @@ namespace ml
 					"vmovss %%xmm14, (4*14)(%%rbx) \n\t"
 					"vmovss %%xmm15, (4*15)(%%rbx) \n\t"
 
-					"vmovss 0x0(%%r13), %%xmm0 \n\t"
+					"movzw 0x0(%%r13), %%rcx \n\t"
+					"vmovq %%rcx, %%xmm0 \n\t"
 					"add %%r12, %%r13 \n\t"// add stride to src pointer
-					"vmovss 0x0(%%r13), %%xmm1 \n\t"
+					"movzw 0x0(%%r13), %%rcx \n\t"
+					"vmovq %%rcx, %%xmm1 \n\t"
 					"add %%r12, %%r13 \n\t"// add stride to src pointer
-					"vmovss 0x0(%%r13), %%xmm2 \n\t"
+					"movzw 0x0(%%r13), %%rcx \n\t"
+					"vmovq %%rcx, %%xmm2 \n\t"
 					"add %%r12, %%r13 \n\t"// add stride to src pointer
-					"vmovss 0x0(%%r13), %%xmm3 \n\t"
+					"movzw 0x0(%%r13), %%rcx \n\t"
+					"vmovq %%rcx, %%xmm3 \n\t"
 					"add %%r12, %%r13 \n\t"// add stride to src pointer
-					"vmovss 0x0(%%r13), %%xmm4 \n\t"
+					"movzw 0x0(%%r13), %%rcx \n\t"
+					"vmovq %%rcx, %%xmm4 \n\t"
 					"add %%r12, %%r13 \n\t"// add stride to src pointer
-					"vmovss 0x0(%%r13), %%xmm5 \n\t"
+					"movzw 0x0(%%r13), %%rcx \n\t"
+					"vmovq %%rcx, %%xmm5 \n\t"
 					"add %%r12, %%r13 \n\t"// add stride to src pointer
-					"vmovss 0x0(%%r13), %%xmm6 \n\t"
+					"movzw 0x0(%%r13), %%rcx \n\t"
+					"vmovq %%rcx, %%xmm6 \n\t"
 					"add %%r12, %%r13 \n\t"// add stride to src pointer
-					"vmovss 0x0(%%r13), %%xmm7 \n\t"
+					"movzw 0x0(%%r13), %%rcx \n\t"
+					"vmovq %%rcx, %%xmm7 \n\t"
 
 					// convert fp16 -> fp32
 					"vcvtph2ps %%xmm0, %%ymm0 \n\t"
@@ -5296,7 +4687,7 @@ namespace ml
 					"vmovss %%xmm6, (4*22)(%%rbx) \n\t"
 					"vmovss %%xmm7, (4*23)(%%rbx) \n\t"
 
-					"add $(4*1), %%rax \n\t"// add stride to src pointer
+					"add $(2*1), %%rax \n\t"// add stride to src pointer
 					"add $(4*24*1), %%rbx \n\t"// add stride to dst pointer
 
 					"dec %%r14 \n\t"
