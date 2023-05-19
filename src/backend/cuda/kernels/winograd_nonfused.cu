@@ -322,14 +322,14 @@ namespace
 
 		if (kernel_size == 3)
 		{
-//			if (tile_size == 2)
-//				kernel_transform_weights<3, 2> <<<gridSize, blockSize, 0, stream>>>(getPointer<T>(matrices), getPointer<T>(weights), filters_out,
-//						filters_in, invert, low_precision);
+			if (tile_size == 2)
+				kernel_transform_weights<3, 2> <<<gridSize, blockSize, 0, stream>>>(getPointer<T>(matrices), getPointer<T>(weights), filters_out,
+						filters_in, invert, low_precision);
 			if (tile_size == 4)
 				kernel_transform_weights<3, 4> <<<gridSize, blockSize, 0, stream>>>(getPointer<T>(matrices), getPointer<T>(weights), filters_out,
 						filters_in, invert, low_precision);
 		}
-		if (kernel_size == 5)
+		if (kernel_size == 5 and tile_size == 2)
 		{
 			kernel_transform_weights<5, 2> <<<gridSize, blockSize, 0, stream>>>(getPointer<T>(matrices), getPointer<T>(weights), filters_out,
 					filters_in, invert, low_precision);
@@ -499,11 +499,10 @@ namespace ml
 				kernel_transform_gradient<3, 4> <<<gridSize, blockSize, 0, stream>>>(getPointer<float>(matrices), getPointer<float>(gradient),
 						batch_size, height, width, filters);
 		}
-		if (kernel_size == 5)
+		if (kernel_size == 5 and tile_size == 2)
 		{
-			if (tile_size == 2)
-				kernel_transform_gradient<5, 2> <<<gridSize, blockSize, 0, stream>>>(getPointer<float>(matrices), getPointer<float>(gradient),
-						batch_size, height, width, filters);
+			kernel_transform_gradient<5, 2> <<<gridSize, blockSize, 0, stream>>>(getPointer<float>(matrices), getPointer<float>(gradient), batch_size,
+					height, width, filters);
 		}
 		assert(cudaGetLastError() == cudaSuccess);
 	}
@@ -529,11 +528,10 @@ namespace ml
 				kernel_transform_update<3, 4> <<<gridSize, blockSize, 0, stream>>>(getPointer<float>(matrices), getPointer<float>(update),
 						filters_out, filters_in);
 		}
-		if (kernel_size == 5)
+		if (kernel_size == 5 and tile_size == 2)
 		{
-			if (tile_size == 2)
-				kernel_transform_update<5, 2> <<<gridSize, blockSize, 0, stream>>>(getPointer<float>(matrices), getPointer<float>(update),
-						filters_out, filters_in);
+			kernel_transform_update<5, 2> <<<gridSize, blockSize, 0, stream>>>(getPointer<float>(matrices), getPointer<float>(update), filters_out,
+					filters_in);
 		}
 
 		assert(cudaGetLastError() == cudaSuccess);

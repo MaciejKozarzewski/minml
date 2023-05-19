@@ -512,6 +512,93 @@ namespace ml
 		EXPECT_LE(testing::diffForTest(correct, update), 1.0e-4f);
 	}
 
+	TEST(TestWinograd3x3_5x5, cpuInputTransform)
+	{
+		const Shape weights_shape( { 35, 3, 3, 1 });
+		Tensor input( { 3, 9, 11, 35 }, DataType::FLOAT32, Device::cpu());
+		testing::initForTest(input, 0.0f);
+
+		int nb_of_tiles = input.dim(0) * ((input.dim(1) + 4) / 5) * ((input.dim(2) + 4) / 5);
+		Tensor matrices( { 49, nb_of_tiles, input.dim(3) }, DataType::FLOAT32, Device::cpu());
+		Tensor correct(matrices.shape(), DataType::FLOAT32, Device::cpu());
+
+		Tensor transform_matrix = toTensor( { { 1.0f, -2.0f, -1.25f, 2.5f, 0.25f, -0.5f, 0.0f }, { 0.0f, -1.0f, 1.0f, 2.25f, -0.25f, -0.5f, 0.0f }, {
+				0.0f, -1.0f, 3.0f, -1.75f, -0.75f, 0.5f, 0.0f }, { 0.0f, 0.5f, -0.75f, -1.0f, 0.75f, 0.5f, 0.0f }, { 0.0f, 0.5f, -1.25f, 0.0f, 1.25f,
+				-0.5f, 0.0f }, { 0.0f, 1.0f, 0.0f, -1.25f, 0.0f, 0.25f, 0.0f }, { 0.0f, -1.0f, 2.0f, 1.25f, -2.5f, -0.25f, 0.5f } });
+		winograd_input_transform(correct, input, transform_matrix, 5);
+
+		Device::cpu().setNumberOfThreads(1);
+		winogradInputTransform(Context(), weights_shape, input, matrices);
+
+		EXPECT_LE(testing::diffForTest(correct, matrices), 1.0e-4f);
+	}
+	TEST(TestWinograd3x3_5x5, cpuOutputTransform)
+	{
+		const Shape weights_shape( { 35, 3, 3, 1 });
+		Tensor output( { 3, 9, 11, 35 }, DataType::FLOAT32, Device::cpu());
+
+		int nb_of_tiles = output.dim(0) * ((output.dim(1) + 4) / 5) * ((output.dim(2) + 4) / 5);
+		Tensor matrices( { 49, nb_of_tiles, output.dim(3) }, DataType::FLOAT32, Device::cpu());
+		testing::initForTest(matrices, 0.0f);
+
+		Tensor correct(output.shape(), DataType::FLOAT32, Device::cpu());
+		Tensor bias;
+
+		Tensor transform_matrix = toTensor(
+				{ { 1.0f, 1.0f, 1.0f, 0.25f, 0.25f, 4.0f, 0.0f }, { 0.0f, 1.0f, -1.0f, 0.5f, -0.5f, 2.0f, 0.0f }, { 0.0f, 1.0f, 1.0f, 1.0f, 1.0f,
+						1.0f, 0.0f }, { 0.0f, 1.0f, -1.0f, 2.0f, -2.0f, 0.5f, 0.0f }, { 0.0f, 1.0f, +1.0f, 4.0f, 4.0f, 0.25f, 1.0f } });
+		winograd_output_transform(correct, matrices, transform_matrix, 5, nullptr, nullptr, false);
+
+		Device::cpu().setNumberOfThreads(2);
+		winogradOutputTransform(Context(), weights_shape, matrices, output, bias, Tensor(), ActivationType::LINEAR);
+
+		EXPECT_LE(testing::diffForTest(correct, output), 1.0e-4f);
+	}
+	TEST(TestWinograd3x3_5x5, cpuOutputTransformExtension)
+	{
+		const Shape weights_shape( { 35, 3, 3, 1 });
+		Tensor output( { 3, 7, 11, 35 }, DataType::FLOAT32, Device::cpu());
+
+		int nb_of_tiles = output.dim(0) * ((output.dim(1) + 4) / 5) * ((output.dim(2) + 4) / 5);
+		Tensor matrices( { 49, nb_of_tiles, output.dim(3) }, DataType::FLOAT32, Device::cpu());
+		Tensor bias( { output.dim(3) }, DataType::FLOAT32, Device::cpu());
+		Tensor add(output.shape(), DataType::FLOAT32, Device::cpu());
+		testing::initForTest(matrices, 0.0f);
+		testing::initForTest(bias, 0.0f);
+		Tensor correct(output.shape(), DataType::FLOAT32, Device::cpu());
+
+		Tensor transform_matrix = toTensor(
+				{ { 1.0f, 1.0f, 1.0f, 0.25f, 0.25f, 4.0f, 0.0f }, { 0.0f, 1.0f, -1.0f, 0.5f, -0.5f, 2.0f, 0.0f }, { 0.0f, 1.0f, 1.0f, 1.0f, 1.0f,
+						1.0f, 0.0f }, { 0.0f, 1.0f, -1.0f, 2.0f, -2.0f, 0.5f, 0.0f }, { 0.0f, 1.0f, +1.0f, 4.0f, 4.0f, 0.25f, 1.0f } });
+		winograd_output_transform(correct, matrices, transform_matrix, 5, &bias, &add, true);
+
+		Device::cpu().setNumberOfThreads(1);
+		winogradOutputTransform(Context(), weights_shape, matrices, output, bias, add, ActivationType::RELU);
+		EXPECT_LE(testing::diffForTest(correct, output), 1.0e-4f);
+
+		Device::cpu().setNumberOfThreads(2);
+		winogradOutputTransform(Context(), weights_shape, matrices, output, bias, add, ActivationType::RELU);
+		EXPECT_LE(testing::diffForTest(correct, output), 1.0e-4f);
+	}
+	TEST(TestWinograd3x3_5x5, cpuWeightTransform)
+	{
+		Tensor weight( { 7, 3, 3, 35 }, DataType::FLOAT32, Device::cpu());
+		testing::initForTest(weight, 0.0f);
+		Tensor matrices( { 49, weight.dim(0), weight.dim(3) }, DataType::FLOAT32, Device::cpu());
+		Tensor correct(matrices.shape(), DataType::FLOAT32, Device::cpu());
+
+		Tensor transform_matrix = toTensor(
+				{ { 1.0f, 0.0f, 0.0f }, { 2.0f / 3.0f, 2.0f / 3.0f, 2.0f / 3.0f }, { 2.0f / 9.0f, -2.0f / 9.0f, 2.0f / 9.0f }, { 2.0f / 9.0f, 4.0f
+						/ 9.0f, 8.0f / 9.0f }, { 2.0f / 15.0f, -4.0f / 15.0f, 8.0f / 15.0f }, { 32.0f / 45.0f, 16.0f / 45.0f, 8.0f / 45.0f }, { 0.0f,
+						0.0f, 2.0f } });
+		winograd_weight_transform(correct, weight, transform_matrix, 5);
+
+		Device::cpu().setNumberOfThreads(1);
+		winogradWeightTransform(Context(), weight, matrices, false, false);
+
+		EXPECT_LE(testing::diffForTest(correct, matrices), 1.0e-4f);
+	}
+
 	TEST(TestWinograd3x3_4x4, cudaInputTransform)
 	{
 		if (Device::numberOfCudaDevices() == 0)

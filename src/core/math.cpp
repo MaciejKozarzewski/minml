@@ -90,6 +90,11 @@ namespace
 			result++;
 		return result;
 	}
+	int get_winograd_tile(const Shape &weight_shape, const Shape &matrices_shape) noexcept
+	{
+		assert(weight_shape[1] == weight_shape[2]); // only square filters
+		return integer_sqrt(matrices_shape.firstDim()) - (weight_shape[1] - 1);
+	}
 
 	mlDataType_t get(DataType dtype) noexcept
 	{
@@ -184,7 +189,7 @@ namespace ml
 		static Timer timer("winogradWeightTransform");
 		TimerGuard tg(timer);
 
-		const int tile_size = integer_sqrt(matrices.firstDim()) - 2;
+		const int tile_size = get_winograd_tile(weights.shape(), matrices.shape());
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
@@ -202,7 +207,7 @@ namespace ml
 		static Timer timer("winogradInputTransform");
 		TimerGuard tg(timer);
 
-		const int tile_size = integer_sqrt(matrices.firstDim()) - 2;
+		const int tile_size = get_winograd_tile(weight_shape, matrices.shape());
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
@@ -221,7 +226,7 @@ namespace ml
 		static Timer timer("winogradOutputTransform");
 		TimerGuard tg(timer);
 
-		const int tile_size = integer_sqrt(matrices.firstDim()) - 2;
+		const int tile_size = get_winograd_tile(weight_shape, matrices.shape());
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
@@ -236,7 +241,7 @@ namespace ml
 	}
 	void winogradGradientTransform(const Context &context, const Shape &weight_shape, const Tensor &gradient, Tensor &matrices)
 	{
-		const int tile_size = integer_sqrt(matrices.firstDim()) - 2;
+		const int tile_size = get_winograd_tile(weight_shape, matrices.shape());
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
@@ -251,7 +256,7 @@ namespace ml
 	}
 	void winogradUpdateTransform(const Context &context, const Tensor &matrices, Tensor &update)
 	{
-		const int tile_size = integer_sqrt(matrices.firstDim()) - 2;
+		const int tile_size = get_winograd_tile(update.shape(), matrices.shape());
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:

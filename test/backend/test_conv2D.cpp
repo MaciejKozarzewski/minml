@@ -247,6 +247,7 @@ namespace ml
 		}
 	}
 
+#ifdef USE_CUDNN
 	TEST(TestConv2D, implicit_gemm_conv2D_1x1_forward_fp16)
 	{
 		Context context(Device::cpu());
@@ -272,7 +273,7 @@ namespace ml
 //		convolutionImplicitGemmForward(context, input, weights, output, bias, add, ActivationType::RELU);
 //		EXPECT_LE(testing::diffForTest(correct_output, output), 1.0e-4f);
 
-		if (Device::numberOfCudaDevices() > 0)
+		if (Device::numberOfCudaDevices() > 0 and Device::cuda(0).supportsType(DataType::FLOAT16))
 		{
 			Context context(Device::cuda(0));
 			input.moveTo(context.device());
@@ -328,7 +329,7 @@ namespace ml
 //		convolutionImplicitGemmForward(context, input, weights, output, bias, add, ActivationType::RELU);
 //		EXPECT_LE(testing::diffForTest(correct_output, output), 1.0e-4f);
 
-		if (Device::numberOfCudaDevices() > 0)
+		if (Device::numberOfCudaDevices() > 0 and Device::cuda(0).supportsType(DataType::FLOAT16))
 		{
 			Context context(Device::cuda(0));
 			input.moveTo(context.device());
@@ -370,7 +371,7 @@ namespace ml
 //		convolutionImplicitGemmForward(context, input, weights, output, bias, add, ActivationType::RELU);
 //		EXPECT_LE(testing::diffForTest(correct_output, output), 1.0e-4f);
 
-		if (Device::numberOfCudaDevices() > 0)
+		if (Device::numberOfCudaDevices() > 0 and Device::cuda(0).supportsType(DataType::FLOAT16))
 		{
 			Context context(Device::cuda(0));
 			input.moveTo(context.device());
@@ -387,6 +388,7 @@ namespace ml
 			EXPECT_LE(testing::diffForTest(correct_output, output), 1.0e-1f);
 		}
 	}
+#endif
 
 	TEST(TestConv2D, winograd_conv2D_3x3_forward)
 	{

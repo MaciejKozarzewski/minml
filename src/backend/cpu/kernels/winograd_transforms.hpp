@@ -273,20 +273,20 @@ namespace SIMD_NAMESPACE
 			inline Line<7, T> operator()(const Line<3, T> &line) const noexcept
 			{
 				const Vector<T> c2_3(2.0 / 3.0);
-				const Vector<T> c4_9(2.0 / 9.0);
-				const Vector<T> c4_15(2.0 / 15.0);
-				const Vector<T> c16_45(8.0 / 45.0);
-				const Vector<T> c2(2.0);
-				const Vector<T> c025(0.25);
+				const Vector<T> c4_9(4.0 / 9.0);
+				const Vector<T> c4_15(4.0 / 15.0);
+				const Vector<T> c16_45(16.0 / 45.0);
+				const Vector<T> c200(2.0);
+				const Vector<T> c050(0.5);
 
 				Line<7, T> result;
 				result[0] = line[0];
 				result[1] = c2_3 * (line[0] + line[1] + line[2]);
-				result[2] = c4_9 * (line[0] - line[1] + line[2]);
-				result[3] = c4_9 * (c025 * line[0] + line[1] + c2 * line[2]);
-				result[4] = c4_15 * (c025 * line[0] - line[1] + c2 * line[2]);
-				result[5] = c16_45 * (c2 * line[0] + line[1] + c025 * line[2]);
-				result[6] = c2 * line[2];
+				result[2] = c4_9 * c050 * (line[0] - line[1] + line[2]);
+				result[3] = c4_9 * (c050 * line[0] + line[1] + c200 * line[2]);
+				result[4] = c4_15 * (c050 * line[0] - line[1] + c200 * line[2]);
+				result[5] = c16_45 * (c200 * line[0] + line[1] + c050 * line[2]);
+				result[6] = c200 * line[2];
 				return result;
 			}
 	};
@@ -301,12 +301,12 @@ namespace SIMD_NAMESPACE
 				const Vector<T> c200(2.0);
 
 				Line<7, T> result;
-				result[0] = mul_add(c025, line[4] - line[2], c050 * (line[3] - line[5])) + mul_add(c200, line[1] - line[3], line[0] - line[2]);
-				result[1] = mul_add(c050, line[5], line[2] - line[1]) + mul_add(c025, line[3] - line[4], c200 * line[3]);
+				result[0] = mul_add(c025, line[4] - line[2], c050 * (line[3] - line[5])) + mul_add(c200, line[3] - line[1], line[0] - line[2]);
+				result[1] = neg_mul_add(c050, line[5], line[2] - line[1]) + mul_add(c025, line[3] - line[4], c200 * line[3]);
 				result[2] = neg_mul_add(c075, line[3] + line[4], mul_add(c200, line[2], line[2])) + mul_sub(c050, line[5], line[1] + line[3]);
 				result[3] = mul_sub(c050, line[1] + line[5], line[3]) + c075 * (line[4] - line[2]);
-				result[4] = mul_sub(c050, line[4] - line[2], line[4] - line[2]) + c050 * (line[1] - line[5]);
-				result[5] = mul_add(c025, line[3] + line[5], line[1] - line[4]);
+				result[4] = mul_add(c025, line[4] - line[2], line[4] - line[2]) + c050 * (line[1] - line[5]);
+				result[5] = mul_add(c025, line[5] - line[3], line[1] - line[3]);
 				result[6] = mul_add(c200, line[2] - line[4], line[3]) + mul_sub(c050, line[6] - line[4], line[1]) + c025 * (line[3] - line[5]);
 				return result;
 			}
@@ -317,16 +317,16 @@ namespace SIMD_NAMESPACE
 			inline Line<5, T> operator()(const Line<7, T> &line) const noexcept
 			{
 				const Vector<T> c025(0.25);
-				const Vector<T> c05(0.5);
-				const Vector<T> c2(2.0);
-				const Vector<T> c4(4.0);
+				const Vector<T> c050(0.5);
+				const Vector<T> c200(2.0);
+				const Vector<T> c400(4.0);
 
 				Line<5, T> result;
-				result[0] = mul_add(c025, line[3] + line[4], mul_add(c4, line[5], line[0] + line[1] + line[2]));
-				result[1] = mul_add(c05, line[3] - line[4], mul_add(c2, line[5], line[1] - line[2]));
+				result[0] = mul_add(c025, line[3] + line[4], mul_add(c400, line[5], line[0] + line[1] + line[2]));
+				result[1] = mul_add(c050, line[3] - line[4], mul_add(c200, line[5], line[1] - line[2]));
 				result[2] = line[1] + line[2] + line[3] + line[4] + line[5];
-				result[3] = mul_add(c2, line[3] - line[4], mul_add(c05, line[5], line[1] - line[2]));
-				result[4] = mul_add(c4, line[3] + line[4], mul_add(c025, line[5], line[1] + line[2] + line[6]));
+				result[3] = mul_add(c200, line[3] - line[4], mul_add(c050, line[5], line[1] - line[2]));
+				result[4] = c400 * (line[3] + line[4]) + mul_add(c025, line[5], line[1] + line[2] + line[6]);
 				return result;
 			}
 	};
