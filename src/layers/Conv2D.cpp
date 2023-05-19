@@ -14,33 +14,27 @@
 #include <minml/utils/testing_util.hpp>
 #include <minml/utils/string_util.hpp>
 
-#include <minml/utils/time_util.hpp>
-
 namespace
 {
 	using namespace ml;
-	Shape get_weight_matrices_shape(const Shape &weight_shape)
+	int square(int i) noexcept
+	{
+		return i * i;
+	}
+
+	Shape get_weight_matrices_shape(const Shape &weight_shape, int tile_size) noexcept
 	{
 		assert(weight_shape[1] == weight_shape[2]); // only square kernels
 		// assuming only 4x4 transform for 3x3 filter and 2x2 for 5x5 filter
-		return Shape( { 36, weight_shape.firstDim(), weight_shape.lastDim() });
+		return Shape( { square(2 + tile_size), weight_shape.firstDim(), weight_shape.lastDim() });
 	}
-	int get_tiles_count(int dim, int tile_size)
+	int get_tiles_count(int dim, int tile_size) noexcept
 	{
 		return (dim + tile_size - 1) / tile_size;
 	}
-	Shape get_matrices_shape(int kernel_size, const Shape &shape)
+	Shape get_matrices_shape(int kernel_size, int tile_size, const Shape &shape) noexcept
 	{
-		// assuming only 4x4 transform for 3x3 filter and 2x2 for 5x5 filter
-		switch (kernel_size)
-		{
-			default:
-				return Shape();
-			case 3:
-				return Shape( { 36, shape.firstDim() * get_tiles_count(shape[1], 4) * get_tiles_count(shape[2], 4), shape.lastDim() });
-			case 5:
-				return Shape( { 36, shape.firstDim() * get_tiles_count(shape[1], 2) * get_tiles_count(shape[2], 2), shape.lastDim() });
-		}
+		return Shape( { square(2 + tile_size), shape[0] * get_tiles_count(shape[1], tile_size) * get_tiles_count(shape[2], tile_size), shape[3] });
 	}
 }
 
@@ -126,8 +120,10 @@ namespace ml
 			return 0;
 		else
 		{
-			const Shape tmp1 = get_matrices_shape(m_kernel_size, getInputShape());
-			const Shape tmp2 = get_matrices_shape(m_kernel_size, getOutputShape());
+			choose_algorithm();
+			const Shape tmp1 = get_matrices_shape(m_kernel_size, m_winograd_tile_size, getInputShape());
+			const Shape tmp2 = get_matrices_shape(m_kernel_size, m_winograd_tile_size, getOutputShape());
+
 			return tmp1.volume() + tmp2.volume() + 1024;
 		}
 	}
@@ -194,72 +190,29 @@ namespace ml
 			}
 			case ConvolutionAlgorithm::WINOGRAD_NON_FUSED:
 			{
-//				struct Timer
-//				{
-//						std::string m_name;
-//						double m_start = 0.0;
-//						double m_total_time = 0.0;
-//						int m_count = 0;
-//						bool m_init = false;
-//
-//						Timer(const std::string &name) :
-//								m_name(name)
-//						{
-//						}
-//						~Timer()
-//						{
-//							std::cout << m_name << " : " << 1.0e3 * m_total_time / m_count << " ms\n";
-//						}
-//						void start() noexcept
-//						{
-//							m_start = getTime();
-//						}
-//						void stop() noexcept
-//						{
-//							if (m_init)
-//							{
-//								m_total_time += getTime() - m_start;
-//								m_count++;
-//							}
-//							else
-//								m_init = true;
-//						}
-//
-//				};
-//				static Timer output_transform("output transform");
-//				static Timer matrix_multiply("gemm            ");
-//				static Timer input_transform("input transform ");
-//				static Timer weight_transform("weight transform");
-
 				if (m_transformed_weights == nullptr)
-					m_transformed_weights = std::make_unique<Tensor>(get_weight_matrices_shape(getWeightShape()), dtype(), device());
+					m_transformed_weights = std::make_unique<Tensor>(get_weight_matrices_shape(getWeightShape(), m_winograd_tile_size), dtype(),
+							device());
 				if (m_are_weights_transformed == false)
 				{
 					m_are_weights_transformed = true;
-
-//					weight_transform.start();
 					winogradWeightTransform(context(), getWeights().getParam(), *m_transformed_weights, false, emulate_low_precision);
-//					weight_transform.stop();
 				}
 
-				Tensor input_matrices = m_workspace.lock()->view(get_matrices_shape(m_kernel_size, input[0].shape()));
-				Tensor output_matrices = m_workspace.lock()->view(get_matrices_shape(m_kernel_size, output.shape()), input_matrices.volume());
+				Tensor input_matrices = m_workspace.lock()->view(get_matrices_shape(m_kernel_size, m_winograd_tile_size, input[0].shape()));
+				Tensor output_matrices = m_workspace.lock()->view(get_matrices_shape(m_kernel_size, m_winograd_tile_size, output.shape()),
+						input_matrices.volume());
 
-//				input_transform.start();
 				winogradInputTransform(context(), getWeightShape(), input[0], input_matrices);
-//				input_transform.stop();
 
-//				matrix_multiply.start();
 				gemmBatched(context(), 'n', 't', output_matrices, input_matrices, *m_transformed_weights, 1, 0);
-//				matrix_multiply.stop();
 
-//				output_transform.start();
 				if (input.size() == 1)
 					winogradOutputTransform(context(), getWeightShape(), output_matrices, output, getBias().getParam(),
 							Tensor(Shape(), dtype(), device()), m_activation);
 				else
 					winogradOutputTransform(context(), getWeightShape(), output_matrices, output, getBias().getParam(), input[1], m_activation);
-//				output_transform.stop();
+
 				break;
 			}
 			case ConvolutionAlgorithm::WINOGRAD_FUSED:
@@ -300,13 +253,14 @@ namespace ml
 			case ConvolutionAlgorithm::WINOGRAD_NON_FUSED:
 			{
 				if (m_transformed_weights == nullptr)
-					m_transformed_weights = std::make_unique<Tensor>(get_weight_matrices_shape(getWeightShape()), dtype(), device());
+					m_transformed_weights = std::make_unique<Tensor>(get_weight_matrices_shape(getWeightShape(), m_winograd_tile_size), dtype(),
+							device());
 
 				m_are_weights_transformed = false;
 				winogradWeightTransform(context(), getWeights().getParam(), *m_transformed_weights, true, emulate_low_precision);
 
-				Tensor gradient_next_matrices = m_workspace.lock()->view(get_matrices_shape(m_kernel_size, output.shape()));
-				Tensor gradient_prev_matrices = m_workspace.lock()->view(get_matrices_shape(m_kernel_size, input[0].shape()),
+				Tensor gradient_next_matrices = m_workspace.lock()->view(get_matrices_shape(m_kernel_size, m_winograd_tile_size, output.shape()));
+				Tensor gradient_prev_matrices = m_workspace.lock()->view(get_matrices_shape(m_kernel_size, m_winograd_tile_size, input[0].shape()),
 						gradient_next_matrices.volume());
 
 				winogradInputTransform(context(), getWeightShape(), gradient_next, gradient_next_matrices);
@@ -325,7 +279,7 @@ namespace ml
 			sumOverFirstDim(context(), getBias().getGradient(), gradient_next, 0);
 	}
 
-	void Conv2D::choose_algorithm()
+	void Conv2D::choose_algorithm() const
 	{
 #ifdef USE_CUDNN
 		const bool can_use_cudnn = startsWith(context().device().info(), "NVIDIA GeForce RTX") and dtype() == DataType::FLOAT16 and not isTrainable()
@@ -340,7 +294,26 @@ namespace ml
 			if (m_kernel_size == 1)
 				m_algorithm = ConvolutionAlgorithm::EXPLICIT_GEMM;
 			else
+			{
+				assert(m_kernel_size == 3 || m_kernel_size == 5);
 				m_algorithm = ConvolutionAlgorithm::WINOGRAD_NON_FUSED;
+				switch (device().type())
+				{
+					case DeviceType::CPU:
+					{
+						if (isTrainable())
+							m_winograd_tile_size = (m_kernel_size == 3) ? 4 : 2;
+						else
+							m_winograd_tile_size = (m_kernel_size == 3) ? 5 : 2;
+						break;
+					}
+					case DeviceType::CUDA:
+					{
+						m_winograd_tile_size = (m_kernel_size == 3) ? 4 : 2;
+						break;
+					}
+				}
+			}
 		}
 	}
 

@@ -11,6 +11,7 @@
 #include <minml/core/Shape.hpp>
 #include <minml/core/Tensor.hpp>
 #include <minml/layers/Conv2D.hpp>
+#include <minml/utils/time_util.hpp>
 
 #include <minml/backend/cpu_backend.h>
 #include <minml/backend/cuda_backend.h>
@@ -18,6 +19,77 @@
 namespace
 {
 	using namespace ml;
+#define USE_TIMING
+
+#ifdef USE_TIMING
+	struct Timer
+	{
+			std::string m_name;
+			double m_start = 0.0;
+			double m_total_time = 0.0;
+			int m_count = 0;
+			bool m_init = false;
+
+			Timer(const std::string &name) :
+					m_name(name)
+			{
+			}
+			~Timer()
+			{
+				if (m_count > 0)
+					std::cout << m_name << " : " << 1.0e3 * m_total_time / m_count << " ms (" << m_count << ")\n";
+			}
+			void start() noexcept
+			{
+				m_start = getTime();
+			}
+			void stop() noexcept
+			{
+				if (m_init)
+				{
+					m_total_time += getTime() - m_start;
+					m_count++;
+				}
+				else
+					m_init = true;
+			}
+	};
+#else
+	struct Timer
+	{
+			Timer(const std::string &name)
+			{
+			}
+			void start() noexcept
+			{
+			}
+			void stop() noexcept
+			{
+			}
+	};
+#endif
+
+	struct TimerGuard
+	{
+			Timer &t;
+			TimerGuard(Timer &timer) :
+					t(timer)
+			{
+				t.start();
+			}
+			~TimerGuard()
+			{
+				t.stop();
+			}
+	};
+
+	int integer_sqrt(int i) noexcept
+	{
+		int result = 1;
+		while (result * result != i)
+			result++;
+		return result;
+	}
 
 	mlDataType_t get(DataType dtype) noexcept
 	{
@@ -55,6 +127,9 @@ namespace ml
 {
 	void unpackInput(const Context &context, Tensor &dst, const Tensor &src)
 	{
+		static Timer timer("unpackInput");
+		TimerGuard tg(timer);
+
 		assert(src.dtype() == DataType::INT32);
 		assert(src.lastDim() == 1);
 		assert(dst.dim(0) == src.dim(0));
@@ -73,6 +148,8 @@ namespace ml
 	}
 	void convertType(const Context &context, void *dst, DataType dst_dtype, const void *src, DataType src_dtype, int elements)
 	{
+		static Timer timer("convertType");
+		TimerGuard tg(timer);
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
@@ -104,68 +181,84 @@ namespace ml
 
 	void winogradWeightTransform(const Context &context, const Tensor &weights, Tensor &matrices, bool invert, bool low_precision)
 	{
+		static Timer timer("winogradWeightTransform");
+		TimerGuard tg(timer);
+
+		const int tile_size = integer_sqrt(matrices.firstDim()) - 2;
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
-				cpu_winograd_weight_transform(get(context), get(weights.dtype()), get_shape(weights), weights.data(), matrices.data(), invert,
-						low_precision);
+				cpu_winograd_weight_transform(get(context), tile_size, get(weights.dtype()), get_shape(weights), weights.data(), matrices.data(),
+						invert, low_precision);
 				break;
 			case DeviceType::CUDA:
-				cuda_winograd_weight_transform(get(context), get(weights.dtype()), get_shape(weights), weights.data(), matrices.data(), invert,
-						low_precision);
+				cuda_winograd_weight_transform(get(context), tile_size, get(weights.dtype()), get_shape(weights), weights.data(), matrices.data(),
+						invert, low_precision);
 				break;
 		}
 	}
 	void winogradInputTransform(const Context &context, const Shape &weight_shape, const Tensor &input, Tensor &matrices)
 	{
+		static Timer timer("winogradInputTransform");
+		TimerGuard tg(timer);
+
+		const int tile_size = integer_sqrt(matrices.firstDim()) - 2;
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
-				cpu_winograd_input_transform(get(context), get(input.dtype()), get(weight_shape), get_shape(input), input.data(), matrices.data());
+				cpu_winograd_input_transform(get(context), tile_size, get(input.dtype()), get(weight_shape), get_shape(input), input.data(),
+						matrices.data());
 				break;
 			case DeviceType::CUDA:
-				cuda_winograd_input_transform(get(context), get(input.dtype()), get(weight_shape), get_shape(input), input.data(), matrices.data());
+				cuda_winograd_input_transform(get(context), tile_size, get(input.dtype()), get(weight_shape), get_shape(input), input.data(),
+						matrices.data());
 				break;
 		}
 	}
 	void winogradOutputTransform(const Context &context, const Shape &weight_shape, const Tensor &matrices, Tensor &output, const Tensor &bias,
 			const Tensor &add, ActivationType act)
 	{
+		static Timer timer("winogradOutputTransform");
+		TimerGuard tg(timer);
+
+		const int tile_size = integer_sqrt(matrices.firstDim()) - 2;
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
-				cpu_winograd_output_transform(get(context), get(output.dtype()), get(weight_shape), get_shape(output), matrices.data(), output.data(),
-						bias.data(), add.data(), get(act));
+				cpu_winograd_output_transform(get(context), tile_size, get(output.dtype()), get(weight_shape), get_shape(output), matrices.data(),
+						output.data(), bias.data(), add.data(), get(act));
 				break;
 			case DeviceType::CUDA:
-				cuda_winograd_output_transform(get(context), get(output.dtype()), get(weight_shape), get_shape(output), matrices.data(),
+				cuda_winograd_output_transform(get(context), tile_size, get(output.dtype()), get(weight_shape), get_shape(output), matrices.data(),
 						output.data(), bias.data(), add.data(), get(act));
 				break;
 		}
 	}
 	void winogradGradientTransform(const Context &context, const Shape &weight_shape, const Tensor &gradient, Tensor &matrices)
 	{
+		const int tile_size = integer_sqrt(matrices.firstDim()) - 2;
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
-				cpu_winograd_gradient_transform(get(context), get(gradient.dtype()), get(weight_shape), get_shape(gradient), gradient.data(),
-						matrices.data());
+				cpu_winograd_gradient_transform(get(context), tile_size, get(gradient.dtype()), get(weight_shape), get_shape(gradient),
+						gradient.data(), matrices.data());
 				break;
 			case DeviceType::CUDA:
-				cuda_winograd_gradient_transform(get(context), get(gradient.dtype()), get(weight_shape), get_shape(gradient), gradient.data(),
-						matrices.data());
+				cuda_winograd_gradient_transform(get(context), tile_size, get(gradient.dtype()), get(weight_shape), get_shape(gradient),
+						gradient.data(), matrices.data());
 				break;
 		}
 	}
 	void winogradUpdateTransform(const Context &context, const Tensor &matrices, Tensor &update)
 	{
+		const int tile_size = integer_sqrt(matrices.firstDim()) - 2;
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
-				cpu_winograd_update_transform(get(context), get(matrices.dtype()), get_shape(update), matrices.data(), update.data());
+				cpu_winograd_update_transform(get(context), tile_size, get(matrices.dtype()), get_shape(update), matrices.data(), update.data());
 				break;
 			case DeviceType::CUDA:
-				cuda_winograd_update_transform(get(context), get(matrices.dtype()), get_shape(update), matrices.data(), update.data());
+				cuda_winograd_update_transform(get(context), tile_size, get(matrices.dtype()), get_shape(update), matrices.data(), update.data());
 				break;
 		}
 	}
@@ -204,6 +297,8 @@ namespace ml
 
 	void gemm(const Context &context, char opA, char opB, Tensor &C, const Tensor &A, const Tensor &B, float alpha, float beta)
 	{
+		static Timer timer("gemm");
+		TimerGuard tg(timer);
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
@@ -217,6 +312,8 @@ namespace ml
 	}
 	void gemmBatched(const Context &context, char opA, char opB, Tensor &C, const Tensor &A, const Tensor &B, float alpha, float beta)
 	{
+		static Timer timer("gemmBatched");
+		TimerGuard tg(timer);
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
@@ -240,6 +337,8 @@ namespace ml
 
 	void addBiasAct(const Context &context, Tensor &input, const Tensor &bias, ActivationType act)
 	{
+		static Timer timer("addBiasAct");
+		TimerGuard tg(timer);
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
@@ -323,6 +422,8 @@ namespace ml
 
 	void activationForward(const Context &context, Tensor &output, const Tensor &input, ActivationType act)
 	{
+		static Timer timer("activationForward");
+		TimerGuard tg(timer);
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:

@@ -411,29 +411,31 @@ namespace
 	}
 
 	template<typename DT, typename CT>
-	void launch_weight_transform(mlContext_t context, mlShape_t weight_shape, const void *weights, void *matrices, bool invert, bool low_precision)
+	void launch_weight_transform(mlContext_t context, int tile_size, mlShape_t weight_shape, const void *weights, void *matrices, bool invert,
+			bool low_precision)
 	{
 		const int filters_out = weight_shape.dim[0];
 		const int filters_in = weight_shape.dim[3];
 
 		const int kernel_size = get_kernel_size(weight_shape);
-		const int transform_size = get_transform_size(weight_shape);
 
 		if (kernel_size == 3)
 		{
-//			if (transform_size == 2)
-//				kernel_transform_weights<DT, CT, 3, 2> (matrices, weights, filters_out,
-//						filters_in, invert, low_precision);
-			if (transform_size == 4)
+			if (tile_size == 2)
+				kernel_transform_weights<DT, CT, 3, 2>(matrices, weights, filters_out, filters_in, invert, low_precision);
+			if (tile_size == 4)
 				kernel_transform_weights<DT, CT, 3, 4>(matrices, weights, filters_out, filters_in, invert, low_precision);
+			if (tile_size == 5)
+				kernel_transform_weights<DT, CT, 3, 5>(matrices, weights, filters_out, filters_in, invert, low_precision);
 		}
 		if (kernel_size == 5)
 		{
-			kernel_transform_weights<DT, CT, 5, 2>(matrices, weights, filters_out, filters_in, invert, low_precision);
+			if (tile_size == 2)
+				kernel_transform_weights<DT, CT, 5, 2>(matrices, weights, filters_out, filters_in, invert, low_precision);
 		}
 	}
 	template<typename DT, typename CT>
-	void launch_input_transform(mlContext_t context, mlShape_t weight_shape, mlShape_t input_shape, const void *input, void *matrices)
+	void launch_input_transform(mlContext_t context, int tile_size, mlShape_t weight_shape, mlShape_t input_shape, const void *input, void *matrices)
 	{
 		const int batch_size = input_shape.dim[0];
 		const int height = input_shape.dim[1];
@@ -441,26 +443,27 @@ namespace
 		const int filters = input_shape.dim[3];
 
 		const int kernel_size = get_kernel_size(weight_shape);
-		const int transform_size = get_transform_size(weight_shape);
 
 		void *workspace = cpu::Context::getWorkspace(context);
 
 		if (kernel_size == 3)
 		{
-//			if (transform_size == 2)
-//				kernel_transform_input<DT, CT, 3, 2>(matrices, input, batch_size, height,
-//						width, filters, workspace);
-			if (transform_size == 4)
+			if (tile_size == 2)
+				kernel_transform_input<DT, CT, 3, 2>(matrices, input, batch_size, height, width, filters, workspace);
+			if (tile_size == 4)
 				kernel_transform_input<DT, CT, 3, 4>(matrices, input, batch_size, height, width, filters, workspace);
+			if (tile_size == 5)
+				kernel_transform_input<DT, CT, 3, 5>(matrices, input, batch_size, height, width, filters, workspace);
 		}
 		if (kernel_size == 5)
 		{
-			kernel_transform_input<DT, CT, 5, 2>(matrices, input, batch_size, height, width, filters, workspace);
+			if (tile_size == 2)
+				kernel_transform_input<DT, CT, 5, 2>(matrices, input, batch_size, height, width, filters, workspace);
 		}
 	}
 	template<typename DT, typename CT>
-	void launch_output_transform(mlContext_t context, mlShape_t weight_shape, mlShape_t output_shape, const void *matrices, void *output,
-			const void *bias, const void *add, mlActivationType_t act)
+	void launch_output_transform(mlContext_t context, int tile_size, mlShape_t weight_shape, mlShape_t output_shape, const void *matrices,
+			void *output, const void *bias, const void *add, mlActivationType_t act)
 	{
 		const int batch_size = output_shape.dim[0];
 		const int height = output_shape.dim[1];
@@ -468,20 +471,22 @@ namespace
 		const int filters = output_shape.dim[3];
 
 		const int kernel_size = get_kernel_size(weight_shape);
-		const int transform_size = get_transform_size(weight_shape);
 
 		void *workspace = cpu::Context::getWorkspace(context);
 
 		if (kernel_size == 3)
 		{
-//			if (transform_size == 2)
-//				kernel_transform_output<DT, CT, 3, 2>(matrices, output, add, bias, act, batch_size, height, width, filters, workspace);
-			if (transform_size == 4)
+			if (tile_size == 2)
+				kernel_transform_output<DT, CT, 3, 2>(matrices, output, add, bias, act, batch_size, height, width, filters, workspace);
+			if (tile_size == 4)
 				kernel_transform_output<DT, CT, 3, 4>(matrices, output, add, bias, act, batch_size, height, width, filters, workspace);
+			if (tile_size == 5)
+				kernel_transform_output<DT, CT, 3, 5>(matrices, output, add, bias, act, batch_size, height, width, filters, workspace);
 		}
 		if (kernel_size == 5)
 		{
-			kernel_transform_output<DT, CT, 5, 2>(matrices, output, add, bias, act, batch_size, height, width, filters, workspace);
+			if (tile_size == 2)
+				kernel_transform_output<DT, CT, 5, 2>(matrices, output, add, bias, act, batch_size, height, width, filters, workspace);
 		}
 	}
 }
@@ -490,29 +495,29 @@ namespace SIMD_NAMESPACE
 {
 	using namespace ml;
 
-	void cpu_kernel_winograd_weight_transform(mlContext_t context, mlDataType_t dtype, mlShape_t weight_shape, const void *weights, void *matrices,
-			bool invert, bool low_precision)
+	void cpu_kernel_winograd_weight_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape, const void *weights,
+			void *matrices, bool invert, bool low_precision)
 	{
 		const ml::cpu::ComputeConfig cfg = ml::cpu::ComputeConfig::getBest(dtype);
 		CREATE_KERNEL_TABLE(launch_weight_transform);
-		CALL_KERNEL(launch_weight_transform, cfg)(context, weight_shape, weights, matrices, invert, low_precision);
+		CALL_KERNEL(launch_weight_transform, cfg)(context, tile_size,weight_shape, weights, matrices, invert, low_precision);
 	}
-	void cpu_kernel_winograd_input_transform(mlContext_t context, mlDataType_t dtype, mlShape_t weight_shape, mlShape_t input_shape,
+	void cpu_kernel_winograd_input_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape, mlShape_t input_shape,
 			const void *input, void *matrices)
 	{
 		const ml::cpu::ComputeConfig cfg = ml::cpu::ComputeConfig::getBest(dtype);
 		CREATE_KERNEL_TABLE(launch_input_transform);
-		CALL_KERNEL(launch_input_transform, cfg)(context, weight_shape, input_shape, input, matrices);
+		CALL_KERNEL(launch_input_transform, cfg)(context, tile_size,weight_shape, input_shape, input, matrices);
 	}
-	void cpu_kernel_winograd_output_transform(mlContext_t context, mlDataType_t dtype, mlShape_t weight_shape, mlShape_t output_shape,
+	void cpu_kernel_winograd_output_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape, mlShape_t output_shape,
 			const void *matrices, void *output, const void *bias, const void *add, mlActivationType_t act)
 	{
 		const ml::cpu::ComputeConfig cfg = ml::cpu::ComputeConfig::getBest(dtype);
 		CREATE_KERNEL_TABLE(launch_output_transform);
-		CALL_KERNEL(launch_output_transform, cfg)(context, weight_shape, output_shape, matrices, output, bias, add, act);
+		CALL_KERNEL(launch_output_transform, cfg)(context, tile_size,weight_shape, output_shape, matrices, output, bias, add, act);
 	}
-	void cpu_kernel_winograd_gradient_transform(mlContext_t context, mlDataType_t dtype, mlShape_t weight_shape, mlShape_t gradient_shape,
-			const void *gradient, void *matrices)
+	void cpu_kernel_winograd_gradient_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape,
+			mlShape_t gradient_shape, const void *gradient, void *matrices)
 	{
 		const int batch_size = gradient_shape.dim[0];
 		const int height = gradient_shape.dim[1];
@@ -520,44 +525,44 @@ namespace SIMD_NAMESPACE
 		const int filters = gradient_shape.dim[3];
 
 		const int kernel_size = get_kernel_size(weight_shape);
-		const int transform_size = get_transform_size(weight_shape);
 
 		float *workspace = cpu::Context::getWorkspace<float>(context);
 
 		if (kernel_size == 3)
 		{
-//			if (transform_size == 2)
-//				kernel_transform_gradient<float, 3, 2> (getPointer<float>(matrices), getPointer<float>(gradient),
-//						batch_size, height, width, filters);
-			if (transform_size == 4)
+			if (tile_size == 2)
+				kernel_transform_gradient<float, 3, 2>(getPointer<float>(matrices), getPointer<float>(gradient), batch_size, height, width, filters,
+						workspace);
+			if (tile_size == 4)
 				kernel_transform_gradient<float, 3, 4>(getPointer<float>(matrices), getPointer<float>(gradient), batch_size, height, width, filters,
 						workspace);
 		}
 		if (kernel_size == 5)
 		{
-			kernel_transform_gradient<float, 5, 2>(getPointer<float>(matrices), getPointer<float>(gradient), batch_size, height, width, filters,
-					workspace);
+			if (tile_size == 2)
+				kernel_transform_gradient<float, 5, 2>(getPointer<float>(matrices), getPointer<float>(gradient), batch_size, height, width, filters,
+						workspace);
 		}
 	}
-	void cpu_kernel_winograd_update_transform(mlContext_t context, mlDataType_t dtype, mlShape_t weight_shape, const void *matrices, void *update)
+	void cpu_kernel_winograd_update_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape, const void *matrices,
+			void *update)
 	{
 		const int filters_out = weight_shape.dim[0];
 		const int filters_in = weight_shape.dim[3];
 
 		const int kernel_size = get_kernel_size(weight_shape);
-		const int transform_size = get_transform_size(weight_shape);
 
 		if (kernel_size == 3)
 		{
-//			if (transform_size == 2)
-//				kernel_transform_update<float, 3, 2> (getPointer<float>(matrices), getPointer<float>(update),
-//						filters_out, filters_in, workspace);
-			if (transform_size == 4)
+			if (tile_size == 2)
+				kernel_transform_update<float, 3, 2>(getPointer<float>(matrices), getPointer<float>(update), filters_out, filters_in);
+			if (tile_size == 4)
 				kernel_transform_update<float, 3, 4>(getPointer<float>(matrices), getPointer<float>(update), filters_out, filters_in);
 		}
 		if (kernel_size == 5)
 		{
-			kernel_transform_update<float, 5, 2>(getPointer<float>(matrices), getPointer<float>(update), filters_out, filters_in);
+			if (tile_size == 2)
+				kernel_transform_update<float, 5, 2>(getPointer<float>(matrices), getPointer<float>(update), filters_out, filters_in);
 		}
 	}
 

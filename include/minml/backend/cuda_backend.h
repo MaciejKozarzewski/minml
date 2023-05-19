@@ -51,16 +51,16 @@ namespace ml
 		DLL_PUBLIC void cuda_transpose_021(mlContext_t context, mlDataType_t dtype, mlShape_t shape, const void *input, void *output);
 
 		// implemented in 'winograd_non_fused.cu'
-		DLL_PUBLIC void cuda_winograd_weight_transform(mlContext_t context, mlDataType_t dtype, mlShape_t weight_shape, const void *weights,
-				void *matrices, bool invert, bool low_precision);
-		DLL_PUBLIC void cuda_winograd_input_transform(mlContext_t context, mlDataType_t dtype, mlShape_t weight_shape, mlShape_t input_shape,
-				const void *input, void *matrices);
-		DLL_PUBLIC void cuda_winograd_output_transform(mlContext_t context, mlDataType_t dtype, mlShape_t weight_shape, mlShape_t output_shape,
-				const void *matrices, void *output, const void *bias, const void *add, mlActivationType_t act);
-		DLL_PUBLIC void cuda_winograd_gradient_transform(mlContext_t context, mlDataType_t dtype, mlShape_t weight_shape, mlShape_t gradient_shape,
-				const void *gradient, void *matrices);
-		DLL_PUBLIC void cuda_winograd_update_transform(mlContext_t context, mlDataType_t dtype, mlShape_t weight_shape, const void *matrices,
-				void *update);
+		DLL_PUBLIC void cuda_winograd_weight_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape,
+				const void *weights, void *matrices, bool invert, bool low_precision);
+		DLL_PUBLIC void cuda_winograd_input_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape,
+				mlShape_t input_shape, const void *input, void *matrices);
+		DLL_PUBLIC void cuda_winograd_output_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape,
+				mlShape_t output_shape, const void *matrices, void *output, const void *bias, const void *add, mlActivationType_t act);
+		DLL_PUBLIC void cuda_winograd_gradient_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape,
+				mlShape_t gradient_shape, const void *gradient, void *matrices);
+		DLL_PUBLIC void cuda_winograd_update_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape,
+				const void *matrices, void *update);
 
 		// implemented in 'implicit_gemm_conv.cu'
 		DLL_PUBLIC void cuda_convolution_implicit_gemm_forward(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape,

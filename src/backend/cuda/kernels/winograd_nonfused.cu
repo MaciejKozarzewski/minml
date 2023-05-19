@@ -301,31 +301,19 @@ namespace
 		assert(weight_shape.dim[1] == weight_shape.dim[2]);
 		return weight_shape.dim[1];
 	}
-	int get_transform_size(mlContext_t context, const mlShape_t &weight_shape, bool is_float32)
-	{
-		switch (get_kernel_size(weight_shape))
-		{
-			case 3:
-				return 4; //(ml::cuda::has_tensor_cores(context) and not is_float32) ? 2 : 4;
-			case 5:
-				return 2;
-			default:
-				return 0;
-		}
-	}
 	int get_number_of_tiles(int dim, int transform_size)
 	{
 		return (dim + transform_size - 1) / transform_size;
 	}
 
 	template<typename T>
-	void launch_weight_transform(mlContext_t context, mlShape_t weight_shape, const void *weights, void *matrices, bool invert, bool low_precision)
+	void launch_weight_transform(mlContext_t context, int tile_size, mlShape_t weight_shape, const void *weights, void *matrices, bool invert,
+			bool low_precision)
 	{
 		const int filters_out = weight_shape.dim[0];
 		const int filters_in = weight_shape.dim[3];
 
 		const int kernel_size = get_kernel_size(weight_shape);
-		const int transform_size = get_transform_size(context, weight_shape, is_fp32<T>());
 
 		const int max_threads = cuda::has_fp16_math(context) ? 64 : 128;
 		dim3 blockSize(std::min(max_threads, filters_in));
@@ -334,10 +322,10 @@ namespace
 
 		if (kernel_size == 3)
 		{
-//			if (transform_size == 2)
+//			if (tile_size == 2)
 //				kernel_transform_weights<3, 2> <<<gridSize, blockSize, 0, stream>>>(getPointer<T>(matrices), getPointer<T>(weights), filters_out,
 //						filters_in, invert, low_precision);
-			if (transform_size == 4)
+			if (tile_size == 4)
 				kernel_transform_weights<3, 4> <<<gridSize, blockSize, 0, stream>>>(getPointer<T>(matrices), getPointer<T>(weights), filters_out,
 						filters_in, invert, low_precision);
 		}
@@ -350,7 +338,7 @@ namespace
 	}
 
 	template<typename T>
-	void launch_input_transform(mlContext_t context, mlShape_t weight_shape, mlShape_t input_shape, const void *input, void *matrices)
+	void launch_input_transform(mlContext_t context, int tile_size, mlShape_t weight_shape, mlShape_t input_shape, const void *input, void *matrices)
 	{
 		const int batch_size = input_shape.dim[0];
 		const int height = input_shape.dim[1];
@@ -358,10 +346,9 @@ namespace
 		const int filters = input_shape.dim[3];
 
 		const int kernel_size = get_kernel_size(weight_shape);
-		const int transform_size = get_transform_size(context, weight_shape, is_fp32<T>());
 
-		const int tiles_h = get_number_of_tiles(height, transform_size);
-		const int tiles_w = get_number_of_tiles(width, transform_size);
+		const int tiles_h = get_number_of_tiles(height, tile_size);
+		const int tiles_w = get_number_of_tiles(width, tile_size);
 		cudaStream_t stream = cuda::Context::getStream(context);
 
 		const int max_threads = cuda::has_fp16_math(context) ? 64 : 128;
@@ -370,10 +357,10 @@ namespace
 
 		if (kernel_size == 3)
 		{
-//			if (transform_size == 2)
-//				kernel_transform_input<3, 2> <<<gridSize, blockSize, 0, stream>>>(getPointer<T>(matrices), getPointer<T>(input), batch_size, height,
-//						width, filters);
-			if (transform_size == 4)
+			if (tile_size == 2)
+				kernel_transform_input<3, 2> <<<gridSize, blockSize, 0, stream>>>(getPointer<T>(matrices), getPointer<T>(input), batch_size, height,
+						width, filters);
+			if (tile_size == 4)
 			{
 				if (filters % 2 == 0 and cuda::has_fp16_math(context) and std::is_same<T, half>::value)
 					kernel_transform_input_vect<3, 4> <<<gridSize, blockSize, 0, stream>>>(getPointer<half>(matrices), getPointer<half>(input),
@@ -383,7 +370,7 @@ namespace
 							height, width, filters);
 			}
 		}
-		if (kernel_size == 5)
+		if (kernel_size == 5 and tile_size == 2)
 		{
 			if (filters % 2 == 0 and cuda::has_fp16_math(context) and std::is_same<T, half>::value)
 				kernel_transform_input_vect<5, 2> <<<gridSize, blockSize, 0, stream>>>(getPointer<half>(matrices), getPointer<half>(input),
@@ -397,8 +384,8 @@ namespace
 	}
 
 	template<typename T>
-	void launch_output_transform(mlContext_t context, mlShape_t weight_shape, mlShape_t output_shape, const void *matrices, void *output,
-			const void *bias, const void *add, mlActivationType_t act)
+	void launch_output_transform(mlContext_t context, int tile_size, mlShape_t weight_shape, mlShape_t output_shape, const void *matrices,
+			void *output, const void *bias, const void *add, mlActivationType_t act)
 	{
 		const int batch_size = output_shape.dim[0];
 		const int height = output_shape.dim[1];
@@ -406,10 +393,9 @@ namespace
 		const int filters = output_shape.dim[3];
 
 		const int kernel_size = get_kernel_size(weight_shape);
-		const int transform_size = get_transform_size(context, weight_shape, is_fp32<T>());
 
-		const int tiles_h = get_number_of_tiles(height, transform_size);
-		const int tiles_w = get_number_of_tiles(width, transform_size);
+		const int tiles_h = get_number_of_tiles(height, tile_size);
+		const int tiles_w = get_number_of_tiles(width, tile_size);
 		cudaStream_t stream = cuda::Context::getStream(context);
 
 		const int max_threads = cuda::has_fp16_math(context) ? 64 : 128;
@@ -418,14 +404,14 @@ namespace
 
 		if (kernel_size == 3)
 		{
-//			if (transform_size == 2)
-//				kernel_transform_output<3, 2> <<<gridSize, blockSize, 0, stream>>>(getPointer<T>(matrices), getPointer<T>(output), getPointer<T>(add),
-//						getPointer<T>(bias), act, batch_size, height, width, filters);
-			if (transform_size == 4)
+			if (tile_size == 2)
+				kernel_transform_output<3, 2> <<<gridSize, blockSize, 0, stream>>>(getPointer<T>(matrices), getPointer<T>(output), getPointer<T>(add),
+						getPointer<T>(bias), act, batch_size, height, width, filters);
+			if (tile_size == 4)
 				kernel_transform_output<3, 4> <<<gridSize, blockSize, 0, stream>>>(getPointer<T>(matrices), getPointer<T>(output), getPointer<T>(add),
 						getPointer<T>(bias), act, batch_size, height, width, filters);
 		}
-		if (kernel_size == 5)
+		if (kernel_size == 5 and tile_size == 2)
 		{
 			kernel_transform_output<5, 2> <<<gridSize, blockSize, 0, stream>>>(getPointer<T>(matrices), getPointer<T>(output), getPointer<T>(add),
 					getPointer<T>(bias), act, batch_size, height, width, filters);
@@ -438,55 +424,55 @@ namespace
 
 namespace ml
 {
-	void cuda_winograd_weight_transform(mlContext_t context, mlDataType_t dtype, mlShape_t weight_shape, const void *weights, void *matrices,
-			bool invert, bool low_precision)
+	void cuda_winograd_weight_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape, const void *weights,
+			void *matrices, bool invert, bool low_precision)
 	{
 		switch (dtype)
 		{
 			case DTYPE_BFLOAT16:
-				launch_weight_transform<__nv_bfloat16 >(context, weight_shape, weights, matrices, invert, low_precision);
+				launch_weight_transform<__nv_bfloat16 >(context, tile_size, weight_shape, weights, matrices, invert, low_precision);
 				break;
 			case DTYPE_FLOAT16:
-				launch_weight_transform<half>(context, weight_shape, weights, matrices, invert, low_precision);
+				launch_weight_transform<half>(context, tile_size, weight_shape, weights, matrices, invert, low_precision);
 				break;
 			case DTYPE_FLOAT32:
-				launch_weight_transform<float>(context, weight_shape, weights, matrices, invert, low_precision);
+				launch_weight_transform<float>(context, tile_size, weight_shape, weights, matrices, invert, low_precision);
 				break;
 		}
 	}
-	void cuda_winograd_input_transform(mlContext_t context, mlDataType_t dtype, mlShape_t weight_shape, mlShape_t input_shape, const void *input,
-			void *matrices)
+	void cuda_winograd_input_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape, mlShape_t input_shape,
+			const void *input, void *matrices)
 	{
 		switch (dtype)
 		{
 			case DTYPE_BFLOAT16:
-				launch_input_transform<__nv_bfloat16 >(context, weight_shape, input_shape, input, matrices);
+				launch_input_transform<__nv_bfloat16 >(context, tile_size, weight_shape, input_shape, input, matrices);
 				break;
 			case DTYPE_FLOAT16:
-				launch_input_transform<half>(context, weight_shape, input_shape, input, matrices);
+				launch_input_transform<half>(context, tile_size, weight_shape, input_shape, input, matrices);
 				break;
 			case DTYPE_FLOAT32:
-				launch_input_transform<float>(context, weight_shape, input_shape, input, matrices);
+				launch_input_transform<float>(context, tile_size, weight_shape, input_shape, input, matrices);
 				break;
 		}
 	}
-	void cuda_winograd_output_transform(mlContext_t context, mlDataType_t dtype, mlShape_t weight_shape, mlShape_t output_shape, const void *matrices,
-			void *output, const void *bias, const void *add, mlActivationType_t act)
+	void cuda_winograd_output_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape, mlShape_t output_shape,
+			const void *matrices, void *output, const void *bias, const void *add, mlActivationType_t act)
 	{
 		switch (dtype)
 		{
 			case DTYPE_BFLOAT16:
-				launch_output_transform<__nv_bfloat16 >(context, weight_shape, output_shape, matrices, output, bias, add, act);
+				launch_output_transform<__nv_bfloat16 >(context, tile_size, weight_shape, output_shape, matrices, output, bias, add, act);
 				break;
 			case DTYPE_FLOAT16:
-				launch_output_transform<half>(context, weight_shape, output_shape, matrices, output, bias, add, act);
+				launch_output_transform<half>(context, tile_size, weight_shape, output_shape, matrices, output, bias, add, act);
 				break;
 			case DTYPE_FLOAT32:
-				launch_output_transform<float>(context, weight_shape, output_shape, matrices, output, bias, add, act);
+				launch_output_transform<float>(context, tile_size, weight_shape, output_shape, matrices, output, bias, add, act);
 				break;
 		}
 	}
-	void cuda_winograd_gradient_transform(mlContext_t context, mlDataType_t dtype, mlShape_t weight_shape, mlShape_t gradient_shape,
+	void cuda_winograd_gradient_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape, mlShape_t gradient_shape,
 			const void *gradient, void *matrices)
 	{
 		const int batch_size = gradient_shape.dim[0];
@@ -495,10 +481,9 @@ namespace ml
 		const int filters = gradient_shape.dim[3];
 
 		const int kernel_size = get_kernel_size(weight_shape);
-		const int transform_size = get_transform_size(context, weight_shape, true);
 
-		const int tiles_h = get_number_of_tiles(height, transform_size);
-		const int tiles_w = get_number_of_tiles(width, transform_size);
+		const int tiles_h = get_number_of_tiles(height, tile_size);
+		const int tiles_w = get_number_of_tiles(width, tile_size);
 		cudaStream_t stream = cuda::Context::getStream(context);
 
 		const int max_threads = cuda::has_fp16_math(context) ? 64 : 128;
@@ -507,27 +492,28 @@ namespace ml
 
 		if (kernel_size == 3)
 		{
-//			if (transform_size == 2)
-//				kernel_transform_gradient<3, 2> <<<gridSize, blockSize, 0, stream>>>(getPointer<float>(matrices), getPointer<float>(gradient),
-//						batch_size, height, width, filters);
-			if (transform_size == 4)
+			if (tile_size == 2)
+				kernel_transform_gradient<3, 2> <<<gridSize, blockSize, 0, stream>>>(getPointer<float>(matrices), getPointer<float>(gradient),
+						batch_size, height, width, filters);
+			if (tile_size == 4)
 				kernel_transform_gradient<3, 4> <<<gridSize, blockSize, 0, stream>>>(getPointer<float>(matrices), getPointer<float>(gradient),
 						batch_size, height, width, filters);
 		}
 		if (kernel_size == 5)
 		{
-			kernel_transform_gradient<5, 2> <<<gridSize, blockSize, 0, stream>>>(getPointer<float>(matrices), getPointer<float>(gradient), batch_size,
-					height, width, filters);
+			if (tile_size == 2)
+				kernel_transform_gradient<5, 2> <<<gridSize, blockSize, 0, stream>>>(getPointer<float>(matrices), getPointer<float>(gradient),
+						batch_size, height, width, filters);
 		}
 		assert(cudaGetLastError() == cudaSuccess);
 	}
-	void cuda_winograd_update_transform(mlContext_t context, mlDataType_t dtype, mlShape_t weight_shape, const void *matrices, void *update)
+	void cuda_winograd_update_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape, const void *matrices,
+			void *update)
 	{
 		const int filters_out = weight_shape.dim[0];
 		const int filters_in = weight_shape.dim[3];
 
 		const int kernel_size = get_kernel_size(weight_shape);
-		const int transform_size = get_transform_size(context, weight_shape, true);
 
 		const int max_threads = cuda::has_fp16_math(context) ? 64 : 128;
 		dim3 blockSize(std::min(max_threads, filters_in));
@@ -536,17 +522,18 @@ namespace ml
 
 		if (kernel_size == 3)
 		{
-//			if (transform_size == 2)
-//				kernel_transform_update<3, 2> <<<gridSize, blockSize, 0, stream>>>(getPointer<float>(matrices), getPointer<float>(update),
-//						filters_out, filters_in);
-			if (transform_size == 4)
+			if (tile_size == 2)
+				kernel_transform_update<3, 2> <<<gridSize, blockSize, 0, stream>>>(getPointer<float>(matrices), getPointer<float>(update),
+						filters_out, filters_in);
+			if (tile_size == 4)
 				kernel_transform_update<3, 4> <<<gridSize, blockSize, 0, stream>>>(getPointer<float>(matrices), getPointer<float>(update),
 						filters_out, filters_in);
 		}
 		if (kernel_size == 5)
 		{
-			kernel_transform_update<5, 2> <<<gridSize, blockSize, 0, stream>>>(getPointer<float>(matrices), getPointer<float>(update), filters_out,
-					filters_in);
+			if (tile_size == 2)
+				kernel_transform_update<5, 2> <<<gridSize, blockSize, 0, stream>>>(getPointer<float>(matrices), getPointer<float>(update),
+						filters_out, filters_in);
 		}
 
 		assert(cudaGetLastError() == cudaSuccess);

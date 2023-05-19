@@ -29,7 +29,8 @@ namespace ml
 			int m_width = 0;
 			int m_input_filters = 0;
 			int m_kernel_size = 0;
-			ConvolutionAlgorithm m_algorithm = ConvolutionAlgorithm::DIRECT;
+			mutable ConvolutionAlgorithm m_algorithm = ConvolutionAlgorithm::DIRECT;
+			mutable int m_winograd_tile_size = 0;
 			std::unique_ptr<Tensor> m_transformed_weights;
 			bool m_use_bias = true;
 			bool m_are_weights_transformed = false;
@@ -59,7 +60,7 @@ namespace ml
 			void backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next);
 
 		private:
-			void choose_algorithm();
+			void choose_algorithm() const;
 	};
 
 } /* namespace ml */

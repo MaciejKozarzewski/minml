@@ -44,6 +44,13 @@ namespace ml
 	void gemm(const Context &context, char opA, char opB, Tensor &C, const Tensor &A, const Tensor &B, float alpha, float beta);
 	void gemmBatched(const Context &context, char opA, char opB, Tensor &C, const Tensor &A, const Tensor &B, float alpha, float beta);
 
+	/*
+	 * Computes D = alpha * op_A(A) * op_B(B) + beta * C
+	 */
+	void gemm(const Context &context, Tensor &D, float alpha, char opA, const Tensor &A, char opB, const Tensor &B, float beta, const Tensor &C);
+	void gemmBatched(const Context &context, Tensor &D, float alpha, char opA, const Tensor &A, char opB, const Tensor &B, float beta,
+			const Tensor &C);
+
 	void addBiasAct(const Context &context, Tensor &input, const Tensor &bias, ActivationType act);
 
 	void batchnormInference(const Context &context, const Tensor &input, Tensor &output, const Tensor &weights, ActivationType act);
@@ -62,8 +69,8 @@ namespace ml
 	void addTensors(const Context &context, Tensor &dst, const Tensor &src1, const Tensor &src2);
 	float crossEntropyLoss(const Context &context, const Tensor &output, const Tensor &target);
 	void crossEntropyGradient(const Context &context, Tensor &gradient, const Tensor &output, const Tensor &target, float weight = 1.0f);
-	void adamOptimize(const Context &context, Tensor &weight, const Tensor &update, Tensor &momentum, Tensor &variance, float learning_rate, float beta1,
-			float beta2);
+	void adamOptimize(const Context &context, Tensor &weight, const Tensor &update, Tensor &momentum, Tensor &variance, float learning_rate,
+			float beta1, float beta2);
 	void l2Regularization(const Context &context, Tensor &gradient, const Tensor &param, float coefficient, float offset);
 
 } /* namespace ml */

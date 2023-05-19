@@ -128,8 +128,12 @@ namespace ml
 				return false;
 			case DTYPE_FLOAT16:
 			{
-				static const bool result = cpu_x86::get().supports("avx2") and cpu_x86::get().supports("fma") and cpu_x86::get().supports("f16c");
+#ifdef USE_OPENBLAS
+				return false;
+#else
+				static const bool result = cpu_x86::get().supports("avx2") and cpu_x86::get().supports("fma3") and cpu_x86::get().supports("f16c");
 				return result;
+#endif
 			}
 			case DTYPE_FLOAT32:
 				return true;
