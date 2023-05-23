@@ -96,6 +96,27 @@ namespace ml
 			for (int j = 0; j < last_dim; j++)
 				dst_ptr[j] = dst_ptr[j] * beta + tmp_ptr[j];
 	}
+	float cpu_mean_squared_loss(mlContext_t context, mlShape_t shape, const void *output, const void *target)
+	{
+		assert(output != nullptr);
+		assert(target != nullptr);
+
+		const int elements = volume(shape);
+
+		const float *output_ptr = getPointer<float>(output);
+		const float *target_ptr = getPointer<float>(target);
+
+		const float inv_batch_size = 1.0f / get_first_dim(shape);
+
+		float result = 0.0f;
+		for (int i = 0; i < elements; i++)
+			result += square(output_ptr[i] - target_ptr[i]);
+		return 0.5f * result * inv_batch_size;
+	}
+	void cpu_mean_squared_gradient(mlContext_t context, mlShape_t shape, void *gradient, const void *output, const void *target, float weight)
+	{
+		cpu_cross_entropy_gradient(context, shape, gradient, output, target, weight); // in this case both gradients are the same
+	}
 	float cpu_cross_entropy_loss(mlContext_t context, mlShape_t shape, const void *output, const void *target)
 	{
 		assert(output != nullptr);

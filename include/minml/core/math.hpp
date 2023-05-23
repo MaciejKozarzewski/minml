@@ -67,6 +67,8 @@ namespace ml
 	void emulateLowPrecision(const Context &context, Tensor &dst, const Tensor &src);
 	void sumOverFirstDim(const Context &context, Tensor &dst, const Tensor &src, float beta);
 	void addTensors(const Context &context, Tensor &dst, const Tensor &src1, const Tensor &src2);
+	float meanSquaredLoss(const Context &context, const Tensor &output, const Tensor &target);
+	void meanSquaredGradient(const Context &context, Tensor &gradient, const Tensor &output, const Tensor &target, float weight = 1.0f);
 	float crossEntropyLoss(const Context &context, const Tensor &output, const Tensor &target);
 	void crossEntropyGradient(const Context &context, Tensor &gradient, const Tensor &output, const Tensor &target, float weight = 1.0f);
 	void adamOptimize(const Context &context, Tensor &weight, const Tensor &update, Tensor &momentum, Tensor &variance, float learning_rate,

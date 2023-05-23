@@ -19,7 +19,7 @@
 namespace
 {
 	using namespace ml;
-#define USE_TIMING
+//#define USE_TIMING
 
 #ifdef USE_TIMING
 	struct Timer
@@ -487,6 +487,29 @@ namespace ml
 				break;
 			case DeviceType::CUDA:
 				cuda_add_tensors(get(context), get(dst.dtype()), get_shape(dst), dst.data(), src1.data(), src2.data());
+				break;
+		}
+	}
+	float meanSquaredLoss(const Context &context, const Tensor &output, const Tensor &target)
+	{
+		switch (context.device().type())
+		{
+			case DeviceType::CPU:
+				return cpu_mean_squared_loss(get(context), get_shape(output), output.data(), target.data());
+			case DeviceType::CUDA:
+				return cuda_mean_squared_loss(get(context), get_shape(output), output.data(), target.data());
+		}
+		return 0.0f;
+	}
+	void meanSquaredGradient(const Context &context, Tensor &gradient, const Tensor &output, const Tensor &target, float weight)
+	{
+		switch (context.device().type())
+		{
+			case DeviceType::CPU:
+				cpu_mean_squared_gradient(get(context), get_shape(output), gradient.data(), output.data(), target.data(), weight);
+				break;
+			case DeviceType::CUDA:
+				cuda_mean_squared_gradient(get(context), get_shape(output), gradient.data(), output.data(), target.data(), weight);
 				break;
 		}
 	}

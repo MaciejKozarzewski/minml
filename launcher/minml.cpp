@@ -18,6 +18,7 @@
 #include <minml/layers/Add.hpp>
 #include <minml/layers/Softmax.hpp>
 #include <minml/training/Optimizer.hpp>
+#include <minml/training/LossFunction.hpp>
 #include <minml/utils/random.hpp>
 #include <minml/utils/time_util.hpp>
 #include <minml/utils/file_util.hpp>
@@ -2551,6 +2552,118 @@ mlShape_t create_shape(int rows, int cols)
 	result.dim[1] = cols;
 	return result;
 }
+mlShape_t create_shape(int batch, int rows, int cols)
+{
+	mlShape_t result;
+	result.rank = 3;
+	result.dim[0] = batch;
+	result.dim[1] = rows;
+	result.dim[2] = cols;
+	return result;
+}
+
+float fp16_to_fp32(const uint16_t x) noexcept
+{
+	uint32_t exponent = x & 0x7C00; // '0 11111 0000000000'
+	uint32_t mantissa = x & 0x03FF; // '0 00000 1111111111'
+
+	const uint32_t sign = (x & 0x8000) << 16; // '1 00000 0000000000'
+	if (exponent == 0x7C00)
+	{
+		exponent = 0x3FC00; // +/- Inf or +/- NaN (it's 0x7F800000 >> 13)
+		mantissa |= ((mantissa != 0) << 9); // set first bit of the mantissa in case of NaN, but preserve other bits
+	}
+	else
+	{
+		if (exponent != 0) // normalized
+			exponent += (112 << 10);
+		else
+		{
+			if (mantissa != 0)
+			{ // denormalized
+				const uint32_t v = as_uint((float) mantissa) >> 23; // evil log2 bit hack to count leading zeros in denormalized format
+				exponent = (v - 24) << 10;
+				mantissa = (mantissa << (137 - v)) & 0x03FF;
+			}
+		}
+	}
+	return as_float(sign | ((exponent | mantissa) << 13));
+}
+uint16_t fp32_to_fp16(const float x) noexcept
+{
+	const uint32_t original = as_uint(x);
+	const uint32_t rounded = original + 0x00001000; // round-to-nearest-even: add last bit after truncated mantissa
+	uint32_t exponent = (rounded & 0x7F800000) >> 23; // exponent
+	uint32_t mantissa = rounded & 0x007FFFFF; // mantissa; in line below: 0x007FF000 = 0x00800000-0x00001000 = decimal indicator flag - initial rounding
+
+	const uint32_t sign = (original & 0x80000000) >> 16;
+
+	if ((original & 0x7FFFFFFF) > 0x7F800000)
+	{ // check NaN
+		exponent = 0x7C00;
+		mantissa = ((original & 0x007FFFFF) >> 13) | 0x200; // set first mantissa bit but preserve others
+	}
+	else
+	{
+		if (exponent > 142)
+		{ // +/- Inf
+			exponent = 0x7C00;
+			mantissa = 0;
+		}
+		else
+		{
+			if (exponent > 112)
+			{ // normalized
+				exponent = ((exponent - 112) << 10) & 0x7C00;
+				mantissa >>= 13;
+			}
+			else
+			{ // denormalized
+				mantissa += 0x007FF000; // TODO figure out why it is here
+				mantissa >>= std::min(125u - exponent, 31u);
+				mantissa = (mantissa + 1) >> 1;
+				exponent = 0;
+			}
+		}
+	}
+	return sign | exponent | mantissa;
+}
+
+float bf16_to_fp32(const uint16_t x) noexcept
+{
+	return as_float(static_cast<uint32_t>(x) << 16);
+}
+uint16_t fp32_to_bf16(const float x) noexcept
+{
+	return as_uint(x) >> 16;
+}
+
+using namespace ml;
+template<typename SrcT, typename DstT>
+DstT convert(SrcT x) noexcept
+{
+	return static_cast<DstT>(x);
+}
+template<>
+float16 convert(float x) noexcept
+{
+	return float16 { fp32_to_fp16(x) };
+}
+template<>
+bfloat16 convert(float x) noexcept
+{
+	return bfloat16 { fp32_to_bf16(x) };
+}
+template<>
+float convert(float16 x) noexcept
+{
+	return fp16_to_fp32(x.m_data);
+}
+template<>
+float convert(bfloat16 x) noexcept
+{
+	return bf16_to_fp32(x.m_data);
+}
 
 template<typename DataType, typename ComputeType = float>
 void baseline_gemm(mlShape_t shape_D, void *D, float alpha, char opA, mlShape_t shape_A, const void *A, char opB, mlShape_t shape_B, const void *B,
@@ -2570,121 +2683,167 @@ void baseline_gemm(mlShape_t shape_D, void *D, float alpha, char opA, mlShape_t 
 			ComputeType tmp = static_cast<ComputeType>(0);
 			for (int k = 0; k < K; k++)
 			{
-				const ComputeType a = reinterpret_cast<const DataType*>(A)[m * strides_a[0] + k * strides_a[1]];
-				const ComputeType b = reinterpret_cast<const DataType*>(B)[k * strides_b[0] + n * strides_b[1]];
+				const ComputeType a = convert<DataType, ComputeType>(reinterpret_cast<const DataType*>(A)[m * strides_a[0] + k * strides_a[1]]);
+				const ComputeType b = convert<DataType, ComputeType>(reinterpret_cast<const DataType*>(B)[k * strides_b[0] + n * strides_b[1]]);
 				tmp += a * b;
 			}
 			tmp = alpha * tmp;
 			if (beta != 0.0f)
 			{
-				const ComputeType c = reinterpret_cast<const DataType*>(C)[m * strides_c[0] + n * strides_c[1]];
+				const ComputeType c = convert<DataType, ComputeType>(reinterpret_cast<const DataType*>(C)[m * strides_c[0] + n * strides_c[1]]);
 				tmp += beta * c;
 			}
-			reinterpret_cast<DataType*>(D)[m * strides_c[0] + n * strides_c[1]] = tmp;
+			reinterpret_cast<DataType*>(D)[m * strides_c[0] + n * strides_c[1]] = convert<ComputeType, DataType>(tmp);
 		}
 }
 
-#include "../src/backend/cpu/kernels/gemm/utilities.hpp"
-#include "../src/backend/cpu/kernels/gemm/Fragment.hpp"
-#include "../src/backend/cpu/kernels/gemm/Matrix.hpp"
-#include "../src/backend/cpu/kernels/gemm/gemm_kernels.hpp"
-#include "../src/backend/cpu/kernels/gemm/gemm_traits.hpp"
-
-void test_packing()
+template<typename DataType, typename ComputeType = float>
+void baseline_gemm_batched(mlShape_t shape_D, void *D, float alpha, char opA, mlShape_t shape_A, const void *A, char opB, mlShape_t shape_B,
+		const void *B, float beta, mlShape_t shape_C, const void *C)
 {
-	constexpr ml::MatrixOp op = MatrixOp::NORMAL;
-	constexpr int M = 16;
-	constexpr int K = 1024;
+	const int M = (opA == 't') ? shape_A.dim[2] : shape_A.dim[1];
+	const int N = (opB == 't') ? shape_B.dim[1] : shape_B.dim[2];
+	const int K = (opA == 't') ? shape_A.dim[1] : shape_A.dim[2];
 
-	std::unique_ptr<uint16_t[]> src = std::make_unique<uint16_t[]>(1024 * 1024);
+	const int strides_a[2] = { (opA == 'n') ? K : 1, (opA == 'n') ? 1 : M };
+	const int strides_b[2] = { (opB == 'n') ? N : 1, (opB == 'n') ? 1 : K };
+	const int strides_c[2] = { N, 1 };
+
+	const int MK = shape_A.dim[1] * shape_A.dim[2];
+	const int KN = shape_B.dim[1] * shape_B.dim[2];
+	const int MN = shape_C.dim[1] * shape_C.dim[2];
+
+	for (int batch = 0; batch < shape_D.dim[0]; batch++)
+		for (int m = 0; m < M; m++)
+			for (int n = 0; n < N; n++)
+			{
+				ComputeType tmp = static_cast<ComputeType>(0);
+				for (int k = 0; k < K; k++)
+				{
+					const ComputeType a = convert<DataType, ComputeType>(
+							reinterpret_cast<const DataType*>(A)[batch * MK + m * strides_a[0] + k * strides_a[1]]);
+					const ComputeType b = convert<DataType, ComputeType>(
+							reinterpret_cast<const DataType*>(B)[batch * KN + k * strides_b[0] + n * strides_b[1]]);
+					tmp += a * b;
+				}
+				tmp = alpha * tmp;
+				if (beta != 0.0f)
+				{
+					const ComputeType c = convert<DataType, ComputeType>(
+							reinterpret_cast<const DataType*>(C)[batch * MN + m * strides_c[0] + n * strides_c[1]]);
+					tmp += beta * c;
+				}
+				reinterpret_cast<DataType*>(D)[batch * MN + m * strides_c[0] + n * strides_c[1]] = convert<ComputeType, DataType>(tmp);
+			}
+}
+
+#include "../src/backend/cpu/gemm/utilities.hpp"
+#include "../src/backend/cpu/gemm/Fragment.hpp"
+#include "../src/backend/cpu/gemm/Matrix.hpp"
+#include "../src/backend/cpu/gemm/gemm_kernels.hpp"
+
+void test_packing(int rows, int columns, ml::MatrixOp op)
+{
+	const int M = columns;
+	const int K = rows;
+
+	std::unique_ptr<float[]> src = std::make_unique<float[]>(1024 * 1024);
 	for (int i = 0; i < 1024 * 1024; i++)
-//		src[i] = (i / 1024) + (i % 1024) * 0.01f;
-		src[i] = float_to_half(randFloat());
+		src[i] = (i / 1024) + (i % 1024) * 0.01f;
+//		src[i] = float_to_half(randFloat());
 
-	constexpr size_t size_in_bytes = sizeof(float) * M * K;
+	const size_t size_in_bytes = sizeof(float) * M * K;
 	void *dst1 = gemm::aligned_new(size_in_bytes, 4096);
 	void *dst2 = gemm::aligned_new(size_in_bytes, 4096);
 	std::memset(dst1, 0, size_in_bytes);
 	std::memset(dst2, 0, size_in_bytes);
 
-	Fragment correct(dst1, DTYPE_FLOAT32);
-	Fragment fragment(dst2, DTYPE_FLOAT32);
-	correct.mark_as_packed_with_size( { K, M }, M);
-	fragment.mark_as_packed_with_size( { K, M }, M);
+	Fragment correct(dst1, DTYPE_FLOAT32, M);
+	Fragment fragment(dst2, DTYPE_FLOAT32, M);
+	correct.mark_as_packed_with_size( { K, M });
+	fragment.mark_as_packed_with_size( { K, M });
 
-	Matrix matrix(src.get(), DTYPE_FLOAT16, 1024, 1024, 1024);
+	Matrix matrix(src.get(), DTYPE_FLOAT32, 1024, 1024, 1024);
 
-	pack_def_MxK_fp16_fp32(correct, matrix, { 0, 0 }, op);
-	pack_avx2_fma_16xK_fp16_fp32(fragment, matrix, { 0, 0 }, op);
+	pack_def_MxK_fp32(correct, matrix, { 0, 0 }, op);
+	pack_sse2_8xK_fp32(fragment, matrix, { 0, 0 }, op);
 
-	std::cout << "Correct\n";
-	for (int k = 0; k < K; k++)
-	{
-		for (int m = 0; m < M; m++)
-			std::cout << correct.at<float>(k, m) << ' ';
-//			std::cout << half_to_float(correct.at<uint16_t>(k, m)) << ' ';
-		std::cout << '\n';
-	}
-	std::cout << "-------------------------------------------\n";
-	std::cout << "Actual\n";
-	for (int k = 0; k < K; k++)
-	{
-		for (int m = 0; m < M; m++)
-			std::cout << fragment.at<float>(k, m) << ' ';
-//			std::cout << half_to_float(fragment.at<uint16_t>(k, m)) << ' ';
-		std::cout << '\n';
-	}
+//	std::cout << "Correct\n";
+//	for (int k = 0; k < K; k++)
+//	{
+//		for (int m = 0; m < M; m++)
+//			std::cout << correct.at<float>(k, m) << ' ';
+////			std::cout << half_to_float(correct.at<uint16_t>(k, m)) << ' ';
+//		std::cout << '\n';
+//	}
+//	std::cout << "-------------------------------------------\n";
+//	std::cout << "Actual\n";
+//	for (int k = 0; k < K; k++)
+//	{
+//		for (int m = 0; m < M; m++)
+//			std::cout << fragment.at<float>(k, m) << ' ';
+////			std::cout << half_to_float(fragment.at<uint16_t>(k, m)) << ' ';
+//		std::cout << '\n';
+//	}
 
 	double diff = 0.0;
+	double max_diff = 0.0;
 	for (int k = 0; k < K; k++)
 		for (int m = 0; m < M; m++)
-			diff += std::fabs(correct.at<float>(k, m) - fragment.at<float>(k, m));
+		{
+			double tmp = std::fabs(correct.at<float>(k, m) - fragment.at<float>(k, m));
+			diff += tmp;
+			max_diff = std::max(max_diff, tmp);
+		}
 //			diff += std::fabs(half_to_float(correct.at<uint16_t>(k, m)) - half_to_float(fragment.at<uint16_t>(k, m)));
-	std::cout << "\ndiff = " << diff / (M * K) << '\n';
-
-	const double repeats = 1.0e8;
-	const double start = getTime();
-	int i = 0;
-	for (; i < repeats; i++)
+//	std::cout << "\ndiff = " << diff / (M * K) << '\n';
+	if (diff > 1.0e-3 or max_diff > 1.0e-3)
 	{
-		pack_avx2_fma_16xK_fp16_fp32(fragment, matrix, { 0, 0 }, op);
-		if ((getTime() - start) > 10.0)
-			break;
+		std::cout << "rows = " << rows << ", columns = " << columns << ", transpose = " << (int) op << ": FAILED\n";
+		exit(255);
 	}
-	const double stop = getTime();
-	std::cout << 1.0e6 * (stop - start) / i << " us (" << i << " repeats)\n";
+	else
+		std::cout << "rows = " << rows << ", columns = " << columns << ", transpose = " << (int) op << " : OK\n";
+
+//	const double repeats = 1.0e8;
+//	const double start = getTime();
+//	int i = 0;
+//	for (; i < repeats; i++)
+//	{
+//		pack_avx2_fma_24xK_fp16_fp32(fragment, matrix, { 0, 0 }, op);
+//		if ((getTime() - start) > 10.0)
+//			break;
+//	}
+//	const double stop = getTime();
+//	std::cout << 1.0e6 * (stop - start) / i << " us (" << i << " repeats)\n";
 
 	gemm::aligned_free(dst1, 4096);
 	gemm::aligned_free(dst2, 4096);
 }
 
-void test_microkernel()
+void test_microkernel(const int M, const int N, const int K)
 {
-	constexpr int M = 10;
-	constexpr int N = 8;
-	constexpr int K = 1024;
-
 	std::unique_ptr<float[]> matrix_c = std::make_unique<float[]>(1024 * 1024);
 	std::unique_ptr<float[]> matrix_d = std::make_unique<float[]>(1024 * 1024);
 	std::unique_ptr<float[]> correct_d = std::make_unique<float[]>(1024 * 1024);
 
-	constexpr size_t size_in_bytes_lhs = sizeof(float) * M * K;
-	constexpr size_t size_in_bytes_rhs = sizeof(float) * N * K;
+	const size_t size_in_bytes_lhs = sizeof(float) * M * K;
+	const size_t size_in_bytes_rhs = sizeof(float) * N * K;
 	void *lhs = gemm::aligned_new(size_in_bytes_lhs, 4096);
 	void *rhs = gemm::aligned_new(size_in_bytes_rhs, 4096);
 	std::memset(lhs, 0, size_in_bytes_lhs);
 	std::memset(rhs, 0, size_in_bytes_rhs);
 
-	Fragment fragment_a(lhs, DTYPE_FLOAT32);
-	Fragment fragment_b(rhs, DTYPE_FLOAT32);
-	Fragment fragment_c(matrix_c.get(), DTYPE_FLOAT32);
-	Fragment fragment_d(matrix_d.get(), DTYPE_FLOAT32);
-	Fragment correct_fragment_d(correct_d.get(), fragment_d.dtype());
-	fragment_a.mark_as_packed_with_size( { K, M }, M);
-	fragment_b.mark_as_packed_with_size( { K, N }, N);
-	fragment_c.mark_as_packed_with_size( { M, N }, 1024);
-	fragment_d.mark_as_packed_with_size( { M, N }, 1024);
-	correct_fragment_d.mark_as_packed_with_size( { M, N }, 1024);
+	Fragment fragment_a(lhs, DTYPE_FLOAT32, M);
+	Fragment fragment_b(rhs, DTYPE_FLOAT32, N);
+	Fragment fragment_c(matrix_c.get(), DTYPE_FLOAT16, 1024);
+	Fragment fragment_d(matrix_d.get(), DTYPE_FLOAT16, 1024);
+	Fragment correct_fragment_d(correct_d.get(), fragment_d.dtype(), 1024);
+	fragment_a.mark_as_packed_with_size( { K, M });
+	fragment_b.mark_as_packed_with_size( { K, N });
+	fragment_c.mark_as_packed_with_size( { M, N });
+	fragment_d.mark_as_packed_with_size( { M, N });
+	correct_fragment_d.mark_as_packed_with_size( { M, N });
 
 	if (fragment_c.dtype() == DTYPE_FLOAT16)
 		for (int m = 0; m < M; m++)
@@ -2715,16 +2874,16 @@ void test_microkernel()
 	const float alpha = 1.0f;
 	const float beta = 0.0f;
 
-	gemm_def_MxN_fp32(correct_fragment_d, &alpha, fragment_a, fragment_b, &beta, fragment_c);
-//	gemm_avx2_fma_24x4_fp32(fragment_d, &alpha, fragment_a, fragment_b, &beta, fragment_c);
-	gemm_avx_10x8_fp32(fragment_d, &alpha, fragment_a, fragment_b, &beta, fragment_c);
+	gemm_def_MxN_fp16_fp32(correct_fragment_d, &alpha, fragment_a, fragment_b, &beta, fragment_c);
+	gemm_avx2_fma_6x16_fp16_fp32(fragment_d, &alpha, fragment_a, fragment_b, &beta, fragment_c);
+//	gemm_avx_10x8_fp32(fragment_d, &alpha, fragment_a, fragment_b, &beta, fragment_c);
 
 	std::cout << "Correct\n";
 	for (int m = 0; m < M; m++)
 	{
 		for (int n = 0; n < N; n++)
-//			std::cout << half_to_float(correct_fragment_d.at<uint16_t>(m, n)) << ' ';
-			std::cout << correct_fragment_d.at<float>(m, n) << ' ';
+			std::cout << half_to_float(correct_fragment_d.at<uint16_t>(m, n)) << ' ';
+//			std::cout << correct_fragment_d.at<float>(m, n) << ' ';
 		std::cout << '\n';
 	}
 	std::cout << "-------------------------------------------\n";
@@ -2732,18 +2891,16 @@ void test_microkernel()
 	for (int m = 0; m < M; m++)
 	{
 		for (int n = 0; n < N; n++)
-//			std::cout << half_to_float(fragment_d.at<uint16_t>(m, n)) << ' ';
-			std::cout << fragment_d.at<float>(m, n) << ' ';
+			std::cout << half_to_float(fragment_d.at<uint16_t>(m, n)) << ' ';
+//			std::cout << fragment_d.at<float>(m, n) << ' ';
 		std::cout << '\n';
 	}
 
 	double diff = 0.0;
-//	for (int m = 0; m < M; m++)
-//		for (int n = 0; n < N; n++)
-//			diff += std::fabs(half_to_float(correct_fragment_d.at<uint16_t>(m, n)) - half_to_float(fragment_d.at<uint16_t>(m, n)));
 	for (int m = 0; m < M; m++)
 		for (int n = 0; n < N; n++)
-			diff += std::fabs(correct_fragment_d.at<float>(m, n) - fragment_d.at<float>(m, n));
+//			diff += std::fabs(correct_fragment_d.at<float>(m, n) - fragment_d.at<float>(m, n));
+			diff += std::fabs(half_to_float(correct_fragment_d.at<uint16_t>(m, n)) - half_to_float(fragment_d.at<uint16_t>(m, n)));
 	std::cout << "\ndiff = " << diff / (M * K) << '\n';
 
 	const double repeats = 1.0e8;
@@ -2751,14 +2908,14 @@ void test_microkernel()
 	int i = 0;
 	for (; i < repeats; i++)
 	{
-		gemm_avx_10x8_fp32(fragment_d, &alpha, fragment_a, fragment_b, &beta, fragment_c);
+		gemm_avx2_fma_6x16_fp16_fp32(fragment_d, &alpha, fragment_a, fragment_b, &beta, fragment_c);
 		if ((getTime() - start) > 15.0)
 			break;
 	}
 	const double stop = getTime();
 	std::cout << 1.0e6 * (stop - start) / i << " us (" << i << " repeats)\n";
 	const double flops = (double) i * (M * N * K) / (stop - start);
-	std::cout << flops / 1.0e9 << " GFLOPS\n";
+	std::cout << M << "x" << N << "x" << K << " : " << flops / 1.0e9 << " GFLOPS\n";
 
 	gemm::aligned_free(lhs, 4096);
 	gemm::aligned_free(rhs, 4096);
@@ -2767,104 +2924,116 @@ void test_microkernel()
 int main()
 {
 	std::cout << "BEGIN" << std::endl;
-//	test_packing();
-	test_microkernel();
-	return 0;
+//	for (int i = 1; i <= 1024; i++)
+//	{
+//		test_packing(i, 8, ml::MatrixOp::NORMAL);
+//		test_packing(i, 8, ml::MatrixOp::TRANSPOSE);
+//	}
+//	test_microkernel(6, 16, 2);
+//	test_microkernel(24, 4, 64);
+//	test_microkernel(24, 4, 128);
+//	test_microkernel(24, 4, 256);
+//	test_microkernel(24, 4, 512);
+//	test_microkernel(24, 4, 1024);
+//	return 0;
 
-	{
-		Device::setNumberOfThreads(1);
-		const char op_a = 'n';
-		const char op_b = 't';
-
-		const int M = 120;
-		const int N = 128;
-		const int K = 128;
-
-		mlShape_t shape_a = (op_a == 'n') ? create_shape(M, K) : create_shape(K, M);
-		mlShape_t shape_b = (op_b == 'n') ? create_shape(K, N) : create_shape(N, K);
-		mlShape_t shape_c = create_shape(M, N);
-		mlShape_t shape_d = create_shape(M, N);
-
-		std::unique_ptr<float[]> matrix_a = std::make_unique<float[]>(M * K);
-		std::unique_ptr<float[]> matrix_b = std::make_unique<float[]>(K * N);
-		std::unique_ptr<float[]> matrix_c = std::make_unique<float[]>(M * N);
-		std::unique_ptr<float[]> matrix_d = std::make_unique<float[]>(M * N);
-
-		for (int i = 0; i < M * K; i++)
-			matrix_a[i] = 0; //randFloat();
-		for (int i = 0; i < K * N; i++)
-			matrix_b[i] = 0; //randFloat();
-
-		const float alpha = 1.0f;
-		const float beta = 0.0f;
-
-//		for (int row = 0; row < shape_a.dim[0]; row++)
-//		{
-//			for (int col = 0; col < shape_a.dim[1]; col++)
-//				std::cout << matrix_a[row * shape_a.dim[1] + col] << ' ';
-//			std::cout << '\n';
-//		}
-
-		mlContext_t context = cpu_create_context();
-		cpu_gemm_v2(context, DTYPE_FLOAT32, shape_d, matrix_d.get(), alpha, op_a, shape_a, matrix_a.get(), op_b, shape_b, matrix_b.get(), beta,
-				shape_c, matrix_c.get());
-//		cpu_gemm(context, DTYPE_FLOAT32, shape_d, matrix_d.get(), shape_a, matrix_a.get(), shape_b, matrix_b.get(), op_a, op_b, alpha, beta);
-
-		const double repeats = 1.0e7;
-		const double start = getTime();
-		int i = 0;
-		for (; i < repeats; i++)
-		{
-//			cpu_gemm_v2(context, DTYPE_FLOAT32, shape_d, matrix_d.get(), alpha, op_a, shape_a, matrix_a.get(), op_b, shape_b, matrix_b.get(), beta,
-//					shape_d, matrix_d.get());
-			cpu_gemm(context, DTYPE_FLOAT32, shape_d, matrix_d.get(), shape_a, matrix_a.get(), shape_b, matrix_b.get(), op_a, op_b, alpha, beta);
-			if ((getTime() - start) > 10.0)
-				break;
-		}
-		const double stop = getTime();
-		std::cout << 1.0e6 * (stop - start) / i << " us (" << i << " repeats)\n";
-		const double flops = (double) i * (M * N * K) / (stop - start);
-		std::cout << flops / 1.0e9 << " GFLOPS\n";
-
-//		cpu_gemm_v2(context, DTYPE_FLOAT32, shape_d, matrix_d.get(), alpha, op_a, shape_a, matrix_a.get(), op_b, shape_b, matrix_b.get(), beta,
+//	{
+//		Device::setNumberOfThreads(1);
+//		const char op_a = 'n';
+//		const char op_b = 't';
+//
+//		const int B = 36;
+//		const int M = 64;
+//		const int N = 128;
+//		const int K = 8;
+//
+//		mlShape_t shape_a = (op_a == 'n') ? create_shape(B, M, K) : create_shape(B, K, M);
+//		mlShape_t shape_b = (op_b == 'n') ? create_shape(B, K, N) : create_shape(B, N, K);
+//		mlShape_t shape_c = create_shape(B, M, N);
+//		mlShape_t shape_d = create_shape(B, M, N);
+//
+//		std::unique_ptr<uint16_t[]> matrix_a = std::make_unique<uint16_t[]>(B * M * K);
+//		std::unique_ptr<uint16_t[]> matrix_b = std::make_unique<uint16_t[]>(B * K * N);
+//		std::unique_ptr<uint16_t[]> matrix_c = std::make_unique<uint16_t[]>(B * M * N);
+//		std::unique_ptr<uint16_t[]> matrix_d = std::make_unique<uint16_t[]>(B * M * N);
+//
+//		for (int i = 0; i < B * M * K; i++)
+//			matrix_a[i] = float_to_half(randFloat() - 0.5f);
+//		for (int i = 0; i < B * K * N; i++)
+//			matrix_b[i] = float_to_half(randFloat() - 0.5f);
+//
+//		const float alpha = 1.0f;
+//		const float beta = 0.0f;
+//
+////		for (int row = 0; row < shape_a.dim[0]; row++)
+////		{
+////			for (int col = 0; col < shape_a.dim[1]; col++)
+////				std::cout << matrix_a[row * shape_a.dim[1] + col] << ' ';
+////			std::cout << '\n';
+////		}
+//
+//		std::unique_ptr<uint16_t[]> correct_d = std::make_unique<uint16_t[]>(B * M * N);
+//		baseline_gemm_batched<float16, float>(shape_d, correct_d.get(), alpha, op_a, shape_a, matrix_a.get(), op_b, shape_b, matrix_b.get(), beta,
 //				shape_c, matrix_c.get());
-
-		std::unique_ptr<float[]> correct_d = std::make_unique<float[]>(M * N);
-
-		baseline_gemm<float, float>(shape_d, correct_d.get(), alpha, op_a, shape_a, matrix_a.get(), op_b, shape_b, matrix_b.get(), beta, shape_c,
-				matrix_c.get());
-
-//		std::cout << "Correct\n";
-//		for (int row = 0; row < M; row++)
+//
+//		mlContext_t context = cpu_create_context();
+//		cpu_gemm_batched(context, DTYPE_FLOAT16, shape_c, matrix_c.get(), shape_a, matrix_a.get(), shape_b, matrix_b.get(), op_a, op_b, alpha, beta);
+////		cpu_gemm(context, DTYPE_FLOAT32, shape_d, matrix_d.get(), shape_a, matrix_a.get(), shape_b, matrix_b.get(), op_a, op_b, alpha, beta);
+//
+////		const double repeats = 1.0e7;
+////		const double start = getTime();
+////		int i = 0;
+////		for (; i < repeats; i++)
+////		{
+////			cpu_gemm_v2(context, DTYPE_FLOAT16, shape_d, matrix_d.get(), alpha, op_a, shape_a, matrix_a.get(), op_b, shape_b, matrix_b.get(), beta,
+////					shape_d, matrix_d.get());
+//////			cpu_gemm(context, DTYPE_FLOAT32, shape_d, matrix_d.get(), shape_a, matrix_a.get(), shape_b, matrix_b.get(), op_a, op_b, alpha, beta);
+////			if ((getTime() - start) > 10.0)
+////				break;
+////		}
+////		const double stop = getTime();
+////		std::cout << 1.0e6 * (stop - start) / i << " us (" << i << " repeats)\n";
+////		const double flops = (double) i * (M * N * K) / (stop - start);
+////		std::cout << flops / 1.0e9 << " GFLOPS\n";
+//
+////		cpu_gemm_v2(context, DTYPE_FLOAT32, shape_d, matrix_d.get(), alpha, op_a, shape_a, matrix_a.get(), op_b, shape_b, matrix_b.get(), beta,
+////				shape_c, matrix_c.get());
+//
+////		std::cout << "Correct\n";
+////		for (int row = 0; row < M; row++)
+////		{
+////			for (int col = 0; col < N; col++)
+////				std::cout << half_to_float(correct_d[row * N + col]) << ' ';
+////			std::cout << '\n';
+////		}
+////		std::cout << "-------------------------------------------\n";
+////		std::cout << "Actual\n";
+////		for (int row = 0; row < M; row++)
+////		{
+////			for (int col = 0; col < N; col++)
+////				std::cout << half_to_float(matrix_c[row * N + col]) << ' ';
+////			std::cout << '\n';
+////		}
+//
+//		double diff = 0.0;
+//		float max_diff = 0.0;
+//		for (int i = 0; i < B * M * N; i++)
 //		{
-//			for (int col = 0; col < N; col++)
-//				std::cout << correct_d[row * N + col] << ' ';
-//			std::cout << '\n';
+////			diff += std::fabs(matrix_d[i] - correct_d[i]);
+//			diff += std::fabs(half_to_float(matrix_c[i]) - half_to_float(correct_d[i]));
+//			max_diff = std::max(max_diff, std::fabs(half_to_float(matrix_c[i]) - half_to_float(correct_d[i])));
+////			if (std::fabs(matrix_d[i] - correct_d[i]) > 1.0e-3)
+////			{
+////				std::cout << "correct = " << correct_d[i] << ", got = " << matrix_d[i] << " at " << (i / N) << ", " << (i % N) << '\n';
+////				break;
+////			}
 //		}
-//		std::cout << "-------------------------------------------\n";
-//		std::cout << "Actual\n";
-//		for (int row = 0; row < M; row++)
-//		{
-//			for (int col = 0; col < N; col++)
-//				std::cout << matrix_d[row * N + col] << ' ';
-//			std::cout << '\n';
-//		}
-
-		double diff = 0.0;
-		for (int i = 0; i < M * N; i++)
-		{
-			diff += std::fabs(matrix_d[i] - correct_d[i]);
-			if (std::fabs(matrix_d[i] - correct_d[i]) > 1.0e-3)
-			{
-				std::cout << "correct = " << correct_d[i] << ", got = " << matrix_d[i] << " at " << (i / N) << ", " << (i % N) << '\n';
-				break;
-			}
-		}
-		std::cout << "\ndiff = " << diff / (M * N) << '\n';
-
-		cpu_destroy_context(context);
-		return 0;
-	}
+//		std::cout << "\ndiff = " << diff / (B * M * N) << " (max = " << max_diff << ")\n";
+//
+//		cpu_destroy_context(context);
+//		std::cout << "END" << std::endl;
+//		return 0;
+//	}
 
 //	{
 //		Device::setNumberOfThreads(1);
@@ -2899,79 +3068,79 @@ int main()
 //	}
 //	std::cout << "END" << std::endl;
 
-	{
-		constexpr int m = 6;
-		constexpr int n = 16;
-		constexpr int max_k = 320;
-		float *A = reinterpret_cast<float*>(gemm::aligned_new(2880 * m * max_k * 4, 4096));
-		float *B = reinterpret_cast<float*>(gemm::aligned_new(2880 * n * max_k * 4, 4096));
-		float *C = reinterpret_cast<float*>(gemm::aligned_new(2880 * m * n * 4, 4096));
-		float *workspace = reinterpret_cast<float*>(gemm::aligned_new(4096, 4096));
-
-		for (int i = 0; i < 2880 * m * max_k; i++)
-			A[i] = randFloat();
-		for (int i = 0; i < 2880 * n * max_k; i++)
-			B[i] = randFloat();
-		for (int i = 0; i < 2880 * m * n; i++)
-			C[i] = randFloat();
-
-		const float alpha = 1.1f;
-		const float beta = 0.0f;
-
-		float C2[m * n];
-		for (int i = 0; i < m * n; i++)
-			C2[i] = C[i];
-		gemm::gemm_def_MxN_fp32(m, n, max_k, &alpha, A + 0 * m * max_k, B + 0 * n * max_k, &beta, C2, n);
-
-		const double repeats = 1.0e7;
-		const double start = getTime();
-		for (int i = 0; i < repeats; i++)
-		{
-			const int tmp = 0; // i % 384;
-//			gemm::gemm_avx2_fma_6x16_fp32(m, n, max_k, &alpha, A + tmp * m * max_k, B + tmp * n * max_k, &beta, C + tmp * m * n, n);
-			gemm::gemm_avx2_fma_6x16_fp16_fp32(m, n, max_k, &alpha, A + tmp * m * max_k, B + tmp * n * max_k, &beta, C + tmp * m * n, n, workspace);
-
-//			gemm::gemm_avx_8x8_fp32(m, n, max_k, &alpha, A + tmp * m * max_k, B + tmp * n * max_k, &beta, C + tmp * m * n, n);
-
-//			gemm::gemm_sse2_8x4_fp32(m, n, max_k, &alpha, A + tmp * m * max_k, B + tmp * n * max_k, &beta, C + tmp * m * n, n);
-
-//			gemm::gemm_def_MxN_fp32(m, n, max_k, &alpha, A + 0 * m * max_k, B + 0 * n * max_k, &beta, C, n);
-
-//			gemm::gemm_avx2_fma_5x16_fp32(m, n, max_k, &alpha, A + tmp * m * max_k, B + tmp * n * max_k, &beta, C + tmp * m * n, n);
-		}
-		const double stop = getTime();
-		std::cout << 1.0e6 * (stop - start) / repeats << " us" << '\n';
-		const double flops = repeats * (m * n * max_k) / (stop - start);
-		std::cout << flops / 1.0e9 << " GFLOPS\n";
-
-		double diff = 0.0;
-		for (int i = 0; i < m * n; i++)
-			diff += std::fabs(C[i] - C2[i]);
-		std::cout << "diff = " << diff / (m * n) << '\n';
-
-		for (int i = 0; i < m; i++)
-		{
-			for (int j = 0; j < n; j++)
-				std::cout << C2[i * n + j] << ' ';
-			std::cout << '\n';
-		}
-		std::cout << '\n';
-
-		for (int i = 0; i < m; i++)
-		{
-			for (int j = 0; j < n; j++)
-				std::cout << C[0 * m * n + i * n + j] << ' ';
-			std::cout << '\n';
-		}
-
-		std::cout << "END" << std::endl;
-
-		gemm::aligned_free(A, 4096);
-		gemm::aligned_free(B, 4096);
-		gemm::aligned_free(C, 4096);
-		gemm::aligned_free(workspace, 4096);
-		return 0;
-	}
+//	{
+//		constexpr int m = 6;
+//		constexpr int n = 16;
+//		constexpr int max_k = 320;
+//		float *A = reinterpret_cast<float*>(gemm::aligned_new(2880 * m * max_k * 4, 4096));
+//		float *B = reinterpret_cast<float*>(gemm::aligned_new(2880 * n * max_k * 4, 4096));
+//		float *C = reinterpret_cast<float*>(gemm::aligned_new(2880 * m * n * 4, 4096));
+//		float *workspace = reinterpret_cast<float*>(gemm::aligned_new(4096, 4096));
+//
+//		for (int i = 0; i < 2880 * m * max_k; i++)
+//			A[i] = randFloat();
+//		for (int i = 0; i < 2880 * n * max_k; i++)
+//			B[i] = randFloat();
+//		for (int i = 0; i < 2880 * m * n; i++)
+//			C[i] = randFloat();
+//
+//		const float alpha = 1.1f;
+//		const float beta = 0.0f;
+//
+//		float C2[m * n];
+//		for (int i = 0; i < m * n; i++)
+//			C2[i] = C[i];
+//		gemm::gemm_def_MxN_fp32(m, n, max_k, &alpha, A + 0 * m * max_k, B + 0 * n * max_k, &beta, C2, n);
+//
+//		const double repeats = 1.0e7;
+//		const double start = getTime();
+//		for (int i = 0; i < repeats; i++)
+//		{
+//			const int tmp = 0; // i % 384;
+////			gemm::gemm_avx2_fma_6x16_fp32(m, n, max_k, &alpha, A + tmp * m * max_k, B + tmp * n * max_k, &beta, C + tmp * m * n, n);
+//			gemm::gemm_avx2_fma_6x16_fp16_fp32(m, n, max_k, &alpha, A + tmp * m * max_k, B + tmp * n * max_k, &beta, C + tmp * m * n, n, workspace);
+//
+////			gemm::gemm_avx_8x8_fp32(m, n, max_k, &alpha, A + tmp * m * max_k, B + tmp * n * max_k, &beta, C + tmp * m * n, n);
+//
+////			gemm::gemm_sse2_8x4_fp32(m, n, max_k, &alpha, A + tmp * m * max_k, B + tmp * n * max_k, &beta, C + tmp * m * n, n);
+//
+////			gemm::gemm_def_MxN_fp32(m, n, max_k, &alpha, A + 0 * m * max_k, B + 0 * n * max_k, &beta, C, n);
+//
+////			gemm::gemm_avx2_fma_5x16_fp32(m, n, max_k, &alpha, A + tmp * m * max_k, B + tmp * n * max_k, &beta, C + tmp * m * n, n);
+//		}
+//		const double stop = getTime();
+//		std::cout << 1.0e6 * (stop - start) / repeats << " us" << '\n';
+//		const double flops = repeats * (m * n * max_k) / (stop - start);
+//		std::cout << flops / 1.0e9 << " GFLOPS\n";
+//
+//		double diff = 0.0;
+//		for (int i = 0; i < m * n; i++)
+//			diff += std::fabs(C[i] - C2[i]);
+//		std::cout << "diff = " << diff / (m * n) << '\n';
+//
+//		for (int i = 0; i < m; i++)
+//		{
+//			for (int j = 0; j < n; j++)
+//				std::cout << C2[i * n + j] << ' ';
+//			std::cout << '\n';
+//		}
+//		std::cout << '\n';
+//
+//		for (int i = 0; i < m; i++)
+//		{
+//			for (int j = 0; j < n; j++)
+//				std::cout << C[0 * m * n + i * n + j] << ' ';
+//			std::cout << '\n';
+//		}
+//
+//		std::cout << "END" << std::endl;
+//
+//		gemm::aligned_free(A, 4096);
+//		gemm::aligned_free(B, 4096);
+//		gemm::aligned_free(C, 4096);
+//		gemm::aligned_free(workspace, 4096);
+//		return 0;
+//	}
 
 //	ml::cpu::cpu_x86 prop;
 //	prop.print();
@@ -2982,11 +3151,17 @@ int main()
 		const int filters = 128;
 
 		Graph graph;
-		auto x = graph.addInput( { batch_size, 15, 15, filters });
+		auto x = graph.addInput( { batch_size, 20, 20, filters });
 		for (int i = 0; i < 10; i++)
-			x = graph.add(Conv2D(filters, 3, "linear"), x);
-		graph.addOutput(x);
+		{
+//			x = graph.add(ml::Conv2D(filters / 2, 1, "relu"), x);
+//			x = graph.add(ml::Conv2D(filters / 2, 3, "relu"), x);
+			x = graph.add(ml::Conv2D(filters, 3, "relu"), x);
 
+//			x = graph.add(Conv2D(filters, 3, "linear"), x);
+		}
+		graph.addOutput(x);
+		graph.makeNonTrainable();
 		graph.convertTo(DataType::FLOAT16);
 		graph.moveTo(Device::cpu());
 		graph.forward(batch_size);

@@ -11,7 +11,7 @@
 #include <minml/core/Context.hpp>
 #include <minml/core/ml_exceptions.hpp>
 #include <minml/layers/Input.hpp>
-#include <minml/training/CrossEntropyLoss.hpp>
+#include <minml/training/LossFunction.hpp>
 #include <minml/utils/json.hpp>
 #include <minml/utils/testing_util.hpp>
 
@@ -76,11 +76,16 @@ namespace ml
 			throw LogicError(METHOD_NAME, "nodes list must not be empty");
 		return add_node(layer, nodes);
 	}
-	void Graph::addOutput(GraphNodeID node, float weight)
+	void Graph::addOutput(GraphNodeID node, const LossFunction &loss)
 	{
 		m_output_nodes.push_back(get_node(node));
 		m_targets.push_back(nullptr);
-		m_loss_weights.push_back(weight);
+		m_losses.push_back(loss.clone());
+	}
+	void Graph::addOutput(GraphNodeID node, float weight)
+	{
+		CrossEntropyLoss loss(weight);
+		this->addOutput(node, loss);
 	}
 
 	const Tensor& Graph::getInput(int index) const
@@ -224,13 +229,12 @@ namespace ml
 
 		for (size_t i = 0; i < m_targets.size(); i++)
 		{
-			CrossEntropyLoss loss(m_loss_weights.at(i));
 			Shape tmp(getTarget(i).shape());
 			tmp[0] = batchSize;
 			Tensor gradient = getGradient(i).view(tmp);
 			Tensor output = getOutput(i).view(tmp);
 			Tensor target = getTarget(i).view(tmp);
-			loss.getGradient(context(), gradient, output, target);
+			m_losses.at(i)->getGradient(context(), gradient, output, target);
 		}
 
 		for (int i = static_cast<int>(m_nodes.size()) - 1; i >= 0; i--)
@@ -246,12 +250,11 @@ namespace ml
 		std::vector<float> result(numberOfOutputs());
 		for (size_t i = 0; i < m_targets.size(); i++)
 		{
-			CrossEntropyLoss loss(m_loss_weights.at(i));
 			Shape tmp(getTarget(i).shape());
 			tmp[0] = batchSize;
 			Tensor output = getOutput(i).view(tmp);
 			Tensor target = getTarget(i).view(tmp);
-			result[i] = loss.getLoss(context(), output, target);
+			result[i] = m_losses.at(i)->getLoss(context(), output, target);
 		}
 		return result;
 	}
@@ -302,6 +305,7 @@ namespace ml
 	void Graph::makeNonTrainable()
 	{
 		m_targets.clear();
+		m_losses.clear();
 		for (int i = 0; i < numberOfNodes(); i++)
 			getNode(i).makeNonTrainable();
 		m_is_trainable = false;
@@ -433,7 +437,7 @@ namespace ml
 		{
 			for (size_t i = 0; i < m_output_nodes.size(); i++)
 				if (m_output_nodes[i] == node)
-					result["loss_weight"] = m_loss_weights.at(i);
+					result["loss"] = m_losses.at(i)->serialize(binary_data);
 		}
 		result["input_nodes"] = Json(JsonType::Array);
 		for (int i = 0; i < node->numberOfInputs(); i++)
@@ -460,7 +464,16 @@ namespace ml
 		if (json["is_output_node"])
 		{
 			m_output_nodes.push_back(m_nodes.back().get());
-			m_loss_weights.push_back(json["loss_weight"].getDouble());
+			if (json.hasKey("loss_weight"))
+				m_losses.push_back(std::make_unique<CrossEntropyLoss>(json["loss_weight"].getDouble()));
+			else
+			{
+				if (json["loss"]["name"].getString() == "CrossEntropyLoss")
+					m_losses.push_back(std::make_unique<CrossEntropyLoss>());
+				if (json["loss"]["name"].getString() == "MeanSquaredLoss")
+					m_losses.push_back(std::make_unique<MeanSquaredLoss>());
+				m_losses.back()->unserialize(json["loss"], binary_data);
+			}
 		}
 	}
 	int Graph::index_of_node(const GraphNode *node) const noexcept
