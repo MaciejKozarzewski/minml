@@ -273,6 +273,7 @@ namespace SIMD_NAMESPACE
 			inline Line<7, T> operator()(const Line<3, T> &line) const noexcept
 			{
 				const Vector<T> c2_3(2.0 / 3.0);
+				const Vector<T> c2_9(2.0 / 9.0);
 				const Vector<T> c4_9(4.0 / 9.0);
 				const Vector<T> c4_15(4.0 / 15.0);
 				const Vector<T> c16_45(16.0 / 45.0);
@@ -282,7 +283,7 @@ namespace SIMD_NAMESPACE
 				Line<7, T> result;
 				result[0] = line[0];
 				result[1] = c2_3 * (line[0] + line[1] + line[2]);
-				result[2] = c4_9 * c050 * (line[0] - line[1] + line[2]);
+				result[2] = c2_9 * (line[0] - line[1] + line[2]);
 				result[3] = c4_9 * (c050 * line[0] + line[1] + c200 * line[2]);
 				result[4] = c4_15 * (c050 * line[0] - line[1] + c200 * line[2]);
 				result[5] = c16_45 * (c200 * line[0] + line[1] + c050 * line[2]);

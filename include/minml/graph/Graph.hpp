@@ -9,6 +9,7 @@
 #define MINML_GRAPH_HPP_
 
 #include <minml/layers/Layer.hpp>
+#include <minml/training/LossFunction.hpp>
 #include <minml/core/DataType.hpp>
 #include <minml/core/Context.hpp>
 #include <minml/core/Shape.hpp>
@@ -39,7 +40,7 @@ namespace ml
 
 			std::vector<std::unique_ptr<GraphNode>> m_nodes;
 			std::vector<std::unique_ptr<Tensor>> m_targets;
-			std::vector<float> m_loss_weights;
+			std::vector<std::unique_ptr<LossFunction>> m_losses;
 
 			std::vector<GraphNode*> m_input_nodes; // non-owning
 			std::vector<GraphNode*> m_output_nodes; // non-owning
@@ -64,6 +65,7 @@ namespace ml
 			GraphNodeID addInput(const Shape &shape);
 			GraphNodeID add(const Layer &layer, GraphNodeID node);
 			GraphNodeID add(const Layer &layer, std::initializer_list<GraphNodeID> nodes);
+			void addOutput(GraphNodeID node, const LossFunction &loss);
 			void addOutput(GraphNodeID node, float weight = 1.0f);
 
 			const Tensor& getInput(int index = 0) const;

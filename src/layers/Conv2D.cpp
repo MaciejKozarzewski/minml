@@ -25,8 +25,7 @@ namespace
 	Shape get_weight_matrices_shape(const Shape &weight_shape, int tile_size) noexcept
 	{
 		assert(weight_shape[1] == weight_shape[2]); // only square kernels
-		// assuming only 4x4 transform for 3x3 filter and 2x2 for 5x5 filter
-		return Shape( { square(2 + tile_size), weight_shape.firstDim(), weight_shape.lastDim() });
+		return Shape( { square(tile_size + weight_shape[1] - 1), weight_shape.firstDim(), weight_shape.lastDim() });
 	}
 	int get_tiles_count(int dim, int tile_size) noexcept
 	{
@@ -34,7 +33,8 @@ namespace
 	}
 	Shape get_matrices_shape(int kernel_size, int tile_size, const Shape &shape) noexcept
 	{
-		return Shape( { square(2 + tile_size), shape[0] * get_tiles_count(shape[1], tile_size) * get_tiles_count(shape[2], tile_size), shape[3] });
+		return Shape( { square(tile_size + kernel_size - 1), shape[0] * get_tiles_count(shape[1], tile_size) * get_tiles_count(shape[2], tile_size),
+				shape[3] });
 	}
 }
 

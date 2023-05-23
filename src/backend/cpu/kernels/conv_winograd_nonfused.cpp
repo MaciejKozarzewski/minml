@@ -214,7 +214,7 @@ namespace
 						{
 							int x = tile_x * TileSize + i;
 							int y = tile_y * TileSize + j;
-							if (x < height and y < width and add != nullptr)
+							if (x < height and y < width)
 								ptr_add[output_idx] = getPointer<DT>(add) + output_indexer.at(batch, x, y, 0);
 							else
 								ptr_add[output_idx] = zero_line;

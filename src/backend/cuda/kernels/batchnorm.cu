@@ -373,7 +373,7 @@ namespace ml
 
 		int2 shape1 { first_dim, last_dim };
 		dim3 gridDim2(gridDim1.x);
-		int2 shape2 { workspace_first_dim, last_dim };
+//		int2 shape2 { workspace_first_dim, last_dim };
 		cudaStream_t stream = cuda::Context::getStream(context);
 
 		kernel_batchnorm_forward_avg_var_1<<<gridDim1, blockDim, 0,stream >>>(workspace, getPointer<float>(input), first_dim, last_dim);
