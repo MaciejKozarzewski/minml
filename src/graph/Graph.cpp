@@ -437,7 +437,7 @@ namespace ml
 		{
 			for (size_t i = 0; i < m_output_nodes.size(); i++)
 				if (m_output_nodes[i] == node)
-					result["loss"] = m_losses.at(i)->serialize(binary_data);
+					result["loss"] = isTrainable() ? m_losses.at(i)->serialize(binary_data) : Json();
 		}
 		result["input_nodes"] = Json(JsonType::Array);
 		for (int i = 0; i < node->numberOfInputs(); i++)
@@ -468,11 +468,14 @@ namespace ml
 				m_losses.push_back(std::make_unique<CrossEntropyLoss>(json["loss_weight"].getDouble()));
 			else
 			{
-				if (json["loss"]["name"].getString() == "CrossEntropyLoss")
-					m_losses.push_back(std::make_unique<CrossEntropyLoss>());
-				if (json["loss"]["name"].getString() == "MeanSquaredLoss")
-					m_losses.push_back(std::make_unique<MeanSquaredLoss>());
-				m_losses.back()->unserialize(json["loss"], binary_data);
+				if (not json["loss"].isNull())
+				{
+					if (json["loss"]["name"].getString() == "CrossEntropyLoss")
+						m_losses.push_back(std::make_unique<CrossEntropyLoss>());
+					if (json["loss"]["name"].getString() == "MeanSquaredLoss")
+						m_losses.push_back(std::make_unique<MeanSquaredLoss>());
+					m_losses.back()->unserialize(json["loss"], binary_data);
+				}
 			}
 		}
 	}
