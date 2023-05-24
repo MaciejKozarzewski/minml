@@ -25,6 +25,21 @@ namespace ml
 		CUDA
 	};
 
+	enum class CpuSimd
+	{
+		NONE,
+		SSE,
+		SSE2,
+		SSE3,
+		SSSE3,
+		SSE41,
+		SSE42,
+		AVX,
+		AVX2,
+		AVX512F,
+		AVX512VL_BW_DQ
+	};
+
 	class Device
 	{
 		private:
@@ -51,6 +66,7 @@ namespace ml
 			 * \brief In MB.
 			 */
 			int memory() const;
+			static CpuSimd cpuSimdLevel();
 			static int numberOfCpuCores();
 			static int numberOfCudaDevices();
 			static void setNumberOfThreads(int t);

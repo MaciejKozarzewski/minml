@@ -92,6 +92,11 @@ namespace ml
 				return 0;
 		}
 	}
+	CpuSimd Device::cpuSimdLevel()
+	{
+		static const CpuSimd result = static_cast<CpuSimd>(cpu_get_simd_level());
+		return result;
+	}
 	int Device::numberOfCpuCores()
 	{
 		static const int result = cpu_get_number_of_cores();

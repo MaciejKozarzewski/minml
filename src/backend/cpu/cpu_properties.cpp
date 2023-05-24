@@ -120,6 +120,10 @@ namespace ml
 	{
 		return cpu_x86::get().memory() >> 20;
 	}
+	int cpu_get_simd_level()
+	{
+		return static_cast<int>(getSimdSupport());
+	}
 	bool cpu_supports_type(mlDataType_t dtype)
 	{
 		switch (dtype)

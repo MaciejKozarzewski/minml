@@ -24,6 +24,7 @@ namespace ml
 		 * \brief In MB.
 		 */
 		int cpu_get_memory();
+		int cpu_get_simd_level();
 		bool cpu_supports_type(mlDataType_t dtype);
 		const char* cpu_get_device_info();
 
