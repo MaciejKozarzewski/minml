@@ -71,7 +71,7 @@ namespace
 			{
 #if (defined(__x86_64__) || defined(_M_X64) || defined(__i386) || defined(_M_IX86))
 #  if _WIN32
-			__cpuidex(m_data, eax, ecx);
+				__cpuidex(reinterpret_cast<int*>(m_data), eax, ecx);
 #  elif (defined(__GNUC__) || defined(__clang__))
 				__cpuid_count(eax, ecx, m_data[0], m_data[1], m_data[2], m_data[3]);
 #  endif
@@ -99,7 +99,7 @@ namespace
 	{
 #if (defined(__x86_64__) || defined(_M_X64) || defined(__i386) || defined(_M_IX86))
 #  if _WIN32
-	return _xgetbv(index);
+		return _xgetbv(index);
 #  elif (defined(__GNUC__) || defined(__clang__))
 		uint32_t eax, edx;
 		__asm__ __volatile__("xgetbv" : "=a"(eax), "=d"(edx) : "c"(index));

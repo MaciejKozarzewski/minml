@@ -82,7 +82,16 @@
 #define COMPILED_WITH_SSE41 (SIMD_LEVEL >= 5)
 #define COMPILED_WITH_SSE2 (SIMD_LEVEL >= 2)
 
-#define COMPILED_WITH_FMA defined(__FMA__)
-#define COMPILED_WITH_F16C defined(__F16C__)
+#ifdef __FMA__
+#  define COMPILED_WITH_FMA 1
+#else
+#  define COMPILED_WITH_FMA 0
+#endif
+
+#ifdef __F16C__
+#  define COMPILED_WITH_F16C 1
+#else
+#  define COMPILED_WITH_F16C 0
+#endif
 
 #endif /* VECTORS_VECTOR_MACROS_HPP_ */

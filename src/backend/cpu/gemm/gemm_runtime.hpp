@@ -18,6 +18,7 @@
 #include "utilities.hpp"
 
 #include <algorithm>
+#include <functional>
 #include <iostream>
 
 namespace ml
