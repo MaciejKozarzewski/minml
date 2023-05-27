@@ -15,7 +15,7 @@
 #include "../utils.hpp"
 #include "../ComputeConfig.hpp"
 
-#include <omp.h>
+//#include <omp.h>
 
 namespace
 {
@@ -42,12 +42,12 @@ namespace
 
 		const DT *weights_ptr = getPointer<DT>(weights);
 		DT *matrices_ptr = getPointer<DT>(matrices);
-#pragma omp parallel
+//#pragma omp parallel
 		{
 			const DT *ptr_in[KernelSize * KernelSize];
 			DT *ptr_out[TransformSize * TransformSize];
 			Vector<CT> storage[TransformSize * KernelSize];
-#pragma omp for
+//#pragma omp for
 			for (int out = 0; out < output_filters; out++)
 			{
 				for (int i = 0; i < KernelSize; i++)
@@ -110,12 +110,12 @@ namespace
 		DT *zero_line = getPointer<DT>(workspace);
 		std::memset(zero_line, 0, sizeof(DT) * input_filters);
 
-#pragma omp parallel
+//#pragma omp parallel
 		{
 			const DT *ptr_in[TransformSize * TransformSize];
 			DT *ptr_out[TransformSize * TransformSize];
 			Vector<CT> storage[TransformSize * TransformSize];
-#pragma omp for
+//#pragma omp for
 			for (int tile_idx = 0; tile_idx < nb_of_tiles; tile_idx++)
 			{
 				int batch = tile_idx / tiles_per_image;
@@ -176,16 +176,17 @@ namespace
 		DT *zero_line = getPointer<DT>(workspace);
 		std::memset(zero_line, 0, sizeof(DT) * output_filters);
 
-#pragma omp parallel
+//#pragma omp parallel
 		{
-			DT *fake_storage = getPointer<DT>(workspace) + (1 + omp_get_thread_num()) * output_filters;
+//			DT *fake_storage = getPointer<DT>(workspace) + (1 + omp_get_thread_num()) * output_filters;
+			DT *fake_storage = getPointer<DT>(workspace) + (1 + 0) * output_filters;
 
 			Vector<CT> storage[TileSize * TransformSize];
 			const DT *ptr_in[TransformSize * TransformSize];
 			DT *ptr_out[TileSize * TileSize];
 			const DT *ptr_add[TileSize * TileSize];
 
-#pragma omp for
+//#pragma omp for
 			for (int tile_idx = 0; tile_idx < nb_of_tiles; tile_idx++)
 			{
 				for (int j = 0; j < TransformSize * TransformSize; j++)
@@ -295,12 +296,12 @@ namespace
 		T *zero_line = workspace;
 		std::memset(zero_line, 0, sizeof(T) * output_filters);
 
-#pragma omp parallel
+//#pragma omp parallel
 		{
 			const T *ptr_in[TransformSize * TransformSize];
 			T *ptr_out[TransformSize * TransformSize];
 			Vector<T> storage[TransformSize * TileSize];
-#pragma omp for
+//#pragma omp for
 			for (int tile_idx = 0; tile_idx < nb_of_tiles; tile_idx++)
 			{
 				int batch = tile_idx / tiles_per_image;
@@ -351,12 +352,12 @@ namespace
 		const Indexer<3> matrices_indexer(TransformSize * TransformSize, output_filters, input_filters);
 		const Indexer<4> update_indexer(output_filters, KernelSize, KernelSize, input_filters);
 
-#pragma omp parallel
+//#pragma omp parallel
 		{
 			const T *ptr_in[TransformSize * TransformSize];
 			T *ptr_out[KernelSize * KernelSize];
 			Vector<T> storage[TransformSize * KernelSize];
-#pragma omp for
+//#pragma omp for
 			for (int out = 0; out < output_filters; out++)
 			{
 				int matrix_index = 0;

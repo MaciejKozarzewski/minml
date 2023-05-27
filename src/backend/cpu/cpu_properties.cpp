@@ -16,7 +16,7 @@
 #include <algorithm>
 #include <iostream>
 #include <cassert>
-#include <omp.h>
+//#include <omp.h>
 
 #ifdef USE_OPENBLAS
 #  ifdef __linux__
@@ -107,10 +107,10 @@ namespace ml
 
 	void cpu_set_number_of_threads(int number)
 	{
-		omp_set_num_threads(number);
-#ifdef USE_OPENBLAS
-		openblas_set_num_threads(number);
-#endif
+//		omp_set_num_threads(number);
+//#ifdef USE_OPENBLAS
+//		openblas_set_num_threads(number);
+//#endif
 	}
 	int cpu_get_number_of_cores()
 	{
