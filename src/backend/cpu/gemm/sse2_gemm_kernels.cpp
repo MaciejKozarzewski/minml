@@ -337,8 +337,8 @@ namespace ml
 				[alpha_ptr] "m"(alpha_ptr),
 				[beta_ptr] "m"(beta_ptr)
 				:// clobbers
-				"cc", "memory", "%ymm0", "%ymm1", "%ymm2", "%ymm3", "%ymm4", "%ymm5", "%ymm6", "%ymm7",
-				"%ymm8", "%ymm9", "%ymm10", "%ymm11", "%ymm12", "%ymm13", "%ymm14", "%ymm15", "%rax", "%rbx", "%rcx", "%r14");
+				"cc", "memory", "%xmm0", "%xmm1", "%xmm2", "%xmm3", "%xmm4", "%xmm5", "%xmm6", "%xmm7",
+				"%xmm8", "%xmm9", "%xmm10", "%xmm11", "%xmm12", "%xmm13", "%xmm14", "%xmm15", "%rax", "%rbx", "%rcx", "%r14");
 	}
 	void gemm_sse2_4x4_fp32(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr,
 			const Fragment &C) noexcept
@@ -553,8 +553,8 @@ namespace ml
 				[alpha_ptr] "m"(alpha_ptr),
 				[beta_ptr] "m"(beta_ptr)
 				:// clobbers
-				"cc", "memory", "%ymm0", "%ymm1", "%ymm2", "%ymm3", "%ymm4", "%ymm5", "%ymm6", "%ymm7",
-				"%ymm8", "%ymm9", "%ymm10", "%ymm11", "%ymm12", "%ymm13", "%ymm14", "%ymm15", "%rax", "%rbx", "%rcx", "%r14");
+				"cc", "memory", "%xmm0", "%xmm1", "%xmm2", "%xmm3", "%xmm4", "%xmm5", "%xmm6", "%xmm7",
+				"%xmm8", "%xmm9", "%xmm10", "%xmm11", "%xmm12", "%xmm13", "%xmm14", "%xmm15", "%rax", "%rbx", "%rcx", "%r14");
 	}
 
 	void pack_sse2_4xK_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept
@@ -627,7 +627,6 @@ namespace ml
 					"jne UNROLLED1%= \n\t"
 
 					"EPILOGUE%=: \n\t"
-					"vzeroupper \n\t"
 
 					:// outputs
 					:// inputs
@@ -637,9 +636,8 @@ namespace ml
 					[k_left] "m"(k_left),
 					[src_stride] "m"(src_stride)
 					:// clobbers
-					"cc", "memory", "%ymm0", "%ymm1", "%ymm2", "%ymm3", "%ymm4", "%ymm5", "%ymm6", "%ymm7",
-					"%ymm8", "%ymm9", "%ymm10", "%ymm11", "%ymm12", "%ymm13", "%ymm14", "%ymm15", "%rax", "%rbx",
-					"%r12", "%r14");
+					"cc", "memory", "%xmm0", "%xmm1", "%xmm2", "%xmm3", "%xmm4", "%xmm5", "%xmm6", "%xmm7",
+					"%rax", "%rbx", "%r12", "%r14");
 		}
 		else
 		{
@@ -724,18 +722,18 @@ namespace ml
 					"UNROLLED1%=: \n\t"
 					"movq %%rax, %%r13 \n\t"// tmp src pointer is in r13
 
-					"vmovss 0x0(%%r13), %%xmm0 \n\t"
+					"movss 0x0(%%r13), %%xmm0 \n\t"
 					"add %%r12, %%r13 \n\t"// add stride to src pointer
-					"vmovss 0x0(%%r13), %%xmm1 \n\t"
+					"movss 0x0(%%r13), %%xmm1 \n\t"
 					"add %%r12, %%r13 \n\t"// add stride to src pointer
-					"vmovss 0x0(%%r13), %%xmm2 \n\t"
+					"movss 0x0(%%r13), %%xmm2 \n\t"
 					"add %%r12, %%r13 \n\t"// add stride to src pointer
-					"vmovss 0x0(%%r13), %%xmm3 \n\t"
+					"movss 0x0(%%r13), %%xmm3 \n\t"
 
-					"vmovss %%xmm0, (4*0)(%%rbx) \n\t"
-					"vmovss %%xmm1, (4*1)(%%rbx) \n\t"
-					"vmovss %%xmm2, (4*2)(%%rbx) \n\t"
-					"vmovss %%xmm3, (4*3)(%%rbx) \n\t"
+					"movss %%xmm0, (4*0)(%%rbx) \n\t"
+					"movss %%xmm1, (4*1)(%%rbx) \n\t"
+					"movss %%xmm2, (4*2)(%%rbx) \n\t"
+					"movss %%xmm3, (4*3)(%%rbx) \n\t"
 
 					"add $(4*1), %%rax \n\t"// add stride to src pointer
 					"add $(4*4*1), %%rbx \n\t"// add stride to dst pointer
@@ -744,7 +742,6 @@ namespace ml
 					"jne UNROLLED1%= \n\t"
 
 					"EPILOGUE%=: \n\t"
-					"vzeroupper \n\t"
 
 					:// outputs
 					:// inputs
@@ -754,8 +751,8 @@ namespace ml
 					[k_left] "m"(k_left),
 					[src_stride] "m"(src_stride)
 					:// clobbers
-					"cc", "memory", "%ymm0", "%ymm1", "%ymm2", "%ymm3", "%ymm4", "%ymm5", "%ymm6", "%ymm7",
-					"%ymm8", "%ymm9", "%ymm10", "%ymm11", "%ymm12", "%ymm13", "%ymm14", "%ymm15", "%rax", "%rbx", "%rcx",
+					"cc", "memory", "%xmm0", "%xmm1", "%xmm2", "%xmm3", "%xmm4", "%xmm5", "%xmm6", "%xmm7",
+					"%xmm8", "%xmm9", "%xmm10", "%xmm11", "%xmm12", "%xmm13", "%xmm14", "%xmm15", "%rax", "%rbx", "%rcx",
 					"%r12", "%r13", "%r14");
 		}
 	}
@@ -847,7 +844,6 @@ namespace ml
 					"jne UNROLLED1%= \n\t"
 
 					"EPILOGUE%=: \n\t"
-					"vzeroupper \n\t"
 
 					:// outputs
 					:// inputs
@@ -857,8 +853,8 @@ namespace ml
 					[k_left] "m"(k_left),
 					[src_stride] "m"(src_stride)
 					:// clobbers
-					"cc", "memory", "%ymm0", "%ymm1", "%ymm2", "%ymm3", "%ymm4", "%ymm5", "%ymm6", "%ymm7",
-					"%ymm8", "%ymm9", "%ymm10", "%ymm11", "%ymm12", "%ymm13", "%ymm14", "%ymm15", "%rax", "%rbx",
+					"cc", "memory", "%xmm0", "%xmm1", "%xmm2", "%xmm3", "%xmm4", "%xmm5", "%xmm6", "%xmm7",
+					"%xmm8", "%xmm9", "%xmm10", "%xmm11", "%xmm12", "%xmm13", "%xmm14", "%xmm15", "%rax", "%rbx",
 					"%r12", "%r14");
 		}
 		else
@@ -948,30 +944,30 @@ namespace ml
 					"UNROLLED1%=: \n\t"
 					"movq %%rax, %%r13 \n\t"// tmp src pointer is in r13
 
-					"vmovss 0x0(%%r13), %%xmm0 \n\t"
+					"movss 0x0(%%r13), %%xmm0 \n\t"
 					"add %%r12, %%r13 \n\t"// add stride to src pointer
-					"vmovss 0x0(%%r13), %%xmm1 \n\t"
+					"movss 0x0(%%r13), %%xmm1 \n\t"
 					"add %%r12, %%r13 \n\t"// add stride to src pointer
-					"vmovss 0x0(%%r13), %%xmm2 \n\t"
+					"movss 0x0(%%r13), %%xmm2 \n\t"
 					"add %%r12, %%r13 \n\t"// add stride to src pointer
-					"vmovss 0x0(%%r13), %%xmm3 \n\t"
+					"movss 0x0(%%r13), %%xmm3 \n\t"
 					"add %%r12, %%r13 \n\t"// add stride to src pointer
-					"vmovss 0x0(%%r13), %%xmm4 \n\t"
+					"movss 0x0(%%r13), %%xmm4 \n\t"
 					"add %%r12, %%r13 \n\t"// add stride to src pointer
-					"vmovss 0x0(%%r13), %%xmm5 \n\t"
+					"movss 0x0(%%r13), %%xmm5 \n\t"
 					"add %%r12, %%r13 \n\t"// add stride to src pointer
-					"vmovss 0x0(%%r13), %%xmm6 \n\t"
+					"movss 0x0(%%r13), %%xmm6 \n\t"
 					"add %%r12, %%r13 \n\t"// add stride to src pointer
-					"vmovss 0x0(%%r13), %%xmm7 \n\t"
+					"movss 0x0(%%r13), %%xmm7 \n\t"
 
-					"vmovss %%xmm0, (4*0)(%%rbx) \n\t"
-					"vmovss %%xmm1, (4*1)(%%rbx) \n\t"
-					"vmovss %%xmm2, (4*2)(%%rbx) \n\t"
-					"vmovss %%xmm3, (4*3)(%%rbx) \n\t"
-					"vmovss %%xmm4, (4*4)(%%rbx) \n\t"
-					"vmovss %%xmm5, (4*5)(%%rbx) \n\t"
-					"vmovss %%xmm6, (4*6)(%%rbx) \n\t"
-					"vmovss %%xmm7, (4*7)(%%rbx) \n\t"
+					"movss %%xmm0, (4*0)(%%rbx) \n\t"
+					"movss %%xmm1, (4*1)(%%rbx) \n\t"
+					"movss %%xmm2, (4*2)(%%rbx) \n\t"
+					"movss %%xmm3, (4*3)(%%rbx) \n\t"
+					"movss %%xmm4, (4*4)(%%rbx) \n\t"
+					"movss %%xmm5, (4*5)(%%rbx) \n\t"
+					"movss %%xmm6, (4*6)(%%rbx) \n\t"
+					"movss %%xmm7, (4*7)(%%rbx) \n\t"
 
 					"add $(4*1), %%rax \n\t"// add stride to src pointer
 					"add $(4*8*1), %%rbx \n\t"// add stride to dst pointer
@@ -980,7 +976,6 @@ namespace ml
 					"jne UNROLLED1%= \n\t"
 
 					"EPILOGUE%=: \n\t"
-					"vzeroupper \n\t"
 
 					:// outputs
 					:// inputs
@@ -990,8 +985,8 @@ namespace ml
 					[k_left] "m"(k_left),
 					[src_stride] "m"(src_stride)
 					:// clobbers
-					"cc", "memory", "%ymm0", "%ymm1", "%ymm2", "%ymm3", "%ymm4", "%ymm5", "%ymm6", "%ymm7",
-					"%ymm8", "%ymm9", "%ymm10", "%ymm11", "%ymm12", "%ymm13", "%ymm14", "%ymm15", "%rax", "%rbx", "%rcx",
+					"cc", "memory", "%xmm0", "%xmm1", "%xmm2", "%xmm3", "%xmm4", "%xmm5", "%xmm6", "%xmm7",
+					"%xmm8", "%xmm9", "%xmm10", "%xmm11", "%xmm12", "%xmm13", "%xmm14", "%xmm15", "%rax", "%rbx", "%rcx",
 					"%r12", "%r13", "%r14");
 		}
 	}

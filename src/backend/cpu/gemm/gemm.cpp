@@ -107,7 +107,7 @@ namespace
 		result[1].inner_tile = { 24, 4, 256 };
 		result[1].gemm_kernel = gemm_avx2_fma_24x4_fp32;
 		result[1].a_packing = pack_avx2_fma_24xK_fp32;
-		result[1].b_packing = pack_sse2_4xK_fp32;
+		result[1].b_packing = pack_avx2_fma_4xK_fp32;
 		result[1].c_packing = pack_def_MxK_fp32;
 		result[1].d_packing = pack_def_MxK_fp32;
 		result[1].d_unpacking = unpack_def_MxK_fp32;
