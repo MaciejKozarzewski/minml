@@ -13,4 +13,4 @@ set_source_files_properties(sse2_gemm_kernels.cpp PROPERTIES COMPILE_OPTIONS "-m
 set_source_files_properties(avx_gemm_kernels.cpp PROPERTIES COMPILE_OPTIONS "-mavx")
 set_source_files_properties(avx2_gemm_kernels.cpp PROPERTIES COMPILE_OPTIONS "-mavx2;-mfma;-mf16c")
 
-target_link_libraries(MinML PRIVATE gemm_backend)
+target_link_libraries(${LibName} PRIVATE gemm_backend)

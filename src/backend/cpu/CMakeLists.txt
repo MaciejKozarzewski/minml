@@ -1,4 +1,4 @@
-target_sources(MinML PRIVATE 	batchnorm.cpp
+target_sources(${LibName} PRIVATE 	batchnorm.cpp
 				ComputeConfig.cpp
 				cpu_context.cpp
 				cpu_memory.cpp

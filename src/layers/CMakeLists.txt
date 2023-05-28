@@ -1,4 +1,4 @@
-target_sources(MinML PRIVATE 	Add.cpp
+target_sources(${LibName} PRIVATE 	Add.cpp
 								BatchNormalization.cpp
 								Conv2D.cpp
 								Dense.cpp

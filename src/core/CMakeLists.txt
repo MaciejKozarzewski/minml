@@ -1,4 +1,4 @@
-target_sources(MinML PRIVATE 	Context.cpp
+target_sources(${LibName} PRIVATE 	Context.cpp
 								DataType.cpp
 								Device.cpp
 								math.cpp

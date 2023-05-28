@@ -1,4 +1,4 @@
-target_sources(MinML PRIVATE 	file_util.cpp
+target_sources(${LibName} PRIVATE 	file_util.cpp
 								json.cpp
 								random.cpp
 								serialization.cpp
