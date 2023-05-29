@@ -55,6 +55,8 @@ namespace ml
 		void cpu_winograd_update_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape, const void *matrices,
 				void *update);
 
+		void cpu_im2row(mlContext_t context, mlDataType_t dtype, mlShape_t weights_shape, mlShape_t input_shape, const void *input, void *matrix);
+
 		void cpu_convolution_implicit_gemm_forward(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, mlShape_t weights_shape,
 				const void *input, const void *weights, void *output, const void *bias, const void *add, mlActivationType_t act);
 

@@ -15,8 +15,10 @@ namespace ml
 	class Context;
 	class Shape;
 	class Tensor;
-	enum class DataType;
-	enum class ActivationType;
+	enum class DataType
+	;
+	enum class ActivationType
+	;
 }
 
 namespace ml
@@ -31,6 +33,8 @@ namespace ml
 			const Tensor &add, ActivationType act);
 	void winogradGradientTransform(const Context &context, const Shape &weight_shape, const Tensor &gradient, Tensor &matrices);
 	void winogradUpdateTransform(const Context &context, const Tensor &matrices, Tensor &update);
+
+	void im2row(const Context &context, const Shape &weight_shape, const Tensor &input, Tensor &matrix);
 
 	void convolutionImplicitGemmForward(const Context &context, const Tensor &input, const Tensor &weights, Tensor &output, const Tensor &bias,
 			const Tensor &add, ActivationType act);

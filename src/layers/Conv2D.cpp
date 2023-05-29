@@ -121,10 +121,22 @@ namespace ml
 		else
 		{
 			choose_algorithm();
-			const Shape tmp1 = get_matrices_shape(m_kernel_size, m_winograd_tile_size, getInputShape());
-			const Shape tmp2 = get_matrices_shape(m_kernel_size, m_winograd_tile_size, getOutputShape());
-
-			return tmp1.volume() + tmp2.volume() + 1024;
+			switch (m_algorithm)
+			{
+				case ConvolutionAlgorithm::EXPLICIT_GEMM:
+				{
+					const Shape tmp( { getInputShape().volumeWithoutLastDim(), getWeightShape().volumeWithoutFirstDim() });
+					return tmp.volume();
+				}
+				case ConvolutionAlgorithm::WINOGRAD_NON_FUSED:
+				{
+					const Shape tmp1 = get_matrices_shape(m_kernel_size, m_winograd_tile_size, getInputShape());
+					const Shape tmp2 = get_matrices_shape(m_kernel_size, m_winograd_tile_size, getOutputShape());
+					return tmp1.volume() + tmp2.volume() + 1024;
+				}
+				default:
+					return 0;
+			}
 		}
 	}
 	void Conv2D::changeContext(std::shared_ptr<Context> &context)
@@ -169,10 +181,17 @@ namespace ml
 			}
 			case ConvolutionAlgorithm::EXPLICIT_GEMM:
 			{
-				assert(m_kernel_size == 1);
-				Tensor input_matrix = input[0].view( { input[0].shape().volumeWithoutLastDim(), input[0].lastDim() });
+				Tensor input_matrix;
 				Tensor output_matrix = output.view( { output.shape().volumeWithoutLastDim(), output.lastDim() });
 				Tensor weight_matrix = getWeights().getParam().view( { getWeightShape().firstDim(), getWeightShape().volumeWithoutFirstDim() });
+				if (m_kernel_size == 1)
+					input_matrix = input[0].view( { input[0].shape().volumeWithoutLastDim(), input[0].lastDim() });
+				else
+				{
+					assert(device().isCPU());
+					input_matrix = m_workspace.lock()->view( { input[0].shape().volumeWithoutLastDim(), getWeightShape().volumeWithoutFirstDim() });
+					im2row(context(), getWeightShape(), input[0], input_matrix);
+				}
 
 				if (input.size() == 2)
 				{
@@ -291,7 +310,7 @@ namespace ml
 			m_algorithm = ConvolutionAlgorithm::IMPLICIT_GEMM;
 		else
 		{
-			if (m_kernel_size == 1)
+			if (m_kernel_size == 1 or (m_kernel_size == 5 and device().isCPU() and not isTrainable())) // TODO for 5x5 kernel it may be good to use winograd if there are enough filters
 				m_algorithm = ConvolutionAlgorithm::EXPLICIT_GEMM;
 			else
 			{

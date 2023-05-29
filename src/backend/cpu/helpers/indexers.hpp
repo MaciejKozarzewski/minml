@@ -14,18 +14,18 @@ template<int Rank>
 class Indexer
 {
 	public:
-		 Indexer()
+		Indexer()
 		{
 		}
-		 int last_dim() const
-		{
-			return 0;
-		}
-		 int at() const
+		int last_dim() const
 		{
 			return 0;
 		}
-		 constexpr int rank() const
+		int at() const
+		{
+			return 0;
+		}
+		constexpr int rank() const
 		{
 			return Rank;
 		}
@@ -37,23 +37,23 @@ class Indexer<1>
 	public:
 		int length;
 	public:
-		 Indexer() // @suppress("Class members should be properly initialized")
+		Indexer() // @suppress("Class members should be properly initialized")
 		{
 		}
-		 Indexer(int dim0) :
+		Indexer(int dim0) :
 				length(dim0)
 		{
 		}
-		 int last_dim() const
+		int last_dim() const
 		{
 			return length;
 		}
-		 int at(int x0) const
+		int at(int x0) const
 		{
 			assert(0 <= x0 && x0 < length);
 			return x0;
 		}
-		 constexpr int rank() const
+		constexpr int rank() const
 		{
 			return 1;
 		}
@@ -68,10 +68,10 @@ class Indexer<2>
 		int d0, d1;
 #endif
 	public:
-		 Indexer() // @suppress("Class members should be properly initialized")
+		Indexer() // @suppress("Class members should be properly initialized")
 		{
 		}
-		 Indexer(int dim0, int dim1) :
+		Indexer(int dim0, int dim1) :
 				stride0(dim1)
 		{
 #ifndef NDEBUG
@@ -79,17 +79,17 @@ class Indexer<2>
 			d1 = dim1;
 #endif
 		}
-		 int last_dim() const
+		int last_dim() const
 		{
 			return stride0;
 		}
-		 int at(int x0, int x1) const
+		int at(int x0, int x1) const
 		{
 			assert(0 <= x0 && x0 < d0);
 			assert(0 <= x1 && x1 < d1);
 			return x0 * stride0 + x1;
 		}
-		 constexpr int rank() const
+		constexpr int rank() const
 		{
 			return 2;
 		}
@@ -104,10 +104,10 @@ class Indexer<3>
 		int d0, d1, d2;
 #endif
 	public:
-		 Indexer() // @suppress("Class members should be properly initialized")
+		Indexer() // @suppress("Class members should be properly initialized")
 		{
 		}
-		 Indexer(int dim0, int dim1, int dim2) :
+		Indexer(int dim0, int dim1, int dim2) :
 				stride0(dim1 * dim2),
 				stride1(dim2)
 		{
@@ -117,18 +117,18 @@ class Indexer<3>
 			d2 = dim2;
 #endif
 		}
-		 int last_dim() const
+		int last_dim() const
 		{
 			return stride1;
 		}
-		 int at(int x0, int x1, int x2) const
+		int at(int x0, int x1, int x2) const
 		{
 			assert(0 <= x0 && x0 < d0);
 			assert(0 <= x1 && x1 < d1);
 			assert(0 <= x2 && x2 < d2);
 			return x0 * stride0 + x1 * stride1 + x2;
 		}
-		 constexpr int rank() const
+		constexpr int rank() const
 		{
 			return 3;
 		}
@@ -143,10 +143,10 @@ class Indexer<4>
 		int d0, d1, d2, d3;
 #endif
 	public:
-		 Indexer() // @suppress("Class members should be properly initialized")
+		Indexer() // @suppress("Class members should be properly initialized")
 		{
 		}
-		 Indexer(int dim0, int dim1, int dim2, int dim3) :
+		Indexer(int dim0, int dim1, int dim2, int dim3) :
 				stride0(dim1 * dim2 * dim3),
 				stride1(dim2 * dim3),
 				stride2(dim3)
@@ -158,11 +158,11 @@ class Indexer<4>
 			d3 = dim3;
 #endif
 		}
-		 int last_dim() const
+		int last_dim() const
 		{
 			return stride2;
 		}
-		 int at(int x0, int x1, int x2, int x3) const
+		int at(int x0, int x1, int x2, int x3) const
 		{
 			assert(0 <= x0 && x0 < d0);
 			assert(0 <= x1 && x1 < d1);
@@ -170,7 +170,7 @@ class Indexer<4>
 			assert(0 <= x3 && x3 < d3);
 			return x0 * stride0 + x1 * stride1 + x2 * stride2 + x3;
 		}
-		 constexpr int rank() const
+		constexpr int rank() const
 		{
 			return 4;
 		}

@@ -268,6 +268,19 @@ namespace ml
 		}
 	}
 
+	void im2row(const Context &context, const Shape &weight_shape, const Tensor &input, Tensor &matrix)
+	{
+		switch (context.device().type())
+		{
+			case DeviceType::CPU:
+				cpu_im2row(get(context), get(input.dtype()), get(weight_shape), get_shape(input), input.data(), matrix.data());
+				break;
+			case DeviceType::CUDA:
+				// TODO
+				break;
+		}
+	}
+
 	void convolutionImplicitGemmForward(const Context &context, const Tensor &input, const Tensor &weights, Tensor &output, const Tensor &bias,
 			const Tensor &add, ActivationType act)
 	{

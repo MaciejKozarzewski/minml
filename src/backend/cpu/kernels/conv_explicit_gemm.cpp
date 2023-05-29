@@ -5,15 +5,17 @@
  *      Author: Maciej Kozarzewski
  */
 
-
-#include "../kernel_definitions.hpp"
+#include <minml/backend/cpu_backend.h>
 #include <minml/backend/backend_utils.hpp>
 
-#include "../vectors/vectors.hpp"
+#include "../helpers/indexers.hpp"
 
-namespace SIMD_NAMESPACE
+#include <cstring>
+#include <cinttypes>
+
+
+namespace ml
 {
-	using namespace ml;
 
 }
 
