@@ -13,6 +13,7 @@
 
 #include <memory>
 #include <vector>
+#include <chrono>
 
 class Json;
 namespace ml
@@ -26,6 +27,35 @@ namespace ml
 
 namespace ml
 {
+	class TimedStat
+	{
+		private:
+			using time_point = std::chrono::time_point<std::chrono::steady_clock, std::chrono::nanoseconds>;
+
+			std::string m_name;
+			time_point m_timer_start;
+			time_point m_timer_stop;
+			int64_t m_total_time = 0;
+			int64_t m_total_count = 0;
+		public:
+			TimedStat() noexcept = default;
+			TimedStat(const std::string &name) :
+					m_name(name)
+			{
+			}
+			void start() noexcept
+			{
+				m_timer_start = std::chrono::steady_clock::now();
+				m_timer_stop = m_timer_start;
+			}
+			void stop() noexcept
+			{
+				m_timer_stop = std::chrono::steady_clock::now();
+				m_total_time += std::chrono::duration<int64_t, std::nano>(m_timer_stop - m_timer_start).count();
+				m_total_count++;
+			}
+			std::string toString() const;
+	};
 
 	class GraphNode
 	{
@@ -40,8 +70,10 @@ namespace ml
 			Shape m_output_shape;
 
 			bool m_done_backward = false;
+			TimedStat m_timer;
 		public:
 			GraphNode(std::unique_ptr<Layer> &layer, const std::vector<GraphNode*> input_nodes);
+			~GraphNode();
 
 			bool isInputNode() const;
 			bool isOutputNode() const;

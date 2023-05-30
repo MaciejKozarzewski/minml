@@ -130,36 +130,36 @@ namespace ml
 			EXPECT_LE(testing::diffForTest(correct_output, output), 1.0e-3);
 		}
 	}
-	TEST(TestTensorOp, addBiasAct_bf16)
-	{
-		Context context;
-		Tensor correct_output( { 123, 34 }, DataType::FLOAT32, Device::cpu());
-		Tensor output( { 123, 34 }, DataType::BFLOAT16, Device::cpu());
-		Tensor bias( { 34 }, DataType::FLOAT32, Device::cpu());
-		testing::initForTest(bias, 0.0f);
-		testing::initForTest(output, 1.57f);
-		testing::initForTest(correct_output, 1.57f);
-
-		baseline_add_bias_act(correct_output, bias, ActivationType::SIGMOID);
-
-		bias.convertTo(context, DataType::BFLOAT16);
-		addBiasAct(context, output, bias, ActivationType::SIGMOID);
-		output.convertTo(context, DataType::FLOAT32);
-		EXPECT_LE(testing::diffForTest(correct_output, output), 1.0e-2);
-
-		if (Device::numberOfCudaDevices() > 0)
-		{
-			Context context(Device::cuda(0));
-			testing::initForTest(output, 1.57f);
-			bias.moveTo(context.device());
-			output.moveTo(context.device());
-			output.convertTo(context, DataType::BFLOAT16);
-			addBiasAct(context, output, bias, ActivationType::SIGMOID);
-			output.convertTo(context, DataType::FLOAT32);
-			context.synchronize();
-			EXPECT_LE(testing::diffForTest(correct_output, output), 1.0e-2);
-		}
-	}
+//	TEST(TestTensorOp, addBiasAct_bf16)
+//	{
+//		Context context;
+//		Tensor correct_output( { 123, 34 }, DataType::FLOAT32, Device::cpu());
+//		Tensor output( { 123, 34 }, DataType::BFLOAT16, Device::cpu());
+//		Tensor bias( { 34 }, DataType::FLOAT32, Device::cpu());
+//		testing::initForTest(bias, 0.0f);
+//		testing::initForTest(output, 1.57f);
+//		testing::initForTest(correct_output, 1.57f);
+//
+//		baseline_add_bias_act(correct_output, bias, ActivationType::SIGMOID);
+//
+//		bias.convertTo(context, DataType::BFLOAT16);
+//		addBiasAct(context, output, bias, ActivationType::SIGMOID);
+//		output.convertTo(context, DataType::FLOAT32);
+//		EXPECT_LE(testing::diffForTest(correct_output, output), 1.0e-2);
+//
+//		if (Device::numberOfCudaDevices() > 0)
+//		{
+//			Context context(Device::cuda(0));
+//			testing::initForTest(output, 1.57f);
+//			bias.moveTo(context.device());
+//			output.moveTo(context.device());
+//			output.convertTo(context, DataType::BFLOAT16);
+//			addBiasAct(context, output, bias, ActivationType::SIGMOID);
+//			output.convertTo(context, DataType::FLOAT32);
+//			context.synchronize();
+//			EXPECT_LE(testing::diffForTest(correct_output, output), 1.0e-2);
+//		}
+//	}
 
 	TEST(TestTensorOp, sumOverFirstDim)
 	{

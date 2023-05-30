@@ -85,15 +85,16 @@ namespace ml
 				default:
 					throw std::runtime_error("Unsupported compute configuration");
 				case DTYPE_BFLOAT16:
-					if (has_hardware_bf16_math())
-						return ComputeConfig(Type::BF16, Type::BF16);
-					else
-					{
-						if (has_hardware_bf16_conversion())
-							return ComputeConfig(Type::BF16, Type::FP32);
-						else
-							return ComputeConfig(Type::SW_BF16, Type::FP32);
-					}
+					throw std::runtime_error("Unsupported compute configuration");
+//					if (has_hardware_bf16_math())
+//						return ComputeConfig(Type::BF16, Type::BF16);
+//					else
+//					{
+//						if (has_hardware_bf16_conversion())
+//							return ComputeConfig(Type::BF16, Type::FP32);
+//						else
+//							return ComputeConfig(Type::SW_BF16, Type::FP32);
+//					}
 				case DTYPE_FLOAT16:
 					if (has_hardware_fp16_math())
 						return ComputeConfig(Type::FP16, Type::FP16);
@@ -102,7 +103,8 @@ namespace ml
 						if (has_hardware_fp16_conversion())
 							return ComputeConfig(Type::FP16, Type::FP32);
 						else
-							return ComputeConfig(Type::SW_FP16, Type::FP32);
+							throw std::runtime_error("Unsupported compute configuration");
+//							return ComputeConfig(Type::SW_FP16, Type::FP32);
 					}
 				case DTYPE_FLOAT32:
 					return ComputeConfig(Type::FP32, Type::FP32);

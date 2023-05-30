@@ -43,12 +43,38 @@ namespace
 
 namespace ml
 {
+	std::string TimedStat::toString() const
+	{
+		double time = (m_total_count == 0) ? 0.0 : (m_total_time * 1.0e-9 / m_total_count);
+		char unit = ' ';
+		if (time < 1.0e-3)
+		{
+			time *= 1.0e6;
+			unit = 'u';
+		}
+		else
+		{
+			if (time < 1.0)
+			{
+				time *= 1.0e3;
+				unit = 'm';
+			}
+		}
+		return m_name + " = " + std::to_string(m_total_time * 1.0e-9) + "s : " + std::to_string(m_total_count) + " : " + std::to_string(time) + ' '
+				+ unit + 's';
+	}
 
 	GraphNode::GraphNode(std::unique_ptr<Layer> &layer, const std::vector<GraphNode*> input_nodes) :
 			m_layer(std::move(layer))
 	{
 		GraphNode::link(input_nodes, this);
 		resolveInputShapes();
+//		m_timer = TimedStat(
+//				m_layer->name() + " : " + m_layer->getInputShape() + " x " + m_layer->getWeightShape() + " -> " + m_layer->getOutputShape());
+	}
+	GraphNode::~GraphNode()
+	{
+//		std::cout << m_timer.toString() << '\n';
 	}
 	bool GraphNode::isInputNode() const
 	{
@@ -137,7 +163,9 @@ namespace ml
 			input[i] = changeBatch(batchSize, getInputNode(i)->getOutputTensor());
 		Tensor output = changeBatch(batchSize, this->getOutputTensor());
 
+//		m_timer.start();
 		getLayer().forward(input, output);
+//		m_timer.stop();
 
 		const bool emulate_low_precision = false; // getLayer().isTrainable() and getLayer().dtype() == DataType::FLOAT32;
 		if (emulate_low_precision)

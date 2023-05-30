@@ -85,11 +85,15 @@ namespace ml
 #define CREATE_EMPTY_KERNEL_TABLE(name) static auto name##_table = ml::cpu::createFunctionTable(name<float, float>)
 
 #define CREATE_KERNEL_TABLE(name) static auto name##_table = ml::cpu::createFunctionTable(name<float, float>);	\
-		name##_table.get(ml::cpu::Type::SW_BF16, ml::cpu::Type::FP32) = name<sw_bfloat16, float>;				\
-		name##_table.get(ml::cpu::Type::BF16, ml::cpu::Type::FP32) = name<bfloat16, float>;						\
-		name##_table.get(ml::cpu::Type::SW_FP16, ml::cpu::Type::FP32) = name<sw_float16, float>;				\
 		name##_table.get(ml::cpu::Type::FP16, ml::cpu::Type::FP32) = name<float16, float>;						\
 		name##_table.get(ml::cpu::Type::FP32, ml::cpu::Type::FP32) = name<float, float>
+
+//#define CREATE_KERNEL_TABLE(name) static auto name##_table = ml::cpu::createFunctionTable(name<float, float>);	\
+//		name##_table.get(ml::cpu::Type::SW_BF16, ml::cpu::Type::FP32) = name<sw_bfloat16, float>;				\
+//		name##_table.get(ml::cpu::Type::BF16, ml::cpu::Type::FP32) = name<bfloat16, float>;						\
+//		name##_table.get(ml::cpu::Type::SW_FP16, ml::cpu::Type::FP32) = name<sw_float16, float>;				\
+//		name##_table.get(ml::cpu::Type::FP16, ml::cpu::Type::FP32) = name<float16, float>;						\
+//		name##_table.get(ml::cpu::Type::FP32, ml::cpu::Type::FP32) = name<float, float>
 
 		/*
 #define CREATE_KERNEL_TABLE(name) static auto name##_table = ml::cpu::createFunctionTable(name<float, float>);	\
