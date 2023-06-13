@@ -113,9 +113,9 @@ namespace ml
 	}
 	std::string Device::hardwareInfo()
 	{
-		std::string result = Device::cpu().info() + '\n';
+		std::string result = Device::cpu().toString() + " : " + Device::cpu().info() + '\n';
 		for (int i = 0; i < Device::numberOfCudaDevices(); i++)
-			result += Device::cuda(i).info() + '\n';
+			result += Device::cuda(i).toString() + " : " + Device::cuda(i).info() + '\n';
 		return result;
 	}
 

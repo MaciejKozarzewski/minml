@@ -27,6 +27,7 @@ namespace ml
 		int cpu_get_simd_level();
 		bool cpu_supports_type(mlDataType_t dtype);
 		const char* cpu_get_device_info();
+		void cpu_print_device_features();
 
 		mlContext_t cpu_create_context();
 		void cpu_synchronize_with_context(mlContext_t context);

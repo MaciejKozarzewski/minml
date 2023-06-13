@@ -345,14 +345,6 @@ namespace ml
 		}
 	}
 
-	void gemm(const Context &context, Tensor &D, float alpha, char opA, const Tensor &A, char opB, const Tensor &B, float beta, const Tensor &C)
-	{
-	}
-	void gemmBatched(const Context &context, Tensor &D, float alpha, char opA, const Tensor &A, char opB, const Tensor &B, float beta,
-			const Tensor &C)
-	{
-	}
-
 	void addBiasAct(const Context &context, Tensor &input, const Tensor &bias, ActivationType act)
 	{
 		static Timer timer("addBiasAct");

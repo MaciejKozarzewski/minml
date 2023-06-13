@@ -26,6 +26,7 @@ namespace ml
 		int cuda_get_memory(int index);
 		DLL_PUBLIC bool cuda_supports_type(int index, mlDataType_t dtype);
 		DLL_PUBLIC const char* cuda_get_device_info(int index);
+		DLL_PUBLIC void cuda_print_device_features(int index);
 
 		// implemented in 'cuda_context.cpp'
 		DLL_PUBLIC mlContext_t cuda_create_context(int device_index);

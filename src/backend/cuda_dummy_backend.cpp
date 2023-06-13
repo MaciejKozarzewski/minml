@@ -30,6 +30,10 @@ namespace ml
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
+	void cuda_print_device_features(int index)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
 
 	// implemented in 'cuda_context.cpp'
 	mlContext_t cuda_create_context(int device_index)

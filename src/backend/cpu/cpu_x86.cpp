@@ -335,12 +335,12 @@ namespace ml
 			std::cout << "Cores  : " << cores() << '\n';
 			std::cout << "Memory : " << (memory() >> 20) << "MB\n";
 			std::cout << "Features:\n";
-			size_t max_name_length = 0;
-			for (auto iter = m_features.begin(); iter != m_features.end(); iter++)
-				max_name_length = std::max(max_name_length, iter->first.length());
+//			size_t max_name_length = 0;
+//			for (auto iter = m_features.begin(); iter != m_features.end(); iter++)
+//				max_name_length = std::max(max_name_length, iter->first.length());
 			for (auto iter = m_features.begin(); iter != m_features.end(); iter++)
 			{
-				std::cout << std::string(max_name_length - iter->first.length(), ' ');
+//				std::cout << std::string(max_name_length - iter->first.length(), ' ');
 				std::cout << iter->first << " : ";
 				std::cout << (iter->second.is_supported ? "YES" : "NO");
 				if (not iter->second.comment.empty())

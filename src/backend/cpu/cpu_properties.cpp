@@ -150,5 +150,11 @@ namespace ml
 		static const std::string info = get_device_info();
 		return info.data();
 	}
+	void cpu_print_device_features()
+	{
+		cpu_x86::get().print();
+		std::cout << "Detected SIMD level : " << cpu_get_simd_level() << '\n';
+
+	}
 
 } /* namespace ml */

@@ -17,15 +17,6 @@
 #include <cassert>
 #include <iostream>
 
-namespace
-{
-	bool is_transpose(char c) noexcept
-	{
-		assert(c == 'T' || c == 't' || c == 'N' || c == 'n');
-		return c == 'T' or c == 't';
-	}
-}
-
 namespace ml
 {
 
