@@ -101,6 +101,12 @@ namespace ml
 			return result;
 		}
 	}
+	[[maybe_unused]] static bool is_transpose(char c) noexcept
+	{
+		assert(c == 'T' || c == 't' || c == 'N' || c == 'n');
+		return c == 'T' or c == 't';
+	}
+
 } /* namespace ml */
 
 #endif /* MINML_BACKEND_BACKEND_UTILS_HPP_ */

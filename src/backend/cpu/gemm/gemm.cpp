@@ -175,9 +175,9 @@ namespace
 		assert(shape_B.rank == 2 || shape_B.rank == 3);
 		const TypeConfiguration tc { dtype, dtype, dtype, dtype, DTYPE_FLOAT32 };
 
-		const int M = (opA == 'n') ? shape_A.dim[shape_A.rank - 2] : shape_A.dim[shape_A.rank - 1];
-		const int N = (opB == 'n') ? shape_B.dim[shape_B.rank - 1] : shape_B.dim[shape_B.rank - 2];
-		const int K = (opA == 'n') ? shape_A.dim[shape_A.rank - 1] : shape_A.dim[shape_A.rank - 2];
+		const int M = is_transpose(opA) ? shape_A.dim[shape_A.rank - 1] : shape_A.dim[shape_A.rank - 2];
+		const int N = is_transpose(opB) ? shape_B.dim[shape_B.rank - 2] : shape_B.dim[shape_B.rank - 1];
+		const int K = is_transpose(opA) ? shape_A.dim[shape_A.rank - 2] : shape_A.dim[shape_A.rank - 1];
 
 		const std::vector<GemmRuntime> &table = get_gemm_runtime_table(context);
 		GemmRuntime result;

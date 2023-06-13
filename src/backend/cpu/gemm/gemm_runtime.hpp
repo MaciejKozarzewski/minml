@@ -124,8 +124,7 @@ namespace ml
 	}
 	static MatrixOp convert_op(char op) noexcept
 	{
-		assert(op == 'n' || op == 't');
-		return (op == 'n') ? MatrixOp::NORMAL : MatrixOp::TRANSPOSE;
+		return is_transpose(op) ? MatrixOp::TRANSPOSE : MatrixOp::NORMAL;
 	}
 	static MatrixOp invert_op(MatrixOp op) noexcept
 	{
