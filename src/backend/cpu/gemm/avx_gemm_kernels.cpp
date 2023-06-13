@@ -268,7 +268,7 @@ namespace ml
 				"vbroadcastss 0x0(%%rbx), %%ymm9 \n\t"
 
 				// scale by alpha
-//				"vmulps %%ymm8, %%ymm0, %%ymm0 \n\t"
+				"vmulps %%ymm8, %%ymm0, %%ymm0 \n\t"
 				"vmulps %%ymm8, %%ymm1, %%ymm1 \n\t"
 				"vmulps %%ymm8, %%ymm2, %%ymm2 \n\t"
 				"vmulps %%ymm8, %%ymm3, %%ymm3 \n\t"
