@@ -46,14 +46,14 @@ namespace ml
 				"movq %[B_ptr], %%rbx \n\t"// rhs pointer is in rbx
 
 				// Set accumulators to zero.
-				"vpxor %%ymm8, %%ymm8, %%ymm8 \n\t"
-				"vpxor %%ymm9, %%ymm9, %%ymm9 \n\t"
-				"vpxor %%ymm10, %%ymm10, %%ymm10 \n\t"
-				"vpxor %%ymm11, %%ymm11, %%ymm11 \n\t"
-				"vpxor %%ymm12, %%ymm12, %%ymm12 \n\t"
-				"vpxor %%ymm13, %%ymm13, %%ymm13 \n\t"
-				"vpxor %%ymm14, %%ymm14, %%ymm14 \n\t"
-				"vpxor %%ymm15, %%ymm15, %%ymm15 \n\t"
+				"vxorps %%ymm8, %%ymm8, %%ymm8 \n\t"
+				"vxorps %%ymm9, %%ymm9, %%ymm9 \n\t"
+				"vxorps %%ymm10, %%ymm10, %%ymm10 \n\t"
+				"vxorps %%ymm11, %%ymm11, %%ymm11 \n\t"
+				"vxorps %%ymm12, %%ymm12, %%ymm12 \n\t"
+				"vxorps %%ymm13, %%ymm13, %%ymm13 \n\t"
+				"vxorps %%ymm14, %%ymm14, %%ymm14 \n\t"
+				"vxorps %%ymm15, %%ymm15, %%ymm15 \n\t"
 
 				"movq %[k_iter], %%r14 \n\t"// load the number of 4-unrolled iterations
 				"test %%r14, %%r14 \n\t"
@@ -277,7 +277,7 @@ namespace ml
 				"vmulps %%ymm8, %%ymm6, %%ymm6 \n\t"
 				"vmulps %%ymm8, %%ymm7, %%ymm7 \n\t"
 
-				"vpxor %%ymm15, %%ymm15, %%ymm15 \n\t"
+				"vxorps %%ymm15, %%ymm15, %%ymm15 \n\t"
 				"vucomiss %%xmm9, %%xmm15 \n\t"// set ZF if beta == 0.
 				"je BETAZERO%= \n\t"
 				// beta != 0 case
@@ -391,16 +391,16 @@ namespace ml
 				"movq %[B_ptr], %%rbx \n\t"// rhs pointer is in rbx
 
 				// Set accumulators to zero.
-				"vpxor %%ymm6, %%ymm6, %%ymm6 \n\t"
-				"vpxor %%ymm7, %%ymm7, %%ymm7 \n\t"
-				"vpxor %%ymm8, %%ymm8, %%ymm8 \n\t"
-				"vpxor %%ymm9, %%ymm9, %%ymm9 \n\t"
-				"vpxor %%ymm10, %%ymm10, %%ymm10 \n\t"
-				"vpxor %%ymm11, %%ymm11, %%ymm11 \n\t"
-				"vpxor %%ymm12, %%ymm12, %%ymm12 \n\t"
-				"vpxor %%ymm13, %%ymm13, %%ymm13 \n\t"
-				"vpxor %%ymm14, %%ymm14, %%ymm14 \n\t"
-				"vpxor %%ymm15, %%ymm15, %%ymm15 \n\t"
+				"vxorps %%ymm6, %%ymm6, %%ymm6 \n\t"
+				"vxorps %%ymm7, %%ymm7, %%ymm7 \n\t"
+				"vxorps %%ymm8, %%ymm8, %%ymm8 \n\t"
+				"vxorps %%ymm9, %%ymm9, %%ymm9 \n\t"
+				"vxorps %%ymm10, %%ymm10, %%ymm10 \n\t"
+				"vxorps %%ymm11, %%ymm11, %%ymm11 \n\t"
+				"vxorps %%ymm12, %%ymm12, %%ymm12 \n\t"
+				"vxorps %%ymm13, %%ymm13, %%ymm13 \n\t"
+				"vxorps %%ymm14, %%ymm14, %%ymm14 \n\t"
+				"vxorps %%ymm15, %%ymm15, %%ymm15 \n\t"
 
 				"movq %[k_iter], %%r14 \n\t"// load the number of 4-unrolled iterations
 				"test %%r14, %%r14 \n\t"
@@ -628,7 +628,7 @@ namespace ml
 				"vmulps %%ymm1, %%ymm14, %%ymm14 \n\t"
 				"vmulps %%ymm1, %%ymm15, %%ymm15 \n\t"
 
-				"vpxor %%ymm1, %%ymm1, %%ymm1 \n\t"
+				"vxorps %%ymm1, %%ymm1, %%ymm1 \n\t"
 				"vucomiss %%xmm0, %%xmm1 \n\t"// set ZF if beta == 0.
 				"je BETAZERO%= \n\t"
 				// beta != 0 case

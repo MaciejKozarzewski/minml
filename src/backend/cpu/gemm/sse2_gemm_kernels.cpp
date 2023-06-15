@@ -48,14 +48,14 @@ namespace ml
 				"movq %[B_ptr], %%rbx \n\t"// B pointer is in rbx
 
 				// Set accumulators to zero.
-				"pxor %%xmm8, %%xmm8 \n\t"
-				"pxor %%xmm9, %%xmm9 \n\t"
-				"pxor %%xmm10, %%xmm10 \n\t"
-				"pxor %%xmm11, %%xmm11 \n\t"
-				"pxor %%xmm12, %%xmm12 \n\t"
-				"pxor %%xmm13, %%xmm13 \n\t"
-				"pxor %%xmm14, %%xmm14 \n\t"
-				"pxor %%xmm15, %%xmm15 \n\t"
+				"xorps %%xmm8, %%xmm8 \n\t"
+				"xorps %%xmm9, %%xmm9 \n\t"
+				"xorps %%xmm10, %%xmm10 \n\t"
+				"xorps %%xmm11, %%xmm11 \n\t"
+				"xorps %%xmm12, %%xmm12 \n\t"
+				"xorps %%xmm13, %%xmm13 \n\t"
+				"xorps %%xmm14, %%xmm14 \n\t"
+				"xorps %%xmm15, %%xmm15 \n\t"
 
 				"movq %[k_iter], %%r14 \n\t"// load the number of 4-unrolled iterations
 				"test %%r14, %%r14 \n\t"
@@ -259,7 +259,7 @@ namespace ml
 
 				// load destination pointer and stride
 
-				"pxor %%xmm0, %%xmm0 \n\t"
+				"xorps %%xmm0, %%xmm0 \n\t"
 				"ucomiss %%xmm1, %%xmm0 \n\t"// set ZF if beta == 0.
 				"je BETAZERO%= \n\t"
 				// beta != 0 case
@@ -370,10 +370,10 @@ namespace ml
 				"movq %[B_ptr], %%rbx \n\t"// B pointer is in rbx
 
 				// Set accumulators to zero.
-				"pxor %%xmm12, %%xmm12 \n\t"
-				"pxor %%xmm13, %%xmm13 \n\t"
-				"pxor %%xmm14, %%xmm14 \n\t"
-				"pxor %%xmm15, %%xmm15 \n\t"
+				"xorps %%xmm12, %%xmm12 \n\t"
+				"xorps %%xmm13, %%xmm13 \n\t"
+				"xorps %%xmm14, %%xmm14 \n\t"
+				"xorps %%xmm15, %%xmm15 \n\t"
 
 				"movq %[k_iter], %%r14 \n\t"// load the number of 4-unrolled iterations
 				"test %%r14, %%r14 \n\t"
@@ -501,7 +501,7 @@ namespace ml
 				"mulps %%xmm0, %%xmm14 \n\t"
 				"mulps %%xmm0, %%xmm15 \n\t"
 
-				"pxor %%xmm0, %%xmm0 \n\t"
+				"xorps %%xmm0, %%xmm0 \n\t"
 				"ucomiss %%xmm1, %%xmm0 \n\t"// set ZF if beta == 0.
 				"je BETAZERO%= \n\t"
 				// optionally load C fragment and scale by beta
