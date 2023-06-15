@@ -2,7 +2,7 @@
  * cpu_x86.hpp
  *
  *  Created on: Mar 29, 2023
- *      Author: maciek
+ *      Author: Maciej Kozarzewski
  */
 
 #ifndef BACKEND_CPU_CPU_X86_HPP_

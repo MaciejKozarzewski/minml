@@ -6,4 +6,5 @@ target_sources(${LibName} PRIVATE 	file_util.cpp
 								string_util.cpp
 								testing_util.cpp
 								time_util.cpp
+								version.cpp
 								ZipWrapper.cpp)

@@ -1,8 +1,6 @@
 /*
  * cpu_properties.cpp
  *
- *  Created on : Dec 4, 2014
- *      Author: Alexander J. Yee (https://github.com/Mysticial/FeatureDetector)
  *  Modified on: May 12, 2020
  *      by Maciej Kozarzewski
  */
