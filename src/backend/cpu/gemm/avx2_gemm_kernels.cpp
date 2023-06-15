@@ -3862,12 +3862,12 @@ namespace ml
 					"je EPILOGUE%= \n\t"
 
 					"UNROLLED1%=: \n\t"
-					"movups 0x0(%%rax), %%xmm0 \n\t"
-					"movsd  0x8(%%rax), %%xmm1 \n\t"
+					"vmovups 0x0(%%rax), %%xmm0 \n\t"
+					"vmovsd  0x8(%%rax), %%xmm1 \n\t"
 					"vcvtph2ps %%xmm0, %%ymm0 \n\t"
 					"vcvtph2ps %%xmm1, %%ymm1 \n\t"
-					"movups %%xmm0, (4*(0*6+0))(%%rbx) \n\t"
-					"movsd  %%xmm1, (4*(0*6+4))(%%rbx) \n\t"
+					"vmovups %%xmm0, (4*(0*6+0))(%%rbx) \n\t"
+					"vmovsd  %%xmm1, (4*(0*6+4))(%%rbx) \n\t"
 					"add %%r12, %%rax \n\t"// add stride to src pointer
 					"add $(4*1*6), %%rbx \n\t"// add stride to dst pointer (4 * 1 * 6)
 
