@@ -99,7 +99,7 @@ namespace
 				{
 					const int h = TransformSize * blockIdx.x - Padding + row;
 					const int w = TransformSize * blockIdx.y - Padding + col;
-					if (0 <= h and h < height and 0 <= w and w < width)
+					if (0 <= h && h < height && 0 <= w && w < width)
 						tile.at(col, row) = input_wrapper.load(blockIdx.z, h, w, f);
 					else
 						tile.at(col, row) = vector_zero<T>();
@@ -140,7 +140,7 @@ namespace
 				{
 					const int h = TransformSize * blockIdx.x - Padding + row;
 					const int w = TransformSize * blockIdx.y - Padding + col;
-					if (0 <= h and h < height and 0 <= w and w < width)
+					if (0 <= h && h < height && 0 <= w && w < width)
 						tile.at(col, row) = reinterpret_cast<const half2*>(input)[input_indexer.at(blockIdx.z, h, w, f)];
 					else
 						tile.at(col, row) = vector_zero<half>();
@@ -233,7 +233,7 @@ namespace
 				{
 					const int h = TransformSize * blockIdx.x + row;
 					const int w = TransformSize * blockIdx.y + col;
-					if (0 <= h and h < height and 0 <= w and w < width)
+					if (0 <= h && h < height && 0 <= w && w < width)
 						tile.at(col, row) = gradient_wrapper.load(blockIdx.z, h, w, f);
 					else
 						tile.at(col, row) = vector_zero<T>();
@@ -329,7 +329,7 @@ namespace
 				kernel_transform_weights<3, 4> <<<gridSize, blockSize, 0, stream>>>(getPointer<T>(matrices), getPointer<T>(weights), filters_out,
 						filters_in, invert, low_precision);
 		}
-		if (kernel_size == 5 and tile_size == 2)
+		if (kernel_size == 5 && tile_size == 2)
 		{
 			kernel_transform_weights<5, 2> <<<gridSize, blockSize, 0, stream>>>(getPointer<T>(matrices), getPointer<T>(weights), filters_out,
 					filters_in, invert, low_precision);
@@ -362,7 +362,7 @@ namespace
 						width, filters);
 			if (tile_size == 4)
 			{
-				if (filters % 2 == 0 and cuda::has_fp16_math(context) and std::is_same<T, half>::value)
+				if (filters % 2 == 0 && cuda::has_fp16_math(context) && std::is_same<T, half>::value)
 					kernel_transform_input_vect<3, 4> <<<gridSize, blockSize, 0, stream>>>(getPointer<half>(matrices), getPointer<half>(input),
 							batch_size, height, width, filters);
 				else
@@ -370,9 +370,9 @@ namespace
 							height, width, filters);
 			}
 		}
-		if (kernel_size == 5 and tile_size == 2)
+		if (kernel_size == 5 && tile_size == 2)
 		{
-			if (filters % 2 == 0 and cuda::has_fp16_math(context) and std::is_same<T, half>::value)
+			if (filters % 2 == 0 && cuda::has_fp16_math(context) && std::is_same<T, half>::value)
 				kernel_transform_input_vect<5, 2> <<<gridSize, blockSize, 0, stream>>>(getPointer<half>(matrices), getPointer<half>(input),
 						batch_size, height, width, filters);
 			else
@@ -411,7 +411,7 @@ namespace
 				kernel_transform_output<3, 4> <<<gridSize, blockSize, 0, stream>>>(getPointer<T>(matrices), getPointer<T>(output), getPointer<T>(add),
 						getPointer<T>(bias), act, batch_size, height, width, filters);
 		}
-		if (kernel_size == 5 and tile_size == 2)
+		if (kernel_size == 5 && tile_size == 2)
 		{
 			kernel_transform_output<5, 2> <<<gridSize, blockSize, 0, stream>>>(getPointer<T>(matrices), getPointer<T>(output), getPointer<T>(add),
 					getPointer<T>(bias), act, batch_size, height, width, filters);
@@ -429,9 +429,9 @@ namespace ml
 	{
 		switch (dtype)
 		{
-			case DTYPE_BFLOAT16:
-				launch_weight_transform<__nv_bfloat16 >(context, tile_size, weight_shape, weights, matrices, invert, low_precision);
-				break;
+//			case DTYPE_BFLOAT16:
+//				launch_weight_transform<__nv_bfloat16 >(context, tile_size, weight_shape, weights, matrices, invert, low_precision);
+//				break;
 			case DTYPE_FLOAT16:
 				launch_weight_transform<half>(context, tile_size, weight_shape, weights, matrices, invert, low_precision);
 				break;
@@ -445,9 +445,9 @@ namespace ml
 	{
 		switch (dtype)
 		{
-			case DTYPE_BFLOAT16:
-				launch_input_transform<__nv_bfloat16 >(context, tile_size, weight_shape, input_shape, input, matrices);
-				break;
+//			case DTYPE_BFLOAT16:
+//				launch_input_transform<__nv_bfloat16 >(context, tile_size, weight_shape, input_shape, input, matrices);
+//				break;
 			case DTYPE_FLOAT16:
 				launch_input_transform<half>(context, tile_size, weight_shape, input_shape, input, matrices);
 				break;
@@ -461,9 +461,9 @@ namespace ml
 	{
 		switch (dtype)
 		{
-			case DTYPE_BFLOAT16:
-				launch_output_transform<__nv_bfloat16 >(context, tile_size, weight_shape, output_shape, matrices, output, bias, add, act);
-				break;
+//			case DTYPE_BFLOAT16:
+//				launch_output_transform<__nv_bfloat16 >(context, tile_size, weight_shape, output_shape, matrices, output, bias, add, act);
+//				break;
 			case DTYPE_FLOAT16:
 				launch_output_transform<half>(context, tile_size, weight_shape, output_shape, matrices, output, bias, add, act);
 				break;
@@ -499,7 +499,7 @@ namespace ml
 				kernel_transform_gradient<3, 4> <<<gridSize, blockSize, 0, stream>>>(getPointer<float>(matrices), getPointer<float>(gradient),
 						batch_size, height, width, filters);
 		}
-		if (kernel_size == 5 and tile_size == 2)
+		if (kernel_size == 5 && tile_size == 2)
 		{
 			kernel_transform_gradient<5, 2> <<<gridSize, blockSize, 0, stream>>>(getPointer<float>(matrices), getPointer<float>(gradient), batch_size,
 					height, width, filters);
@@ -528,7 +528,7 @@ namespace ml
 				kernel_transform_update<3, 4> <<<gridSize, blockSize, 0, stream>>>(getPointer<float>(matrices), getPointer<float>(update),
 						filters_out, filters_in);
 		}
-		if (kernel_size == 5 and tile_size == 2)
+		if (kernel_size == 5 && tile_size == 2)
 		{
 			kernel_transform_update<5, 2> <<<gridSize, blockSize, 0, stream>>>(getPointer<float>(matrices), getPointer<float>(update), filters_out,
 					filters_in);

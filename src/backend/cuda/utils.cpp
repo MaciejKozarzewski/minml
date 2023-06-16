@@ -83,7 +83,7 @@ namespace ml
 		}
 		void Context::setWorkspaceSize(mlContext_t context, size_t bytes)
 		{
-			if (context != nullptr and bytes > get(context)->m_workspace_size)
+			if (context != nullptr && bytes > get(context)->m_workspace_size)
 			{
 				cuda_free(get(context)->m_workspace);
 				get(context)->m_workspace = cuda_malloc(get(context)->m_device_index, bytes);

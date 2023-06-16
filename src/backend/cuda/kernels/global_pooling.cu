@@ -159,10 +159,10 @@ namespace ml
 
 		switch (dtype)
 		{
-			case DTYPE_BFLOAT16:
-				kernel_pooling_forward_avg_max<<<gridDim, blockDim, 0, stream >>>(reinterpret_cast<__nv_bfloat16* >(pooled_1),
-						getPointer<__nv_bfloat16 >(input), dim0, dim1, dim2);
-				break;
+//			case DTYPE_BFLOAT16:
+//				kernel_pooling_forward_avg_max<<<gridDim, blockDim, 0, stream >>>(reinterpret_cast<__nv_bfloat16* >(pooled_1),
+//						getPointer<__nv_bfloat16 >(input), dim0, dim1, dim2);
+//				break;
 			case DTYPE_FLOAT16:
 				kernel_pooling_forward_avg_max<<<gridDim, blockDim, 0, stream >>>(reinterpret_cast<half*>(pooled_1), getPointer<half>(input), dim0,
 						dim1, dim2);
@@ -181,10 +181,10 @@ namespace ml
 		dim3 gridDim2((dim2 + 127) / 128, 1, dim0);
 		switch (dtype)
 		{
-			case DTYPE_BFLOAT16:
-				kernel_broadcast<<<gridDim2, 128, 0, stream >>>(getPointer<__nv_bfloat16 >(output), reinterpret_cast<__nv_bfloat16* >(pooled_2),
-						dim0, dim1, dim2);
-				break;
+//			case DTYPE_BFLOAT16:
+//				kernel_broadcast<<<gridDim2, 128, 0, stream >>>(getPointer<__nv_bfloat16 >(output), reinterpret_cast<__nv_bfloat16* >(pooled_2),
+//						dim0, dim1, dim2);
+//				break;
 			case DTYPE_FLOAT16:
 				kernel_broadcast<<<gridDim2, 128, 0, stream >>>(getPointer<half>(output), reinterpret_cast<half*>(pooled_2), dim0, dim1, dim2);
 				break;

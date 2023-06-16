@@ -61,7 +61,7 @@ namespace
 				const int d0 = blockIdx.x;
 				const int d1 = blockIdx.y * Rows + row;
 				const int d2 = blockIdx.z * Columns + col;
-				if (d1 < dim1 and d2 < dim2)
+				if (d1 < dim1 && d2 < dim2)
 				{
 					const int idx = row * Columns + (row * Padding + col) % Columns;
 					workspace[idx] = input[src_indexer.at(d0, d1, d2)];
@@ -76,7 +76,7 @@ namespace
 				const int d0 = blockIdx.x;
 				const int d1 = blockIdx.y * Rows + row;
 				const int d2 = blockIdx.z * Columns + col;
-				if (d1 < dim1 and d2 < dim2)
+				if (d1 < dim1 && d2 < dim2)
 				{
 					const int idx = row * Columns + (row * Padding + col) % Columns;
 					output[dst_indexer.at(d0, d2, d1)] = workspace[idx];
@@ -115,7 +115,7 @@ namespace ml
 		dim3 gridDim = cuda::gridSize<1024>(elements, 256);
 		cudaStream_t stream = cuda::Context::getStream(context);
 
-		if (dst_dtype == src_dtype and dst != src)
+		if (dst_dtype == src_dtype && dst != src)
 		{ // same type, different locations, can just copy memory
 			cudaError_t status = cudaMemcpy(dst, src, elements * size_of(dst_dtype), cudaMemcpyDeviceToDevice);
 			assert(status == cudaSuccess);

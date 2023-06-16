@@ -104,7 +104,7 @@ namespace ml
 	[[maybe_unused]] static bool is_transpose(char c) noexcept
 	{
 		assert(c == 'T' || c == 't' || c == 'N' || c == 'n');
-		return c == 'T' or c == 't';
+		return c == 'T' || c == 't';
 	}
 
 } /* namespace ml */

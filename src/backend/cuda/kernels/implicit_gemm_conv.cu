@@ -8,30 +8,30 @@
 #include <minml/backend/cuda_backend.h>
 #include <minml/backend/backend_utils.hpp>
 
-#include "../vectors/vectors.cuh"
-#include "../utils.hpp"
+//#include "../vectors/vectors.cuh"
+//#include "../utils.hpp"
 
-#include "../helpers/accumulators.cuh"
-#include "../helpers/indexers.cuh"
-#include "../helpers/tensor_wrappers.cuh"
-#include "../helpers/lines_and_tiles.cuh"
+//#include "../helpers/accumulators.cuh"
+//#include "../helpers/indexers.cuh"
+//#include "../helpers/tensor_wrappers.cuh"
+//#include "../helpers/lines_and_tiles.cuh"
 
-#include <cuda_runtime_api.h>
-#include <cuda_runtime.h>
-#include <cuda_fp16.h>
-#include <cooperative_groups.h>
-namespace cg = cooperative_groups;
+//#include <cuda_runtime_api.h>
+//#include <cuda_runtime.h>
+//#include <cuda_fp16.h>
+//#include <cooperative_groups.h>
+//namespace cg = cooperative_groups;
 
-#include <cassert>
-#include <iostream>
-#include <vector>
-#include <array>
-#include <iostream>
+//#include <cassert>
+//#include <iostream>
+//#include <vector>
+//#include <array>
+//#include <iostream>
 
 namespace
 {
-	using namespace ml;
-	using namespace vectors;
+//	using namespace ml;
+//	using namespace vectors;
 
 //	__device__ constexpr int square(int x)
 //	{

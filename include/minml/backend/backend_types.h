@@ -11,7 +11,7 @@
 namespace ml
 {
 #if defined(_WIN32) && defined(USE_CUDA)
-#  ifdef BUILDING_DLL
+#  ifdef IN_THE_DLL
 #    define DLL_PUBLIC __declspec(dllexport)
 #  else
 #    define DLL_PUBLIC __declspec(dllimport)

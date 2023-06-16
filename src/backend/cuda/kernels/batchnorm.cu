@@ -125,7 +125,7 @@ namespace
 		__syncthreads();
 
 		combine_stats(shared_stats);
-		if (threadIdx.y == 0 and tid < last_dim)
+		if (threadIdx.y == 0 && tid < last_dim)
 			workspace[blockIdx.y * last_dim + tid] = shared_stats[threadIdx.x];
 	}
 	__global__ void kernel_batchnorm_forward_avg_var_2(AvgVarStats<float> *running_stat, const AvgVarStats<float> *workspace, int first_dim,
@@ -145,7 +145,7 @@ namespace
 		__syncthreads();
 
 		combine_stats(shared_stats);
-		if (threadIdx.y == 0 and tid < last_dim)
+		if (threadIdx.y == 0 && tid < last_dim)
 			running_stat[tid] = shared_stats[threadIdx.x];
 	}
 
@@ -234,7 +234,7 @@ namespace
 			for (int i = 32 * blockIdx.y + threadIdx.y; i < shape.x; i += 32 * gridDim.y)
 			{
 				const int tmp_idx = i * shape.y + tid;
-				if (act == ACTIVATION_RELU and output[tmp_idx] == 0.0f)
+				if (act == ACTIVATION_RELU && output[tmp_idx] == 0.0f)
 					gradient_next[tmp_idx] = 0.0f;
 				if (act == ACTIVATION_TANH)
 					gradient_next[tmp_idx] *= (1.0f - output[tmp_idx]) * (1.0f + output[tmp_idx]);
@@ -249,7 +249,7 @@ namespace
 
 		__syncthreads();
 		reduce_add_32x32_dual(d_sigma, d_mu);
-		if (threadIdx.y == 0 and tid < shape.y)
+		if (threadIdx.y == 0 && tid < shape.y)
 		{
 			workspace[2 * blockIdx.y * shape.y + tid] = d_sigma[threadIdx.x];
 			workspace[(2 * blockIdx.y + 1) * shape.y + tid] = d_mu[threadIdx.x];
@@ -272,7 +272,7 @@ namespace
 
 		__syncthreads();
 		reduce_add_32x32_dual(storage_d_sigma, storage_d_mu);
-		if (threadIdx.y == 0 and tid < shape.y)
+		if (threadIdx.y == 0 && tid < shape.y)
 		{
 			workspace[tid] = storage_d_sigma[threadIdx.x];
 			workspace[shape.y + tid] = storage_d_mu[threadIdx.x];
@@ -292,7 +292,7 @@ namespace
 
 			float d_sigma = workspace[tid];
 			float d_mu = workspace[shape.y + tid];
-			if (blockIdx.y == 0 and threadIdx.y == 0)
+			if (blockIdx.y == 0 && threadIdx.y == 0)
 			{ // only single line can update this
 				weight_update[2 * shape.y + tid] += d_sigma; // gamma
 				weight_update[3 * shape.y + tid] += d_mu; // beta
@@ -318,9 +318,9 @@ namespace
 			weights[0 * last_dim + tid] = stats.get_average();
 			weights[1 * last_dim + tid] = stats.get_variance();
 
-			if (not use_gamma)
+			if (!use_gamma)
 				weights[2 * last_dim + tid] = 1.0f; // gamma
-			if (not use_beta)
+			if (!use_beta)
 				weights[3 * last_dim + tid] = 0.0f; // beta
 		}
 	}

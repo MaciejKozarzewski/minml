@@ -185,10 +185,10 @@ namespace ml
 				dim3 gridDim = cuda::gridSize<1024>(volume(shape), 256);
 				switch (dtype)
 				{
-					case DTYPE_BFLOAT16:
-						kernel_sigmoid_forward<<<gridDim, blockDim, 0, stream>>>(getPointer<__nv_bfloat16 >(output),
-								getPointer<__nv_bfloat16 >(input), volume(shape));
-						break;
+//					case DTYPE_BFLOAT16:
+//						kernel_sigmoid_forward<<<gridDim, blockDim, 0, stream>>>(getPointer<__nv_bfloat16 >(output),
+//								getPointer<__nv_bfloat16 >(input), volume(shape));
+//						break;
 					case DTYPE_FLOAT16:
 						kernel_sigmoid_forward<<<gridDim, blockDim, 0, stream>>>(getPointer<half>(output), getPointer<half>(input), volume(shape));
 						break;
@@ -205,10 +205,10 @@ namespace ml
 				dim3 gridDim = cuda::gridSize<1024>(volume(shape), 256);
 				switch (dtype)
 				{
-					case DTYPE_BFLOAT16:
-						kernel_tanh_forward<<<gridDim, blockDim, 0, stream>>>(getPointer<__nv_bfloat16 >(output), getPointer<__nv_bfloat16 >(input),
-								volume(shape));
-						break;
+//					case DTYPE_BFLOAT16:
+//						kernel_tanh_forward<<<gridDim, blockDim, 0, stream>>>(getPointer<__nv_bfloat16 >(output), getPointer<__nv_bfloat16 >(input),
+//								volume(shape));
+//						break;
 					case DTYPE_FLOAT16:
 						kernel_tanh_forward<<<gridDim, blockDim, 0, stream>>>(getPointer<half>(output), getPointer<half>(input), volume(shape));
 						break;
@@ -225,10 +225,10 @@ namespace ml
 				dim3 gridDim = cuda::gridSize<1024>(volume(shape), 256);
 				switch (dtype)
 				{
-					case DTYPE_BFLOAT16:
-						kernel_relu_forward<<<gridDim, blockDim, 0, stream>>>(getPointer<__nv_bfloat16 >(output), getPointer<__nv_bfloat16 >(input),
-								volume(shape));
-						break;
+//					case DTYPE_BFLOAT16:
+//						kernel_relu_forward<<<gridDim, blockDim, 0, stream>>>(getPointer<__nv_bfloat16 >(output), getPointer<__nv_bfloat16 >(input),
+//								volume(shape));
+//						break;
 					case DTYPE_FLOAT16:
 						kernel_relu_forward<<<gridDim, blockDim, 0, stream>>>(getPointer<half>(output), getPointer<half>(input), volume(shape));
 						break;
@@ -251,10 +251,10 @@ namespace ml
 					dim3 gridDim((first_dim + 255) / 256);
 					switch (dtype)
 					{
-						case DTYPE_BFLOAT16:
-							kernel_softmax_3_channels<<<gridDim, blockDim, 0, stream>>>(getPointer<__nv_bfloat16 >(output),
-									getPointer<__nv_bfloat16 >(input), first_dim);
-							break;
+//						case DTYPE_BFLOAT16:
+//							kernel_softmax_3_channels<<<gridDim, blockDim, 0, stream>>>(getPointer<__nv_bfloat16 >(output),
+//									getPointer<__nv_bfloat16 >(input), first_dim);
+//							break;
 						case DTYPE_FLOAT16:
 							kernel_softmax_3_channels<<<gridDim, blockDim, 0, stream>>>(getPointer<half>(output), getPointer<half>(input), first_dim);
 							break;
@@ -270,10 +270,10 @@ namespace ml
 					dim3 gridDim(std::min(1024, first_dim));
 					switch (dtype)
 					{
-						case DTYPE_BFLOAT16:
-							kernel_softmax_generic<<<gridDim, blockDim, 0, stream>>>(getPointer<__nv_bfloat16 >(output),
-									getPointer<__nv_bfloat16 >(input), first_dim, last_dim);
-							break;
+//						case DTYPE_BFLOAT16:
+//							kernel_softmax_generic<<<gridDim, blockDim, 0, stream>>>(getPointer<__nv_bfloat16 >(output),
+//									getPointer<__nv_bfloat16 >(input), first_dim, last_dim);
+//							break;
 						case DTYPE_FLOAT16:
 							kernel_softmax_generic<<<gridDim, blockDim, 0, stream>>>(getPointer<half>(output), getPointer<half>(input), first_dim,
 									last_dim);
@@ -349,10 +349,10 @@ namespace ml
 
 		switch (dtype)
 		{
-			case DTYPE_BFLOAT16:
-				kernel_add_to_last_dim<<<gridDim, blockDim, 0, stream>>>(getPointer<__nv_bfloat16 >(input), getPointer<__nv_bfloat16 >(bias),
-						first_dim, last_dim, act);
-				break;
+//			case DTYPE_BFLOAT16:
+//				kernel_add_to_last_dim<<<gridDim, blockDim, 0, stream>>>(getPointer<__nv_bfloat16 >(input), getPointer<__nv_bfloat16 >(bias),
+//						first_dim, last_dim, act);
+//				break;
 			case DTYPE_FLOAT16:
 				kernel_add_to_last_dim<<<gridDim, blockDim, 0, stream>>>(getPointer<half>(input), getPointer<half>(bias), first_dim, last_dim, act);
 				break;

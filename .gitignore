@@ -20,3 +20,4 @@ scripts/tmp_script.bat
 CMakeFiles/*
 CMakeCache.txt
 *.bin
+/build/

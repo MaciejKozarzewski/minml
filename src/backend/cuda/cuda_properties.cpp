@@ -11,6 +11,7 @@
 
 #include <cuda_runtime_api.h>
 
+#include <array>
 #include <vector>
 #include <string>
 #include <cassert>
@@ -73,7 +74,7 @@ namespace
 
 	std::string to_hex(uint8_t x)
 	{
-		static const std::array<char, 16> text = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f' };
+		static const std::array<char, 16> text ( { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f' });
 		return std::to_string(text[x / 16]) + std::to_string(text[x % 16]);
 	}
 	template<typename T>
@@ -120,7 +121,7 @@ namespace ml
 	}
 	bool cuda_supports_type(int index, mlDataType_t dtype)
 	{
-		if (index >= 0 and index < cuda_get_number_of_devices())
+		if (index >= 0 && index < cuda_get_number_of_devices())
 		{
 			switch (dtype)
 			{
@@ -138,14 +139,14 @@ namespace ml
 	const char* cuda_get_device_info(int index)
 	{
 		static const std::vector<std::string> infos = get_device_infos();
-		if (index >= 0 and index < cuda_get_number_of_devices())
+		if (index >= 0 && index < cuda_get_number_of_devices())
 			return infos.at(index).data();
 		else
 			return nullptr;
 	}
 	void cuda_print_device_features(int index)
 	{
-		if (index >= 0 and index < cuda_get_number_of_devices())
+		if (index >= 0 && index < cuda_get_number_of_devices())
 		{
 			const cudaDeviceProp &prop = get_device_properties().at(index);
 			print_text("name", prop.name, "ASCII string identifying device");
@@ -255,7 +256,7 @@ namespace ml
 		bool has_fp16_math(mlContext_t context)
 		{
 			const int sm_ver = cuda::get_compute_capability(cuda::Context::getDeviceIndex(context));
-			return sm_ver == 53 or sm_ver == 60 or sm_ver >= 62;
+			return sm_ver == 53 || sm_ver == 60 || sm_ver >= 62;
 		}
 
 		bool has_bf16_math(mlContext_t context)
