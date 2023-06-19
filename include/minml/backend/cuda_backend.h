@@ -68,11 +68,6 @@ namespace ml
 				mlShape_t weights_shape, const void *input, const void *weights, void *output, const void *bias, const void *add,
 				mlActivationType_t act);
 
-		// implemented in 'winograd_fused.cu'
-		DLL_PUBLIC void cuda_convolution_fused_winograd_forward(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape,
-				mlShape_t weights_shape, const void *input, const void *weights, void *output, const void *bias, const void *add,
-				mlActivationType_t act);
-
 		// implemented in 'global_pooling.cu'
 		DLL_PUBLIC void cuda_global_avg_and_max_pooling_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, const void *input,
 				void *output, const void *weights);

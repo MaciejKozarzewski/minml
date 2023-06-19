@@ -61,9 +61,6 @@ namespace ml
 		void cpu_convolution_implicit_gemm_forward(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, mlShape_t weights_shape,
 				const void *input, const void *weights, void *output, const void *bias, const void *add, mlActivationType_t act);
 
-		void cpu_convolution_fused_winograd_forward(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, mlShape_t weights_shape,
-				const void *input, const void *weights, void *output, const void *bias, const void *add, mlActivationType_t act);
-
 		void cpu_gemm(mlContext_t context, mlDataType_t dtype, mlShape_t shape_C, void *C, mlShape_t shape_A, const void *A, mlShape_t shape_B,
 				const void *B, char opA, char opB, float alpha, float beta);
 		void cpu_gemm_batched(mlContext_t context, mlDataType_t dtype, mlShape_t shape_C, void *C, mlShape_t shape_A, const void *A,
@@ -92,9 +89,10 @@ namespace ml
 				mlActivationType_t act);
 
 		// implemented in 'global_pooling.cu'
-		void cpu_global_avg_and_max_pooling_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, const void *input, void *output);
+		void cpu_global_avg_and_max_pooling_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, const void *input, void *output,
+				const void *weights);
 		void cpu_global_avg_and_max_pooling_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next,
-				const void *input);
+				const void *input, const void *weights);
 
 		// used for training
 		void cpu_emulate_low_precision(mlContext_t context, mlShape_t shape, void *dst, const void *src);

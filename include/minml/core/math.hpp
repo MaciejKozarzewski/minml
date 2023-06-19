@@ -37,9 +37,6 @@ namespace ml
 	void convolutionImplicitGemmForward(const Context &context, const Tensor &input, const Tensor &weights, Tensor &output, const Tensor &bias,
 			const Tensor &add, ActivationType act);
 
-	void convolutionFusedWinogradForward(const Context &context, const Tensor &input, const Tensor &weights, Tensor &output, const Tensor &bias,
-			const Tensor &add, ActivationType act);
-
 	void globalAvgAndMaxPoolingForward(const Context &context, const Tensor &input, Tensor &output, Tensor &max_indices);
 	void globalAvgAndMaxPoolingBackward(const Context &context, Tensor &gradient_prev, const Tensor &gradient_next, const Tensor &max_indices);
 

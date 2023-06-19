@@ -1,6 +1,5 @@
 
 set(kernelsrc 	add_bias_act.cpp
-		conv_explicit_gemm.cpp
 		conv_implicit_gemm.cpp
 		conv_winograd_fused.cpp
 		conv_winograd_nonfused.cpp

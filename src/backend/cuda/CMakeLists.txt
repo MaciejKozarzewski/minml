@@ -8,9 +8,7 @@ else()
 	set(codesrc 	kernels/activations.cu
 		kernels/batchnorm.cu
 		kernels/conversion.cu
-		kernels/implicit_gemm_conv.cu
 		kernels/training.cu
-		kernels/winograd_fused.cu
 		kernels/winograd_nonfused.cu
 		cuda_context.cpp
 		cuda_memory.cu

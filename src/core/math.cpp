@@ -297,22 +297,6 @@ namespace ml
 		}
 	}
 
-	void convolutionFusedWinogradForward(const Context &context, const Tensor &input, const Tensor &weights, Tensor &output, const Tensor &bias,
-			const Tensor &add, ActivationType act)
-	{
-		switch (context.device().type())
-		{
-			case DeviceType::CPU:
-				cpu_convolution_fused_winograd_forward(get(context), get(weights.dtype()), get_shape(input), get_shape(weights), input.data(),
-						weights.data(), output.data(), bias.data(), add.data(), get(act));
-				break;
-			case DeviceType::CUDA:
-				cuda_convolution_fused_winograd_forward(get(context), get(weights.dtype()), get_shape(input), get_shape(weights), input.data(),
-						weights.data(), output.data(), bias.data(), add.data(), get(act));
-				break;
-		}
-	}
-
 	void gemm(const Context &context, char opA, char opB, Tensor &C, const Tensor &A, const Tensor &B, float alpha, float beta)
 	{
 		static Timer timer("gemm");
