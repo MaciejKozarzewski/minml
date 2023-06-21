@@ -265,11 +265,6 @@ namespace ml
 				kernel_gemm_fp32<float16, float, float, float16>(D, alpha_ptr, A, B, beta_ptr, C);
 		}
 	}
-	void gemm_def_MxN_bf16_fp32(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr,
-			const Fragment &C) noexcept
-	{
-		kernel_gemm_fp32<bfloat16, float, float, bfloat16>(D, alpha_ptr, A, B, beta_ptr, C);
-	}
 
 	void pack_def_MxK_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept
 	{
@@ -289,18 +284,6 @@ namespace ml
 		assert(src.dtype() == DTYPE_FLOAT16);
 		kernel_pack<float16, float16>(dst, src, src_pos.row, src_pos.column, src_op);
 	}
-	void pack_def_MxK_bf16_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept
-	{
-		assert(dst.dtype() == DTYPE_FLOAT32);
-		assert(src.dtype() == DTYPE_BFLOAT16);
-		kernel_pack<bfloat16, float>(dst, src, src_pos.row, src_pos.column, src_op);
-	}
-	void pack_def_MxK_bf16(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept
-	{
-		assert(dst.dtype() == DTYPE_BFLOAT16);
-		assert(src.dtype() == DTYPE_BFLOAT16);
-		kernel_pack<bfloat16, bfloat16>(dst, src, src_pos.row, src_pos.column, src_op);
-	}
 
 	void unpack_def_MxK_fp32(Matrix &dst, const Position2D &dst_pos, const Fragment &src) noexcept
 	{
@@ -309,10 +292,6 @@ namespace ml
 	void unpack_def_MxK_fp16(Matrix &dst, const Position2D &dst_pos, const Fragment &src) noexcept
 	{
 		kernel_unpack<float16, float16>(dst, dst_pos.row, dst_pos.column, src);
-	}
-	void unpack_def_MxK_bf16(Matrix &dst, const Position2D &dst_pos, const Fragment &src) noexcept
-	{
-		kernel_unpack<bfloat16, bfloat16>(dst, dst_pos.row, dst_pos.column, src);
 	}
 
 } /* namespace ml */

@@ -57,7 +57,7 @@ namespace
 	}
 	std::vector<GemmRuntime> get_avx_gemm_runtime()
 	{
-		std::vector<GemmRuntime> result(2);
+		std::vector<GemmRuntime> result(1);
 		// 10x8
 		result[0].type_configuration = { DTYPE_FLOAT32, DTYPE_FLOAT32, DTYPE_FLOAT32, DTYPE_FLOAT32, DTYPE_FLOAT32 };
 		result[0].inner_tile = { 10, 8, 256 };
@@ -70,19 +70,6 @@ namespace
 		result[0].edge_a_packing = pack_def_MxK_fp32;
 		result[0].edge_b_packing = pack_def_MxK_fp32;
 		result[0].perf_estimator = PerfEstimator(-334.44, 31.64);
-
-		// 8x8
-		result[1].type_configuration = { DTYPE_FLOAT32, DTYPE_FLOAT32, DTYPE_FLOAT32, DTYPE_FLOAT32, DTYPE_FLOAT32 };
-		result[1].inner_tile = { 8, 8, 256 };
-		result[1].gemm_kernel = gemm_avx_8x8_fp32;
-		result[1].a_packing = pack_avx_8xK_fp32;
-		result[1].b_packing = pack_avx_8xK_fp32;
-		result[1].c_packing = pack_def_MxK_fp32;
-		result[1].d_packing = pack_def_MxK_fp32;
-		result[1].d_unpacking = unpack_def_MxK_fp32;
-		result[1].edge_a_packing = pack_def_MxK_fp32;
-		result[1].edge_b_packing = pack_def_MxK_fp32;
-		result[1].perf_estimator = PerfEstimator(-256.41, 26.07);
 
 		return result;
 	}
