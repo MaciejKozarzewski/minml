@@ -155,7 +155,7 @@ namespace ml
 				const int m_fragments = (total_size.M + inner_tile.M - 1) / inner_tile.M;
 				const int n_fragments = (total_size.N + inner_tile.N - 1) / inner_tile.N;
 				const double coverage = static_cast<double>(total_size.M * total_size.N) / (m_fragments * n_fragments * inner_tile.M * inner_tile.N);
-				const double gflops = m_b + m_a / total_size.K;
+				const double gflops = m_a * total_size.K / (total_size.K + m_b);
 				return gflops * coverage;
 			}
 	};

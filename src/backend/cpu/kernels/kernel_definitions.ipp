@@ -27,9 +27,6 @@ void cpu_kernel_winograd_update_transform(mlContext_t context, int tile_size, ml
 void cpu_kernel_convolution_implicit_gemm_forward(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, mlShape_t weights_shape,
 		const void *input, const void *weights, void *output, const void *bias, const void *add, mlActivationType_t act);
 
-void cpu_kernel_convolution_fused_winograd_forward(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, mlShape_t weights_shape,
-		const void *input, const void *weights, void *output, const void *bias, const void *add, mlActivationType_t act);
-
 // implemented in 'global_pooling.cpp'
 void cpu_kernel_global_avg_and_max_pooling_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, const void *input, void *output);
 void cpu_kernel_global_avg_and_max_pooling_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next,

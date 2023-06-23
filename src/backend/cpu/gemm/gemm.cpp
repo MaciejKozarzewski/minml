@@ -27,31 +27,18 @@ namespace
 	std::vector<GemmRuntime> get_sse2_gemm_runtime()
 	{
 		std::vector<GemmRuntime> result(2);
-		// 8x4
+		// 4x8
 		result[0].type_configuration = { DTYPE_FLOAT32, DTYPE_FLOAT32, DTYPE_FLOAT32, DTYPE_FLOAT32, DTYPE_FLOAT32 };
-		result[0].inner_tile = { 8, 4, 256 };
-		result[0].gemm_kernel = gemm_sse2_8x4_fp32;
-		result[0].a_packing = pack_sse2_8xK_fp32;
-		result[0].b_packing = pack_sse2_4xK_fp32;
+		result[0].inner_tile = { 4, 8, 256 };
+		result[0].gemm_kernel = gemm_sse2_4x8_fp32;
+		result[0].a_packing = pack_sse2_4xK_fp32;
+		result[0].b_packing = pack_sse2_8xK_fp32;
 		result[0].c_packing = pack_def_MxK_fp32;
 		result[0].d_packing = pack_def_MxK_fp32;
 		result[0].d_unpacking = unpack_def_MxK_fp32;
 		result[0].edge_a_packing = pack_def_MxK_fp32;
 		result[0].edge_b_packing = pack_def_MxK_fp32;
-		result[0].perf_estimator = PerfEstimator(-239.87, 15.65);
-
-		// 4x4
-		result[1].type_configuration = { DTYPE_FLOAT32, DTYPE_FLOAT32, DTYPE_FLOAT32, DTYPE_FLOAT32, DTYPE_FLOAT32 };
-		result[1].inner_tile = { 4, 4, 256 };
-		result[1].gemm_kernel = gemm_sse2_4x4_fp32;
-		result[1].a_packing = pack_sse2_4xK_fp32;
-		result[1].b_packing = pack_sse2_4xK_fp32;
-		result[1].c_packing = pack_def_MxK_fp32;
-		result[1].d_packing = pack_def_MxK_fp32;
-		result[1].d_unpacking = unpack_def_MxK_fp32;
-		result[1].edge_a_packing = pack_def_MxK_fp32;
-		result[1].edge_b_packing = pack_def_MxK_fp32;
-		result[1].perf_estimator = PerfEstimator(-147.65, 15.61);
+		result[0].perf_estimator = PerfEstimator(15.8, 14.2);
 
 		return result;
 	}
@@ -69,64 +56,38 @@ namespace
 		result[0].d_unpacking = unpack_def_MxK_fp32;
 		result[0].edge_a_packing = pack_def_MxK_fp32;
 		result[0].edge_b_packing = pack_def_MxK_fp32;
-		result[0].perf_estimator = PerfEstimator(-334.44, 31.64);
+		result[0].perf_estimator = PerfEstimator(31.9, 16.7);
 
 		return result;
 	}
 	std::vector<GemmRuntime> get_avx2_fma_f16c_gemm_runtime()
 	{
-		std::vector<GemmRuntime> result(4);
-		// 6x16 fp32
+		std::vector<GemmRuntime> result(2);
+
+		// 12x8 fp32
 		result[0].type_configuration = { DTYPE_FLOAT32, DTYPE_FLOAT32, DTYPE_FLOAT32, DTYPE_FLOAT32, DTYPE_FLOAT32 };
-		result[0].inner_tile = { 6, 16, 1024 };
-		result[0].gemm_kernel = gemm_avx2_fma_6x16_fp32;
-		result[0].a_packing = pack_avx2_fma_6xK_fp32;
-		result[0].b_packing = pack_avx2_fma_16xK_fp32;
+		result[0].inner_tile = { 12, 8, 1024 };
+		result[0].gemm_kernel = gemm_avx2_fma_12x8_fp32;
+		result[0].a_packing = pack_avx2_fma_12xK_fp32;
+		result[0].b_packing = pack_avx_8xK_fp32;
 		result[0].c_packing = pack_def_MxK_fp32;
 		result[0].d_packing = pack_def_MxK_fp32;
 		result[0].d_unpacking = unpack_def_MxK_fp32;
 		result[0].edge_a_packing = pack_def_MxK_fp32;
 		result[0].edge_b_packing = pack_def_MxK_fp32;
-		result[0].perf_estimator = PerfEstimator(-945.15, 59.64);
+		result[0].perf_estimator = PerfEstimator(62.8, 23.4);
 
-		// 24x4 fp32
-		result[1].type_configuration = { DTYPE_FLOAT32, DTYPE_FLOAT32, DTYPE_FLOAT32, DTYPE_FLOAT32, DTYPE_FLOAT32 };
-		result[1].inner_tile = { 24, 4, 256 };
-		result[1].gemm_kernel = gemm_avx2_fma_24x4_fp32;
-		result[1].a_packing = pack_avx2_fma_24xK_fp32;
-		result[1].b_packing = pack_avx2_fma_4xK_fp32;
-		result[1].c_packing = pack_def_MxK_fp32;
-		result[1].d_packing = pack_def_MxK_fp32;
-		result[1].d_unpacking = unpack_def_MxK_fp32;
-		result[1].edge_a_packing = pack_def_MxK_fp32;
-		result[1].edge_b_packing = pack_def_MxK_fp32;
-		result[1].perf_estimator = PerfEstimator(-692.08, 46.66);
-
-		// 6x16 fp16/fp32
-		result[2].type_configuration = { DTYPE_FLOAT16, DTYPE_FLOAT16, DTYPE_FLOAT16, DTYPE_FLOAT16, DTYPE_FLOAT32 };
-		result[2].inner_tile = { 6, 16, 1024 };
-		result[2].gemm_kernel = gemm_avx2_fma_6x16_fp16_fp32;
-		result[2].a_packing = pack_avx2_fma_6xK_fp16_fp32;
-		result[2].b_packing = pack_avx2_fma_16xK_fp16_fp32;
-		result[2].c_packing = pack_def_MxK_fp16;
-		result[2].d_packing = pack_def_MxK_fp16;
-		result[2].d_unpacking = unpack_def_MxK_fp16;
-		result[2].edge_a_packing = pack_def_MxK_fp16_fp32;
-		result[2].edge_b_packing = pack_def_MxK_fp16_fp32;
-		result[2].perf_estimator = PerfEstimator(-819.13, 60.28);
-
-		// 24x4 fp16/fp32
-		result[3].type_configuration = { DTYPE_FLOAT16, DTYPE_FLOAT16, DTYPE_FLOAT16, DTYPE_FLOAT16, DTYPE_FLOAT32 };
-		result[3].inner_tile = { 24, 4, 512 };
-		result[3].gemm_kernel = gemm_avx2_fma_24x4_fp16_fp32;
-		result[3].a_packing = pack_avx2_fma_24xK_fp16_fp32;
-		result[3].b_packing = pack_avx2_fma_4xK_fp16_fp32;
-		result[3].c_packing = pack_def_MxK_fp16;
-		result[3].d_packing = pack_def_MxK_fp16;
-		result[3].d_unpacking = unpack_def_MxK_fp16;
-		result[3].edge_a_packing = pack_def_MxK_fp16_fp32;
-		result[3].edge_b_packing = pack_def_MxK_fp16_fp32;
-		result[3].perf_estimator = PerfEstimator(-655.10, 46.88);
+		result[1].type_configuration = { DTYPE_FLOAT16, DTYPE_FLOAT16, DTYPE_FLOAT16, DTYPE_FLOAT16, DTYPE_FLOAT32 };
+		result[1].inner_tile = { 12, 8, 1024 };
+		result[1].gemm_kernel = gemm_avx2_fma_12x8_fp32_fp16;
+		result[1].a_packing = pack_avx2_fma_12xK_fp16_fp32;
+		result[1].b_packing = pack_avx_8xK_fp16_fp32;
+		result[1].c_packing = pack_def_MxK_fp16;
+		result[1].d_packing = pack_def_MxK_fp16;
+		result[1].d_unpacking = unpack_def_MxK_fp16;
+		result[1].edge_a_packing = pack_def_MxK_fp16_fp32;
+		result[1].edge_b_packing = pack_def_MxK_fp16_fp32;
+		result[1].perf_estimator = PerfEstimator(61.2, 25.5);
 
 		return result;
 	}
@@ -146,11 +107,11 @@ namespace
 //			if (simd >= cpu::SimdLevel::AVX512F)
 //				;
 			if (simd >= cpu::SimdLevel::AVX2)
-				return get_avx2_fma_f16c_gemm_runtime();
+				join_vectors(result, get_avx2_fma_f16c_gemm_runtime());
 			if (simd >= cpu::SimdLevel::AVX)
-				return get_avx_gemm_runtime();
+				join_vectors(result, get_avx_gemm_runtime());
 			if (simd >= cpu::SimdLevel::SSE2)
-				return get_sse2_gemm_runtime();
+				join_vectors(result, get_sse2_gemm_runtime());
 			return result;
 		}();
 		return runtime_table;

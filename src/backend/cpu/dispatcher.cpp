@@ -113,14 +113,6 @@ namespace ml
 				act);
 	}
 
-	void cpu_convolution_fused_winograd_forward(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, mlShape_t weights_shape,
-			const void *input, const void *weights, void *output, const void *bias, const void *add, mlActivationType_t act)
-	{
-		CREATE_TABLE(cpu_kernel_convolution_fused_winograd_forward);
-		DISPATCH_AND_CALL(cpu_kernel_convolution_fused_winograd_forward)(context, dtype, input_shape, weights_shape, input, weights, output, bias,
-				add, act);
-	}
-
 	// implemented in 'global_pooling.cpp'
 	void cpu_global_avg_and_max_pooling_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, const void *input, void *output,
 			void *max_indices)

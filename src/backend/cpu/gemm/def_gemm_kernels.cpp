@@ -30,6 +30,23 @@ namespace
 	}
 	float fp16_to_fp32(const uint16_t x) noexcept
 	{
+//		uint64_t y;
+//		asm volatile(
+//				"movzw %[x], %%r14 \n\t"
+//				"vmovq %%r14, %%xmm0 \n\t"
+//				"vcvtph2ps %%xmm0, %%xmm0 \n\t"
+//				"vmovq %%xmm0, %%r14 \n\t"
+//				"movq %%r14, %[y] \n\t"
+//				: // outputs
+//				[y] "=m"(y)
+//				:// inputs
+//				[x] "m"(x)
+//				:// clobbers
+//				"cc", "%ymm0", "%r14");
+//		return as_float(y);
+
+//		return _cvtsh_ss(x);
+
 		uint32_t exponent = x & 0x7C00; // '0 11111 0000000000'
 		uint32_t mantissa = x & 0x03FF; // '0 00000 1111111111'
 
@@ -57,6 +74,24 @@ namespace
 	}
 	uint16_t fp32_to_fp16(const float x) noexcept
 	{
+//		uint64_t tmp_x = as_uint(x);
+//		uint64_t y;
+//		asm volatile(
+//				"movq %[tmp_x], %%r14 \n\t"
+//				"vmovq %%r14, %%xmm0 \n\t"
+//				"vcvtps2ph $(0x03), %%xmm0, %%xmm0 \n\t"
+//				"vmovq %%xmm0, %%r14 \n\t"
+//				"movq %%r14, %[y] \n\t"
+//				: // outputs
+//				[y] "=m"(y)
+//				:// inputs
+//				[tmp_x] "m"(tmp_x)
+//				:// clobbers
+//				"cc", "%ymm0", "%r14");
+//		return y;
+
+//		return _cvtss_sh(x, (_MM_FROUND_TO_ZERO |_MM_FROUND_NO_EXC));
+
 		const uint32_t original = as_uint(x);
 		const uint32_t rounded = original + 0x00001000; // round-to-nearest-even: add last bit after truncated mantissa
 		uint32_t exponent = (rounded & 0x7F800000) >> 23; // exponent
