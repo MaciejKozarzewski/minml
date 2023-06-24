@@ -15,8 +15,7 @@ namespace ml
 	class Fragment;
 	class Matrix;
 	struct Position2D;
-	enum class MatrixOp
-	;
+	enum class MatrixOp;
 	class GemmRuntime;
 }
 
@@ -26,7 +25,7 @@ namespace ml
 	 * default kernels
 	 */
 	void gemm_def_MxN_fp32(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C) noexcept;
-	void gemm_def_MxN_fp16_fp32(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr,
+	void gemm_def_MxN_fp32_fp16(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr,
 			const Fragment &C) noexcept;
 	void pack_def_MxK_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept;
 	void pack_def_MxK_fp16_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept;

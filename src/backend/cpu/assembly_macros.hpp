@@ -319,6 +319,7 @@
  */
 #define lea(_0, _1) INSTR_(lea, _0, _1)
 #define mov(_0, _1) INSTR_(mov, _0, _1)
+#define movzw(_0, _1) INSTR_(movzw, _0, _1)
 #define movd(_0, _1) INSTR_(movd, _0, _1)
 #define movl(_0, _1) INSTR_(movl, _0, _1)
 #define movq(_0, _1) INSTR_(movq, _0, _1)

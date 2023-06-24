@@ -89,15 +89,17 @@
 	vmovups(reg2, mem(rcx, r14, 2))\
 	add(r15, rcx)
 
-#define PERMUTE_BACK_4x8xFP32(reg0, reg1, reg2, reg3)\
+#define PERMUTE_AND_SCALE_4x8xFP32(reg0, reg1, reg2, reg3)\
 	vpermilps(imm(0xB1), reg1, reg1)\
 	vpermilps(imm(0xB1), reg3, reg3)\
-	vmovaps(reg0, ymm2)\
-	vmovaps(reg2, ymm3)\
-	vblendps(imm(0x55), reg0, reg1, reg0)\
-	vblendps(imm(0xAA), ymm2, reg1, reg1)\
-	vblendps(imm(0x55), reg2, reg3, reg2)\
-	vblendps(imm(0xAA), ymm3, reg3, reg3)
+	vblendps(imm(0x55), reg0, reg1, ymm2)\
+	vblendps(imm(0xAA), reg0, reg1, reg1)\
+	vblendps(imm(0x55), reg2, reg3, ymm3)\
+	vblendps(imm(0xAA), reg2, reg3, reg3)\
+	vmulps(ymm1, ymm2, reg0)\
+	vmulps(ymm1, reg1, reg1)\
+	vmulps(ymm1, ymm3, reg2)\
+	vmulps(ymm1, reg3, reg3)
 
 #define CONVERT_ACCUMULATORS_TO_FP16()\
 	vcvtps2ph(imm(0x03), ymm4, xmm4)\
@@ -196,17 +198,15 @@ namespace ml
 
 		label(EPILOGUE)
 
-		// permute back to original layout
-		PERMUTE_BACK_4x8xFP32(ymm4, ymm5, ymm6, ymm7)
-		PERMUTE_BACK_4x8xFP32(ymm8, ymm9, ymm10, ymm11)
-		PERMUTE_BACK_4x8xFP32(ymm12, ymm13, ymm14, ymm15)
-
 		movq(var(alpha_ptr), rax)// load address of alpha
 		movq(var(beta_ptr), rbx)// load address of beta
 		vbroadcastss(mem(rax), ymm1)
 		vbroadcastss(mem(rbx), ymm0)
 
-		SCALE_ACCUMULATORS_BY(ymm1)
+		// permute back to original layout
+		PERMUTE_AND_SCALE_4x8xFP32(ymm4, ymm5, ymm6, ymm7)
+		PERMUTE_AND_SCALE_4x8xFP32(ymm8, ymm9, ymm10, ymm11)
+		PERMUTE_AND_SCALE_4x8xFP32(ymm12, ymm13, ymm14, ymm15)
 
 		vxorps(ymm1, ymm1, ymm1)
 		vucomiss(xmm0, xmm1)// set ZF if beta == 0.
@@ -316,17 +316,15 @@ namespace ml
 
 		label(EPILOGUE)
 
-		// permute back to original layout
-		PERMUTE_BACK_4x8xFP32(ymm4, ymm5, ymm6, ymm7)
-		PERMUTE_BACK_4x8xFP32(ymm8, ymm9, ymm10, ymm11)
-		PERMUTE_BACK_4x8xFP32(ymm12, ymm13, ymm14, ymm15)
-
 		movq(var(alpha_ptr), rax)// load address of alpha
 		movq(var(beta_ptr), rbx)// load address of beta
 		vbroadcastss(mem(rax), ymm1)
 		vbroadcastss(mem(rbx), ymm0)
 
-		SCALE_ACCUMULATORS_BY(ymm1)
+		// permute back to original layout
+		PERMUTE_AND_SCALE_4x8xFP32(ymm4, ymm5, ymm6, ymm7)
+		PERMUTE_AND_SCALE_4x8xFP32(ymm8, ymm9, ymm10, ymm11)
+		PERMUTE_AND_SCALE_4x8xFP32(ymm12, ymm13, ymm14, ymm15)
 
 		vxorps(ymm1, ymm1, ymm1)
 		vucomiss(xmm0, xmm1)// set ZF if beta == 0.

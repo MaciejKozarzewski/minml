@@ -21,7 +21,7 @@ namespace
 		const uint64_t cache_L2 = 256 * 1024; // [bytes]
 		const uint64_t cache_L3 = 6 * 1024 * 1024; // [bytes]
 
-		return TileDimensions { 192, 192, inner_kernel.K };
+		return TileDimensions { 240, 192, inner_kernel.K };
 	}
 	int round_up(int x, int y) noexcept
 	{

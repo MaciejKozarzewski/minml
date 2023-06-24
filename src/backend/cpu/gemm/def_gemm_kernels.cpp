@@ -278,7 +278,7 @@ namespace ml
 	{
 		kernel_gemm_fp32<float, float, float, float>(D, alpha_ptr, A, B, beta_ptr, C);
 	}
-	void gemm_def_MxN_fp16_fp32(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr,
+	void gemm_def_MxN_fp32_fp16(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr,
 			const Fragment &C) noexcept
 	{
 		assert(D.dtype() == DTYPE_FLOAT16);

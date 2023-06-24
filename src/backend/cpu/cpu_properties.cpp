@@ -133,7 +133,7 @@ namespace ml
 #ifdef USE_OPENBLAS
 				return false;
 #else
-				static const bool result = cpu_x86::get().supports("avx2") and cpu_x86::get().supports("fma3") and cpu_x86::get().supports("f16c");
+				static const bool result = cpu_x86::get().supports("avx") and cpu_x86::get().supports("f16c");
 				return result;
 #endif
 			}

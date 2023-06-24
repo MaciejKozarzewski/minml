@@ -108,11 +108,11 @@
 	vmulps(ymm5, ymm0, ymm5)
 
 #define ADD_5x8xFP32_TO_ACCUMULATORS(acc0, acc1, acc2, acc3, acc4)\
-	vmulps(ymm1, acc0, acc0)\
-	vmulps(ymm2, acc1, acc1)\
-	vmulps(ymm3, acc2, acc2)\
-	vmulps(ymm4, acc3, acc3)\
-	vmulps(ymm5, acc4, acc4)
+	vaddps(ymm1, acc0, acc0)\
+	vaddps(ymm2, acc1, acc1)\
+	vaddps(ymm3, acc2, acc2)\
+	vaddps(ymm4, acc3, acc3)\
+	vaddps(ymm5, acc4, acc4)
 
 #define LOAD_ADD_16xFP16(beta, reg1, reg2, stride)\
 	vmovups(mem(rcx, 0*stride), xmm2)\
@@ -137,7 +137,9 @@
 	vmovups(reg5, mem(rcx))\
 	add(r14, rcx)
 
-#define STORE_5x8xFP16(reg1, reg2, reg3, reg4, reg5)\
+#define STORE_5x8xFP16(reg0, reg1, reg2, reg3, reg4)\
+	vmovups(reg0, mem(rcx))\
+	add(r14, rcx)\
 	vmovups(reg1, mem(rcx))\
 	add(r14, rcx)\
 	vmovups(reg2, mem(rcx))\
@@ -145,8 +147,6 @@
 	vmovups(reg3, mem(rcx))\
 	add(r14, rcx)\
 	vmovups(reg4, mem(rcx))\
-	add(r14, rcx)\
-	vmovups(reg5, mem(rcx))\
 	add(r14, rcx)
 
 #define CONVERT_5x8xFP16_TO_5x8xFP32()\
@@ -180,6 +180,24 @@
 	vmovsd (mem(rax, r15, 1, 8*4), xmm(reg3))\
 	add(r12, rax)
 
+#define LOAD_1x10xFP16(reg0, reg1)\
+	vmovups(mem(rax), xmm(reg0))\
+	vmovss (mem(rax, 8*2), xmm(reg1))\
+	add(r12, rax)\
+	vcvtph2ps(xmm(reg0), ymm(reg0))\
+	vcvtph2ps(xmm(reg1), xmm(reg1))
+
+#define LOAD_2x10xFP16(reg0, reg1, reg2, reg3)\
+	vmovups(mem(rax), xmm(reg0))\
+	vmovss (mem(rax, 8*2), xmm(reg1))\
+	vmovups(mem(rax, r15, 1), xmm(reg2))\
+	vmovss (mem(rax, r15, 1, 8*2), xmm(reg3))\
+	add(r12, rax)\
+	vcvtph2ps(xmm(reg0), ymm(reg0))\
+	vcvtph2ps(xmm(reg1), xmm(reg1))\
+	vcvtph2ps(xmm(reg2), ymm(reg2))\
+	vcvtph2ps(xmm(reg3), xmm(reg3))
+
 #define STORE_1x10xFP32(n, reg0, reg1)\
 	vmovups(ymm(reg0), (4*(n*10+0))(rbx))\
 	vmovsd (xmm(reg1), (4*(n*10+8))(rbx))
@@ -195,8 +213,8 @@ namespace ml
 		assert(C.dtype() == DTYPE_FLOAT32);
 		assert(D.dtype() == DTYPE_FLOAT32);
 		assert(A.rows() == B.rows());
-		assert(A.columns() == 10);
-		assert(B.columns() == 8);
+		assert(A.stride() == 10);
+		assert(B.stride() == 8);
 		assert(D.rows() == A.columns());
 		assert(D.columns() == B.columns());
 
@@ -304,11 +322,11 @@ namespace ml
 	{
 		assert(A.dtype() == DTYPE_FLOAT32);
 		assert(B.dtype() == DTYPE_FLOAT32);
-		assert(C.dtype() == DTYPE_FLOAT32);
-		assert(D.dtype() == DTYPE_FLOAT32);
+		assert(C.dtype() == DTYPE_FLOAT16);
+		assert(D.dtype() == DTYPE_FLOAT16);
 		assert(A.rows() == B.rows());
-		assert(A.columns() == 10);
-		assert(B.columns() == 8);
+		assert(A.stride() == 10);
+		assert(B.stride() == 8);
 		assert(D.rows() == A.columns());
 		assert(D.columns() == B.columns());
 
@@ -319,14 +337,14 @@ namespace ml
 
 		const float *A_ptr = A.data<float>();
 		const float *B_ptr = B.data<float>();
-		const float *C_ptr = C.data<float>();
-		float *D_ptr = D.data<float>();
+		const float16 *C_ptr = C.data<float16>();
+		float16 *D_ptr = D.data<float16>();
 
 		const int K = A.rows();
 		uint64_t k_iter = K / 4;
 		uint64_t k_left = K % 4;
-		const uint64_t C_stride = C.stride() * sizeof(float);
-		const uint64_t D_stride = D.stride() * sizeof(float);
+		const uint64_t C_stride = C.stride() * sizeof(float16);
+		const uint64_t D_stride = D.stride() * sizeof(float16);
 
 		begin_asm()
 		movq(var(A_ptr), rax) // lhs pointer is in rax
@@ -417,6 +435,8 @@ namespace ml
 
 	void pack_avx_10xK_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept
 	{
+		assert(dst.dtype() == DTYPE_FLOAT32);
+		assert(src.dtype() == DTYPE_FLOAT32);
 		assert(dst.stride() == 10);
 		assert(ml::cpu::is_aligned(dst.data(), register_size<YMM>()));
 
@@ -883,12 +903,14 @@ namespace ml
 	}
 	void pack_avx_10xK_fp16_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept
 	{
+		assert(dst.dtype() == DTYPE_FLOAT32);
+		assert(src.dtype() == DTYPE_FLOAT16);
 		assert(dst.stride() == 10);
 		assert(ml::cpu::is_aligned(dst.data(), register_size<YMM>()));
 
 		uint64_t k_iter = dst.rows() / 8;
 		uint64_t k_left = dst.rows() % 8;
-		const uint64_t src_stride = src.stride() * sizeof(float);
+		const uint64_t src_stride = src.stride() * sizeof(float16);
 		const void *src_ptr = src.pointer_at(src_pos.row, src_pos.column);
 		void *dst_ptr = dst.data();
 
@@ -906,10 +928,10 @@ namespace ml
 			je(FINALLOOP)
 
 			label(UNROLLED8)
-			LOAD_2x10xFP32(0, 1, 2, 3)
-			LOAD_2x10xFP32(4, 5, 6, 7)
-			LOAD_2x10xFP32(8, 9, 10, 11)
-			LOAD_2x10xFP32(12, 13, 14, 15)
+			LOAD_2x10xFP16(0, 1, 2, 3)
+			LOAD_2x10xFP16(4, 5, 6, 7)
+			LOAD_2x10xFP16(8, 9, 10, 11)
+			LOAD_2x10xFP16(12, 13, 14, 15)
 
 			STORE_1x10xFP32(0, 0, 1)
 			STORE_1x10xFP32(1, 2, 3)
@@ -932,7 +954,7 @@ namespace ml
 
 			sar(imm(1), r12)// divide stride by 2, effectively reverting to reading single row at the time
 			label(UNROLLED1)
-			LOAD_1x10xFP32(0, 1)
+			LOAD_1x10xFP16(0, 1)
 			STORE_1x10xFP32(0, 0, 1)
 			add(imm(4*1*10), rbx)// add stride to dst pointer
 
@@ -970,22 +992,31 @@ namespace ml
 			// first 8x8 tile
 			movq(rax, r13)// tmp src pointer is in r13
 			// rows 0-7
-			vmovups(mem(r13), ymm0)
+			vmovups(mem(r13), xmm0)
 			add(r12, r13)// add stride to src pointer
-			vmovups(mem(r13), ymm1)
+			vmovups(mem(r13), xmm1)
 			add(r12, r13)// add stride to src pointer
-			vmovups(mem(r13), ymm2)
+			vmovups(mem(r13), xmm2)
 			add(r12, r13)// add stride to src pointer
-			vmovups(mem(r13), ymm3)
+			vmovups(mem(r13), xmm3)
 			add(r12, r13)// add stride to src pointer
-			vmovups(mem(r13), ymm4)
+			vmovups(mem(r13), xmm4)
 			add(r12, r13)// add stride to src pointer
-			vmovups(mem(r13), ymm5)
+			vmovups(mem(r13), xmm5)
 			add(r12, r13)// add stride to src pointer
-			vmovups(mem(r13), ymm6)
+			vmovups(mem(r13), xmm6)
 			add(r12, r13)// add stride to src pointer
-			vmovups(mem(r13), ymm7)
+			vmovups(mem(r13), xmm7)
 			add(r12, r13)// add stride to src pointer
+
+			vcvtph2ps(xmm0, ymm0)
+			vcvtph2ps(xmm1, ymm1)
+			vcvtph2ps(xmm2, ymm2)
+			vcvtph2ps(xmm3, ymm3)
+			vcvtph2ps(xmm4, ymm4)
+			vcvtph2ps(xmm5, ymm5)
+			vcvtph2ps(xmm6, ymm6)
+			vcvtph2ps(xmm7, ymm7)
 
 			AVX_8x8_TRANSPOSE()
 
@@ -999,10 +1030,13 @@ namespace ml
 			vmovups(ymm15, mem(rbx,4*(7*10+0)))
 
 			// rows 8-9
-			vmovups(mem(r13), ymm0)
+			vmovups(mem(r13), xmm0)
 			add(r12, r13)
-			vmovups(mem(r13), ymm1)
+			vmovups(mem(r13), xmm1)
 			add(r12, r13)
+
+			vcvtph2ps(xmm0, ymm0)
+			vcvtph2ps(xmm1, ymm1)
 
 			vunpcklps(ymm1, ymm0, ymm4)
 			vunpckhps(ymm1, ymm0, ymm5)
@@ -1019,7 +1053,7 @@ namespace ml
 			vmovlpd(xmm7, mem(rbx, 4*(6*10+8)))
 			vmovhpd(xmm7, mem(rbx, 4*(7*10+8)))
 
-			add(imm(4*8), rax)// add stride to src pointer
+			add(imm(2*8), rax)// add stride to src pointer
 			add(imm(4*8*10), rbx)// add stride to dst pointer
 
 			dec(r14)
@@ -1033,26 +1067,47 @@ namespace ml
 			label(UNROLLED1)
 			movq(rax, r13)// tmp src pointer is in r13
 
-			vmovss(mem(r13), xmm0)
+			movzw(mem(r13), rcx)
+			vmovq(rcx, xmm0)
 			add(r12, r13)// add stride to src pointer
-			vmovss(mem(r13), xmm1)
+			movzw(mem(r13), rcx)
+			vmovq(rcx, xmm1)
 			add(r12, r13)// add stride to src pointer
-			vmovss(mem(r13), xmm2)
+			movzw(mem(r13), rcx)
+			vmovq(rcx, xmm2)
 			add(r12, r13)// add stride to src pointer
-			vmovss(mem(r13), xmm3)
+			movzw(mem(r13), rcx)
+			vmovq(rcx, xmm3)
 			add(r12, r13)// add stride to src pointer
-			vmovss(mem(r13), xmm4)
+			movzw(mem(r13), rcx)
+			vmovq(rcx, xmm4)
 			add(r12, r13)// add stride to src pointer
-			vmovss(mem(r13), xmm5)
+			movzw(mem(r13), rcx)
+			vmovq(rcx, xmm5)
 			add(r12, r13)// add stride to src pointer
-			vmovss(mem(r13), xmm6)
+			movzw(mem(r13), rcx)
+			vmovq(rcx, xmm6)
 			add(r12, r13)// add stride to src pointer
-			vmovss(mem(r13), xmm7)
+			movzw(mem(r13), rcx)
+			vmovq(rcx, xmm7)
 			add(r12, r13)// add stride to src pointer
-			vmovss(mem(r13), xmm8)
+			movzw(mem(r13), rcx)
+			vmovq(rcx, xmm8)
 			add(r12, r13)// add stride to src pointer
-			vmovss(mem(r13), xmm9)
+			movzw(mem(r13), rcx)
+			vmovq(rcx, xmm9)
 			add(r12, r13)// add stride to src pointer
+
+			vcvtph2ps(xmm0, ymm0)
+			vcvtph2ps(xmm1, ymm1)
+			vcvtph2ps(xmm2, ymm2)
+			vcvtph2ps(xmm3, ymm3)
+			vcvtph2ps(xmm4, ymm4)
+			vcvtph2ps(xmm5, ymm5)
+			vcvtph2ps(xmm6, ymm6)
+			vcvtph2ps(xmm7, ymm7)
+			vcvtph2ps(xmm8, ymm8)
+			vcvtph2ps(xmm9, ymm9)
 
 			vmovss(xmm0, mem(rbx, 0*4))
 			vmovss(xmm1, mem(rbx, 1*4))
@@ -1065,7 +1120,7 @@ namespace ml
 			vmovss(xmm8, mem(rbx, 8*4))
 			vmovss(xmm9, mem(rbx, 9*4))
 
-			add(imm(4*1), rax)// add stride to src pointer
+			add(imm(2*1), rax)// add stride to src pointer
 			add(imm(4*10*1), rbx)// add stride to dst pointer
 
 			dec(r14)
@@ -1092,6 +1147,8 @@ namespace ml
 
 	void pack_avx_8xK_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept
 	{
+		assert(dst.dtype() == DTYPE_FLOAT32);
+		assert(src.dtype() == DTYPE_FLOAT32);
 		assert(dst.stride() == 8);
 		assert(ml::cpu::is_aligned(dst.data(), register_size<YMM>()));
 
@@ -1308,6 +1365,8 @@ namespace ml
 	}
 	void pack_avx_8xK_fp16_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept
 	{
+		assert(dst.dtype() == DTYPE_FLOAT32);
+		assert(src.dtype() == DTYPE_FLOAT16);
 		assert(dst.stride() == 8);
 		assert(ml::cpu::is_aligned(dst.data(), register_size<YMM>()));
 
