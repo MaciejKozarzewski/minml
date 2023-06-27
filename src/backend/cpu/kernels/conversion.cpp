@@ -39,12 +39,7 @@ namespace
 	template<>
 	float16 one_or_zero(bool b) noexcept
 	{
-		return b ? float16 { 0x3c00 } : float16 { 0u };
-	}
-	template<>
-	bfloat16 one_or_zero(bool b) noexcept
-	{
-		return b ? bfloat16 { 0x3f80 } : bfloat16 { 0u };
+		return b ? float16 { 0x3c00 } : float16 { 0x0000 };
 	}
 
 	template<typename T>
@@ -258,9 +253,6 @@ namespace SIMD_NAMESPACE
 		assert(last_dim <= 32);
 		switch (dst_dtype)
 		{
-			case DTYPE_BFLOAT16:
-				kernel_unpack_input(getPointer<bfloat16>(dst), getPointer<uint32_t>(src), first_dim, last_dim);
-				break;
 			case DTYPE_FLOAT16:
 				kernel_unpack_input(getPointer<float16>(dst), getPointer<uint32_t>(src), first_dim, last_dim);
 				break;
@@ -279,95 +271,18 @@ namespace SIMD_NAMESPACE
 			return;
 		}
 
-		switch (dst_dtype)
+		if (dst_dtype == DTYPE_FLOAT16 and src_dtype == DTYPE_FLOAT32)
 		{
-			case DTYPE_BFLOAT16:
-			{
-				switch (src_dtype)
-				{
-					case DTYPE_FLOAT16:
-					{
-						if (cpu::has_hardware_bf16_conversion())
-							kernel_convert(getPointer<bfloat16>(dst), getPointer<float16>(src), elements);
-						else
-							kernel_convert(getPointer<sw_bfloat16>(dst), getPointer<float16>(src), elements);
-						break;
-					}
-					case DTYPE_FLOAT32:
-					{
-						if (cpu::has_hardware_bf16_conversion())
-							kernel_convert(getPointer<bfloat16>(dst), getPointer<float>(src), elements);
-						else
-							kernel_convert(getPointer<sw_bfloat16>(dst), getPointer<float>(src), elements);
-						break;
-					}
-					default:
-						break;
-				}
-				break;
-			}
-			case DTYPE_FLOAT16:
-			{
-				switch (src_dtype)
-				{
-					case DTYPE_BFLOAT16:
-					{
-						if (cpu::has_hardware_bf16_conversion())
-						{
-							if (cpu::has_hardware_fp16_conversion())
-								kernel_convert(getPointer<float16>(dst), getPointer<bfloat16>(src), elements);
-							else
-								kernel_convert(getPointer<sw_float16>(dst), getPointer<bfloat16>(src), elements);
-						}
-						else
-						{
-							if (cpu::has_hardware_fp16_conversion())
-								kernel_convert(getPointer<float16>(dst), getPointer<sw_bfloat16>(src), elements);
-							else
-								kernel_convert(getPointer<sw_float16>(dst), getPointer<sw_bfloat16>(src), elements);
-						}
-						break;
-					}
-					case DTYPE_FLOAT32:
-					{
-						if (cpu::has_hardware_fp16_conversion())
-							kernel_convert(getPointer<float16>(dst), getPointer<float>(src), elements);
-						else
-							kernel_convert(getPointer<sw_float16>(dst), getPointer<float>(src), elements);
-						break;
-					}
-					default:
-						break;
-				}
-				break;
-			}
-			case DTYPE_FLOAT32:
-			{
-				switch (src_dtype)
-				{
-					case DTYPE_BFLOAT16:
-					{
-						if (cpu::has_hardware_bf16_conversion())
-							kernel_convert(getPointer<float>(dst), getPointer<bfloat16>(src), elements);
-						else
-							kernel_convert(getPointer<float>(dst), getPointer<sw_bfloat16>(src), elements);
-						break;
-					}
-					case DTYPE_FLOAT16:
-					{
-						if (cpu::has_hardware_fp16_conversion())
-							kernel_convert(getPointer<float>(dst), getPointer<float16>(src), elements);
-						else
-							kernel_convert(getPointer<float>(dst), getPointer<sw_float16>(src), elements);
-						break;
-					}
-					default:
-						break;
-				}
-				break;
-			}
-			default:
-				break;
+			assert(dst != src);
+			kernel_convert(getPointer<float16>(dst), getPointer<float>(src), elements);
+			return;
+		}
+		if (dst_dtype == DTYPE_FLOAT32 and src_dtype == DTYPE_FLOAT16)
+		{
+
+			assert(dst != src);
+			kernel_convert(getPointer<float>(dst), getPointer<float16>(src), elements);
+			return;
 		}
 	}
 	void cpu_kernel_transpose_021(mlContext_t context, mlDataType_t dtype, mlShape_t shape, const void *input, void *output)
