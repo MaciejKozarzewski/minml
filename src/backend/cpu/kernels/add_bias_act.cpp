@@ -77,6 +77,8 @@ namespace
 	template<typename DT, typename CT>
 	void kernel_softmax(void *dst, const void *src, int first_dim, int last_dim, void *workspace)
 	{
+		static_assert(std::is_same<CT, float>::value);
+
 		assert(dst != nullptr);
 		assert(src != nullptr);
 		const DT *src_ptr = getPointer<DT>(src);
@@ -85,36 +87,31 @@ namespace
 
 		for (int i = 0; i < first_dim; i++)
 		{
-			const Vector<CT> first(src_ptr[0]);
-
-			Vector<CT> max_value = first;
 			for (int j = 0; j < last_dim; j += Vector<CT>::size())
 			{
 				const int elements = std::min(Vector<CT>::size(), last_dim - j);
 				Vector<CT> tmp(src_ptr + j, elements);
-				tmp.cutoff(elements, first);
-				max_value = max(max_value, tmp);
 				tmp.store(workspace_ptr + j);
 			}
-			max_value = horizontal_max(max_value);
 
-			Vector<CT> sum = Vector<CT>::zero();
-			for (int j = 0; j < last_dim; j += Vector<CT>::size())
+			CT max_value = workspace_ptr[0];
+			for (int j = 0; j < last_dim; j++)
+				max_value = std::max(max_value, workspace_ptr[j]);
+
+			CT sum = static_cast<CT>(0);
+			for (int j = 0; j < last_dim; j++)
 			{
-				const int elements = std::min(Vector<CT>::size(), last_dim - j);
-				Vector<CT> tmp(workspace_ptr + j, elements);
-				tmp = exp(tmp - max_value);
-				tmp.cutoff(elements, Vector<CT>::zero());
+				const CT tmp = exp(workspace_ptr[j] - max_value);
 				sum += tmp;
-				tmp.store(workspace_ptr + j);
+				workspace_ptr[j] = tmp;
 			}
 
-			sum = Vector<CT>::one() / Vector<CT>(horizontal_add(sum));
+			const Vector<CT> scale(1.0f / sum);
 			for (int j = 0; j < last_dim; j += Vector<CT>::size())
 			{
 				const int elements = std::min(Vector<CT>::size(), last_dim - j);
 				Vector<CT> tmp(workspace_ptr + j, elements);
-				tmp *= sum;
+				tmp *= scale;
 				tmp.store(dst_ptr + j, elements);
 			}
 			src_ptr += last_dim;

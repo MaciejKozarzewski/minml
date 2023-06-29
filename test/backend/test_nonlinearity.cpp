@@ -42,19 +42,6 @@ namespace ml
 		activationForward(Context(), input, input, ActivationType::SOFTMAX);
 		EXPECT_LE(testing::diffForTest(input, correct_output), 1.0e-3f);
 	}
-//	TEST(TestSoftmax, ForwardOnCPU_bf16)
-//	{
-//		Context context;
-//		Tensor input = toTensor( { { 0.1f, -0.9f, 2.0f, 0.0f }, { 0.3f, -1.0f, 0.7f, -0.1f } });
-//		Tensor correct_output = toTensor( { { 0.11162444f, 0.04106433f, 0.74630924f, 0.10100197f }, { 0.29114823f, 0.07934714f, 0.43434212f,
-//				0.19516249f } });
-//
-//		input.convertTo(context, DataType::BFLOAT16);
-//		correct_output.convertTo(context, DataType::BFLOAT16);
-//
-//		activationForward(Context(), input, input, ActivationType::SOFTMAX);
-//		EXPECT_LE(testing::diffForTest(input, correct_output), 1.0e-2f);
-//	}
 
 	TEST(TestSoftmax, ForwardOnCUDA_fp32)
 	{
@@ -88,23 +75,6 @@ namespace ml
 		context.synchronize();
 		EXPECT_LE(testing::diffForTest(input, correct_output), 1.0e-3f);
 	}
-//	TEST(TestSoftmax, ForwardOnCUDA_bf16)
-//	{
-//		if (Device::numberOfCudaDevices() == 0 or not Device::cuda(0).supportsType(DataType::FLOAT16))
-//			GTEST_SKIP_("No CUDA enabled devices");
-//		Context context(Device::cuda(0));
-//		Tensor input = toTensor( { { 0.1f, -0.9f, 2.0f, 0.0f }, { 0.3f, -1.0f, 0.7f, -0.1f } });
-//		Tensor correct_output = toTensor( { { 0.11162444f, 0.04106433f, 0.74630924f, 0.10100197f }, { 0.29114823f, 0.07934714f, 0.43434212f,
-//				0.19516249f } });
-//
-//		input.moveTo(context.device());
-//		input.convertTo(context, DataType::BFLOAT16);
-//		correct_output.convertTo(Context(), DataType::BFLOAT16);
-//
-//		activationForward(context, input, input, ActivationType::SOFTMAX);
-//		context.synchronize();
-//		EXPECT_LE(testing::diffForTest(input, correct_output), 1.0e-2f);
-//	}
 
 } /* namespace ml */
 

@@ -29,8 +29,6 @@ namespace
 			default:
 			case DTYPE_UNKNOWN:
 				return CUDNN_DATA_FLOAT;
-			case DTYPE_BFLOAT16:
-				return CUDNN_DATA_BFLOAT16;
 			case DTYPE_FLOAT16:
 				return CUDNN_DATA_HALF;
 			case DTYPE_FLOAT32:
@@ -46,8 +44,6 @@ namespace
 			default:
 			case DTYPE_UNKNOWN:
 				return CUDA_R_32F;
-			case DTYPE_BFLOAT16:
-				return CUDA_R_16BF;
 			case DTYPE_FLOAT16:
 				return CUDA_R_16F;
 			case DTYPE_FLOAT32:
@@ -62,8 +58,6 @@ namespace
 		{
 			default:
 			case DTYPE_UNKNOWN:
-				return CUBLAS_COMPUTE_32F;
-			case DTYPE_BFLOAT16:
 				return CUBLAS_COMPUTE_32F;
 			case DTYPE_FLOAT16:
 				return CUBLAS_COMPUTE_16F;

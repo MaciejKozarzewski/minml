@@ -125,9 +125,6 @@ namespace ml
 		{
 			switch (dtype)
 			{
-				case DTYPE_BFLOAT16:
-					return false;
-//					return cuda::get_compute_capability(index) >= 53;
 				case DTYPE_FLOAT16:
 					return cuda::get_compute_capability(index) >= 53;
 				case DTYPE_FLOAT32:

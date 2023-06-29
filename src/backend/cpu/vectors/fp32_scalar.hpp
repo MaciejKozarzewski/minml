@@ -47,18 +47,6 @@ namespace SIMD_NAMESPACE
 					m_data(Converter<SCALAR, float16, float>()(x))
 			{
 			}
-			Vector(sw_float16 x) noexcept :
-					m_data(Converter<SCALAR, sw_float16, float>()(x))
-			{
-			}
-			Vector(bfloat16 x) noexcept :
-					m_data(Converter<SCALAR, bfloat16, float>()(x))
-			{
-			}
-			Vector(sw_bfloat16 x) noexcept :
-					m_data(Converter<SCALAR, sw_bfloat16, float>()(x))
-			{
-			}
 			Vector(uint32_t raw_bytes) noexcept :
 					m_data(bitwise_cast<float>(raw_bytes))
 			{
@@ -71,109 +59,58 @@ namespace SIMD_NAMESPACE
 			{
 				return bitwise_cast<uint32_t>(m_data);
 			}
-			void load(const float *ptr, int num = size()) noexcept
+			void load(const float *ptr) noexcept
+			{
+				m_data = Loader<SCALAR>()(ptr, size());
+			}
+			void partial_load(const float *ptr, int num) noexcept
 			{
 				assert(0 <= num && num <= size());
 				m_data = Loader<SCALAR>()(ptr, num);
 			}
-			void load(const float16 *ptr, int num = size()) noexcept
+			void load(const float16 *ptr) noexcept
+			{
+				const float16 tmp = Loader<SCALAR>()(ptr, size());
+				m_data = Converter<SCALAR, float16, float>()(tmp);
+			}
+			void partial_load(const float16 *ptr, int num) noexcept
 			{
 				assert(0 <= num && num <= size());
 				const float16 tmp = Loader<SCALAR>()(ptr, num);
 				m_data = Converter<SCALAR, float16, float>()(tmp);
 			}
-			void load(const sw_float16 *ptr, int num = size()) noexcept
+			void store(float *ptr) const noexcept
 			{
-				assert(0 <= num && num <= size());
-				const sw_float16 tmp = Loader<SCALAR>()(ptr, num);
-				m_data = Converter<SCALAR, sw_float16, float>()(tmp);
+				Storer<SCALAR>()(ptr, m_data, size());
 			}
-			void load(const bfloat16 *ptr, int num = size()) noexcept
-			{
-				assert(0 <= num && num <= size());
-				const bfloat16 tmp = Loader<SCALAR>()(ptr, num);
-				m_data = Converter<SCALAR, bfloat16, float>()(tmp);
-			}
-			void load(const sw_bfloat16 *ptr, int num = size()) noexcept
-			{
-				assert(0 <= num && num <= size());
-				const sw_bfloat16 tmp = Loader<SCALAR>()(ptr, num);
-				m_data = Converter<SCALAR, sw_bfloat16, float>()(tmp);
-			}
-			void store(float *ptr, int num = size()) const noexcept
+			void partial_store(float *ptr, int num) const noexcept
 			{
 				assert(0 <= num && num <= size());
 				Storer<SCALAR>()(ptr, m_data, num);
 			}
-			void store(float16 *ptr, int num = size()) const noexcept
+			void store(float16 *ptr) const noexcept
+			{
+				const float16 tmp = Converter<SCALAR, float, float16>()(m_data);
+				Storer<SCALAR>()(ptr, tmp, size());
+			}
+			void partial_store(float16 *ptr, int num) const noexcept
 			{
 				assert(0 <= num && num <= size());
 				const float16 tmp = Converter<SCALAR, float, float16>()(m_data);
 				Storer<SCALAR>()(ptr, tmp, num);
 			}
-			void store(sw_float16 *ptr, int num = size()) const noexcept
-			{
-				assert(0 <= num && num <= size());
-				const sw_float16 tmp = Converter<SCALAR, float, sw_float16>()(m_data);
-				Storer<SCALAR>()(ptr, tmp, num);
-			}
-			void store(bfloat16 *ptr, int num = size()) const noexcept
-			{
-				assert(0 <= num && num <= size());
-				const bfloat16 tmp = Converter<SCALAR, float, bfloat16>()(m_data);
-				Storer<SCALAR>()(ptr, tmp, num);
-			}
-			void store(sw_bfloat16 *ptr, int num = size()) const noexcept
-			{
-				assert(0 <= num && num <= size());
-				const sw_bfloat16 tmp = Converter<SCALAR, float, sw_bfloat16>()(m_data);
-				Storer<SCALAR>()(ptr, tmp, num);
-			}
-			template<typename T>
-			void insert(T value, int index) noexcept
-			{
-				assert(0 <= index && index < size());
-				m_data = Converter<SCALAR, T, float>()(value);
-			}
-			float extract(int index) const noexcept
-			{
-				assert(0 <= index && index < size());
-				return m_data;
-			}
-			float operator[](int index) const noexcept
-			{
-				return extract(index);
-			}
-			void cutoff(const int num, Vector<float, SCALAR> value = zero()) noexcept
-			{
-				assert(0 <= num && num <= size());
-				m_data = (num == 0) ? value.m_data : m_data;
-			}
-
-			static constexpr float scalar_zero() noexcept
-			{
-				return 0.0f;
-			}
-			static constexpr float scalar_one() noexcept
-			{
-				return 1.0f;
-			}
-			static constexpr float scalar_epsilon() noexcept
-			{
-				return std::numeric_limits<float>::epsilon();
-			}
 
 			static Vector<float, SCALAR> zero() noexcept
 			{
-				return Vector<float, SCALAR>(scalar_zero()); // @suppress("Ambiguous problem")
+				return Vector<float, SCALAR>(0.0f); // @suppress("Ambiguous problem")
 			}
 			static Vector<float, SCALAR> one() noexcept
 			{
-				return Vector<float, SCALAR>(scalar_one()); // @suppress("Ambiguous problem")
+				return Vector<float, SCALAR>(1.0f); // @suppress("Ambiguous problem")
 			}
 			static Vector<float, SCALAR> epsilon() noexcept
 			{
-				return Vector<float, SCALAR>(scalar_epsilon()); // @suppress("Ambiguous problem")
+				return Vector<float, SCALAR>(std::numeric_limits<float>::epsilon()); // @suppress("Ambiguous problem")
 			}
 
 			static constexpr int size() noexcept

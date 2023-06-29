@@ -53,18 +53,6 @@ namespace SIMD_NAMESPACE
 					m_data(broadcast(Converter<SCALAR, float16, float>()(x)))
 			{
 			}
-			Vector(sw_float16 x) noexcept :
-					m_data(broadcast(Converter<SCALAR, sw_float16, float>()(x)))
-			{
-			}
-			Vector(bfloat16 x) noexcept :
-					m_data(broadcast(Converter<SCALAR, bfloat16, float>()(x)))
-			{
-			}
-			Vector(sw_bfloat16 x) noexcept :
-					m_data(broadcast(Converter<SCALAR, sw_bfloat16, float>()(x)))
-			{
-			}
 			Vector(__m512i raw_bytes) noexcept :
 					m_data(_mm512_castsi512_ps(raw_bytes))
 			{
@@ -97,24 +85,6 @@ namespace SIMD_NAMESPACE
 				const __m256i tmp = Loader<XMM>()(reinterpret_cast<const uint16_t*>(src), num);
 				m_data = Converter<ZMM, float16, float>()(tmp);
 			}
-			void load(const sw_float16 *src, int num = size()) noexcept
-			{
-				assert(0 <= num && num <= size());
-				const __m256i tmp = Loader<XMM>()(reinterpret_cast<const uint16_t*>(src), num);
-				m_data = Converter<ZMM, sw_float16, float>()(tmp);
-			}
-			void load(const bfloat16 *src, int num = size()) noexcept
-			{
-				assert(0 <= num && num <= size());
-				const __m256i tmp = Loader<XMM>()(reinterpret_cast<const uint16_t*>(src), num);
-				m_data = Converter<ZMM, bfloat16, float>()(tmp);
-			}
-			void load(const sw_bfloat16 *src, int num = size()) noexcept
-			{
-				assert(0 <= num && num <= size());
-				const __m256i tmp = Loader<XMM>()(reinterpret_cast<const uint16_t*>(src), num);
-				m_data = Converter<ZMM, sw_bfloat16, float>()(tmp);
-			}
 			void store(float *dst, int num = size()) const noexcept
 			{
 				assert(0 <= num && num <= size());
@@ -126,129 +96,23 @@ namespace SIMD_NAMESPACE
 				const __m256i tmp = Converter<ZMM, float, float16>()(m_data);
 				Storer<XMM>()(reinterpret_cast<uint16_t*>(dst), tmp, num);
 			}
-			void store(sw_float16 *dst, int num = size()) const noexcept
-			{
-				assert(0 <= num && num <= size());
-				const __m256i tmp = Converter<ZMM, float, sw_float16>()(m_data);
-				Storer<XMM>()(reinterpret_cast<uint16_t*>(dst), tmp, num);
-			}
-			void store(bfloat16 *dst, int num = size()) const noexcept
-			{
-				assert(0 <= num && num <= size());
-				const __m256i tmp = Converter<ZMM, float, bfloat16>()(m_data);
-				Storer<XMM>()(reinterpret_cast<uint16_t*>(dst), tmp, num);
-			}
-			void store(sw_bfloat16 *dst, int num = size()) const noexcept
-			{
-				assert(0 <= num && num <= size());
-				const __m256i tmp = Converter<ZMM, float, sw_bfloat16>()(m_data);
-				Storer<XMM>()(reinterpret_cast<uint16_t*>(dst), tmp, num);
-			}
-			template<typename T>
-			void insert(T value, int index) noexcept
-			{
-				assert(0 <= index && index < size());
-//				const float x = Converter<SCALAR, T, float>()(value);
-//				const __m256 tmp = internal::broadcast(x);
-//				switch (index)
-//				{
-//					case 0:
-//						m_data = _mm256_blend_ps(m_data, tmp, 1);
-//						break;
-//					case 1:
-//						m_data = _mm256_blend_ps(m_data, tmp, 2);
-//						break;
-//					case 2:
-//						m_data = _mm256_blend_ps(m_data, tmp, 4);
-//						break;
-//					case 3:
-//						m_data = _mm256_blend_ps(m_data, tmp, 8);
-//						break;
-//					case 4:
-//						m_data = _mm256_blend_ps(m_data, tmp, 16);
-//						break;
-//					case 5:
-//						m_data = _mm256_blend_ps(m_data, tmp, 32);
-//						break;
-//					case 6:
-//						m_data = _mm256_blend_ps(m_data, tmp, 64);
-//						break;
-//					default:
-//						m_data = _mm256_blend_ps(m_data, tmp, 128);
-//						break;
-//				}
-			}
-			float extract(int index) const noexcept
-			{
-				assert(0 <= index && index < size());
-				float tmp[size()];
-				store(tmp);
-				return tmp[index];
-			}
-			float operator[](int index) const noexcept
-			{
-				return extract(index);
-			}
-			void cutoff(const int num, Vector<float, ZMM> value = zero()) noexcept
-			{
-//				switch (num)
-//				{
-//					case 0:
-//						m_data = value;
-//						break;
-//					case 1:
-//						m_data = _mm256_blend_ps(value, m_data, 1);
-//						break;
-//					case 2:
-//						m_data = _mm256_blend_ps(value, m_data, 3);
-//						break;
-//					case 3:
-//						m_data = _mm256_blend_ps(value, m_data, 7);
-//						break;
-//					case 4:
-//						m_data = _mm256_blend_ps(value, m_data, 15);
-//						break;
-//					case 5:
-//						m_data = _mm256_blend_ps(value, m_data, 31);
-//						break;
-//					case 6:
-//						m_data = _mm256_blend_ps(value, m_data, 63);
-//						break;
-//					case 7:
-//						m_data = _mm256_blend_ps(value, m_data, 127);
-//						break;
-//				}
-			}
-
-			static constexpr float scalar_zero() noexcept
-			{
-				return 0.0f;
-			}
-			static constexpr float scalar_one() noexcept
-			{
-				return 1.0f;
-			}
-			static constexpr float scalar_epsilon() noexcept
-			{
-				return std::numeric_limits<float>::epsilon();
-			}
 
 			static Vector<float, ZMM> zero() noexcept
 			{
-				return Vector<float, ZMM>(scalar_zero()); // @suppress("Ambiguous problem")
+				return Vector<float, ZMM>(0.0f); // @suppress("Ambiguous problem")
 			}
 			static Vector<float, ZMM> one() noexcept
 			{
-				return Vector<float, ZMM>(scalar_one()); // @suppress("Ambiguous problem")
+				return Vector<float, ZMM>(1.0f); // @suppress("Ambiguous problem")
 			}
 			static Vector<float, ZMM> epsilon() noexcept
 			{
-				return Vector<float, ZMM>(scalar_epsilon()); // @suppress("Ambiguous problem")
+				return Vector<float, ZMM>(std::numeric_limits<float>::epsilon()); // @suppress("Ambiguous problem")
 			}
 
 			static constexpr int size() noexcept
 			{
-				return 8;
+				return 16;
 			}
 			static constexpr RegisterType register_type() noexcept
 			{

@@ -151,19 +151,9 @@ namespace
 		return float16 { fp32_to_fp16(x) };
 	}
 	template<>
-	bfloat16 convert(float x) noexcept
-	{
-		return bfloat16 { fp32_to_bf16(x) };
-	}
-	template<>
 	float convert(float16 x) noexcept
 	{
 		return fp16_to_fp32(x.m_data);
-	}
-	template<>
-	float convert(bfloat16 x) noexcept
-	{
-		return bf16_to_fp32(x.m_data);
 	}
 
 	template<typename DT, typename AT, typename BT, typename CT>

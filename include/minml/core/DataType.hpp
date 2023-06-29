@@ -16,16 +16,13 @@ namespace ml
 	enum class DataType
 	{
 		UNKNOWN,
-		BFLOAT16,
 		FLOAT16,
 		FLOAT32,
 		INT32
 	};
 
 	uint16_t convert_fp32_to_fp16(float x);
-	uint16_t convert_fp32_to_bf16(float x);
 	float convert_fp16_to_fp32(uint16_t x);
-	float convert_bf16_to_fp32(uint16_t x);
 
 	size_t sizeOf(DataType t) noexcept;
 

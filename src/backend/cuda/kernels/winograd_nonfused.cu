@@ -429,9 +429,6 @@ namespace ml
 	{
 		switch (dtype)
 		{
-//			case DTYPE_BFLOAT16:
-//				launch_weight_transform<__nv_bfloat16 >(context, tile_size, weight_shape, weights, matrices, invert, low_precision);
-//				break;
 			case DTYPE_FLOAT16:
 				launch_weight_transform<half>(context, tile_size, weight_shape, weights, matrices, invert, low_precision);
 				break;
@@ -445,9 +442,6 @@ namespace ml
 	{
 		switch (dtype)
 		{
-//			case DTYPE_BFLOAT16:
-//				launch_input_transform<__nv_bfloat16 >(context, tile_size, weight_shape, input_shape, input, matrices);
-//				break;
 			case DTYPE_FLOAT16:
 				launch_input_transform<half>(context, tile_size, weight_shape, input_shape, input, matrices);
 				break;
@@ -461,9 +455,6 @@ namespace ml
 	{
 		switch (dtype)
 		{
-//			case DTYPE_BFLOAT16:
-//				launch_output_transform<__nv_bfloat16 >(context, tile_size, weight_shape, output_shape, matrices, output, bias, add, act);
-//				break;
 			case DTYPE_FLOAT16:
 				launch_output_transform<half>(context, tile_size, weight_shape, output_shape, matrices, output, bias, add, act);
 				break;

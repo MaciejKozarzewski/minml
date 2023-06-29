@@ -43,7 +43,6 @@ namespace ml
 			default:
 			case DTYPE_UNKNOWN:
 				return 0;
-			case DTYPE_BFLOAT16:
 			case DTYPE_FLOAT16:
 				return 2;
 			case DTYPE_FLOAT32:

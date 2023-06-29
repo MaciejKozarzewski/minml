@@ -126,8 +126,6 @@ namespace ml
 	{
 		switch (dtype)
 		{
-			case DTYPE_BFLOAT16:
-				return false;
 			case DTYPE_FLOAT16:
 			{
 #ifdef USE_OPENBLAS

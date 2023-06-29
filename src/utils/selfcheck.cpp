@@ -48,8 +48,6 @@ namespace
 			result.push_back(DataType::FLOAT32);
 		if (device.supportsType(DataType::FLOAT16))
 			result.push_back(DataType::FLOAT16);
-		if (device.supportsType(DataType::BFLOAT16))
-			result.push_back(DataType::BFLOAT16);
 		return result;
 	}
 
@@ -134,7 +132,6 @@ namespace ml
 					cpu_print_device_features();
 					std::cout << "Supports fp32 : " << (cpu_supports_type(DTYPE_FLOAT32) ? "YES" : "NO") << '\n';
 					std::cout << "Supports fp16 : " << (cpu_supports_type(DTYPE_FLOAT16) ? "YES" : "NO") << '\n';
-					std::cout << "Supports bf16 : " << (cpu_supports_type(DTYPE_BFLOAT16) ? "YES" : "NO") << std::endl;
 					return 0;
 				}
 				case DeviceType::CUDA:
@@ -142,7 +139,6 @@ namespace ml
 					cuda_print_device_features(device.index());
 					std::cout << "Supports fp32 : " << (cuda_supports_type(device.index(), DTYPE_FLOAT32) ? "YES" : "NO") << '\n';
 					std::cout << "Supports fp16 : " << (cuda_supports_type(device.index(), DTYPE_FLOAT16) ? "YES" : "NO") << '\n';
-					std::cout << "Supports bf16 : " << (cuda_supports_type(device.index(), DTYPE_BFLOAT16) ? "YES" : "NO") << std::endl;
 					return 0;
 				}
 				default:

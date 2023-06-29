@@ -205,9 +205,6 @@ namespace ml
 		{ // in place addition
 			switch (dtype)
 			{
-				case DTYPE_BFLOAT16:
-					kernel_add_tensors<<<gridDim, blockDim, 0, stream>>>(getPointer<__nv_bfloat16 >(dst), getPointer<__nv_bfloat16 >(src2), length);
-					break;
 				case DTYPE_FLOAT16:
 					kernel_add_tensors<<<gridDim, blockDim, 0, stream>>>(getPointer<half>(dst), getPointer<half>(src2), length);
 					break;
@@ -220,10 +217,6 @@ namespace ml
 		{
 			switch (dtype)
 			{
-				case DTYPE_BFLOAT16:
-					kernel_add_tensors<<<gridDim, blockDim, 0, stream>>>(getPointer<__nv_bfloat16 >(dst), getPointer<__nv_bfloat16 >(src1),
-							getPointer<__nv_bfloat16 >(src2), length);
-					break;
 				case DTYPE_FLOAT16:
 					kernel_add_tensors<<<gridDim, blockDim, 0, stream>>>(getPointer<half>(dst), getPointer<half>(src1), getPointer<half>(src2),
 							length);

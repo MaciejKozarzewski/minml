@@ -260,9 +260,6 @@ namespace ml
 		uint16_t tmp[2] = { 0, 0 };
 		switch (dtype())
 		{
-			case DataType::BFLOAT16:
-				tmp[0] = convert_fp32_to_bf16(value);
-				break;
 			case DataType::FLOAT16:
 				tmp[0] = convert_fp32_to_fp16(value);
 				break;
@@ -398,8 +395,6 @@ namespace ml
 		ml::memcpy(Device::cpu(), tmp, 0, device(), data(), sizeOf(dtype()) * get_index(idx.begin(), idx.size()), sizeOf(dtype()));
 		switch (dtype())
 		{
-			case DataType::BFLOAT16:
-				return convert_bf16_to_fp32(tmp[0]);
 			case DataType::FLOAT16:
 				return convert_fp16_to_fp32(tmp[0]);
 			case DataType::FLOAT32:
@@ -423,9 +418,6 @@ namespace ml
 		uint16_t tmp[2] = { 0, 0 };
 		switch (dtype())
 		{
-			case DataType::BFLOAT16:
-				tmp[0] = convert_fp32_to_bf16(value);
-				break;
 			case DataType::FLOAT16:
 				tmp[0] = convert_fp32_to_fp16(value);
 				break;

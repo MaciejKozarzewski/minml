@@ -96,10 +96,6 @@ namespace ml
 
 		switch (dst_dtype)
 		{
-			case DTYPE_BFLOAT16:
-				kernel_unpack_input<<<gridDim, last_dim, 0, stream>>>(getPointer<__nv_bfloat16 >(dst), getPointer<uint32_t>(src), first_dim,
-						last_dim);
-				break;
 			case DTYPE_FLOAT16:
 				kernel_unpack_input<<<gridDim, last_dim, 0, stream>>>(getPointer<half>(dst), getPointer<uint32_t>(src), first_dim, last_dim);
 				break;
@@ -122,55 +118,18 @@ namespace ml
 			return;
 		}
 
-		switch (dst_dtype)
+		if (dst_dtype == DTYPE_FLOAT16 and src_dtype == DTYPE_FLOAT32)
 		{
-			case DTYPE_BFLOAT16:
-			{
-				switch (src_dtype)
-				{
-					case DTYPE_FLOAT16:
-						kernel_convert<<<gridDim, blockDim, 0, stream>>>(getPointer<__nv_bfloat16 >(dst), getPointer<half>(src), elements);
-						break;
-					case DTYPE_FLOAT32:
-						kernel_convert<<<gridDim, blockDim, 0, stream>>>(getPointer<__nv_bfloat16 >(dst), getPointer<float>(src), elements);
-						break;
-					default:
-						break;
-				}
-				break;
-			}
-			case DTYPE_FLOAT16:
-			{
-				switch (src_dtype)
-				{
-					case DTYPE_BFLOAT16:
-						kernel_convert<<<gridDim, blockDim, 0, stream>>>(getPointer<half>(dst), getPointer<__nv_bfloat16 >(src), elements);
-						break;
-					case DTYPE_FLOAT32:
-						kernel_convert<<<gridDim, blockDim, 0, stream>>>(getPointer<half>(dst), getPointer<float>(src), elements);
-						break;
-					default:
-						break;
-				}
-				break;
-			}
-			case DTYPE_FLOAT32:
-			{
-				switch (src_dtype)
-				{
-					case DTYPE_BFLOAT16:
-						kernel_convert<<<gridDim, blockDim, 0, stream>>>(getPointer<float>(dst), getPointer<__nv_bfloat16 >(src), elements);
-						break;
-					case DTYPE_FLOAT16:
-						kernel_convert<<<gridDim, blockDim, 0, stream>>>(getPointer<float>(dst), getPointer<half>(src), elements);
-						break;
-					default:
-						break;
-				}
-				break;
-			}
-			default:
-				break;
+			assert(dst != src);
+			kernel_convert<<<gridDim, blockDim, 0, stream>>>(getPointer<half>(dst), getPointer<float>(src), elements);
+			return;
+		}
+		if (dst_dtype == DTYPE_FLOAT32 and src_dtype == DTYPE_FLOAT16)
+		{
+
+			assert(dst != src);
+			kernel_convert<<<gridDim, blockDim, 0, stream>>>(getPointer<float>(dst), getPointer<half>(src), elements);
+			return;
 		}
 		assert(cudaGetLastError() == cudaSuccess);
 	}
@@ -184,7 +143,6 @@ namespace ml
 
 		switch (dtype)
 		{
-			case DTYPE_BFLOAT16:
 			case DTYPE_FLOAT16:
 			{
 				dim3 gridDim(shape.dim[0], (shape.dim[1] + 128 - 1) / 128, (shape.dim[2] + 64 - 1) / 64);

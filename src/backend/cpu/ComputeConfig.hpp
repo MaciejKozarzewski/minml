@@ -22,9 +22,6 @@ namespace ml
 		enum class Type
 		{
 			NONE,
-			SW_BF16, // software emulated
-			BF16,
-			SW_FP16, // software emulated
 			FP16,
 			FP32,
 			INT8,
@@ -47,12 +44,6 @@ namespace ml
 		template<typename T>
 		ml::cpu::Type get_type() noexcept
 		{
-			if (std::is_same<T, sw_bfloat16>::value)
-				return ml::cpu::Type::SW_BF16;
-			if (std::is_same<T, bfloat16>::value)
-				return ml::cpu::Type::BF16;
-			if (std::is_same<T, sw_float16>::value)
-				return ml::cpu::Type::SW_FP16;
 			if (std::is_same<T, float16>::value)
 				return ml::cpu::Type::FP16;
 			if (std::is_same<T, float>::value)

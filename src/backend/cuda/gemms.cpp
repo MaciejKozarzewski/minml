@@ -40,16 +40,6 @@ namespace ml
 		assert(err == CUBLAS_STATUS_SUCCESS);
 		switch (dtype)
 		{
-			case DTYPE_BFLOAT16: // ABC [bfloat16]
-			{
-				const cublasComputeType_t ct = cuda::has_bf16_math(context) ? CUBLAS_COMPUTE_32F : CUBLAS_COMPUTE_32F_FAST_16BF;
-				const float _alpha = alpha;
-				const float _beta = beta;
-				cublasStatus_t status = cublasGemmEx(handle, op_B, op_A, M, N, K, &_alpha, getPointer<void>(B), CUDA_R_16BF, LDB, getPointer<void>(A),
-						CUDA_R_16BF, LDA, &_beta, getPointer<void>(C), CUDA_R_16BF, LDC, ct, CUBLAS_GEMM_DEFAULT);
-				assert(status == CUBLAS_STATUS_SUCCESS);
-				break;
-			}
 			case DTYPE_FLOAT16: // ABC [float16]
 			{
 				if (cuda::has_fp16_math(context))
@@ -109,17 +99,6 @@ namespace ml
 		assert(err == CUBLAS_STATUS_SUCCESS);
 		switch (dtype)
 		{
-			case DTYPE_BFLOAT16:
-			{
-				const cublasComputeType_t ct = cuda::has_bf16_math(context) ? CUBLAS_COMPUTE_32F : CUBLAS_COMPUTE_32F_FAST_16BF;
-				const float _alpha = alpha;
-				const float _beta = beta;
-				cublasStatus_t status = cublasGemmStridedBatchedEx(handle, op_B, op_A, M, N, K, &_alpha, getPointer<void>(B), CUDA_R_16BF, LDB,
-						strideB, getPointer<void>(A), CUDA_R_16BF, LDA, strideA, &_beta, getPointer<void>(C), CUDA_R_16BF, LDC, strideC, batch, ct,
-						CUBLAS_GEMM_DEFAULT);
-				assert(status == CUBLAS_STATUS_SUCCESS);
-				break;
-			}
 			case DTYPE_FLOAT16:
 			{
 				if (cuda::has_fp16_math(context))

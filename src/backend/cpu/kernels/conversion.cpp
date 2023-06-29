@@ -291,7 +291,6 @@ namespace SIMD_NAMESPACE
 
 		switch (dtype)
 		{
-			case DTYPE_BFLOAT16:
 			case DTYPE_FLOAT16:
 				kernel_transpose_021<uint16_t>(getPointer<uint16_t>(output), getPointer<uint16_t>(input), shape.dim[0], shape.dim[1], shape.dim[2]);
 				break;
