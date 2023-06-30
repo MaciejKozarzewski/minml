@@ -8,16 +8,13 @@
 #ifndef VECTORS_FP32_SCALAR_HPP_
 #define VECTORS_FP32_SCALAR_HPP_
 
+#include "generic_vector.hpp"
+#include "vector_utils.hpp"
+#include "types.hpp"
+
 #include <cassert>
 #include <algorithm>
 #include <cmath>
-
-#include "generic_vector.hpp"
-#include "vector_load.hpp"
-#include "vector_store.hpp"
-#include "vector_utils.hpp"
-#include "types.hpp"
-#include "type_conversions.hpp"
 
 namespace SIMD_NAMESPACE
 {
@@ -31,9 +28,14 @@ namespace SIMD_NAMESPACE
 			{
 			}
 			template<typename T>
-			Vector(const T *src, int num = size()) noexcept // @suppress("Class members should be properly initialized")
+			Vector(const T *src) noexcept // @suppress("Class members should be properly initialized")
 			{
-				load(src, num);
+				load(src);
+			}
+			template<typename T>
+			Vector(const T *src, int num) noexcept // @suppress("Class members should be properly initialized")
+			{
+				partial_load(src, num);
 			}
 			Vector(double x) noexcept :
 					m_data(static_cast<float>(x))
@@ -44,7 +46,11 @@ namespace SIMD_NAMESPACE
 			{
 			}
 			Vector(float16 x) noexcept :
-					m_data(Converter<SCALAR, float16, float>()(x))
+#if COMPILED_WITH_F16C
+					m_data(_cvtsh_ss(x.m_data))
+#else
+					m_data(0.0f)
+#endif
 			{
 			}
 			Vector(uint32_t raw_bytes) noexcept :
@@ -61,43 +67,56 @@ namespace SIMD_NAMESPACE
 			}
 			void load(const float *ptr) noexcept
 			{
-				m_data = Loader<SCALAR>()(ptr, size());
+				assert(ptr != nullptr);
+				m_data = ptr[0];
 			}
 			void partial_load(const float *ptr, int num) noexcept
 			{
+				assert(ptr != nullptr);
 				assert(0 <= num && num <= size());
-				m_data = Loader<SCALAR>()(ptr, num);
+				m_data = (num == 1) ? ptr[0] : 0.0f;
 			}
 			void load(const float16 *ptr) noexcept
 			{
-				const float16 tmp = Loader<SCALAR>()(ptr, size());
-				m_data = Converter<SCALAR, float16, float>()(tmp);
+				assert(ptr != nullptr);
+#if COMPILED_WITH_F16C
+				m_data = _cvtsh_ss(ptr[0].m_data);
+#endif
 			}
 			void partial_load(const float16 *ptr, int num) noexcept
 			{
+				assert(ptr != nullptr);
 				assert(0 <= num && num <= size());
-				const float16 tmp = Loader<SCALAR>()(ptr, num);
-				m_data = Converter<SCALAR, float16, float>()(tmp);
+				const float16 tmp = (num == 1) ? ptr[0] : float16 { 0u };
+				load(&tmp);
 			}
 			void store(float *ptr) const noexcept
 			{
-				Storer<SCALAR>()(ptr, m_data, size());
+				assert(ptr != nullptr);
+				ptr[0] = m_data;
 			}
 			void partial_store(float *ptr, int num) const noexcept
 			{
+				assert(ptr != nullptr);
 				assert(0 <= num && num <= size());
-				Storer<SCALAR>()(ptr, m_data, num);
+				if (num == 1)
+					ptr[0] = m_data;
 			}
 			void store(float16 *ptr) const noexcept
 			{
-				const float16 tmp = Converter<SCALAR, float, float16>()(m_data);
-				Storer<SCALAR>()(ptr, tmp, size());
+#if COMPILED_WITH_F16C
+				assert(ptr != nullptr);
+				ptr[0] = float16 { _cvtss_sh(m_data, (_MM_FROUND_TO_NEAREST_INT |_MM_FROUND_NO_EXC)) };
+#endif
 			}
 			void partial_store(float16 *ptr, int num) const noexcept
 			{
+				assert(ptr != nullptr);
 				assert(0 <= num && num <= size());
-				const float16 tmp = Converter<SCALAR, float, float16>()(m_data);
-				Storer<SCALAR>()(ptr, tmp, num);
+				float16 tmp;
+				store(&tmp);
+				if (num == 1)
+					ptr[0] = tmp;
 			}
 
 			static Vector<float, SCALAR> zero() noexcept

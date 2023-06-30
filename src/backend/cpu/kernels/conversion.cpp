@@ -24,7 +24,7 @@ namespace
 		{
 			const int processed_elements = std::min(Vector<float>::size(), elements - i);
 			const Vector<float> tmp(src + i, processed_elements);
-			tmp.store(dst + i, processed_elements);
+			tmp.partial_store(dst + i, processed_elements);
 		}
 	}
 

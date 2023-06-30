@@ -22,26 +22,58 @@ namespace SIMD_NAMESPACE
 			template<typename U>
 			inline void load_row(U **ptr, const int row, const int offset, const int num, int columns) noexcept
 			{
-				for (int i = 0; i < Length; i++)
-					data[i].load(ptr[row * columns + i] + offset, num);
+				if (num == Vector<T>::size())
+				{ // full load
+					for (int i = 0; i < Length; i++)
+						data[i].load(ptr[row * columns + i] + offset);
+				}
+				else
+				{ // partial load
+					for (int i = 0; i < Length; i++)
+						data[i].partial_load(ptr[row * columns + i] + offset, num);
+				}
 			}
 			template<typename U>
 			inline void load_row(const U **ptr, const int row, const int offset, const int num, int columns) noexcept
 			{
-				for (int i = 0; i < Length; i++)
-					data[i].load(ptr[row * columns + i] + offset, num);
+				if (num == Vector<T>::size())
+				{ // full load
+					for (int i = 0; i < Length; i++)
+						data[i].load(ptr[row * columns + i] + offset);
+				}
+				else
+				{ // partial load
+					for (int i = 0; i < Length; i++)
+						data[i].partial_load(ptr[row * columns + i] + offset, num);
+				}
 			}
 			template<typename U>
 			inline void store_row(U **ptr, const int row, const int offset, const int num, int columns) const noexcept
 			{
-				for (int i = 0; i < Length; i++)
-					data[i].store(ptr[row * columns + i] + offset, num);
+				if (num == Vector<T>::size())
+				{ // full store
+					for (int i = 0; i < Length; i++)
+						data[i].store(ptr[row * columns + i] + offset);
+				}
+				else
+				{ // partial store
+					for (int i = 0; i < Length; i++)
+						data[i].partial_store(ptr[row * columns + i] + offset, num);
+				}
 			}
 			template<typename U>
 			inline void load_column(const U **ptr, const int col, const int offset, const int num, int columns) noexcept
 			{
-				for (int i = 0; i < Length; i++)
-					data[i].load(ptr[i * columns + col] + offset, num);
+				if (num == Vector<T>::size())
+				{ // full load
+					for (int i = 0; i < Length; i++)
+						data[i].load(ptr[i * columns + col] + offset);
+				}
+				else
+				{ // partial load
+					for (int i = 0; i < Length; i++)
+						data[i].partial_load(ptr[i * columns + col] + offset, num);
+				}
 			}
 			template<typename U>
 			inline void store_column(U **ptr, const int col, const int offset, const int num, int columns) const noexcept

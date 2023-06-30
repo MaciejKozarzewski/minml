@@ -5,19 +5,15 @@
  *      Author: Maciej Kozarzewski
  */
 
-#ifndef BACKEND_CPU_VECTORS_FP32_ZMM_HPP_
-#define BACKEND_CPU_VECTORS_FP32_ZMM_HPP_
+#ifndef VECTORS_FP32_ZMM_HPP_
+#define VECTORS_FP32_ZMM_HPP_
+
+#include "generic_vector.hpp"
 
 #include <cassert>
 #include <algorithm>
 #include <cmath>
 #include <x86intrin.h>
-
-#include "fp32_xmm.hpp"
-#include "generic_vector.hpp"
-#include "vector_load.hpp"
-#include "vector_store.hpp"
-#include "type_conversions.hpp"
 
 namespace SIMD_NAMESPACE
 {
@@ -332,4 +328,4 @@ namespace SIMD_NAMESPACE
 
 } /* namespace SIMD_NAMESPACE */
 
-#endif /* BACKEND_CPU_VECTORS_FP32_ZMM_HPP_ */
+#endif /* VECTORS_FP32_ZMM_HPP_ */

@@ -8,7 +8,7 @@
 #ifndef VECTORS_VECTOR_MACROS_HPP_
 #define VECTORS_VECTOR_MACROS_HPP_
 
-//#define __AVX2__
+#define __AVX2__
 
 #define NAMESPACE_AVX2 ns_avx2
 #define NAMESPACE_AVX ns_avx

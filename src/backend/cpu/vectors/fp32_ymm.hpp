@@ -8,16 +8,12 @@
 #ifndef VECTORS_FP32_YMM_HPP_
 #define VECTORS_FP32_YMM_HPP_
 
+#include "generic_vector.hpp"
+
 #include <cassert>
 #include <algorithm>
 #include <cmath>
 #include <x86intrin.h>
-
-#include "fp32_xmm.hpp"
-#include "generic_vector.hpp"
-#include "vector_load.hpp"
-#include "vector_store.hpp"
-#include "type_conversions.hpp"
 
 namespace SIMD_NAMESPACE
 {
@@ -37,9 +33,14 @@ namespace SIMD_NAMESPACE
 			{
 			}
 			template<typename T>
-			Vector(const T *src, int num = size()) noexcept // @suppress("Class members should be properly initialized")
+			Vector(const T *src) noexcept // @suppress("Class members should be properly initialized")
 			{
-				load(src, num);
+				load(src);
+			}
+			template<typename T>
+			Vector(const T *src, int num) noexcept // @suppress("Class members should be properly initialized")
+			{
+				partial_load(src, num);
 			}
 			Vector(double x) noexcept :
 					m_data(broadcast(static_cast<float>(x)))
@@ -50,7 +51,11 @@ namespace SIMD_NAMESPACE
 			{
 			}
 			Vector(float16 x) noexcept :
-					m_data(broadcast(Converter<SCALAR, float16, float>()(x)))
+#if COMPILED_WITH_F16C
+					m_data(broadcast(_cvtsh_ss(x.m_data)))
+#else
+					m_data(_mm256_setzero_ps())
+#endif
 			{
 			}
 			Vector(__m256i raw_bytes) noexcept :
@@ -86,27 +91,61 @@ namespace SIMD_NAMESPACE
 			{
 				return _mm256_castps_si256(m_data);
 			}
-			void load(const float *src, int num = size()) noexcept
+			void load(const float *src) noexcept
 			{
-				assert(0 <= num && num <= size());
-				m_data = Loader<YMM>()(src, num);
+				assert(src != nullptr);
+				m_data = _mm256_loadu_ps(src);
 			}
-			void load(const float16 *src, int num = size()) noexcept
+			void partial_load(const float *src, int num) noexcept
 			{
+				assert(src != nullptr);
 				assert(0 <= num && num <= size());
-				const __m128i tmp = Loader<XMM>()(reinterpret_cast<const uint16_t*>(src), num);
-				m_data = Converter<YMM, float16, float>()(tmp);
+				m_data = _mm256_maskload_ps(src, get_mask(num));
 			}
-			void store(float *dst, int num = size()) const noexcept
+			void load(const float16 *src) noexcept
 			{
-				assert(0 <= num && num <= size());
-				Storer<YMM>()(dst, m_data, num);
+#if COMPILED_WITH_F16C
+				assert(src != nullptr);
+				const __m128i tmp = _mm_loadu_si128(reinterpret_cast<const __m128i*>(src));
+				m_data = _mm256_cvtph_ps(tmp);
+#endif
 			}
-			void store(float16 *dst, int num = size()) const noexcept
+			void partial_load(const float16 *src, int num) noexcept
 			{
+				assert(src != nullptr);
 				assert(0 <= num && num <= size());
-				const __m128i tmp = Converter<YMM, float, float16>()(m_data);
-				Storer<XMM>()(reinterpret_cast<uint16_t*>(dst), tmp, num);
+				float16 tmp[8] = { float16(), float16(), float16(), float16(), float16(), float16(), float16(), float16() };
+				for (int i = 0; i < num; i++)
+					tmp[i] = src[i];
+				load(tmp);
+			}
+			void store(float *dst) const noexcept
+			{
+				assert(dst != nullptr);
+				_mm256_storeu_ps(dst, m_data);
+			}
+			void partial_store(float *dst, int num) const noexcept
+			{
+				assert(dst != nullptr);
+				assert(0 <= num && num <= size());
+				_mm256_maskstore_ps(dst, get_mask(num), m_data);
+			}
+			void store(float16 *dst) const noexcept
+			{
+#if COMPILED_WITH_F16C
+				assert(dst != nullptr);
+				const __m128i tmp = _mm256_cvtps_ph(m_data, _MM_FROUND_NO_EXC);
+				_mm_storeu_si128(reinterpret_cast<__m128i*>(dst), tmp);
+#endif
+			}
+			void partial_store(float16 *dst, int num) const noexcept
+			{
+				assert(dst != nullptr);
+				assert(0 <= num && num <= size());
+				float16 tmp[8];
+				store(tmp);
+				for (int i = 0; i < num; i++)
+					dst[i] = tmp[i];
 			}
 
 			static Vector<float, YMM> zero() noexcept

@@ -67,7 +67,7 @@ namespace
 				if (remaining_elements > 0)
 				{
 					const Vector<CT> tmp(workspace + j * Vector<CT>::size());
-					tmp.store(dst_ptr + j * Vector<CT>::size(), std::min(Vector<CT>::size(), remaining_elements));
+					tmp.partial_store(dst_ptr + j * Vector<CT>::size(), std::min(Vector<CT>::size(), remaining_elements));
 				}
 			src_ptr += stride;
 			dst_ptr += stride;
@@ -112,7 +112,7 @@ namespace
 				const int elements = std::min(Vector<CT>::size(), last_dim - j);
 				Vector<CT> tmp(workspace_ptr + j, elements);
 				tmp *= scale;
-				tmp.store(dst_ptr + j, elements);
+				tmp.partial_store(dst_ptr + j, elements);
 			}
 			src_ptr += last_dim;
 			dst_ptr += last_dim;
@@ -132,7 +132,7 @@ namespace
 			const int elements = std::min(Vector<CT>::size(), length - i);
 			Vector<CT> tmp(src_ptr + i, elements);
 			tmp = Vector<CT>::one() / (Vector<CT>::one() + exp(-tmp));
-			tmp.store(dst_ptr + i, elements);
+			tmp.partial_store(dst_ptr + i, elements);
 		}
 	}
 	void kernel_sigmoid_backward(float *gradient_prev, const float *gradient_next, const float *output, int length)
@@ -154,7 +154,7 @@ namespace
 			const int elements = std::min(Vector<CT>::size(), length - i);
 			Vector<CT> tmp(src_ptr + i, elements);
 			tmp = tanh(tmp);
-			tmp.store(dst_ptr + i, elements);
+			tmp.partial_store(dst_ptr + i, elements);
 		}
 	}
 	void kernel_tanh_backward(float *gradient_prev, const float *gradient_next, const float *output, int length)
@@ -176,7 +176,7 @@ namespace
 			const int elements = std::min(Vector<CT>::size(), length - i);
 			Vector<CT> tmp(src_ptr + i, elements);
 			tmp = max(Vector<CT>::zero(), tmp);
-			tmp.store(dst_ptr + i, elements);
+			tmp.partial_store(dst_ptr + i, elements);
 		}
 	}
 	void kernel_relu_backward(float *gradient_prev, const float *gradient_next, const float *output, int length)
@@ -204,7 +204,7 @@ namespace
 				Vector<CT> tmp(input_ptr + j, elements);
 				Vector<CT> b(bias_ptr + j, elements);
 				tmp = activation_forward(ACT, tmp + b);
-				tmp.store(input_ptr + j, elements);
+				tmp.partial_store(input_ptr + j, elements);
 			}
 			input_ptr += last_dim;
 		}
