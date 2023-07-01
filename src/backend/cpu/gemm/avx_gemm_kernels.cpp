@@ -202,11 +202,24 @@
 	vmovups(ymm(reg0), (4*(n*10+0))(rbx))\
 	vmovsd (xmm(reg1), (4*(n*10+8))(rbx))
 
+#define RELU_10x8xFP32()\
+	vxorps(ymm0, ymm0, ymm0)\
+	vmaxps(ymm0, ymm6, ymm6)\
+	vmaxps(ymm0, ymm7, ymm7)\
+	vmaxps(ymm0, ymm8, ymm8)\
+	vmaxps(ymm0, ymm9, ymm9)\
+	vmaxps(ymm0, ymm10, ymm10)\
+	vmaxps(ymm0, ymm11, ymm11)\
+	vmaxps(ymm0, ymm12, ymm12)\
+	vmaxps(ymm0, ymm13, ymm13)\
+	vmaxps(ymm0, ymm14, ymm14)\
+	vmaxps(ymm0, ymm15, ymm15)
+
 namespace ml
 {
 
-	void gemm_avx_10x8_fp32(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr,
-			const Fragment &C) noexcept
+	void gemm_avx_10x8_fp32(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,
+			bool use_relu) noexcept
 	{
 		assert(A.dtype() == DTYPE_FLOAT32);
 		assert(B.dtype() == DTYPE_FLOAT32);
@@ -233,6 +246,7 @@ namespace ml
 		uint64_t k_left = K % 4;
 		const uint64_t C_stride = C.stride() * sizeof(float);
 		const uint64_t D_stride = D.stride() * sizeof(float);
+		const uint64_t flag_relu = use_relu;
 
 		begin_asm()
 		movq(var(A_ptr), rax) // lhs pointer is in rax
@@ -243,7 +257,7 @@ namespace ml
 		test(r14, r14)
 		je(FINALLOOP)
 
-		label(UNROLLED4)
+		label(UNROLLED_x4)
 		SUB_KERNEL_10xFP32_8xFP32(0)
 		SUB_KERNEL_10xFP32_8xFP32(1)
 		SUB_KERNEL_10xFP32_8xFP32(2)
@@ -252,24 +266,25 @@ namespace ml
 		add(imm(4*10*4), rax)
 		add(imm(4*8*4), rbx)
 		dec(r14)
-		jne(UNROLLED4)
+		jne(UNROLLED_x4)
 
 		label(FINALLOOP)
 		movq(var(k_left), r14)// load the number of 1-unrolled iterations
 		test(r14, r14)
 		je(EPILOGUE)
 
-		label(UNROLLED1)
+		label(UNROLLED_x1)
 		SUB_KERNEL_10xFP32_8xFP32(0)
 		add(imm(1*10*4), rax)
 		add(imm(1*8*4), rbx)
 		dec(r14)
-		jne(UNROLLED1)
+		jne(UNROLLED_x1)
 
 		label(EPILOGUE)
 
 		movq(var(alpha_ptr), rax)// load address of alpha
 		movq(var(beta_ptr), rbx)// load address of beta
+
 		vbroadcastss(mem(rax), ymm1)
 		vbroadcastss(mem(rbx), ymm0)
 
@@ -277,8 +292,8 @@ namespace ml
 
 		vxorps(ymm1, ymm1, ymm1)
 		vucomiss(xmm0, xmm1)// set ZF if beta == 0.
-		je(BETAZERO)
-		// beta != 0 case
+		je(APPLY_RELU)// if not loading C, jump to ReLU
+		// load C, scale and add to accumulators
 		movq(var(C_stride), r14)// C stride is r14
 		movq(var(C_ptr), rcx)// C pointer is in rcx
 
@@ -290,8 +305,14 @@ namespace ml
 		SCALE_5x8xFP32_BY_BETA()
 		ADD_5x8xFP32_TO_ACCUMULATORS(ymm11, ymm12, ymm13, ymm14, ymm15)
 
-		label(BETAZERO)
-		// beta == 0 case
+		label(APPLY_RELU)
+		movq(var(flag_relu), r14)// load flag if to use relu
+		test(r14, r14)
+		je(STORE_D)
+		// apply ReLU case
+		RELU_10x8xFP32()
+
+		label(STORE_D)
 		movq(var(D_stride), r14)// D stride is r14
 		movq(var(D_ptr), rcx)// D pointer is in rcx
 
@@ -312,13 +333,14 @@ namespace ml
 				[C_stride] "m"(C_stride),
 				[D_stride] "m"(D_stride),
 				[alpha_ptr] "m"(alpha_ptr),
-				[beta_ptr] "m"(beta_ptr)
+				[beta_ptr] "m"(beta_ptr),
+				[flag_relu] "m"(flag_relu)
 				:// clobbers
 				"cc", "memory", "%ymm0", "%ymm1", "%ymm2", "%ymm3", "%ymm4", "%ymm5", "%ymm6", "%ymm7",
 				"%ymm8", "%ymm9", "%ymm10", "%ymm11", "%ymm12", "%ymm13", "%ymm14", "%ymm15", "%rax", "%rbx", "%rcx", "%r14")
 	}
-	void gemm_avx_10x8_fp32_fp16(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr,
-			const Fragment &C) noexcept
+	void gemm_avx_10x8_fp32_fp16(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,
+			bool use_relu) noexcept
 	{
 		assert(A.dtype() == DTYPE_FLOAT32);
 		assert(B.dtype() == DTYPE_FLOAT32);
@@ -345,6 +367,7 @@ namespace ml
 		uint64_t k_left = K % 4;
 		const uint64_t C_stride = C.stride() * sizeof(float16);
 		const uint64_t D_stride = D.stride() * sizeof(float16);
+		const uint64_t flag_relu = use_relu;
 
 		begin_asm()
 		movq(var(A_ptr), rax) // lhs pointer is in rax
@@ -389,8 +412,7 @@ namespace ml
 
 		vxorps(ymm1, ymm1, ymm1)
 		vucomiss(xmm0, xmm1)// set ZF if beta == 0.
-		je(BETAZERO)
-		// beta != 0 case
+		je(APPLY_RELU)
 		movq(var(C_stride), r14)// C stride is r14
 		movq(var(C_ptr), rcx)// C pointer is in rcx
 
@@ -404,8 +426,14 @@ namespace ml
 		SCALE_5x8xFP32_BY_BETA()
 		ADD_5x8xFP32_TO_ACCUMULATORS(ymm11, ymm12, ymm13, ymm14, ymm15)
 
-		label(BETAZERO)
-		// beta == 0 case
+		label(APPLY_RELU)
+		movq(var(flag_relu), r14)// load flag if to use relu
+		test(r14, r14)
+		je(STORE_D)
+		// apply ReLU case
+		RELU_10x8xFP32()
+
+		label(STORE_D)
 		movq(var(D_stride), r14)// D stride is r14
 		movq(var(D_ptr), rcx)// D pointer is in rcx
 
@@ -427,7 +455,8 @@ namespace ml
 				[C_stride] "m"(C_stride),
 				[D_stride] "m"(D_stride),
 				[alpha_ptr] "m"(alpha_ptr),
-				[beta_ptr] "m"(beta_ptr)
+				[beta_ptr] "m"(beta_ptr),
+				[flag_relu] "m"(flag_relu)
 				:// clobbers
 				"cc", "memory", "%ymm0", "%ymm1", "%ymm2", "%ymm3", "%ymm4", "%ymm5", "%ymm6", "%ymm7",
 				"%ymm8", "%ymm9", "%ymm10", "%ymm11", "%ymm12", "%ymm13", "%ymm14", "%ymm15", "%rax", "%rbx", "%rcx", "%r14")

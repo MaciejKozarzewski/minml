@@ -406,6 +406,8 @@
 #define vpcmpeqb(_0, _1, _2) INSTR_(vpcmpeqb, _0, _1, _2)
 #define vpcmpeqw(_0, _1, _2) INSTR_(vpcmpeqw, _0, _1, _2)
 #define vpcmpeqd(_0, _1, _2) INSTR_(vpcmpeqd, _0, _1, _2)
+#define maxps(_0, _1) INSTR_(maxps, _0, _1)
+#define vmaxps(_0, _1, _2) INSTR_(vmaxps, _0, _1, _2)
 
 /*
  * Vector integer math
