@@ -165,6 +165,7 @@ namespace ml
 			Matrix matrix_A, matrix_B, matrix_C, matrix_D;
 			float alpha = 1.0f, beta = 0.0f;
 			MatrixOp op_A = MatrixOp::NORMAL, op_B = MatrixOp::NORMAL;
+			bool use_relu = false;
 
 			TileDimensions outer_tile, total_size;
 
@@ -175,7 +176,7 @@ namespace ml
 			using packing_function = std::function<void(Fragment&, const Matrix&, const Position2D&, MatrixOp)>;
 			using unpacking_function = std::function<void(Matrix&, const Position2D&,const Fragment&)>;
 			using gemm_function = std::function<void(Fragment &, const void *, const Fragment &, const Fragment &, const void *,
-					const Fragment &)>;
+					const Fragment &, bool)>;
 
 			TypeConfiguration type_configuration;
 			TileDimensions inner_tile;
@@ -218,6 +219,10 @@ namespace ml
 			{
 				this->alpha = alpha;
 				this->beta = beta;
+			}
+			void useRelu(bool b) noexcept
+			{
+				use_relu = b;
 			}
 			void setup(mlContext_t context);
 			void run();

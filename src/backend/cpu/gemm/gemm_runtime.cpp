@@ -46,6 +46,7 @@ namespace ml
 			{
 				const float tmp_alpha = alpha;
 				const float tmp_beta = (outer_k == 0) ? beta : 1.0f;
+				const bool is_last_k_tile = (total_size.K - outer_k) <= outer_tile.K;
 
 				A_fragments.reset();
 				for (int outer_n = 0; outer_n < total_size.N; outer_n += outer_tile.N)
@@ -70,7 +71,7 @@ namespace ml
 							else
 								C_fragment = D_fragment;
 
-							gemm_kernel(D_fragment, &tmp_alpha, *A_frag_iter, *B_frag_iter, &tmp_beta, C_fragment);
+							gemm_kernel(D_fragment, &tmp_alpha, *A_frag_iter, *B_frag_iter, &tmp_beta, C_fragment, use_relu and is_last_k_tile);
 							unpack_fragment_D(D_fragment, inner_m, inner_n);
 							A_frag_iter.advance();
 						}

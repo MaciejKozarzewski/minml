@@ -121,18 +121,7 @@ namespace ml
 	{
 		assert(input.size() == 1);
 		if (isUsingWeights())
-		{
-			const bool emulate_low_precision = false; // isTrainable() and dtype() == DataType::FLOAT32;
-
-			if (emulate_low_precision)
-			{
-				Tensor tmp = m_workspace.lock()->view(getWeightShape());
-				emulateLowPrecision(context(), tmp, getWeights().getParam());
-				gemm(context(), 'n', 't', output, flatten_input_tensor(input[0]), tmp, 1, 0);
-			}
-			else
-				gemm(context(), 'n', 't', output, flatten_input_tensor(input[0]), getWeights().getParam(), 1, 0);
-		}
+			gemm(context(), 'n', 't', output, flatten_input_tensor(input[0]), getWeights().getParam(), 1, 0);
 		else
 			output.copyFrom(context(), flatten_input_tensor(input[0]));
 
@@ -149,17 +138,8 @@ namespace ml
 		activationBackward(context(), gradient_next, gradient_next, output, m_activation);
 		if (isUsingWeights())
 		{
-			const bool emulate_low_precision = false; // isTrainable() and dtype() == DataType::FLOAT32;
-
 			Tensor tmp_grad = flatten_input_tensor(gradient_prev[0]);
-			if (emulate_low_precision)
-			{
-				Tensor tmp = m_workspace.lock()->view(getWeightShape());
-				emulateLowPrecision(context(), tmp, getWeights().getParam());
-				gemm(context(), 'n', 'n', tmp_grad, gradient_next, tmp, 1, 0);
-			}
-			else
-				gemm(context(), 'n', 'n', tmp_grad, gradient_next, getWeights().getParam(), 1, 0);
+			gemm(context(), 'n', 'n', tmp_grad, gradient_next, getWeights().getParam(), 1, 0);
 			gemm(context(), 't', 'n', getWeights().getGradient(), gradient_next, flatten_input_tensor(input[0]), 1, 0);
 		}
 		else

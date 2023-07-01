@@ -26,7 +26,7 @@ namespace ml
 		public:
 			Matrix() noexcept = default;
 			Matrix(const void *ptr, mlDataType_t dtype, int rows, int columns, int stride) noexcept :
-					Matrix(const_cast<void*>(ptr), dtype, rows, columns, columns)
+					Matrix(const_cast<void*>(ptr), dtype, rows, columns, stride)
 			{
 			}
 			Matrix(void *ptr, mlDataType_t dtype, int rows, int columns, int stride) noexcept :
@@ -39,7 +39,7 @@ namespace ml
 				assert(ptr != nullptr);
 				assert(rows > 0);
 				assert(columns > 0);
-				assert(stride >= 0 && stride >= columns);
+				assert(stride >= 0);
 			}
 			mlDataType_t dtype() const noexcept
 			{
@@ -93,7 +93,7 @@ namespace ml
 			 */
 			int index_at(int row, int column) const noexcept
 			{
-				assert(0 <= row && row < rows());
+				assert((stride() == 0) or (0 <= row && row < rows()));
 				assert(0 <= column && column < columns());
 				return row * stride() + column;
 			}

@@ -184,7 +184,7 @@ namespace ml
 		}
 	}
 
-	void winogradWeightTransform(const Context &context, const Tensor &weights, Tensor &matrices, bool invert, bool low_precision)
+	void winogradWeightTransform(const Context &context, const Tensor &weights, Tensor &matrices, bool invert)
 	{
 		static Timer timer("winogradWeightTransform");
 		TimerGuard tg(timer);
@@ -194,11 +194,11 @@ namespace ml
 		{
 			case DeviceType::CPU:
 				cpu_winograd_weight_transform(get(context), tile_size, get(weights.dtype()), get_shape(weights), weights.data(), matrices.data(),
-						invert, low_precision);
+						invert);
 				break;
 			case DeviceType::CUDA:
 				cuda_winograd_weight_transform(get(context), tile_size, get(weights.dtype()), get_shape(weights), weights.data(), matrices.data(),
-						invert, low_precision);
+						invert);
 				break;
 		}
 	}
@@ -326,6 +326,34 @@ namespace ml
 				cuda_gemm_batched(get(context), get(C.dtype()), get_shape(C), C.data(), get_shape(A), A.data(), get_shape(B), B.data(), opA, opB,
 						alpha, beta);
 				break;
+		}
+	}
+
+	void gemm_ex(const Context &context, Tensor &D, float alpha, char opA, const Tensor &A, char opB, const Tensor &B, float beta, const Tensor &C,
+			ActivationType act)
+	{
+		static Timer timer("gemm");
+		TimerGuard tg(timer);
+		switch (context.device().type())
+		{
+			case DeviceType::CPU:
+			{
+				if (act != ActivationType::RELU and act != ActivationType::LINEAR)
+					throw std::logic_error("Only ReLU or linear activations are supported for CPU gemm_ex");
+				cpu_gemm_ex(get(context), get(C.dtype()), get_shape(D), D.data(), alpha, opA, get_shape(A), A.data(), opB, get_shape(B), B.data(),
+						beta, get_shape(C), C.data(), get(act));
+				break;
+			}
+			case DeviceType::CUDA:
+			{
+				if (C.data() != D.data())
+					throw std::logic_error("C and D must point to the same memory for CUDA gemm_ex");
+				if (act != ActivationType::RELU and act != ActivationType::LINEAR)
+					throw std::logic_error("Only ReLU or linear activations are supported for CUDA gemm_ex");
+				cuda_gemm(get(context), get(D.dtype()), get_shape(D), D.data(), get_shape(A), A.data(), get_shape(B), B.data(), opA, opB, alpha,
+						beta);
+				break;
+			}
 		}
 	}
 

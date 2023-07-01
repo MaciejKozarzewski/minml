@@ -31,20 +31,9 @@ namespace
 	using namespace ml;
 	using namespace vectors;
 
-	template<typename T>
-	__device__ T fake_low_precision(T x)
-	{
-		return x;
-	}
-	__device__ Vector<float> fake_low_precision(Vector<float> x)
-	{
-		uint32_t tmp = reinterpret_cast<uint32_t*>(&x)[0] & 0xFFFFF000u;
-		return reinterpret_cast<float*>(&tmp)[0];
-	}
-
 	template<int KernelSize, int TransformSize, typename T>
 	__global__ void kernel_transform_weights(T *__restrict__ matrices, const T *__restrict__ weights, int output_filters, int input_filters,
-			bool invert, bool low_precision)
+			bool invert)
 	{
 		constexpr int TileSize = KernelSize + TransformSize - 1;
 
@@ -60,8 +49,6 @@ namespace
 						tmp = weights_wrapper.load(blockIdx.y, KernelSize - 1 - row, KernelSize - 1 - col, f);
 					else
 						tmp = weights_wrapper.load(blockIdx.y, row, col, f);
-					if (low_precision)
-						tmp = fake_low_precision(tmp);
 					tile.at(col, row) = tmp;
 				}
 
@@ -307,8 +294,7 @@ namespace
 	}
 
 	template<typename T>
-	void launch_weight_transform(mlContext_t context, int tile_size, mlShape_t weight_shape, const void *weights, void *matrices, bool invert,
-			bool low_precision)
+	void launch_weight_transform(mlContext_t context, int tile_size, mlShape_t weight_shape, const void *weights, void *matrices, bool invert)
 	{
 		const int filters_out = weight_shape.dim[0];
 		const int filters_in = weight_shape.dim[3];
@@ -324,15 +310,15 @@ namespace
 		{
 			if (tile_size == 2)
 				kernel_transform_weights<3, 2> <<<gridSize, blockSize, 0, stream>>>(getPointer<T>(matrices), getPointer<T>(weights), filters_out,
-						filters_in, invert, low_precision);
+						filters_in, invert);
 			if (tile_size == 4)
 				kernel_transform_weights<3, 4> <<<gridSize, blockSize, 0, stream>>>(getPointer<T>(matrices), getPointer<T>(weights), filters_out,
-						filters_in, invert, low_precision);
+						filters_in, invert);
 		}
 		if (kernel_size == 5 && tile_size == 2)
 		{
 			kernel_transform_weights<5, 2> <<<gridSize, blockSize, 0, stream>>>(getPointer<T>(matrices), getPointer<T>(weights), filters_out,
-					filters_in, invert, low_precision);
+					filters_in, invert);
 		}
 		assert(cudaGetLastError() == cudaSuccess);
 	}
@@ -425,15 +411,15 @@ namespace
 namespace ml
 {
 	void cuda_winograd_weight_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape, const void *weights,
-			void *matrices, bool invert, bool low_precision)
+			void *matrices, bool invert)
 	{
 		switch (dtype)
 		{
 			case DTYPE_FLOAT16:
-				launch_weight_transform<half>(context, tile_size, weight_shape, weights, matrices, invert, low_precision);
+				launch_weight_transform<half>(context, tile_size, weight_shape, weights, matrices, invert);
 				break;
 			case DTYPE_FLOAT32:
-				launch_weight_transform<float>(context, tile_size, weight_shape, weights, matrices, invert, low_precision);
+				launch_weight_transform<float>(context, tile_size, weight_shape, weights, matrices, invert);
 				break;
 		}
 	}

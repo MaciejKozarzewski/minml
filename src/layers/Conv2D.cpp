@@ -158,8 +158,6 @@ namespace ml
 
 	void Conv2D::forward(const std::vector<Tensor> &input, Tensor &output)
 	{
-		const bool emulate_low_precision = false; // isTrainable() and dtype() == DataType::FLOAT32;
-
 		choose_algorithm();
 
 		switch (m_algorithm)
@@ -215,7 +213,7 @@ namespace ml
 				if (m_are_weights_transformed == false)
 				{
 					m_are_weights_transformed = true;
-					winogradWeightTransform(context(), getWeights().getParam(), *m_transformed_weights, false, emulate_low_precision);
+					winogradWeightTransform(context(), getWeights().getParam(), *m_transformed_weights, false);
 				}
 
 				Tensor input_matrices = m_workspace.lock()->view(get_matrices_shape(m_kernel_size, m_winograd_tile_size, input[0].shape()));
@@ -243,7 +241,6 @@ namespace ml
 	void Conv2D::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next)
 	{
 		assert(input.size() == 1 && gradient_prev.size() == 1);
-		const bool emulate_low_precision = false; // isTrainable() and dtype() == DataType::FLOAT32;
 		choose_algorithm();
 
 		activationBackward(context(), gradient_next, gradient_next, output, m_activation);
@@ -276,7 +273,7 @@ namespace ml
 							device());
 
 				m_are_weights_transformed = false;
-				winogradWeightTransform(context(), getWeights().getParam(), *m_transformed_weights, true, emulate_low_precision);
+				winogradWeightTransform(context(), getWeights().getParam(), *m_transformed_weights, true);
 
 				Tensor gradient_next_matrices = m_workspace.lock()->view(get_matrices_shape(m_kernel_size, m_winograd_tile_size, output.shape()));
 				Tensor gradient_prev_matrices = m_workspace.lock()->view(get_matrices_shape(m_kernel_size, m_winograd_tile_size, input[0].shape()),

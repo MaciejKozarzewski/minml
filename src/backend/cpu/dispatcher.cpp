@@ -11,6 +11,7 @@
 #include "kernel_definitions.hpp"
 
 #include <functional>
+#include <iostream>
 
 namespace
 {
@@ -74,10 +75,10 @@ namespace ml
 	}
 
 	void cpu_winograd_weight_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape, const void *weights,
-			void *matrices, bool invert, bool low_precision)
+			void *matrices, bool invert)
 	{
 		CREATE_TABLE(cpu_kernel_winograd_weight_transform);
-		DISPATCH_AND_CALL(cpu_kernel_winograd_weight_transform)(context, tile_size, dtype, weight_shape, weights, matrices, invert, low_precision);
+		DISPATCH_AND_CALL(cpu_kernel_winograd_weight_transform)(context, tile_size, dtype, weight_shape, weights, matrices, invert);
 	}
 	void cpu_winograd_input_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape, mlShape_t input_shape,
 			const void *input, void *matrices)

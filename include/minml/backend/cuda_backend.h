@@ -53,7 +53,7 @@ namespace ml
 
 		// implemented in 'winograd_non_fused.cu'
 		DLL_PUBLIC void cuda_winograd_weight_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape,
-				const void *weights, void *matrices, bool invert, bool low_precision);
+				const void *weights, void *matrices, bool invert);
 		DLL_PUBLIC void cuda_winograd_input_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape,
 				mlShape_t input_shape, const void *input, void *matrices);
 		DLL_PUBLIC void cuda_winograd_output_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape,

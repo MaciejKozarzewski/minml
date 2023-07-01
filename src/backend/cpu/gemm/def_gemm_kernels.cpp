@@ -155,9 +155,14 @@ namespace
 	{
 		return fp16_to_fp32(x.m_data);
 	}
+	float relu(float x) noexcept
+	{
+		return (x > 0.0f) ? x : 0.0f;
+	}
 
 	template<typename DT, typename AT, typename BT, typename CT>
-	void kernel_gemm_fp32(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C) noexcept
+	void kernel_gemm_fp32(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,
+			bool use_relu) noexcept
 	{
 		assert(A.rows() == B.rows());
 		const int M = A.columns();
@@ -184,23 +189,26 @@ namespace
 				acc[i] *= alpha;
 		}
 
-		assert(D.rows() == M);
-		assert(D.columns() == N);
-		assert(C.size() == D.size());
 		assert(beta_ptr != nullptr);
 		const float beta = reinterpret_cast<const float*>(beta_ptr)[0];
-		if (beta == 0.0f)
+		if (beta != 0.0f)
 		{
+			assert(C.size() == D.size());
 			for (int m = 0; m < M; m++)
 				for (int n = 0; n < N; n++)
-					D.at<DT>(m, n) = convert<float, DT>(acc[m * N + n]);
+					acc[m * N + n] += beta * convert<DT, float>(C.at<DT>(m, n));
 		}
-		else
+		if (use_relu)
 		{
-			for (int m = 0; m < M; m++)
-				for (int n = 0; n < N; n++)
-					D.at<DT>(m, n) = convert<float, DT>(beta * convert<CT, float>(C.at<CT>(m, n)) + acc[m * N + n]);
+			for (int i = 0; i < M * N; i++)
+				acc[i] = relu(acc[i]);
 		}
+
+		assert(D.rows() == M);
+		assert(D.columns() == N);
+		for (int m = 0; m < M; m++)
+			for (int n = 0; n < N; n++)
+				D.at<DT>(m, n) = convert<float, DT>(acc[m * N + n]);
 	}
 
 	template<typename SrcT, typename DstT>
@@ -264,12 +272,13 @@ namespace ml
 	 * Computes D = alpha * A * B + beta * C
 	 * C and D may point to the same object
 	 */
-	void gemm_def_MxN_fp32(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C) noexcept
+	void gemm_def_MxN_fp32(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,
+			bool use_relu) noexcept
 	{
-		kernel_gemm_fp32<float, float, float, float>(D, alpha_ptr, A, B, beta_ptr, C);
+		kernel_gemm_fp32<float, float, float, float>(D, alpha_ptr, A, B, beta_ptr, C, use_relu);
 	}
-	void gemm_def_MxN_fp32_fp16(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr,
-			const Fragment &C) noexcept
+	void gemm_def_MxN_fp32_fp16(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,
+			bool use_relu) noexcept
 	{
 		assert(D.dtype() == DTYPE_FLOAT16);
 		assert(C.dtype() == DTYPE_FLOAT16);
@@ -278,16 +287,16 @@ namespace ml
 		if (A.dtype() == DTYPE_FLOAT16)
 		{
 			if (B.dtype() == DTYPE_FLOAT16)
-				kernel_gemm_fp32<float16, float16, float16, float16>(D, alpha_ptr, A, B, beta_ptr, C);
+				kernel_gemm_fp32<float16, float16, float16, float16>(D, alpha_ptr, A, B, beta_ptr, C, use_relu);
 			else
-				kernel_gemm_fp32<float16, float16, float, float16>(D, alpha_ptr, A, B, beta_ptr, C);
+				kernel_gemm_fp32<float16, float16, float, float16>(D, alpha_ptr, A, B, beta_ptr, C, use_relu);
 		}
 		else
 		{
 			if (B.dtype() == DTYPE_FLOAT16)
-				kernel_gemm_fp32<float16, float, float16, float16>(D, alpha_ptr, A, B, beta_ptr, C);
+				kernel_gemm_fp32<float16, float, float16, float16>(D, alpha_ptr, A, B, beta_ptr, C, use_relu);
 			else
-				kernel_gemm_fp32<float16, float, float, float16>(D, alpha_ptr, A, B, beta_ptr, C);
+				kernel_gemm_fp32<float16, float, float, float16>(D, alpha_ptr, A, B, beta_ptr, C, use_relu);
 		}
 	}
 

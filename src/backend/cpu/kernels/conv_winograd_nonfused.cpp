@@ -22,19 +22,315 @@ namespace
 	using namespace ml;
 	using namespace SIMD_NAMESPACE;
 
-	template<typename T>
-	T fake_low_precision(T x)
+	template<int N>
+	Indexer<N> create_indexer(const mlShape_t &shape) noexcept
 	{
-		return x;
+		assert(N == shape.rank);
+		if constexpr (N == 4)
+			return Indexer<4>(shape.dim[0], shape.dim[1], shape.dim[2], shape.dim[3]);
+		if constexpr (N == 3)
+			return Indexer<3>(shape.dim[0], shape.dim[1], shape.dim[2]);
+		if constexpr (N == 2)
+			return Indexer<2>(shape.dim[0], shape.dim[1]);
+		if constexpr (N == 1)
+			return Indexer<1>(shape.dim[0]);
+		return Indexer<N>();
 	}
-//	Vector<float> emulate_low_precision(Vector<float> x)
-//	{
-//		return x & Vector<float>(constant<0xFFFFF000u>());
-//	}
+
+	template<typename DT, typename CT, int Size>
+	class ConstTensorTile
+	{
+			const DT *m_pointers[Size * Size];
+			const DT *m_src_ptr = nullptr;
+			Indexer<4> m_indexer;
+			int m_height, m_width;
+		public:
+			ConstTensorTile(const void *src, int batch, int height, int width, int filters) noexcept :
+					m_src_ptr(reinterpret_cast<const DT*>(src)),
+					m_indexer(batch, height, width, filters),
+					m_height(height),
+					m_width(width)
+			{
+			}
+			void extract_tile_at(int b, int h, int w, const DT *zero_line) noexcept
+			{
+				int idx = 0;
+				for (int i = 0; i < Size; i++)
+					for (int j = 0; j < Size; j++, idx++)
+					{
+						const int x = h + i;
+						const int y = w + j;
+						if (x >= 0 and x < m_height and y >= 0 and y < m_width)
+							m_pointers[idx] = m_src_ptr + m_indexer.at(b, x, y, 0);
+						else
+							m_pointers[idx] = zero_line;
+					}
+			}
+			Line<Size, CT> load_column(int col, int elements_to_load) const noexcept
+			{
+				Line<Size, CT> result;
+				if (elements_to_load == Vector<CT>::size())
+				{ // full load
+					for (int i = 0; i < Size; i++)
+						result[i].load(m_pointers[i * Size + col]);
+				}
+				else
+				{ // partial load
+					for (int i = 0; i < Size; i++)
+						result[i].partial_load(m_pointers[i * Size + col], elements_to_load);
+				}
+				return result;
+			}
+			void increment() noexcept
+			{
+				for (int i = 0; i < Size * Size; i++)
+					m_pointers[i] += Vector<CT>::size();
+			}
+	};
+	template<typename DT, typename CT, int Size>
+	class TensorTile
+	{
+			DT *m_pointers[Size * Size];
+			DT *m_dst_ptr = nullptr;
+			DT *m_fake_storage = nullptr;
+			int m_elements_left = 0;
+			mlShape_t m_shape;
+		public:
+			TensorTile(void *dst, const mlShape_t &shape, DT *fake_storage) noexcept :
+					m_dst_ptr(reinterpret_cast<DT*>(dst)),
+					m_fake_storage(fake_storage),
+					m_shape(shape)
+			{
+			}
+			void extract_tile_at(int b, int h, int w) noexcept
+			{
+				assert(0 <= b && b < m_shape.dim[0]);
+				m_elements_left = get_last_dim(m_shape);
+				const Indexer<4> indexer = create_indexer<4>(m_shape);
+				int idx = 0;
+				for (int i = 0; i < Size; i++)
+					for (int j = 0; j < Size; j++, idx++)
+					{
+						const int x = h + i;
+						const int y = w + j;
+						if (x >= 0 and x < m_shape.dim[1] and y >= 0 and y < m_shape.dim[2])
+							m_pointers[idx] = m_dst_ptr + indexer.at(b, x, y, 0);
+						else
+							m_pointers[idx] = m_fake_storage;
+					}
+			}
+			void store_element(const Vector<CT> &value, int row, int col) noexcept
+			{
+				DT *dst_ptr = m_pointers[row * Size + col];
+				if (m_elements_left >= Vector<CT>::size())
+					value.store(dst_ptr); // full store
+				else
+					value.partial_load(dst_ptr, std::min(Vector<CT>::size(), m_elements_left)); // partial store
+			}
+			void increment() noexcept
+			{
+				m_elements_left -= Vector<CT>::Size();
+			}
+	};
+	template<typename DT, typename CT, int Size>
+	class ConstMatrixTile
+	{
+			const DT *m_pointers[Size * Size];
+			const DT *m_src_ptr = nullptr;
+			int m_elements_left = 0;
+			mlShape_t m_shape;
+		public:
+			ConstMatrixTile(const void *src, const mlShape_t &shape) noexcept :
+					m_src_ptr(reinterpret_cast<DT*>(src)),
+					m_shape(shape)
+			{
+			}
+			void extract_tile_at(int idx) noexcept
+			{
+				m_elements_left = get_last_dim(m_shape);
+				const Indexer<3> indexer = create_indexer<3>(m_shape);
+				for (int i = 0; i < Size * Size; i++)
+					m_pointers[i] = m_src_ptr + indexer.at(i, idx, 0);
+			}
+			Line<Size, CT> load_column(int col) const noexcept
+			{
+				Line<Size, CT> result;
+				if (m_elements_left >= Vector<CT>::size())
+				{ // full load
+					for (int i = 0; i < Size; i++)
+						result[i].load(m_pointers[i * Size + col]);
+				}
+				else
+				{ // partial load
+					const int tmp = std::min(Vector<CT>::size(), m_elements_left);
+					for (int i = 0; i < Size; i++)
+						result[i].partial_load(m_pointers[i * Size + col], tmp);
+				}
+				return result;
+			}
+			void increment() noexcept
+			{
+				m_elements_left -= Vector<CT>::Size();
+			}
+	};
+	template<typename DT, typename CT, int Size>
+	class MatrixTile
+	{
+			DT *m_pointers[Size * Size];
+			DT *m_dst_ptr = nullptr;
+			Indexer<3> m_indexer;
+		public:
+			MatrixTile(void *dst, int dim1, int dim2) noexcept :
+					m_dst_ptr(reinterpret_cast<DT*>(dst)),
+					m_indexer(Size * Size, dim1, dim2)
+			{
+			}
+			void extract_tile_at(int idx) noexcept
+			{
+				for (int i = 0; i < Size * Size; i++)
+					m_pointers[i] = m_dst_ptr + m_indexer.at(i, idx, 0);
+			}
+			void store_element(const Vector<CT> &value, int row, int col, int elements_to_load) noexcept
+			{
+				DT *dst_ptr = m_pointers[row * Size + col];
+				if (elements_to_load == Vector<CT>::size())
+					value.store(dst_ptr); // full store
+				else
+					value.partial_store(dst_ptr, elements_to_load); // partial store
+			}
+			void increment() noexcept
+			{
+				for (int i = 0; i < Size * Size; i++)
+					m_pointers[i] += Vector<CT>::size();
+			}
+	};
+	template<typename CT, int Rows, int Columns>
+	class WorkspaceTile
+	{
+			alignas(64) CT m_data[Rows * Columns * Vector<CT>::size()];
+		public:
+			size_t sizeInBytes() const noexcept
+			{
+				return sizeof(Vector<CT>()) * Rows * Columns;
+			}
+			Line<Columns, CT> load_row(int row) const noexcept
+			{
+				Line<Columns, CT> result;
+				for (int col = 0; col < Columns; col++)
+					result[col].load(m_data + (row * Columns + col) * Vector<CT>::size());
+				return result;
+			}
+			Line<Rows, CT> load_column(int col) const noexcept
+			{
+				Line<Rows, CT> result;
+				for (int row = 0; row < Rows; row++)
+					result[row].load(m_data + (row * Columns + col) * Vector<CT>::size());
+				return result;
+			}
+			void store_element(const Vector<CT> &value, int row, int col) noexcept
+			{
+				value.store(m_data + (row * Columns + col) * Vector<CT>::size());
+			}
+	};
 
 	template<typename DT, typename CT, int KernelSize, int TileSize>
-	void kernel_transform_weights(void *__restrict__ matrices, const void *__restrict__ weights, int output_filters, int input_filters, bool invert,
-			bool low_precision)
+	void kernel_transform_input_v2(void *__restrict__ matrices, const void *__restrict__ input, int batch_size, int height, int width,
+			int input_filters, void *__restrict__ workspace)
+	{
+		constexpr int Padding = KernelSize / 2;
+		constexpr int TransformSize = TileSize + KernelSize - 1;
+
+		const int tiles_h = (height + TileSize - 1) / TileSize;
+		const int tiles_w = (width + TileSize - 1) / TileSize;
+		const int tiles_per_image = tiles_h * tiles_w;
+		const int nb_of_tiles = batch_size * tiles_per_image;
+
+		DT *zero_line = getPointer<DT>(workspace);
+		std::memset(zero_line, 0, sizeof(DT) * input_filters);
+
+//#pragma omp parallel
+		{
+			ConstTensorTile<DT, CT, TransformSize> tensor_tile(input, batch_size, height, width, input_filters);
+			MatrixTile<DT, CT, TransformSize> matrix_tile(matrices, nb_of_tiles, input_filters);
+			WorkspaceTile<CT, TransformSize, TransformSize> storage;
+
+//#pragma omp for
+			const Indexer<3> tile_indexer(batch_size, tiles_h, tiles_w);
+			for (int b = 0; b < batch_size; b++)
+				for (int h = 0; h < tiles_h; h++)
+					for (int w = 0; w < tiles_w; w++)
+					{
+						tensor_tile.extract_tile_at(b, TileSize * h - Padding, TileSize * w - Padding, zero_line);
+						matrix_tile.extract_tile_at(tile_indexer.at(b, h, w));
+
+						Transform<TransformType::INPUT, KernelSize, TileSize, CT> transform;
+						int elements_left = input_filters;
+						while (elements_left >= Vector<CT>::size())
+						{
+							for (int col = 0; col < TransformSize; col++)
+							{
+								const Line<TransformSize, CT> whole_column = tensor_tile.load_column(col, Vector<CT>::size());
+
+								storage.store_element(transform(whole_column, 0), 0, col);
+								storage.store_element(transform(whole_column, 1), 1, col);
+								storage.store_element(transform(whole_column, 2), 2, col);
+								storage.store_element(transform(whole_column, 3), 3, col);
+								storage.store_element(transform(whole_column, 4), 4, col);
+								storage.store_element(transform(whole_column, 5), 5, col);
+								storage.store_element(transform(whole_column, 6), 6, col);
+//								for (int row = 0; row < TransformSize; row++)
+//								{
+//									const Vector<CT> tmp; // = transform(whole_column, row);
+//									storage.store_element(tmp, row, col);
+//								}
+							}
+
+							for (int row = 0; row < TransformSize; row++)
+							{
+								const Line<TransformSize, CT> whole_row = storage.load_row(row);
+								matrix_tile.store_element(transform(whole_row, 0), row, 0, Vector<CT>::size());
+								matrix_tile.store_element(transform(whole_row, 1), row, 1, Vector<CT>::size());
+								matrix_tile.store_element(transform(whole_row, 2), row, 2, Vector<CT>::size());
+								matrix_tile.store_element(transform(whole_row, 3), row, 3, Vector<CT>::size());
+								matrix_tile.store_element(transform(whole_row, 4), row, 4, Vector<CT>::size());
+								matrix_tile.store_element(transform(whole_row, 5), row, 5, Vector<CT>::size());
+								matrix_tile.store_element(transform(whole_row, 6), row, 6, Vector<CT>::size());
+
+//								for (int col = 0; col < TransformSize; col++)
+//								{
+//									const Vector<CT> tmp; // = transform(whole_row, col);
+//									matrix_tile.store_element(tmp, row, col, Vector<CT>::size());
+//								}
+							}
+							tensor_tile.increment();
+							matrix_tile.increment();
+							elements_left -= Vector<CT>::size();
+						}
+//						for (int col = 0; col < TransformSize; col++)
+//						{
+//							const Line<TransformSize, CT> whole_column = tensor_tile.load_column(col,elements_left);
+//							for (int row = 0; row < TransformSize; row++)
+//							{
+//								const Vector<CT> tmp = transform(whole_column, row);
+//								storage.store_element(tmp, row, col);
+//							}
+//						}
+//
+//						for (int row = 0; row < TransformSize; row++)
+//						{
+//							const Line<TransformSize, CT> whole_row = storage.load_row(row);
+//							for (int col = 0; col < TransformSize; col++)
+//							{
+//								const Vector<CT> tmp = transform(whole_row, col);
+//								matrix_tile.store_element(tmp, row, col, elements_left);
+//							}
+//						}
+					}
+		}
+	}
+
+	template<typename DT, typename CT, int KernelSize, int TileSize>
+	void kernel_transform_weights(void *__restrict__ matrices, const void *__restrict__ weights, int output_filters, int input_filters, bool invert)
 	{
 		constexpr int TransformSize = TileSize + KernelSize - 1;
 		const Indexer<3> matrices_indexer(TransformSize * TransformSize, output_filters, input_filters);
@@ -69,11 +365,6 @@ namespace
 					for (int col = 0; col < KernelSize; col++)
 					{
 						Line<KernelSize, CT> column;
-//						if (low_precision)
-//						{
-//							for (int i = 0; i < column.length(); i++)
-//								column[i] = emulate_low_precision(column[i]);
-//						}
 						column.load_column(ptr_in, col, in, elements_left, KernelSize);
 						Line<TransformSize, CT> transformed = transform(column);
 						transformed.store_column(storage, col, KernelSize);
@@ -412,8 +703,7 @@ namespace
 	}
 
 	template<typename DT, typename CT>
-	void launch_weight_transform(mlContext_t context, int tile_size, mlShape_t weight_shape, const void *weights, void *matrices, bool invert,
-			bool low_precision)
+	void launch_weight_transform(mlContext_t context, int tile_size, mlShape_t weight_shape, const void *weights, void *matrices, bool invert)
 	{
 		const int filters_out = weight_shape.dim[0];
 		const int filters_in = weight_shape.dim[3];
@@ -423,16 +713,16 @@ namespace
 		if (kernel_size == 3)
 		{
 			if (tile_size == 2)
-				kernel_transform_weights<DT, CT, 3, 2>(matrices, weights, filters_out, filters_in, invert, low_precision);
+				kernel_transform_weights<DT, CT, 3, 2>(matrices, weights, filters_out, filters_in, invert);
 			if (tile_size == 4)
-				kernel_transform_weights<DT, CT, 3, 4>(matrices, weights, filters_out, filters_in, invert, low_precision);
+				kernel_transform_weights<DT, CT, 3, 4>(matrices, weights, filters_out, filters_in, invert);
 			if (tile_size == 5)
-				kernel_transform_weights<DT, CT, 3, 5>(matrices, weights, filters_out, filters_in, invert, low_precision);
+				kernel_transform_weights<DT, CT, 3, 5>(matrices, weights, filters_out, filters_in, invert);
 		}
 		if (kernel_size == 5)
 		{
 			if (tile_size == 2)
-				kernel_transform_weights<DT, CT, 5, 2>(matrices, weights, filters_out, filters_in, invert, low_precision);
+				kernel_transform_weights<DT, CT, 5, 2>(matrices, weights, filters_out, filters_in, invert);
 		}
 	}
 	template<typename DT, typename CT>
@@ -447,6 +737,7 @@ namespace
 
 		void *workspace = cpu::Context::getWorkspace(context);
 
+//		kernel_transform_input_v2<DT, CT, 3, 5>(matrices, input, batch_size, height, width, filters, workspace);
 		if (kernel_size == 3)
 		{
 			if (tile_size == 2)
@@ -497,11 +788,11 @@ namespace SIMD_NAMESPACE
 	using namespace ml;
 
 	void cpu_kernel_winograd_weight_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape, const void *weights,
-			void *matrices, bool invert, bool low_precision)
+			void *matrices, bool invert)
 	{
 		const ml::cpu::ComputeConfig cfg = ml::cpu::ComputeConfig::getBest(dtype);
 		CREATE_KERNEL_TABLE(launch_weight_transform);
-		CALL_KERNEL(launch_weight_transform, cfg)(context, tile_size,weight_shape, weights, matrices, invert, low_precision);
+		CALL_KERNEL(launch_weight_transform, cfg)(context, tile_size,weight_shape, weights, matrices, invert);
 	}
 	void cpu_kernel_winograd_input_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape, mlShape_t input_shape,
 			const void *input, void *matrices)

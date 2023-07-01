@@ -25,7 +25,7 @@ namespace ml
 	void convertType(const Context &context, void *dst, DataType dst_dtype, const void *src, DataType src_dtype, int elements);
 	void transpose_021(const Context &context, const Tensor &input, Tensor &output);
 
-	void winogradWeightTransform(const Context &context, const Tensor &weights, Tensor &matrices, bool invert, bool low_precision);
+	void winogradWeightTransform(const Context &context, const Tensor &weights, Tensor &matrices, bool invert);
 	void winogradInputTransform(const Context &context, const Shape &weight_shape, const Tensor &input, Tensor &matrices);
 	void winogradOutputTransform(const Context &context, const Shape &weight_shape, const Tensor &matrices, Tensor &output, const Tensor &bias,
 			const Tensor &add, ActivationType act);
@@ -43,12 +43,11 @@ namespace ml
 	void gemm(const Context &context, char opA, char opB, Tensor &C, const Tensor &A, const Tensor &B, float alpha, float beta);
 	void gemmBatched(const Context &context, char opA, char opB, Tensor &C, const Tensor &A, const Tensor &B, float alpha, float beta);
 
-//	/*
-//	 * Computes D = alpha * op_A(A) * op_B(B) + beta * C
-//	 */
-//	void gemm(const Context &context, Tensor &D, float alpha, char opA, const Tensor &A, char opB, const Tensor &B, float beta, const Tensor &C);
-//	void gemmBatched(const Context &context, Tensor &D, float alpha, char opA, const Tensor &A, char opB, const Tensor &B, float beta,
-//			const Tensor &C);
+	/*
+	 * Computes D = act(alpha * op_A(A) * op_B(B) + beta * C)
+	 */
+	void gemm_ex(const Context &context, Tensor &D, float alpha, char opA, const Tensor &A, char opB, const Tensor &B, float beta, const Tensor &C,
+			ActivationType act);
 
 	void addBiasAct(const Context &context, Tensor &input, const Tensor &bias, ActivationType act);
 

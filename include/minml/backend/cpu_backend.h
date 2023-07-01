@@ -46,7 +46,7 @@ namespace ml
 		void cpu_transpose_021(mlContext_t context, mlDataType_t dtype, mlShape_t shape, const void *input, void *output);
 
 		void cpu_winograd_weight_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape, const void *weights,
-				void *matrices, bool invert, bool low_precision);
+				void *matrices, bool invert);
 		void cpu_winograd_input_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape, mlShape_t input_shape,
 				const void *input, void *matrices);
 		void cpu_winograd_output_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape, mlShape_t output_shape,
@@ -66,10 +66,11 @@ namespace ml
 		void cpu_gemm_batched(mlContext_t context, mlDataType_t dtype, mlShape_t shape_C, void *C, mlShape_t shape_A, const void *A,
 				mlShape_t shape_B, const void *B, char opA, char opB, float alpha, float beta);
 
-		void cpu_gemm_v2(mlContext_t context, mlDataType_t dtype, mlShape_t shape_D, void *D, float alpha, char opA, mlShape_t shape_A, const void *A,
-				char opB, mlShape_t shape_B, const void *B, float beta, mlShape_t shape_C, const void *C);
-		void cpu_gemm_batched_v2(mlContext_t context, mlDataType_t dtype, mlShape_t shape_D, void *D, float alpha, char opA, mlShape_t shape_A,
-				const void *A, char opB, mlShape_t shape_B, const void *B, float beta, mlShape_t shape_C, const void *C);
+		/*
+		 * Computes D = act(alpha * op_A(A) * op_B(B) + beta * C)
+		 */
+		void cpu_gemm_ex(mlContext_t context, mlDataType_t dtype, mlShape_t shape_D, void *D, float alpha, char opA, mlShape_t shape_A, const void *A,
+				char opB, mlShape_t shape_B, const void *B, float beta, mlShape_t shape_C, const void *C, mlActivationType_t act);
 
 		void cpu_add_bias_act(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *input, const void *bias, mlActivationType_t act);
 

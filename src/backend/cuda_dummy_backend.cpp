@@ -107,7 +107,7 @@ namespace ml
 
 	// implemented in 'winograd_non_fused.cu'
 	void cuda_winograd_weight_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape, const void *weights,
-			void *matrices, bool invert, bool low_precision)
+			void *matrices, bool invert)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}

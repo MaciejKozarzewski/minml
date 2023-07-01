@@ -15,7 +15,7 @@ void cpu_kernel_convert_type(mlContext_t context, void *dst, mlDataType_t dst_dt
 void cpu_kernel_transpose_021(mlContext_t context, mlDataType_t dtype, mlShape_t shape, const void *input, void *output);
 
 void cpu_kernel_winograd_weight_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape, const void *weights, void *matrices,
-		bool invert, bool low_precision);
+		bool invert);
 void cpu_kernel_winograd_input_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape, mlShape_t input_shape, const void *input,
 		void *matrices);
 void cpu_kernel_winograd_output_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape, mlShape_t output_shape,
