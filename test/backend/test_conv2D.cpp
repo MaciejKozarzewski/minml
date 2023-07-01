@@ -407,7 +407,7 @@ namespace ml
 		baseline_conv2D_forward(input, correct_output, weights, bias, add, ActivationType::SIGMOID);
 
 		Tensor weight_matrices( { 36, 21, 35 }, "float32", Device::cpu());
-		winogradWeightTransform(context, weights, weight_matrices, false, false);
+		winogradWeightTransform(context, weights, weight_matrices, false);
 
 		Tensor input_matrices( { 36, 12 * 4 * 5, 35 }, "float32", Device::cpu());
 		Tensor output_matrices( { 36, 12 * 4 * 5, 21 }, "float32", Device::cpu());
@@ -431,7 +431,7 @@ namespace ml
 			input_matrices.zeroall(context);
 			output_matrices.zeroall(context);
 
-			winogradWeightTransform(context, weights, weight_matrices, false, false);
+			winogradWeightTransform(context, weights, weight_matrices, false);
 			winogradInputTransform(context, weights.shape(), input, input_matrices);
 			gemmBatched(context, 'n', 't', output_matrices, input_matrices, weight_matrices, 1, 0);
 			winogradOutputTransform(context, weights.shape(), output_matrices, output, bias, Tensor(), ActivationType::SIGMOID);
@@ -460,7 +460,7 @@ namespace ml
 		Tensor gradient_prev_matrices( { 36, 12 * 4 * 5, 35 }, "float32", Device::cpu());
 		Tensor gradient_next_matrices( { 36, 12 * 4 * 5, 21 }, "float32", Device::cpu());
 
-		winogradWeightTransform(context, weights, weight_matrices, true, false);
+		winogradWeightTransform(context, weights, weight_matrices, true);
 		winogradInputTransform(context, weights.shape(), gradient_next, gradient_next_matrices);
 		gemmBatched(context, 'n', 'n', gradient_prev_matrices, gradient_next_matrices, weight_matrices, 1, 0);
 		winogradOutputTransform(context, weights.shape(), gradient_prev_matrices, gradient_prev, Tensor(), Tensor(), ActivationType::LINEAR);
@@ -483,7 +483,7 @@ namespace ml
 
 			ml::testing::initForTest(gradient_next, 1.0f);
 			activationBackward(context, gradient_next, gradient_next, output, ActivationType::SIGMOID);
-			winogradWeightTransform(context, weights, weight_matrices, true, false);
+			winogradWeightTransform(context, weights, weight_matrices, true);
 			winogradInputTransform(context, weights.shape(), gradient_next, gradient_next_matrices);
 			gemmBatched(context, 'n', 'n', gradient_prev_matrices, gradient_next_matrices, weight_matrices, 1, 0);
 			winogradOutputTransform(context, weights.shape(), gradient_prev_matrices, gradient_prev, Tensor(), Tensor(), ActivationType::LINEAR);
@@ -556,7 +556,7 @@ namespace ml
 		baseline_conv2D_forward(input, correct_output, weights, bias, Tensor(), ActivationType::SIGMOID);
 
 		Tensor weight_matrices( { 36, 21, 35 }, "float32", Device::cpu());
-		winogradWeightTransform(context, weights, weight_matrices, false, false);
+		winogradWeightTransform(context, weights, weight_matrices, false);
 
 		Tensor input_matrices( { 36, 12 * 7 * 9, 35 }, "float32", Device::cpu());
 		Tensor output_matrices( { 36, 12 * 7 * 9, 21 }, "float32", Device::cpu());
@@ -580,7 +580,7 @@ namespace ml
 			input_matrices.zeroall(context);
 			output_matrices.zeroall(context);
 
-			winogradWeightTransform(context, weights, weight_matrices, false, false);
+			winogradWeightTransform(context, weights, weight_matrices, false);
 			winogradInputTransform(context, weights.shape(), input, input_matrices);
 			gemmBatched(context, 'n', 't', output_matrices, input_matrices, weight_matrices, 1.0f, 0.0f);
 			winogradOutputTransform(context, weights.shape(), output_matrices, output, bias, Tensor(), ActivationType::SIGMOID);
@@ -609,7 +609,7 @@ namespace ml
 		Tensor gradient_prev_matrices( { 36, 12 * 7 * 9, 35 }, "float32", Device::cpu());
 		Tensor gradient_next_matrices( { 36, 12 * 7 * 9, 21 }, "float32", Device::cpu());
 
-		winogradWeightTransform(context, weights, weight_matrices, true, false);
+		winogradWeightTransform(context, weights, weight_matrices, true);
 		winogradInputTransform(context, weights.shape(), gradient_next, gradient_next_matrices);
 		gemmBatched(context, 'n', 'n', gradient_prev_matrices, gradient_next_matrices, weight_matrices, 1.0f, 0.0f);
 		winogradOutputTransform(context, weights.shape(), gradient_prev_matrices, gradient_prev, Tensor(), Tensor(), ActivationType::LINEAR);
@@ -632,7 +632,7 @@ namespace ml
 
 			ml::testing::initForTest(gradient_next, 1.0f);
 			activationBackward(context, gradient_next, gradient_next, output, ActivationType::SIGMOID);
-			winogradWeightTransform(context, weights, weight_matrices, true, false);
+			winogradWeightTransform(context, weights, weight_matrices, true);
 			winogradInputTransform(context, weights.shape(), gradient_next, gradient_next_matrices);
 			gemmBatched(context, 'n', 'n', gradient_prev_matrices, gradient_next_matrices, weight_matrices, 1.0f, 0.0f);
 			winogradOutputTransform(context, weights.shape(), gradient_prev_matrices, gradient_prev, Tensor(), Tensor(), ActivationType::LINEAR);

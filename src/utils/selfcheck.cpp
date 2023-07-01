@@ -195,7 +195,7 @@ namespace ml
 						std::cout << "  Allocated weight matrices=" << weights_matrices.info() << std::endl;
 
 						std::cout << "  Running weight transform" << std::endl;
-						winogradWeightTransform(context, weights, weights_matrices, false, false);
+						winogradWeightTransform(context, weights, weights_matrices, false);
 						std::cout << "    WORKS" << std::endl;
 
 						/*

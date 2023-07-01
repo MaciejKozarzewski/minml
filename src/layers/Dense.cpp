@@ -121,14 +121,38 @@ namespace ml
 	{
 		assert(input.size() == 1);
 		if (isUsingWeights())
-			gemm(context(), 'n', 't', output, flatten_input_tensor(input[0]), getWeights().getParam(), 1, 0);
-		else
-			output.copyFrom(context(), flatten_input_tensor(input[0]));
+		{
+			if (device().isCPU())
+			{
+				const Tensor flattened_input = flatten_input_tensor(input[0]);
+				const float beta = isUsingBias() ? 1.0f : 0.0f;
+				if (m_activation == ActivationType::RELU or m_activation == ActivationType::LINEAR)
+					gemm_ex(context(), output, 1.0f, 'n', flattened_input, 't', getWeights().getParam(), beta, getBias().getParam(), m_activation);
+				else
+				{
+					gemm_ex(context(), output, 1.0f, 'n', flattened_input, 't', getWeights().getParam(), beta, getBias().getParam(),
+							ActivationType::LINEAR);
+					activationForward(context(), output, output, m_activation);
+				}
+			}
+			else
+			{
+				gemm(context(), 'n', 't', output, flatten_input_tensor(input[0]), getWeights().getParam(), 1, 0);
+				if (isUsingBias())
+					addBiasAct(context(), output, getBias().getParam(), m_activation);
+				else
+					activationForward(context(), output, output, m_activation);
+			}
+		}
 
-		if (isUsingBias())
-			addBiasAct(context(), output, getBias().getParam(), m_activation);
 		else
-			activationForward(context(), output, output, m_activation);
+		{
+			output.copyFrom(context(), flatten_input_tensor(input[0]));
+			if (isUsingBias())
+				addBiasAct(context(), output, getBias().getParam(), m_activation);
+			else
+				activationForward(context(), output, output, m_activation);
+		}
 	}
 	void Dense::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next)
 	{

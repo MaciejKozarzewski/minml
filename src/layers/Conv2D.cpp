@@ -195,14 +195,35 @@ namespace ml
 				{
 					output.copyFrom(context(), input[1]);
 					gemm(context(), 'n', 't', output_matrix, input_matrix, weight_matrix, 1, 1);
+					if (isUsingBias())
+						addBiasAct(context(), output, getBias().getParam(), m_activation);
+					else
+						activationForward(context(), output, output, m_activation);
 				}
 				else
-					gemm(context(), 'n', 't', output_matrix, input_matrix, weight_matrix, 1, 0);
+				{
+					if (device().isCPU())
+					{
+						const float beta = isUsingBias() ? 1.0f : 0.0f;
+						if (m_activation == ActivationType::RELU or m_activation == ActivationType::LINEAR)
+							gemm_ex(context(), output_matrix, 1.0f, 'n', input_matrix, 't', weight_matrix, beta, getBias().getParam(), m_activation);
+						else
+						{
+							gemm_ex(context(), output_matrix, 1.0f, 'n', input_matrix, 't', weight_matrix, beta, getBias().getParam(),
+									ActivationType::LINEAR);
+							activationForward(context(), output, output, m_activation);
+						}
+					}
+					else
+					{
+						gemm(context(), 'n', 't', output_matrix, input_matrix, weight_matrix, 1, 0);
+						if (isUsingBias())
+							addBiasAct(context(), output, getBias().getParam(), m_activation);
+						else
+							activationForward(context(), output, output, m_activation);
+					}
+				}
 
-				if (isUsingBias())
-					addBiasAct(context(), output, getBias().getParam(), m_activation);
-				else
-					activationForward(context(), output, output, m_activation);
 				break;
 			}
 			case ConvolutionAlgorithm::WINOGRAD_NON_FUSED:
