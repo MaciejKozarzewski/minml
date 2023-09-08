@@ -11,6 +11,7 @@
 #include "utilities.hpp"
 #include "../utils.hpp"
 #include "../vectors/types.hpp"
+#include "../fp16.hpp"
 
 #include <x86intrin.h>
 #include <cinttypes>
@@ -130,15 +131,6 @@ namespace
 		return sign | exponent | mantissa;
 	}
 
-	float bf16_to_fp32(const uint16_t x) noexcept
-	{
-		return as_float(static_cast<uint32_t>(x) << 16);
-	}
-	uint16_t fp32_to_bf16(const float x) noexcept
-	{
-		return as_uint(x) >> 16;
-	}
-
 	using namespace ml;
 	template<typename SrcT, typename DstT>
 	DstT convert(SrcT x) noexcept
@@ -148,12 +140,12 @@ namespace
 	template<>
 	float16 convert(float x) noexcept
 	{
-		return float16 { fp32_to_fp16(x) };
+		return float16 { cpu::convert_fp32_to_fp16(x) };
 	}
 	template<>
 	float convert(float16 x) noexcept
 	{
-		return fp16_to_fp32(x.m_data);
+		return cpu::convert_fp16_to_fp32(x.m_data);
 	}
 	float relu(float x) noexcept
 	{

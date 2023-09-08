@@ -6,9 +6,11 @@ target_sources(${LibName} PRIVATE 	batchnorm.cpp
 				cpu_properties.cpp
 				cpu_x86.cpp
 				dispatcher.cpp
+				fp16.cpp
 				openblas_gemm.cpp
 				training.cpp
 				utils.cpp)
 								
 add_subdirectory("kernels")
 add_subdirectory("gemm")
+add_subdirectory("winograd")
