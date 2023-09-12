@@ -15,42 +15,42 @@
 
 namespace
 {
-#define LOAD_INPUT_1x8_FP32(offset, src, dst)\
-	movq(mem(rsi, src), r15)\
+#define LOAD_1x8_FP32(reg, offset, src, dst)\
+	movq(mem(reg, src), r15)\
 	vmovups(mem(r15, offset, 1), dst)
-#define LOAD_INPUT_2x8_FP32(offset, src1, src2, dst1, dst2)\
-	movq(mem(rsi, src1), r14)\
-	movq(mem(rsi, src2), r15)\
+#define LOAD_2x8_FP32(reg, offset, src1, src2, dst1, dst2)\
+	movq(mem(reg, src1), r14)\
+	movq(mem(reg, src2), r15)\
 	vmovups(mem(r14, offset, 1), dst1)\
 	vmovups(mem(r15, offset, 1), dst2)
-#define LOAD_INPUT_1x1_FP32(offset, src, dst)\
-	movq(mem(rsi, src), r15)\
+#define LOAD_1x1_FP32(reg, offset, src, dst)\
+	movq(mem(reg, src), r15)\
 	vmovss(mem(r15, offset, 1), dst)
-#define LOAD_INPUT_2x1_FP32(offset, src1, src2, dst1, dst2)\
-	movq(mem(rsi, src1), r14)\
-	movq(mem(rsi, src2), r15)\
+#define LOAD_2x1_FP32(reg, offset, src1, src2, dst1, dst2)\
+	movq(mem(reg, src1), r14)\
+	movq(mem(reg, src2), r15)\
 	vmovss(mem(r14, offset, 1), dst1)\
 	vmovss(mem(r15, offset, 1), dst2)
 
 #define LOAD_INPUT_1x8_FP16(offset, src, dst)\
-	movq(mem(rsi, src), r15)\
+	movq(mem(rax, src), r15)\
 	vmovups(mem(r15, offset, 1), xmm(dst))\
 	vcvtph2ps(xmm(dst), ymm(dst))
 #define LOAD_INPUT_2x8_FP16(offset, src1, src2, dst1, dst2)\
-	movq(mem(rsi, src1), r14)\
-	movq(mem(rsi, src2), r15)\
+	movq(mem(rax, src1), r14)\
+	movq(mem(rax, src2), r15)\
 	vmovups(mem(r14, offset, 1), xmm(dst1))\
 	vmovups(mem(r15, offset, 1), xmm(dst2))\
 	vcvtph2ps(xmm(dst1), ymm(dst1))\
 	vcvtph2ps(xmm(dst2), ymm(dst2))
 #define LOAD_INPUT_1x1_FP16(offset, src, dst)\
-	movq(mem(rsi, src), r15)\
+	movq(mem(rax, src), r15)\
 	movzw(mem(r15, offset, 1), r15)\
 	vmovq(r15, xmm(dst))\
 	vcvtph2ps(xmm(dst), xmm(dst))
 #define LOAD_INPUT_2x1_FP16(offset, src1, src2, dst1, dst2)\
-	movq(mem(rsi, src1), r14)\
-	movq(mem(rsi, src2), r15)\
+	movq(mem(rax, src1), r14)\
+	movq(mem(rax, src2), r15)\
 	movzw(mem(r14, offset, 1), r14)\
 	movzw(mem(r15, offset, 1), r15)\
 	vmovq(r14, xmm(dst1))\
@@ -59,38 +59,38 @@ namespace
 	vcvtph2ps(xmm(dst2), xmm(dst2))
 
 #define LOAD_INPUT_4x8xFP32(offset)\
-	LOAD_INPUT_2x8_FP32(offset, 0*4*8, 1*4*8, ymm0, ymm1)\
-	LOAD_INPUT_2x8_FP32(offset, 2*4*8, 3*4*8, ymm2, ymm3)
+	LOAD_2x8_FP32(rax, offset, 0*4*8, 1*4*8, ymm0, ymm1)\
+	LOAD_2x8_FP32(rax, offset, 2*4*8, 3*4*8, ymm2, ymm3)
 #define LOAD_INPUT_5x8xFP32(offset)\
-	LOAD_INPUT_2x8_FP32(offset, 0*5*8, 1*5*8, ymm0, ymm1)\
-	LOAD_INPUT_2x8_FP32(offset, 2*5*8, 3*5*8, ymm2, ymm3)\
-	LOAD_INPUT_1x8_FP32(offset, 4*5*8, ymm4)
+	LOAD_2x8_FP32(rax, offset, 0*5*8, 1*5*8, ymm0, ymm1)\
+	LOAD_2x8_FP32(rax, offset, 2*5*8, 3*5*8, ymm2, ymm3)\
+	LOAD_1x8_FP32(rax, offset, 4*5*8, ymm4)
 #define LOAD_INPUT_6x8xFP32(offset)\
-	LOAD_INPUT_2x8_FP32(offset, 0*6*8, 1*6*8, ymm0, ymm1)\
-	LOAD_INPUT_2x8_FP32(offset, 2*6*8, 3*6*8, ymm2, ymm3)\
-	LOAD_INPUT_2x8_FP32(offset, 4*6*8, 5*6*8, ymm4, ymm5)
+	LOAD_2x8_FP32(rax, offset, 0*6*8, 1*6*8, ymm0, ymm1)\
+	LOAD_2x8_FP32(rax, offset, 2*6*8, 3*6*8, ymm2, ymm3)\
+	LOAD_2x8_FP32(rax, offset, 4*6*8, 5*6*8, ymm4, ymm5)
 #define LOAD_INPUT_7x8xFP32(offset)\
-	LOAD_INPUT_2x8_FP32(offset, 0*7*8, 1*7*8, ymm0, ymm1)\
-	LOAD_INPUT_2x8_FP32(offset, 2*7*8, 3*7*8, ymm2, ymm3)\
-	LOAD_INPUT_2x8_FP32(offset, 4*7*8, 5*7*8, ymm4, ymm5)\
-	LOAD_INPUT_1x8_FP32(offset, 6*7*8, ymm6)
+	LOAD_2x8_FP32(rax, offset, 0*7*8, 1*7*8, ymm0, ymm1)\
+	LOAD_2x8_FP32(rax, offset, 2*7*8, 3*7*8, ymm2, ymm3)\
+	LOAD_2x8_FP32(rax, offset, 4*7*8, 5*7*8, ymm4, ymm5)\
+	LOAD_1x8_FP32(rax, offset, 6*7*8, ymm6)
 
 #define LOAD_INPUT_4x1xFP32(offset)\
-	LOAD_INPUT_2x1_FP32(offset, 0*4*8, 1*4*8, xmm0, xmm1)\
-	LOAD_INPUT_2x1_FP32(offset, 2*4*8, 3*4*8, xmm2, xmm3)
+	LOAD_2x1_FP32(rax, offset, 0*4*8, 1*4*8, xmm0, xmm1)\
+	LOAD_2x1_FP32(rax, offset, 2*4*8, 3*4*8, xmm2, xmm3)
 #define LOAD_INPUT_5x1xFP32(offset)\
-	LOAD_INPUT_2x1_FP32(offset, 0*5*8, 1*5*8, xmm0, xmm1)\
-	LOAD_INPUT_2x1_FP32(offset, 2*5*8, 3*5*8, xmm2, xmm3)\
-	LOAD_INPUT_1x1_FP32(offset, 4*5*8, xmm4)
+	LOAD_2x1_FP32(rax, offset, 0*5*8, 1*5*8, xmm0, xmm1)\
+	LOAD_2x1_FP32(rax, offset, 2*5*8, 3*5*8, xmm2, xmm3)\
+	LOAD_1x1_FP32(rax, offset, 4*5*8, xmm4)
 #define LOAD_INPUT_6x1xFP32(offset)\
-	LOAD_INPUT_2x1_FP32(offset, 0*6*8, 1*6*8, xmm0, xmm1)\
-	LOAD_INPUT_2x1_FP32(offset, 2*6*8, 3*6*8, xmm2, xmm3)\
-	LOAD_INPUT_2x1_FP32(offset, 4*6*8, 5*6*8, xmm4, xmm5)
+	LOAD_2x1_FP32(rax, offset, 0*6*8, 1*6*8, xmm0, xmm1)\
+	LOAD_2x1_FP32(rax, offset, 2*6*8, 3*6*8, xmm2, xmm3)\
+	LOAD_2x1_FP32(rax, offset, 4*6*8, 5*6*8, xmm4, xmm5)
 #define LOAD_INPUT_7x1xFP32(offset)\
-	LOAD_INPUT_2x1_FP32(offset, 0*7*8, 1*7*8, xmm0, xmm1)\
-	LOAD_INPUT_2x1_FP32(offset, 2*7*8, 3*7*8, xmm2, xmm3)\
-	LOAD_INPUT_2x1_FP32(offset, 4*7*8, 5*7*8, xmm4, xmm5)\
-	LOAD_INPUT_1x1_FP32(offset, 6*7*8, xmm6)
+	LOAD_2x1_FP32(rax, offset, 0*7*8, 1*7*8, xmm0, xmm1)\
+	LOAD_2x1_FP32(rax, offset, 2*7*8, 3*7*8, xmm2, xmm3)\
+	LOAD_2x1_FP32(rax, offset, 4*7*8, 5*7*8, xmm4, xmm5)\
+	LOAD_1x1_FP32(rax, offset, 6*7*8, xmm6)
 
 #define LOAD_INPUT_4x8xFP16(offset)\
 	LOAD_INPUT_2x8_FP16(offset, 0*4*8, 1*4*8, 0, 1)\
@@ -126,48 +126,80 @@ namespace
 	LOAD_INPUT_2x1_FP16(offset, 4*7*8, 5*7*8, 4, 5)\
 	LOAD_INPUT_1x1_FP16(offset, 6*7*8, 6)
 
-#define STORE_WORKSPACE_1x1xFP32(reg, row, columns) vmovss(reg, mem(rdi, row*columns*1*4))
-#define STORE_WORKSPACE_1x8xFP32(reg, row, columns) vmovaps(reg, mem(rdi, row*columns*8*4))
+#define STORE_WORKSPACE_1x1xFP32(reg, row, columns) vmovss(reg, mem(rbx, row*columns*1*4))
+#define STORE_WORKSPACE_1x8xFP32(reg, row, columns) vmovaps(reg, mem(rbx, row*columns*8*4))
 
 #define STORE_OUTPUT_1x1xFP32(offset, reg, dst) vmovss(reg, mem(dst, offset, 1))
 #define STORE_OUTPUT_1x8xFP32(offset, reg, dst) vmovups(reg, mem(dst, offset, 1))
 
 #define STORE_OUTPUT_1x1xFP16(offset, reg, dst)\
 	vcvtps2ph(imm(0x03), xmm(reg), xmm(reg))\
-	vmovss(xmm(reg), mem(dst, offset, 1))
+	vmovq(xmm(reg), rsi)\
+	mov(si, mem(dst, offset, 1))
 #define STORE_OUTPUT_1x8xFP16(offset, reg, dst)\
 	vcvtps2ph(imm(0x03), ymm(reg), xmm(reg))\
 	vmovups(xmm(reg), mem(dst, offset, 1))
 
 #define LOAD_WORKSPACE_4x8xFP32()\
-	vmovaps(mem(rsi, 0*8*4), ymm0)\
-	vmovaps(mem(rsi, 1*8*4), ymm1)\
-	vmovaps(mem(rsi, 2*8*4), ymm2)\
-	vmovaps(mem(rsi, 3*8*4), ymm3)
+	vmovaps(mem(rbx, 0*8*4), ymm0)\
+	vmovaps(mem(rbx, 1*8*4), ymm1)\
+	vmovaps(mem(rbx, 2*8*4), ymm2)\
+	vmovaps(mem(rbx, 3*8*4), ymm3)
 #define LOAD_WORKSPACE_5x8xFP32()\
 	LOAD_WORKSPACE_4x8xFP32()\
-	vmovaps(mem(rsi, 4*8*4), ymm4)
+	vmovaps(mem(rbx, 4*8*4), ymm4)
 #define LOAD_WORKSPACE_6x8xFP32()\
 	LOAD_WORKSPACE_5x8xFP32()\
-	vmovaps(mem(rsi, 5*8*4), ymm5)
+	vmovaps(mem(rbx, 5*8*4), ymm5)
 #define LOAD_WORKSPACE_7x8xFP32()\
 	LOAD_WORKSPACE_6x8xFP32()\
-	vmovaps(mem(rsi, 6*8*4), ymm6)
+	vmovaps(mem(rbx, 6*8*4), ymm6)
 
 #define LOAD_WORKSPACE_4x1xFP32()\
-	vmovss(mem(rsi, 0*1*4), xmm0)\
-	vmovss(mem(rsi, 1*1*4), xmm1)\
-	vmovss(mem(rsi, 2*1*4), xmm2)\
-	vmovss(mem(rsi, 3*1*4), xmm3)
+	vmovss(mem(rbx, 0*1*4), xmm0)\
+	vmovss(mem(rbx, 1*1*4), xmm1)\
+	vmovss(mem(rbx, 2*1*4), xmm2)\
+	vmovss(mem(rbx, 3*1*4), xmm3)
 #define LOAD_WORKSPACE_5x1xFP32()\
 	LOAD_WORKSPACE_4x1xFP32()\
-	vmovss(mem(rsi, 4*1*4), xmm4)
+	vmovss(mem(rbx, 4*1*4), xmm4)
 #define LOAD_WORKSPACE_6x1xFP32()\
 	LOAD_WORKSPACE_5x1xFP32()\
-	vmovss(mem(rsi, 5*1*4), xmm5)
+	vmovss(mem(rbx, 5*1*4), xmm5)
 #define LOAD_WORKSPACE_7x1xFP32()\
 	LOAD_WORKSPACE_6x1xFP32()\
-	vmovss(mem(rsi, 6*1*4), xmm6)
+	vmovss(mem(rbx, 6*1*4), xmm6)
+
+#define ADD_BIAS_4x8xFP32(reg)\
+	vaddps(ymm0, reg, ymm0)\
+	vaddps(ymm1, reg, ymm1)\
+	vaddps(ymm2, reg, ymm2)\
+	vaddps(ymm3, reg, ymm3)
+#define ADD_BIAS_5x8xFP32(reg)\
+	vaddps(ymm0, reg, ymm0)\
+	vaddps(ymm1, reg, ymm1)\
+	vaddps(ymm2, reg, ymm2)\
+	vaddps(ymm3, reg, ymm3)\
+	vaddps(ymm4, reg, ymm4)
+
+#define LOAD_EXT_4x8xFP32(offset)\
+	LOAD_2x8_FP32(rdx, offset, 0*8, 1*8, ymm4, ymm5)\
+	LOAD_2x8_FP32(rdx, offset, 2*8, 3*8, ymm6, ymm7)
+#define LOAD_EXT_5x8xFP32(offset)\
+	LOAD_2x8_FP32(rdx, offset, 0*8, 1*8, ymm5, ymm6)\
+	LOAD_2x8_FP32(rdx, offset, 2*8, 3*8, ymm7, ymm8)\
+	LOAD_1x8_FP32(rdx, offset, 4*8, ymm9)
+#define ADD_EXT_4x8xFP32()\
+	vaddps(ymm0, ymm4, ymm0)\
+	vaddps(ymm1, ymm5, ymm1)\
+	vaddps(ymm2, ymm6, ymm2)\
+	vaddps(ymm3, ymm7, ymm3)
+#define ADD_EXT_5x8xFP32()\
+	vaddps(ymm0, ymm5, ymm0)\
+	vaddps(ymm1, ymm6, ymm1)\
+	vaddps(ymm2, ymm7, ymm2)\
+	vaddps(ymm3, ymm8, ymm3)\
+	vaddps(ymm4, ymm9, ymm4)
 
 #define INPUT_TRANSFORM_4x4_3x3_ROW_0()\
 	vsubps(ymm2, ymm0, ymm7)\
@@ -320,8 +352,6 @@ namespace ml
 		je(FINALLOOP)
 
 		label(UNROLLED8)// main loop over channels, in steps of 8 elements
-		movq(rax, rsi)
-		movq(rbx, rdi)
 
 		movq(imm(6), r8)// transform col counter
 		label(TRANSFORM1x8)
@@ -340,22 +370,22 @@ namespace ml
 		INPUT_TRANSFORM_4x4_3x3_ROW_5()
 		STORE_WORKSPACE_1x8xFP32(ymm7, 5, 6)
 
-		add(imm(1*8), rsi)// add 1*8 (1 pointer) to rsi (src), moving to next column
-		add(imm(1*8*4), rdi)// add 8*4 (8 floats) to rdi (workspace), moving to next column
+		add(imm(1*8), rax)// add 1*8 (1 pointer) to rax (src), moving to next column
+		add(imm(1*8*4), rbx)// add 8*4 (8 floats) to rbx (workspace), moving to next column
 
 		dec(r8)
 		jne(TRANSFORM1x8)
+		sub(imm(6*1*8), rax)// subtract 6*1*8 (6*1 pointer) to rax (src), moving to start
+		sub(imm(6*1*8*4), rbx)// subtract 6*8*4 (6*8 floats) to rbx (workspace), moving to start
 
-		movq(rbx, rsi)
-		movq(rcx, rdi)
 		movq(imm(6), r8)// transform col counter
 		label(TRANSFORM2x8)
 		// second transform
 		LOAD_WORKSPACE_6x8xFP32()
 
-		movq(mem(rdi, 0*8), r13)
-		movq(mem(rdi, 1*8), r14)
-		movq(mem(rdi, 2*8), r15)
+		movq(mem(rcx, 0*8), r13)
+		movq(mem(rcx, 1*8), r14)
+		movq(mem(rcx, 2*8), r15)
 		INPUT_TRANSFORM_4x4_3x3_ROW_0()
 		STORE_OUTPUT_1x8xFP32(r9, ymm7, r13)
 		INPUT_TRANSFORM_4x4_3x3_ROW_1()
@@ -363,9 +393,9 @@ namespace ml
 		INPUT_TRANSFORM_4x4_3x3_ROW_2()
 		STORE_OUTPUT_1x8xFP32(r9, ymm7, r15)
 
-		movq(mem(rdi, 3*8), r13)
-		movq(mem(rdi, 4*8), r14)
-		movq(mem(rdi, 5*8), r15)
+		movq(mem(rcx, 3*8), r13)
+		movq(mem(rcx, 4*8), r14)
+		movq(mem(rcx, 5*8), r15)
 		INPUT_TRANSFORM_4x4_3x3_ROW_3()
 		STORE_OUTPUT_1x8xFP32(r9, ymm7, r13)
 		INPUT_TRANSFORM_4x4_3x3_ROW_4()
@@ -373,11 +403,13 @@ namespace ml
 		INPUT_TRANSFORM_4x4_3x3_ROW_5()
 		STORE_OUTPUT_1x8xFP32(r9, ymm7, r15)
 
-		add(imm(6*8*4), rsi)// add 7*8 (7*8 floats) to rsi (workspace), moving to next row
-		add(imm(6*8), rdi)// add 7*8*4 (7 pointers) to rdi (dst), moving to next row
+		add(imm(6*8*4), rbx)// add 7*8 (7*8 floats) to rbx (workspace), moving to next row
+		add(imm(6*8), rcx)// add 7*8*4 (7 pointers) to rcx (dst), moving to next row
 
 		dec(r8)
 		jne(TRANSFORM2x8)
+		sub(imm(6*6*8*4), rbx)// subtract 6*6*8 (6*6*8 floats) to rbx (workspace), moving to start
+		sub(imm(6*6*8), rcx)// subtract 6*6*8*4 (6*6 pointers) to rcx (dst), moving to start
 
 		add(imm(8*4), r9)// add 8*4 (8 float32) to r9, the offset in channels
 
@@ -391,8 +423,6 @@ namespace ml
 		je(EPILOGUE)
 
 		label(UNROLLED1)
-		movq(rax, rsi)
-		movq(rbx, rdi)
 
 		movq(imm(6), r8)// transform col counter
 		label(TRANSFORM1x1)
@@ -412,22 +442,22 @@ namespace ml
 		INPUT_TRANSFORM_4x4_3x3_ROW_5()
 		STORE_WORKSPACE_1x1xFP32(xmm7, 5, 6)
 
-		add(imm(1*8), rsi)// add 1*8 (1 pointer) to rsi (src), moving to next column
-		add(imm(1*1*4), rdi)// add 1*4 (1 float32) to rdi (workspace), moving to next column
+		add(imm(1*8), rax)// add 1*8 (1 pointer) to rsi (src), moving to next column
+		add(imm(1*1*4), rbx)// add 1*4 (1 float32) to rdi (workspace), moving to next column
 
 		dec(r8)
 		jne(TRANSFORM1x1)
+		sub(imm(6*1*8), rax)// add 1*8 (1 pointer) to rsi (src), moving to next column
+		sub(imm(6*1*1*4), rbx)// add 1*4 (1 float32) to rdi (workspace), moving to next column
 
-		movq(rbx, rsi)
-		movq(rcx, rdi)
-		movq(imm(7), r8)// transform col counter
+		movq(imm(6), r8)// transform col counter
 		label(TRANSFORM2x1)
 		// second transform
 		LOAD_WORKSPACE_6x1xFP32()
 
-		movq(mem(rdi, 0*8), r13)
-		movq(mem(rdi, 1*8), r14)
-		movq(mem(rdi, 2*8), r15)
+		movq(mem(rcx, 0*8), r13)
+		movq(mem(rcx, 1*8), r14)
+		movq(mem(rcx, 2*8), r15)
 		INPUT_TRANSFORM_4x4_3x3_ROW_0()
 		STORE_OUTPUT_1x1xFP32(r9, xmm7, r13)
 		INPUT_TRANSFORM_4x4_3x3_ROW_1()
@@ -435,9 +465,9 @@ namespace ml
 		INPUT_TRANSFORM_4x4_3x3_ROW_2()
 		STORE_OUTPUT_1x1xFP32(r9, xmm7, r15)
 
-		movq(mem(rdi, 3*8), r13)
-		movq(mem(rdi, 4*8), r14)
-		movq(mem(rdi, 5*8), r15)
+		movq(mem(rcx, 3*8), r13)
+		movq(mem(rcx, 4*8), r14)
+		movq(mem(rcx, 5*8), r15)
 		INPUT_TRANSFORM_4x4_3x3_ROW_3()
 		STORE_OUTPUT_1x1xFP32(r9, xmm7, r13)
 		INPUT_TRANSFORM_4x4_3x3_ROW_4()
@@ -445,11 +475,13 @@ namespace ml
 		INPUT_TRANSFORM_4x4_3x3_ROW_5()
 		STORE_OUTPUT_1x1xFP32(r9, xmm7, r15)
 
-		add(imm(6*1*4), rsi)// add 7*8 (7*1 floats) to rsi (workspace), moving to next row
-		add(imm(6*8), rdi)// add 7*8*4 (7 pointers) to rdi (dst), moving to next row
+		add(imm(6*1*4), rbx)// add 7*8 (7*1 floats) to rsi (workspace), moving to next row
+		add(imm(6*8), rcx)// add 7*8*4 (7 pointers) to rdi (dst), moving to next row
 
 		dec(r8)
 		jne(TRANSFORM2x1)
+		sub(imm(6*6*1*4), rbx)// add 7*8 (7*1 floats) to rsi (workspace), moving to next row
+		sub(imm(6*6*8), rcx)// add 7*8*4 (7 pointers) to rdi (dst), moving to next row
 
 		add(imm(1*4), r9)// add 1*4 (1 float32) to r9, the offset in channels
 		dec(r10)
@@ -468,7 +500,7 @@ namespace ml
 				[c_ptr] "m"(c_ptr)
 				:// clobbers
 				"cc", "memory", "%ymm0", "%ymm1", "%ymm2", "%ymm3", "%ymm4", "%ymm5", "%ymm6", "%ymm7", "%ymm8", "%ymm9", "%ymm10", "%ymm11", "%ymm12",
-				"%ymm13", "%ymm14", "%ymm15", "%rax", "%rbx", "%rcx", "%rdx", "%rsi", "%rdi", "%r8", "%r9", "%r10", "%r13", "%r14", "%r15")
+				"%ymm13", "%ymm14", "%ymm15", "%rax", "%rbx", "%rcx", "%r8", "%r9", "%r10", "%r13", "%r14", "%r15")
 	}
 	void winograd_output_transform_4x4_3x3_avx2_fma_fp32(const void *src[], void *dst[], void *workspace, int filters, const void *ext[],
 			const void *bias, bool use_relu)
@@ -509,8 +541,6 @@ namespace ml
 		je(FINALLOOP)
 
 		label(UNROLLED8)// main loop over channels, in steps of 8 elements
-		movq(rax, rsi)
-		movq(rbx, rdi)
 
 		movq(imm(6), r8)// transform col counter
 		label(TRANSFORM1x8)
@@ -529,22 +559,22 @@ namespace ml
 		INPUT_TRANSFORM_4x4_3x3_ROW_5()
 		STORE_WORKSPACE_1x8xFP32(ymm7, 5, 6)
 
-		add(imm(1*8), rsi)// add 1*8 (1 pointer) to rsi (src), moving to next column
-		add(imm(1*8*4), rdi)// add 8*4 (8 floats) to rdi (workspace), moving to next column
+		add(imm(1*8), rax)// add 1*8 (1 pointer) to rax (src), moving to next column
+		add(imm(1*8*4), rbx)// add 8*4 (8 floats) to rbx (workspace), moving to next column
 
 		dec(r8)
 		jne(TRANSFORM1x8)
+		sub(imm(6*1*8), rax)// add 6*1*8 (1 pointer) to rax (src), moving to start
+		sub(imm(6*1*8*4), rbx)// add 6*8*4 (8 floats) to rbx (workspace), moving to start
 
-		movq(rbx, rsi)
-		movq(rcx, rdi)
 		movq(imm(6), r8)// transform col counter
 		label(TRANSFORM2x8)
 		// second transform
 		LOAD_WORKSPACE_6x8xFP32()
 
-		movq(mem(rdi, 0*8), r13)
-		movq(mem(rdi, 1*8), r14)
-		movq(mem(rdi, 2*8), r15)
+		movq(mem(rcx, 0*8), r13)
+		movq(mem(rcx, 1*8), r14)
+		movq(mem(rcx, 2*8), r15)
 		INPUT_TRANSFORM_4x4_3x3_ROW_0()
 		STORE_OUTPUT_1x8xFP16(r9, 7, r13)
 		INPUT_TRANSFORM_4x4_3x3_ROW_1()
@@ -552,9 +582,9 @@ namespace ml
 		INPUT_TRANSFORM_4x4_3x3_ROW_2()
 		STORE_OUTPUT_1x8xFP16(r9, 7, r15)
 
-		movq(mem(rdi, 3*8), r13)
-		movq(mem(rdi, 4*8), r14)
-		movq(mem(rdi, 5*8), r15)
+		movq(mem(rcx, 3*8), r13)
+		movq(mem(rcx, 4*8), r14)
+		movq(mem(rcx, 5*8), r15)
 		INPUT_TRANSFORM_4x4_3x3_ROW_3()
 		STORE_OUTPUT_1x8xFP16(r9, 7, r13)
 		INPUT_TRANSFORM_4x4_3x3_ROW_4()
@@ -562,11 +592,13 @@ namespace ml
 		INPUT_TRANSFORM_4x4_3x3_ROW_5()
 		STORE_OUTPUT_1x8xFP16(r9, 7, r15)
 
-		add(imm(6*8*4), rsi)// add 7*8 (7*8 floats) to rsi (workspace), moving to next row
-		add(imm(6*8), rdi)// add 7*8*4 (7 pointers) to rdi (dst), moving to next row
+		add(imm(6*8*4), rbx)// add 6*8 (6*8 floats) to rbx (workspace), moving to next row
+		add(imm(6*8), rcx)// add 6*8*4 (6 pointers) to rcx (dst), moving to next row
 
 		dec(r8)
 		jne(TRANSFORM2x8)
+		sub(imm(6*6*8*4), rbx)// add 6*6*8 (6*6*8 floats) to rbx (workspace), moving to start
+		sub(imm(6*6*8), rcx)// add 6*6*8*4 (6*6 pointers) to rcx (dst), moving to start
 
 		add(imm(8*2), r9)// add 8*2 (8 float16) to r9, the offset in channels
 
@@ -580,8 +612,6 @@ namespace ml
 		je(EPILOGUE)
 
 		label(UNROLLED1)
-		movq(rax, rsi)
-		movq(rbx, rdi)
 
 		movq(imm(6), r8)// transform col counter
 		label(TRANSFORM1x1)
@@ -601,22 +631,22 @@ namespace ml
 		INPUT_TRANSFORM_4x4_3x3_ROW_5()
 		STORE_WORKSPACE_1x1xFP32(xmm7, 5, 6)
 
-		add(imm(1*8), rsi)// add 1*8 (1 pointer) to rsi (src), moving to next column
-		add(imm(1*1*4), rdi)// add 1*4 (1 float32) to rdi (workspace), moving to next column
+		add(imm(1*8), rax)// add 1*8 (1 pointer) to rax (src), moving to next column
+		add(imm(1*1*4), rbx)// add 1*4 (1 float32) to rbx (workspace), moving to next column
 
 		dec(r8)
 		jne(TRANSFORM1x1)
+		sub(imm(6*1*8), rax)// subtract 1*8 (1 pointer) to rax (src), moving to start
+		sub(imm(6*1*1*4), rbx)// subtract 1*4 (1 float32) to rbx (workspace), moving to start
 
-		movq(rbx, rsi)
-		movq(rcx, rdi)
-		movq(imm(7), r8)// transform col counter
+		movq(imm(6), r8)// transform col counter
 		label(TRANSFORM2x1)
 		// second transform
 		LOAD_WORKSPACE_6x1xFP32()
 
-		movq(mem(rdi, 0*8), r13)
-		movq(mem(rdi, 1*8), r14)
-		movq(mem(rdi, 2*8), r15)
+		movq(mem(rcx, 0*8), r13)
+		movq(mem(rcx, 1*8), r14)
+		movq(mem(rcx, 2*8), r15)
 		INPUT_TRANSFORM_4x4_3x3_ROW_0()
 		STORE_OUTPUT_1x1xFP16(r9, 7, r13)
 		INPUT_TRANSFORM_4x4_3x3_ROW_1()
@@ -624,9 +654,9 @@ namespace ml
 		INPUT_TRANSFORM_4x4_3x3_ROW_2()
 		STORE_OUTPUT_1x1xFP16(r9, 7, r15)
 
-		movq(mem(rdi, 3*8), r13)
-		movq(mem(rdi, 4*8), r14)
-		movq(mem(rdi, 5*8), r15)
+		movq(mem(rcx, 3*8), r13)
+		movq(mem(rcx, 4*8), r14)
+		movq(mem(rcx, 5*8), r15)
 		INPUT_TRANSFORM_4x4_3x3_ROW_3()
 		STORE_OUTPUT_1x1xFP16(r9, 7, r13)
 		INPUT_TRANSFORM_4x4_3x3_ROW_4()
@@ -634,11 +664,13 @@ namespace ml
 		INPUT_TRANSFORM_4x4_3x3_ROW_5()
 		STORE_OUTPUT_1x1xFP16(r9, 7, r15)
 
-		add(imm(6*1*4), rsi)// add 7*8 (7*1 floats) to rsi (workspace), moving to next row
-		add(imm(6*8), rdi)// add 7*8*4 (7 pointers) to rdi (dst), moving to next row
+		add(imm(6*1*4), rbx)// add 6*8 (6*1 floats) to rsi (workspace), moving to next row
+		add(imm(6*8), rcx)// add 6*8*4 (6 pointers) to rdi (dst), moving to next row
 
 		dec(r8)
 		jne(TRANSFORM2x1)
+		sub(imm(6*6*1*4), rbx)// subtract 6*8 (6*1 floats) to rbx (workspace), moving to start
+		sub(imm(6*6*8), rcx)// subtract 6*8*4 (6 pointers) to rcx (dst), moving to start
 
 		add(imm(1*2), r9)// add 1*2 (1 float16) to r9, the offset in channels
 		dec(r10)
@@ -657,7 +689,7 @@ namespace ml
 				[c_ptr] "m"(c_ptr)
 				:// clobbers
 				"cc", "memory", "%ymm0", "%ymm1", "%ymm2", "%ymm3", "%ymm4", "%ymm5", "%ymm6", "%ymm7", "%ymm8", "%ymm9", "%ymm10", "%ymm11", "%ymm12",
-				"%ymm13", "%ymm14", "%ymm15", "%rax", "%rbx", "%rcx", "%rdx", "%rsi", "%rdi", "%r8", "%r9", "%r10", "%r13", "%r14", "%r15")
+				"%ymm13", "%ymm14", "%ymm15", "%rax", "%rbx", "%rcx", "%rsi", "%r8", "%r9", "%r10", "%r13", "%r14", "%r15")
 	}
 	void winograd_output_transform_4x4_3x3_avx2_fma_fp16(const void *src[], void *dst[], void *workspace, int filters, const void *ext[],
 			const void *bias, bool use_relu)
@@ -698,8 +730,6 @@ namespace ml
 		je(FINALLOOP)
 
 		label(UNROLLED8)// main loop over channels, in steps of 8 elements
-		movq(rax, rsi)
-		movq(rbx, rdi)
 
 		movq(imm(7), r8)// transform col counter
 		label(TRANSFORM1x8)
@@ -720,23 +750,23 @@ namespace ml
 		INPUT_TRANSFORM_5x5_3x3_ROW_6()
 		STORE_WORKSPACE_1x8xFP32(ymm7, 6, 7)
 
-		add(imm(1*8), rsi)// add 1*8 (1 pointer) to rsi (src), moving to next column
-		add(imm(1*8*4), rdi)// add 8*4 (8 floats) to rdi (workspace), moving to next column
+		add(imm(1*8), rax)// add 1*8 (1 pointer) to rax (src), moving to next column
+		add(imm(1*8*4), rbx)// add 8*4 (8 floats) to rbx (workspace), moving to next column
 
 		dec(r8)
 		jne(TRANSFORM1x8)
+		sub(imm(7*8), rax)// subtract 7*8 (7 pointers) from rax, moving to the start
+		sub(imm(7*8*4), rbx)// subtract 7*8*4 (7*8 float32) from rbx, moving to the start
 
-		movq(rbx, rsi)
-		movq(rcx, rdi)
 		movq(imm(7), r8)// transform col counter
 		label(TRANSFORM2x8)
 		// second transform
 		LOAD_WORKSPACE_7x8xFP32()
 
-		movq(mem(rdi, 0*8), r12)
-		movq(mem(rdi, 1*8), r13)
-		movq(mem(rdi, 2*8), r14)
-		movq(mem(rdi, 3*8), r15)
+		movq(mem(rcx, 0*8), r12)
+		movq(mem(rcx, 1*8), r13)
+		movq(mem(rcx, 2*8), r14)
+		movq(mem(rcx, 3*8), r15)
 		INPUT_TRANSFORM_5x5_3x3_ROW_0()
 		STORE_OUTPUT_1x8xFP32(r9, ymm7, r12)
 		INPUT_TRANSFORM_5x5_3x3_ROW_1()
@@ -746,9 +776,9 @@ namespace ml
 		INPUT_TRANSFORM_5x5_3x3_ROW_3()
 		STORE_OUTPUT_1x8xFP32(r9, ymm7, r15)
 
-		movq(mem(rdi, 4*8), r12)
-		movq(mem(rdi, 5*8), r13)
-		movq(mem(rdi, 6*8), r14)
+		movq(mem(rcx, 4*8), r12)
+		movq(mem(rcx, 5*8), r13)
+		movq(mem(rcx, 6*8), r14)
 		INPUT_TRANSFORM_5x5_3x3_ROW_4()
 		STORE_OUTPUT_1x8xFP32(r9, ymm7, r12)
 		INPUT_TRANSFORM_5x5_3x3_ROW_5()
@@ -756,11 +786,13 @@ namespace ml
 		INPUT_TRANSFORM_5x5_3x3_ROW_6()
 		STORE_OUTPUT_1x8xFP32(r9, ymm7, r14)
 
-		add(imm(7*8*4), rsi)// add 7*8 (7*8 floats) to rsi (workspace), moving to next row
-		add(imm(7*8), rdi)// add 7*8*4 (7 pointers) to rdi (dst), moving to next row
+		add(imm(7*8*4), rbx)// add 7*8 (7*8 floats) to rbx (workspace), moving to next row
+		add(imm(7*8), rcx)// add 7*8*4 (7 pointers) to rcx (dst), moving to next row
 
 		dec(r8)
 		jne(TRANSFORM2x8)
+		sub(imm(7*7*8*4), rbx)// subtract 7*7*8*4 (7*7*8 float32) from rbx, moving to the start
+		sub(imm(7*7*8), rcx)// subtract 7*8*4 (7*7*8 pointers) from rcx, moving to the start
 
 		add(imm(8*4), r9)// add 8*4 (8 float32) to r9, the offset in channels
 
@@ -774,8 +806,6 @@ namespace ml
 		je(EPILOGUE)
 
 		label(UNROLLED1)
-		movq(rax, rsi)
-		movq(rbx, rdi)
 
 		movq(imm(7), r8)// transform col counter
 		label(TRANSFORM1x1)
@@ -797,23 +827,23 @@ namespace ml
 		INPUT_TRANSFORM_5x5_3x3_ROW_6()
 		STORE_WORKSPACE_1x1xFP32(xmm7, 6, 7)
 
-		add(imm(1*8), rsi)// add 1*8 (1 pointer) to rsi (src), moving to next column
-		add(imm(1*1*4), rdi)// add 1*4 (1 float32) to rdi (workspace), moving to next column
+		add(imm(1*8), rax)// add 1*8 (1 pointer) to rsi (src), moving to next column
+		add(imm(1*1*4), rbx)// add 1*4 (1 float32) to rdi (workspace), moving to next column
 
 		dec(r8)
 		jne(TRANSFORM1x1)
+		sub(imm(7*8), rax)// subtract 7*8 (7 pointers) from rax, moving to the start
+		sub(imm(7*1*4), rbx)// subtract 7*1*4 (7*1 float32) from rbx, moving to the start
 
-		movq(rbx, rsi)
-		movq(rcx, rdi)
 		movq(imm(7), r8)// transform col counter
 		label(TRANSFORM2x1)
 		// second transform
 		LOAD_WORKSPACE_7x1xFP32()
 
-		movq(mem(rdi, 0*8), r12)
-		movq(mem(rdi, 1*8), r13)
-		movq(mem(rdi, 2*8), r14)
-		movq(mem(rdi, 3*8), r15)
+		movq(mem(rcx, 0*8), r12)
+		movq(mem(rcx, 1*8), r13)
+		movq(mem(rcx, 2*8), r14)
+		movq(mem(rcx, 3*8), r15)
 		INPUT_TRANSFORM_5x5_3x3_ROW_0()
 		STORE_OUTPUT_1x1xFP32(r9, xmm7, r12)
 		INPUT_TRANSFORM_5x5_3x3_ROW_1()
@@ -823,9 +853,9 @@ namespace ml
 		INPUT_TRANSFORM_5x5_3x3_ROW_3()
 		STORE_OUTPUT_1x1xFP32(r9, xmm7, r15)
 
-		movq(mem(rdi, 4*8), r12)
-		movq(mem(rdi, 5*8), r13)
-		movq(mem(rdi, 6*8), r14)
+		movq(mem(rcx, 4*8), r12)
+		movq(mem(rcx, 5*8), r13)
+		movq(mem(rcx, 6*8), r14)
 		INPUT_TRANSFORM_5x5_3x3_ROW_4()
 		STORE_OUTPUT_1x1xFP32(r9, xmm7, r12)
 		INPUT_TRANSFORM_5x5_3x3_ROW_5()
@@ -833,11 +863,13 @@ namespace ml
 		INPUT_TRANSFORM_5x5_3x3_ROW_6()
 		STORE_OUTPUT_1x1xFP32(r9, xmm7, r14)
 
-		add(imm(7*1*4), rsi)// add 7*8 (7*1 floats) to rsi (workspace), moving to next row
-		add(imm(7*8), rdi)// add 7*8*4 (7 pointers) to rdi (dst), moving to next row
+		add(imm(7*1*4), rbx)// add 7*8 (7*1 floats) to rsi (workspace), moving to next row
+		add(imm(7*8), rcx)// add 7*8*4 (7 pointers) to rdi (dst), moving to next row
 
 		dec(r8)
 		jne(TRANSFORM2x1)
+		sub(imm(7*7*1*4), rbx)// subtract 7*7*1*4 (7*7*1 float32) from rbx, moving to the start
+		sub(imm(7*7*8), rcx)// subtract 7*8*4 (7*7*8 pointers) from rcx, moving to the start
 
 		add(imm(1*4), r9)// add 1*4 (1 float32) to r9, the offset in channels
 		dec(r10)
@@ -856,7 +888,7 @@ namespace ml
 				[c_ptr] "m"(c_ptr)
 				:// clobbers
 				"cc", "memory", "%ymm0", "%ymm1", "%ymm2", "%ymm3", "%ymm4", "%ymm5", "%ymm6", "%ymm7", "%ymm8", "%ymm9", "%ymm10", "%ymm11", "%ymm12",
-				"%ymm13", "%ymm14", "%ymm15", "%rax", "%rbx", "%rcx", "%rdx", "%rsi", "%rdi", "%r8", "%r9", "%r10", "%r12", "%r13", "%r14", "%r15")
+				"%ymm13", "%ymm14", "%ymm15", "%rax", "%rbx", "%rcx", "%r8", "%r9", "%r10", "%r12", "%r13", "%r14", "%r15")
 	}
 	void winograd_output_transform_5x5_3x3_avx2_fma_fp32(const void *src[], void *dst[], void *workspace, int filters, const void *ext[],
 			const void *bias, bool use_relu)
@@ -880,28 +912,33 @@ namespace ml
 		begin_asm()
 
 		movq(var(c_ptr), r8) // table of constants
-		movq(var(src_ptr), rax)
-		movq(var(workspace_ptr), rbx)
-		movq(var(dst_ptr), rcx)
-
 		vbroadcastss(mem(r8, 0), ymm12)// 0.25f
 		vbroadcastss(mem(r8, 4), ymm13)// 0.5f
 		vbroadcastss(mem(r8, 8), ymm14)// 2.0f
 		vbroadcastss(mem(r8, 12), ymm15)// 4.0f
 
-		movq(imm(0), r9)// channel offset
+		movq(var(src_ptr), rax)
+		movq(var(workspace_ptr), rbx)
+		movq(var(dst_ptr), rcx)
+		movq(var(bias_ptr), rdi)// bias pointer
+		movq(var(ext_ptr), rdx)// external data pointer
+		movq(rdx, r11)// holding flag
 
+		movq(imm(0), r9)// channel offset
 		movq(var(k_iter), r10)// load the number of 8-unrolled iterations
 		test(r10, r10)
 		je(FINALLOOP)
 
 		label(UNROLLED8)// main loop over channels, in steps of 8 elements
-		movq(rax, rsi)
-		movq(rbx, rdi)
+
+		test(rdi, rdi)
+		je(SKIP_BIAS_LOAD_x8)
+		vmovups(mem(rdi, r9, 1), ymm11)// load bias
+		label(SKIP_BIAS_LOAD_x8)// main loop over channels, in steps of 8 elements
 
 		movq(imm(7), r8)// transform col counter
 		label(TRANSFORM1x8)
-		LOAD_INPUT_7x8xFP32(r9) // load column
+		LOAD_INPUT_7x8xFP32(r9)// load column
 		OUTPUT_TRANSFORM_5x5_3x3()
 		STORE_WORKSPACE_1x8xFP32(ymm0, 0, 7)
 		STORE_WORKSPACE_1x8xFP32(ymm1, 1, 7)
@@ -909,36 +946,47 @@ namespace ml
 		STORE_WORKSPACE_1x8xFP32(ymm3, 3, 7)
 		STORE_WORKSPACE_1x8xFP32(ymm4, 4, 7)
 
-		add(imm(1*8), rsi)// add 1*8 (1 pointer) to rsi (src), moving to next column
-		add(imm(1*8*4), rdi)// add 8*4 (8 floats) to rdi (workspace), moving to next column
+		add(imm(1*8), rax)// add 1*8 (1 pointer) to rsi (src), moving to next column
+		add(imm(1*8*4), rbx)// add 8*4 (8 floats) to rdi (workspace), moving to next column
 
 		dec(r8)
 		jne(TRANSFORM1x8)
+		sub(imm(7*1*8), rax)// add 1*8 (1 pointer) to rsi (src), moving to next column
+		sub(imm(7*1*8*4), rbx)// add 8*4 (8 floats) to rdi (workspace), moving to next column
 
-		movq(rbx, rsi)
-		movq(rcx, rdi)
 		movq(imm(5), r8)// transform row counter
 		label(TRANSFORM2x8)
 		// second transform
-		LOAD_WORKSPACE_7x8xFP32() // load row
+		LOAD_WORKSPACE_7x8xFP32()// load row
 		OUTPUT_TRANSFORM_5x5_3x3()
+		ADD_BIAS_5x8xFP32(ymm11)
 
-		movq(mem(rdi, 0*8), r13)
-		movq(mem(rdi, 1*8), r14)
-		movq(mem(rdi, 2*8), r15)
+		test(r11, r11)
+		je(SKIP_LOAD_EXT_x8)
+		LOAD_EXT_5x8xFP32(r9)
+		ADD_EXT_5x8xFP32()
+		label(SKIP_LOAD_EXT_x8)
+
+		movq(mem(rcx, 0*8), r13)
+		movq(mem(rcx, 1*8), r14)
+		movq(mem(rcx, 2*8), r15)
 		STORE_OUTPUT_1x8xFP32(r9, ymm0, r13)
 		STORE_OUTPUT_1x8xFP32(r9, ymm1, r14)
 		STORE_OUTPUT_1x8xFP32(r9, ymm2, r15)
-		movq(mem(rdi, 3*8), r14)
-		movq(mem(rdi, 4*8), r15)
+		movq(mem(rcx, 3*8), r14)
+		movq(mem(rcx, 4*8), r15)
 		STORE_OUTPUT_1x8xFP32(r9, ymm3, r14)
 		STORE_OUTPUT_1x8xFP32(r9, ymm4, r15)
 
-		add(imm(7*8*4), rsi)// add 7*8 (7*8 floats) to rsi (workspace), moving to next row
-		add(imm(5*8), rdi)// add 5*8 (5 pointers) to rdi (dst), moving to next row
+		add(imm(7*8*4), rbx)// add 7*8 (7*8 floats) to rbx (workspace), moving to next row
+		add(imm(5*8), rcx)// add 5*8 (5 pointers) to rcx (dst), moving to next row
+		add(imm(5*8), rdx)// add 5*8 (5 pointers) to rdx (ext), moving to next row
 
 		dec(r8)
 		jne(TRANSFORM2x8)
+		sub(imm(5*7*8*4), rbx)// add 7*8 (7*8 floats) to rbx (workspace), moving to next row
+		sub(imm(5*5*8), rcx)// add 5*8 (5 pointers) to rcx (dst), moving to next row
+		sub(imm(5*5*8), rdx)// add 5*8 (5 pointers) to rdx (ext), moving to next row
 
 		add(imm(8*4), r9)// add 8*4 (8 float32) to r9, the offset in channels
 
@@ -952,8 +1000,11 @@ namespace ml
 		je(EPILOGUE)
 
 		label(UNROLLED1)
-		movq(rax, rsi)
-		movq(rbx, rdi)
+
+		test(rdi, rdi)
+		je(SKIP_BIAS_LOAD_x1)
+		vmovss(mem(rdi, r9, 1), xmm11)// load bias
+		label(SKIP_BIAS_LOAD_x1)// main loop over channels, in steps of 8 elements
 
 		movq(imm(7), r8)// transform col counter
 		label(TRANSFORM1x1)
@@ -966,36 +1017,39 @@ namespace ml
 		STORE_WORKSPACE_1x1xFP32(xmm3, 3, 7)
 		STORE_WORKSPACE_1x1xFP32(xmm4, 4, 7)
 
-		add(imm(1*8), rsi)// add 1*8 (1 pointer) to rsi (src), moving to next column
-		add(imm(1*1*4), rdi)// add 1*4 (1 float32) to rdi (workspace), moving to next column
+		add(imm(1*8), rax)// add 1*8 (1 pointer) to rsi (src), moving to next column
+		add(imm(1*1*4), rbx)// add 1*4 (1 float32) to rdi (workspace), moving to next column
 
 		dec(r8)
 		jne(TRANSFORM1x1)
+		sub(imm(7*1*8), rax)// add 1*8 (1 pointer) to rsi (src), moving to next column
+		sub(imm(7*1*1*4), rbx)// add 1*4 (1 float32) to rdi (workspace), moving to next column
 
-		movq(rbx, rsi)
-		movq(rcx, rdi)
 		movq(imm(5), r8)// transform row counter
 		label(TRANSFORM2x1)
 		// second transform
-		LOAD_WORKSPACE_7x1xFP32() // load row
+		LOAD_WORKSPACE_7x1xFP32()// load row
 		OUTPUT_TRANSFORM_5x5_3x3()
+		ADD_BIAS_5x8xFP32(ymm11)
 
-		movq(mem(rdi, 0*8), r13)
-		movq(mem(rdi, 1*8), r14)
-		movq(mem(rdi, 2*8), r15)
+		movq(mem(rcx, 0*8), r13)
+		movq(mem(rcx, 1*8), r14)
+		movq(mem(rcx, 2*8), r15)
 		STORE_OUTPUT_1x1xFP32(r9, xmm0, r13)
 		STORE_OUTPUT_1x1xFP32(r9, xmm1, r14)
 		STORE_OUTPUT_1x1xFP32(r9, xmm2, r15)
-		movq(mem(rdi, 3*8), r13)
-		movq(mem(rdi, 4*8), r14)
+		movq(mem(rcx, 3*8), r13)
+		movq(mem(rcx, 4*8), r14)
 		STORE_OUTPUT_1x1xFP32(r9, xmm3, r13)
 		STORE_OUTPUT_1x1xFP32(r9, xmm4, r14)
 
-		add(imm(7*1*4), rsi)// add 7*8 (7*1 floats) to rsi (workspace), moving to next row
-		add(imm(5*8), rdi)// add 5*8 (5 pointers) to rdi (dst), moving to next row
+		add(imm(7*1*4), rbx)// add 7*8 (7*1 floats) to rsi (workspace), moving to next row
+		add(imm(5*8), rcx)// add 5*8 (5 pointers) to rdi (dst), moving to next row
 
 		dec(r8)
 		jne(TRANSFORM2x1)
+		sub(imm(5*7*1*4), rbx)// add 7*8 (7*1 floats) to rsi (workspace), moving to next row
+		sub(imm(5*5*8), rcx)// add 5*8 (5 pointers) to rdi (dst), moving to next row
 
 		add(imm(1*4), r9)// add 1*4 (1 float32) to r9, the offset in channels
 		dec(r10)
@@ -1017,7 +1071,7 @@ namespace ml
 				[flag_relu] "m"(flag_relu)
 				:// clobbers
 				"cc", "memory", "%ymm0", "%ymm1", "%ymm2", "%ymm3", "%ymm4", "%ymm5", "%ymm6", "%ymm7", "%ymm8", "%ymm9", "%ymm10", "%ymm11", "%ymm12",
-				"%ymm13", "%ymm14", "%ymm15", "%rax", "%rbx", "%rcx", "%rdx", "%rsi", "%rdi", "%r8", "%r9", "%r10", "%r13", "%r14", "%r15")
+				"%ymm13", "%ymm14", "%ymm15", "%rax", "%rbx", "%rcx", "%rdx", "%rdi", "%r8", "%r9", "%r10", "%r11", "%r12", "%r13", "%r14", "%r15")
 	}
 	/*
 	 * Transforms for 3x3 kernel and 5x5 tile size in FP16
@@ -1054,8 +1108,6 @@ namespace ml
 		je(FINALLOOP)
 
 		label(UNROLLED8)// main loop over channels, in steps of 8 elements
-		movq(rax, rsi)
-		movq(rbx, rdi)
 
 		movq(imm(7), r8)// transform col counter
 		label(TRANSFORM1x8)
@@ -1076,23 +1128,23 @@ namespace ml
 		INPUT_TRANSFORM_5x5_3x3_ROW_6()
 		STORE_WORKSPACE_1x8xFP32(ymm7, 6, 7)
 
-		add(imm(1*8), rsi)// add 1*8 (1 pointer) to rsi (src), moving to next column
-		add(imm(1*8*4), rdi)// add 8*4 (8 floats) to rdi (workspace), moving to next column
+		add(imm(1*8), rax)// add 1*8 (1 pointer) to rax (src), moving to next column
+		add(imm(1*8*4), rbx)// add 8*4 (8 floats) to rbx (workspace), moving to next column
 
 		dec(r8)
 		jne(TRANSFORM1x8)
+		sub(imm(7*8), rax)// subtract 7*8 (7 pointers) from rax, moving to the start
+		sub(imm(7*8*4), rbx)// subtract 7*8*4 (7*8 float32) from rbx, moving to the start
 
-		movq(rbx, rsi)
-		movq(rcx, rdi)
 		movq(imm(7), r8)// transform col counter
 		label(TRANSFORM2x8)
 		// second transform
 		LOAD_WORKSPACE_7x8xFP32()
 
-		movq(mem(rdi, 0*8), r12)
-		movq(mem(rdi, 1*8), r13)
-		movq(mem(rdi, 2*8), r14)
-		movq(mem(rdi, 3*8), r15)
+		movq(mem(rcx, 0*8), r12)
+		movq(mem(rcx, 1*8), r13)
+		movq(mem(rcx, 2*8), r14)
+		movq(mem(rcx, 3*8), r15)
 		INPUT_TRANSFORM_5x5_3x3_ROW_0()
 		STORE_OUTPUT_1x8xFP16(r9, 7, r12)
 		INPUT_TRANSFORM_5x5_3x3_ROW_1()
@@ -1102,9 +1154,9 @@ namespace ml
 		INPUT_TRANSFORM_5x5_3x3_ROW_3()
 		STORE_OUTPUT_1x8xFP16(r9, 7, r15)
 
-		movq(mem(rdi, 4*8), r12)
-		movq(mem(rdi, 5*8), r13)
-		movq(mem(rdi, 6*8), r14)
+		movq(mem(rcx, 4*8), r12)
+		movq(mem(rcx, 5*8), r13)
+		movq(mem(rcx, 6*8), r14)
 		INPUT_TRANSFORM_5x5_3x3_ROW_4()
 		STORE_OUTPUT_1x8xFP16(r9, 7, r12)
 		INPUT_TRANSFORM_5x5_3x3_ROW_5()
@@ -1112,13 +1164,15 @@ namespace ml
 		INPUT_TRANSFORM_5x5_3x3_ROW_6()
 		STORE_OUTPUT_1x8xFP16(r9, 7, r14)
 
-		add(imm(7*8*4), rsi)// add 7*8 (7*8 floats) to rsi (workspace), moving to next row
-		add(imm(7*8), rdi)// add 7*8*4 (7 pointers) to rdi (dst), moving to next row
+		add(imm(7*8*4), rbx)// add 7*8 (7*8 floats) to rbx (workspace), moving to next row
+		add(imm(7*8), rcx)// add 7*8*4 (7 pointers) to rcx (dst), moving to next row
 
 		dec(r8)
 		jne(TRANSFORM2x8)
+		sub(imm(7*7*8*4), rbx)// subtract 7*7*8*4 (7*7*8 float32) from rbx, moving to the start
+		sub(imm(7*7*8), rcx)// subtract 7*8*4 (7*7*8 pointers) from rcx, moving to the start
 
-		add(imm(8*2), r9)// add 8*2 (8 float16) to r9, the offset in channels
+		add(imm(8*2), r9)// add 8*4 (8 float16) to r9, the offset in channels
 
 		dec(r10)
 		jne(UNROLLED8)
@@ -1130,8 +1184,6 @@ namespace ml
 		je(EPILOGUE)
 
 		label(UNROLLED1)
-		movq(rax, rsi)
-		movq(rbx, rdi)
 
 		movq(imm(7), r8)// transform col counter
 		label(TRANSFORM1x1)
@@ -1153,47 +1205,50 @@ namespace ml
 		INPUT_TRANSFORM_5x5_3x3_ROW_6()
 		STORE_WORKSPACE_1x1xFP32(xmm7, 6, 7)
 
-		add(imm(1*8), rsi)// add 1*8 (1 pointer) to rsi (src), moving to next column
-		add(imm(1*1*4), rdi)// add 1*4 (1 float32) to rdi (workspace), moving to next column
+		add(imm(1*8), rax)// add 1*8 (1 pointer) to rsi (src), moving to next column
+		add(imm(1*1*4), rbx)// add 1*4 (1 float32) to rdi (workspace), moving to next column
 
 		dec(r8)
 		jne(TRANSFORM1x1)
+		sub(imm(7*8), rax)// subtract 7*8 (7 pointers) from rax, moving to the start
+		sub(imm(7*1*4), rbx)// subtract 7*1*4 (7*1 float32) from rbx, moving to the start
 
-		movq(rbx, rsi)
-		movq(rcx, rdi)
 		movq(imm(7), r8)// transform col counter
 		label(TRANSFORM2x1)
 		// second transform
 		LOAD_WORKSPACE_7x1xFP32()
 
-		movq(mem(rdi, 0*8), r12)
-		movq(mem(rdi, 1*8), r13)
-		movq(mem(rdi, 2*8), r14)
-		movq(mem(rdi, 3*8), r15)
+		movq(mem(rcx, 0*8), r12)
+		movq(mem(rcx, 1*8), r13)
+		movq(mem(rcx, 2*8), r14)
 		INPUT_TRANSFORM_5x5_3x3_ROW_0()
 		STORE_OUTPUT_1x1xFP16(r9, 7, r12)
 		INPUT_TRANSFORM_5x5_3x3_ROW_1()
 		STORE_OUTPUT_1x1xFP16(r9, 7, r13)
 		INPUT_TRANSFORM_5x5_3x3_ROW_2()
 		STORE_OUTPUT_1x1xFP16(r9, 7, r14)
-		INPUT_TRANSFORM_5x5_3x3_ROW_3()
-		STORE_OUTPUT_1x1xFP16(r9, 7, r15)
 
-		movq(mem(rdi, 4*8), r12)
-		movq(mem(rdi, 5*8), r13)
-		movq(mem(rdi, 6*8), r14)
-		INPUT_TRANSFORM_5x5_3x3_ROW_4()
+		movq(mem(rcx, 3*8), r12)
+		movq(mem(rcx, 4*8), r13)
+		movq(mem(rcx, 5*8), r14)
+		INPUT_TRANSFORM_5x5_3x3_ROW_3()
 		STORE_OUTPUT_1x1xFP16(r9, 7, r12)
-		INPUT_TRANSFORM_5x5_3x3_ROW_5()
+		INPUT_TRANSFORM_5x5_3x3_ROW_4()
 		STORE_OUTPUT_1x1xFP16(r9, 7, r13)
-		INPUT_TRANSFORM_5x5_3x3_ROW_6()
+		INPUT_TRANSFORM_5x5_3x3_ROW_5()
 		STORE_OUTPUT_1x1xFP16(r9, 7, r14)
 
-		add(imm(7*1*4), rsi)// add 7*8 (7*1 floats) to rsi (workspace), moving to next row
-		add(imm(7*8), rdi)// add 7*8*4 (7 pointers) to rdi (dst), moving to next row
+		movq(mem(rcx, 6*8), r12)
+		INPUT_TRANSFORM_5x5_3x3_ROW_6()
+		STORE_OUTPUT_1x1xFP16(r9, 7, r12)
+
+		add(imm(7*1*4), rbx)// add 7*8 (7*1 floats) to rbx (workspace), moving to next row
+		add(imm(7*8), rcx)// add 7*8*4 (7 pointers) to rcx (dst), moving to next row
 
 		dec(r8)
 		jne(TRANSFORM2x1)
+		sub(imm(7*7*1*4), rbx)// subtract 7*7*1*4 (7*7*1 float32) from rbx, moving to the start
+		sub(imm(7*7*8), rcx)// subtract 7*8*4 (7*7*8 pointers) from rcx, moving to the start
 
 		add(imm(1*2), r9)// add 1*2 (1 float16) to r9, the offset in channels
 		dec(r10)
@@ -1212,7 +1267,7 @@ namespace ml
 				[c_ptr] "m"(c_ptr)
 				:// clobbers
 				"cc", "memory", "%ymm0", "%ymm1", "%ymm2", "%ymm3", "%ymm4", "%ymm5", "%ymm6", "%ymm7", "%ymm8", "%ymm9", "%ymm10", "%ymm11", "%ymm12",
-				"%ymm13", "%ymm14", "%ymm15", "%rax", "%rbx", "%rcx", "%rdx", "%rsi", "%rdi", "%r8", "%r9", "%r10", "%r12", "%r13", "%r14", "%r15")
+				"%ymm13", "%ymm14", "%ymm15", "%rax", "%rbx", "%rcx", "%rsi", "%r8", "%r9", "%r10", "%r12", "%r13", "%r14", "%r15")
 	}
 	void winograd_output_transform_5x5_3x3_avx2_fma_fp16(const void *src[], void *dst[], void *workspace, int filters, const void *ext[],
 			const void *bias, bool use_relu)
