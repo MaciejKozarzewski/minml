@@ -134,8 +134,8 @@
 #define ymm(x) REGISTER_(Ymm##x)
 #define zmm(x) REGISTER_(Zmm##x)
 #define k(x) REGISTER_(k##x)
-#define mask_k(x) MASK_(K(n))
-#define mask_kz(x) MASK_(K(n))MASK_(z)
+#define mask_k(x) mask_(k(x))
+#define mask_kz(x) mask_(k(x))mask_(z)
 
 /*
  * 128-bit SSE registers
@@ -351,6 +351,7 @@
 #define cmovnge(_0, _1) INSTR_(cmovnge, _0, _1)
 #define cmovnl(_0, _1) INSTR_(cmovnl, _0, _1)
 #define cmovnle(_0, _1) INSTR_(cmovnle, _0, _1)
+#define kmovw(_0, _1) INSTR_(kmovw, _0, _1)
 
 /*
  * Vector moves

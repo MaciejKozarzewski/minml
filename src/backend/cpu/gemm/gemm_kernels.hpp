@@ -68,6 +68,19 @@ namespace ml
 	void pack_avx2_fma_12xK_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept;
 	void pack_avx2_fma_12xK_fp16_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept;
 
+	/*
+	 * AVX512 kernels
+	 */
+	void gemm_avx512_24x16_fp32(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,
+			bool use_relu) noexcept;
+	void gemm_avx512_24x16_fp32_fp16(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr,
+			const Fragment &C, bool use_relu) noexcept;
+
+	void pack_avx512_24xK_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept;
+	void pack_avx512_24xK_fp16_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept;
+	void pack_avx512_16xK_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept;
+	void pack_avx512_16xK_fp16_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept;
+
 } /* namespace ml */
 
 #endif /* BACKEND_CPU_KERNELS_GEMM_GEMM_KERNELS_HPP_ */
