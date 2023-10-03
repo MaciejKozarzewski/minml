@@ -74,37 +74,37 @@ namespace ml
 		DISPATCH_AND_CALL(cpu_kernel_transpose_021)(context, dtype, shape, input, output);
 	}
 
-	void cpu_winograd_weight_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape, const void *weights,
-			void *matrices, bool invert)
-	{
-		CREATE_TABLE(cpu_kernel_winograd_weight_transform);
-		DISPATCH_AND_CALL(cpu_kernel_winograd_weight_transform)(context, tile_size, dtype, weight_shape, weights, matrices, invert);
-	}
-	void cpu_winograd_input_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape, mlShape_t input_shape,
-			const void *input, void *matrices)
-	{
-		CREATE_TABLE(cpu_kernel_winograd_input_transform);
-		DISPATCH_AND_CALL(cpu_kernel_winograd_input_transform)(context, tile_size, dtype, weight_shape, input_shape, input, matrices);
-	}
-	void cpu_winograd_output_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape, mlShape_t output_shape,
-			const void *matrices, void *output, const void *bias, const void *add, mlActivationType_t act)
-	{
-		CREATE_TABLE(cpu_kernel_winograd_output_transform);
-		DISPATCH_AND_CALL(cpu_kernel_winograd_output_transform)(context, tile_size, dtype, weight_shape, output_shape, matrices, output, bias, add,
-				act);
-	}
-	void cpu_winograd_gradient_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape, mlShape_t gradient_shape,
-			const void *gradient, void *matrices)
-	{
-		CREATE_TABLE(cpu_kernel_winograd_gradient_transform);
-		DISPATCH_AND_CALL(cpu_kernel_winograd_gradient_transform)(context, tile_size, dtype, weight_shape, gradient_shape, gradient, matrices);
-	}
-	void cpu_winograd_update_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape, const void *matrices,
-			void *update)
-	{
-		CREATE_TABLE(cpu_kernel_winograd_update_transform);
-		DISPATCH_AND_CALL(cpu_kernel_winograd_update_transform)(context, tile_size, dtype, weight_shape, matrices, update);
-	}
+//	void cpu_winograd_weight_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape, const void *weights,
+//			void *matrices, bool invert)
+//	{
+//		CREATE_TABLE(cpu_kernel_winograd_weight_transform);
+//		DISPATCH_AND_CALL(cpu_kernel_winograd_weight_transform)(context, tile_size, dtype, weight_shape, weights, matrices, invert);
+//	}
+//	void cpu_winograd_input_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape, mlShape_t input_shape,
+//			const void *input, void *matrices)
+//	{
+//		CREATE_TABLE(cpu_kernel_winograd_input_transform);
+//		DISPATCH_AND_CALL(cpu_kernel_winograd_input_transform)(context, tile_size, dtype, weight_shape, input_shape, input, matrices);
+//	}
+//	void cpu_winograd_output_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape, mlShape_t output_shape,
+//			const void *matrices, void *output, const void *bias, const void *add, mlActivationType_t act)
+//	{
+//		CREATE_TABLE(cpu_kernel_winograd_output_transform);
+//		DISPATCH_AND_CALL(cpu_kernel_winograd_output_transform)(context, tile_size, dtype, weight_shape, output_shape, matrices, output, bias, add,
+//				act);
+//	}
+//	void cpu_winograd_gradient_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape, mlShape_t gradient_shape,
+//			const void *gradient, void *matrices)
+//	{
+//		CREATE_TABLE(cpu_kernel_winograd_gradient_transform);
+//		DISPATCH_AND_CALL(cpu_kernel_winograd_gradient_transform)(context, tile_size, dtype, weight_shape, gradient_shape, gradient, matrices);
+//	}
+//	void cpu_winograd_update_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape, const void *matrices,
+//			void *update)
+//	{
+//		CREATE_TABLE(cpu_kernel_winograd_update_transform);
+//		DISPATCH_AND_CALL(cpu_kernel_winograd_update_transform)(context, tile_size, dtype, weight_shape, matrices, update);
+//	}
 
 	void cpu_convolution_implicit_gemm_forward(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, mlShape_t weights_shape,
 			const void *input, const void *weights, void *output, const void *bias, const void *add, mlActivationType_t act)

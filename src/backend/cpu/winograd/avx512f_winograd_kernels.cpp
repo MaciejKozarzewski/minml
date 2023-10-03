@@ -1,5 +1,5 @@
 /*
- * avx512_winograd_kernels.cpp
+ * avx512f_winograd_kernels.cpp
  *
  *  Created on: Sep 22, 2023
  *      Author: Maciej Kozarzewski
@@ -357,7 +357,7 @@ namespace ml
 	/*
 	 * Transforms for 3x3 kernel and 4x4 tile size in FP32
 	 */
-	void winograd_input_transform_4x4_3x3_avx512_fp32(const void *src[], void *dst[], void *workspace, int filters)
+	void winograd_input_transform_4x4_3x3_avx512f_fp32(const void *src[], void *dst[], void *workspace, int filters)
 	{
 		assert(workspace != nullptr);
 		assert(filters >= 0);
@@ -539,7 +539,7 @@ namespace ml
 				"cc", "memory", "%zmm0", "%zmm1", "%zmm2", "%zmm3", "%zmm4", "%zmm5", "%zmm6", "%zmm7", "%zmm8", "%zmm9", "%zmm10", "%zmm11", "%zmm12",
 				"%zmm13", "%zmm14", "%zmm15", "%rax", "%rbx", "%rcx", "%r8", "%r9", "%r10", "%r13", "%r14", "%r15")
 	}
-	void winograd_output_transform_4x4_3x3_avx512_fp32(const void *src[], void *dst[], void *workspace, int filters, const void *ext[],
+	void winograd_output_transform_4x4_3x3_avx512f_fp32(const void *src[], void *dst[], void *workspace, int filters, const void *ext[],
 			const void *bias, bool use_relu)
 	{
 		assert(workspace != nullptr);
@@ -738,7 +738,7 @@ namespace ml
 	/*
 	 * Transforms for 3x3 kernel and 4x4 tile size in FP16
 	 */
-	void winograd_input_transform_4x4_3x3_avx512_fp16(const void *src[], void *dst[], void *workspace, int filters)
+	void winograd_input_transform_4x4_3x3_avx512f_fp16(const void *src[], void *dst[], void *workspace, int filters)
 	{
 		assert(workspace != nullptr);
 		assert(filters >= 0);
@@ -920,7 +920,7 @@ namespace ml
 				"cc", "memory", "%zmm0", "%zmm1", "%zmm2", "%zmm3", "%zmm4", "%zmm5", "%zmm6", "%zmm7", "%zmm8", "%zmm9", "%zmm10", "%zmm11", "%zmm12",
 				"%zmm13", "%zmm14", "%zmm15", "%rax", "%rbx", "%rcx", "%rsi", "%r8", "%r9", "%r10", "%r13", "%r14", "%r15")
 	}
-	void winograd_output_transform_4x4_3x3_avx512_fp16(const void *src[], void *dst[], void *workspace, int filters, const void *ext[],
+	void winograd_output_transform_4x4_3x3_avx512f_fp16(const void *src[], void *dst[], void *workspace, int filters, const void *ext[],
 			const void *bias, bool use_relu)
 	{
 		assert(workspace != nullptr);
@@ -1122,7 +1122,7 @@ namespace ml
 	/*
 	 * Transforms for 3x3 kernel and 5x5 tile size in FP32
 	 */
-	void winograd_input_transform_5x5_3x3_avx512_fp32(const void *src[], void *dst[], void *workspace, int filters)
+	void winograd_input_transform_5x5_3x3_avx512f_fp32(const void *src[], void *dst[], void *workspace, int filters)
 	{
 		assert(workspace != nullptr);
 		assert(filters >= 0);
@@ -1314,7 +1314,7 @@ namespace ml
 				"cc", "memory", "%zmm0", "%zmm1", "%zmm2", "%zmm3", "%zmm4", "%zmm5", "%zmm6", "%zmm7", "%zmm8", "%zmm9", "%zmm10", "%zmm11", "%zmm12",
 				"%zmm13", "%zmm14", "%zmm15", "%rax", "%rbx", "%rcx", "%r8", "%r9", "%r10", "%r12", "%r13", "%r14", "%r15")
 	}
-	void winograd_output_transform_5x5_3x3_avx512_fp32(const void *src[], void *dst[], void *workspace, int filters, const void *ext[],
+	void winograd_output_transform_5x5_3x3_avx512f_fp32(const void *src[], void *dst[], void *workspace, int filters, const void *ext[],
 			const void *bias, bool use_relu)
 	{
 		assert(workspace != nullptr);
@@ -1520,7 +1520,7 @@ namespace ml
 	/*
 	 * Transforms for 3x3 kernel and 5x5 tile size in FP16
 	 */
-	void winograd_input_transform_5x5_3x3_avx512_fp16(const void *src[], void *dst[], void *workspace, int filters)
+	void winograd_input_transform_5x5_3x3_avx512f_fp16(const void *src[], void *dst[], void *workspace, int filters)
 	{
 		assert(workspace != nullptr);
 		assert(filters >= 0);
@@ -1713,7 +1713,7 @@ namespace ml
 				"cc", "memory", "%zmm0", "%zmm1", "%zmm2", "%zmm3", "%zmm4", "%zmm5", "%zmm6", "%zmm7", "%zmm8", "%zmm9", "%zmm10", "%zmm11", "%zmm12",
 				"%zmm13", "%zmm14", "%zmm15", "%rax", "%rbx", "%rcx", "%rsi", "%r8", "%r9", "%r10", "%r12", "%r13", "%r14", "%r15")
 	}
-	void winograd_output_transform_5x5_3x3_avx512_fp16(const void *src[], void *dst[], void *workspace, int filters, const void *ext[],
+	void winograd_output_transform_5x5_3x3_avx512f_fp16(const void *src[], void *dst[], void *workspace, int filters, const void *ext[],
 			const void *bias, bool use_relu)
 	{
 		assert(workspace != nullptr);

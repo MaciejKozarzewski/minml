@@ -1519,6 +1519,8 @@ namespace ml
 	 */
 	void winograd_input_transform_5x5_3x3_avx2_fma_fp16(const void *src[], void *dst[], void *workspace, int filters)
 	{
+		assert(src != nullptr);
+		assert(dst != nullptr);
 		assert(workspace != nullptr);
 		assert(filters >= 0);
 
