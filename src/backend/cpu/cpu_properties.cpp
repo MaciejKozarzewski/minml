@@ -32,8 +32,8 @@ namespace
 	{
 //		if (supports_simd(AVOCADO_DEVICE_SUPPORTS_AVX512_VL_BW_DQ))
 //			return SimdLevel::AVX512VL_BW_DQ;
-//		if (cpu_x86::get().supports("avx512-f") and cpu_x86::get().supports("os_avx512"))
-//			return SimdLevel::AVX512F;
+		if (cpu_x86::get().supports("avx512-f") and cpu_x86::get().supports("os_avx512"))
+			return SimdLevel::AVX512F;
 		if (cpu_x86::get().supports("avx2") and cpu_x86::get().supports("os_avx") and cpu_x86::get().supports("fma3"))
 			return SimdLevel::AVX2;
 		if (cpu_x86::get().supports("avx") and cpu_x86::get().supports("os_avx"))

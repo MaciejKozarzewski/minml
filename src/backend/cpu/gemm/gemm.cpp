@@ -105,6 +105,38 @@ namespace
 
 		return result;
 	}
+	std::vector<GemmRuntime> get_avx512_gemm_runtime()
+	{
+		std::vector<GemmRuntime> result(2);
+
+		// 12x8 fp32
+		result[0].type_configuration = { DTYPE_FLOAT32, DTYPE_FLOAT32, DTYPE_FLOAT32, DTYPE_FLOAT32, DTYPE_FLOAT32 };
+		result[0].inner_tile = { 24, 16, 1024 };
+		result[0].gemm_kernel = gemm_avx512f_24x16_fp32;
+		result[0].a_packing = pack_avx512f_24xK_fp32;
+		result[0].b_packing = pack_avx512f_16xK_fp32;
+		result[0].c_packing = pack_def_MxK_fp32;
+		result[0].d_packing = pack_def_MxK_fp32;
+		result[0].d_unpacking = unpack_def_MxK_fp32;
+		result[0].edge_a_packing = pack_def_MxK_fp32;
+		result[0].edge_b_packing = pack_def_MxK_fp32;
+		result[0].perf_estimator = PerfEstimator(62.8, 23.4);
+
+		// 12x8 fp16/fp32
+		result[1].type_configuration = { DTYPE_FLOAT16, DTYPE_FLOAT16, DTYPE_FLOAT16, DTYPE_FLOAT16, DTYPE_FLOAT32 };
+		result[1].inner_tile = { 24, 16, 1024 };
+		result[1].gemm_kernel = gemm_avx512f_24x16_fp32_fp16;
+		result[1].a_packing = pack_avx512f_24xK_fp16_fp32;
+		result[1].b_packing = pack_avx512f_16xK_fp16_fp32;
+		result[1].c_packing = pack_def_MxK_fp16;
+		result[1].d_packing = pack_def_MxK_fp16;
+		result[1].d_unpacking = unpack_def_MxK_fp16;
+		result[1].edge_a_packing = pack_def_MxK_fp16_fp32;
+		result[1].edge_b_packing = pack_def_MxK_fp16_fp32;
+		result[1].perf_estimator = PerfEstimator(61.2, 25.5);
+
+		return result;
+	}
 
 	template<typename T>
 	void join_vectors(std::vector<T> &dst, const std::vector<T> &src)
@@ -118,8 +150,8 @@ namespace
 		{
 			std::vector<GemmRuntime> result;
 			const cpu::SimdLevel simd = cpu::Context::getSimdLevel(context);
-//			if (simd >= cpu::SimdLevel::AVX512F)
-//				;
+			if (simd >= cpu::SimdLevel::AVX512F)
+				join_vectors(result, get_avx512_gemm_runtime());
 			if (simd >= cpu::SimdLevel::AVX2)
 				join_vectors(result, get_avx2_fma_gemm_runtime());
 			if (simd >= cpu::SimdLevel::AVX)

@@ -1,6 +1,7 @@
 
 add_library(gemm_backend OBJECT avx_gemm_kernels.cpp
 								avx2_gemm_kernels.cpp
+								avx512f_gemm_kernels.cpp
 								def_gemm_kernels.cpp
 								gemm_runtime.cpp
 								gemm.cpp
@@ -12,5 +13,6 @@ target_include_directories(gemm_backend PUBLIC PUBLIC "${PROJECT_SOURCE_DIR}/inc
 set_source_files_properties(sse2_gemm_kernels.cpp PROPERTIES COMPILE_OPTIONS "-msse2")
 set_source_files_properties(avx_gemm_kernels.cpp PROPERTIES COMPILE_OPTIONS "-mavx")
 set_source_files_properties(avx2_gemm_kernels.cpp PROPERTIES COMPILE_OPTIONS "-mavx2;-mfma;-mf16c")
+set_source_files_properties(avx512f_gemm_kernels.cpp PROPERTIES COMPILE_OPTIONS "-mavx512f;-mfma;-mf16c")
 
 target_link_libraries(${LibName} PRIVATE gemm_backend)

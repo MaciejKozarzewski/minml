@@ -1,5 +1,5 @@
 /*
- * avx512_gemm_kernels.cpp
+ * avx512f_gemm_kernels.cpp
  *
  *  Created on: Sep 24, 2023
  *      Author: Maciej Kozarzewski
@@ -521,7 +521,7 @@
 namespace ml
 {
 #ifdef __AVX512F__
-	void gemm_avx512_24x16_fp32(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,
+	void gemm_avx512f_24x16_fp32(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,
 			bool use_relu) noexcept
 	{
 		assert(A.dtype() == DTYPE_FLOAT32);
@@ -659,7 +659,7 @@ namespace ml
 				"%zmm17", "%zmm18", "%zmm19", "%zmm20", "%zmm21", "%zmm22", "%zmm23", "%zmm24", "%zmm25",
 				"%zmm26", "%zmm27", "%zmm28", "%zmm29", "%zmm30", "%zmm31", "%rax", "%rbx", "%rcx", "%rdx", "%r14", "%r15")
 	}
-	void gemm_avx512_24x16_fp32_fp16(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr,
+	void gemm_avx512f_24x16_fp32_fp16(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr,
 			const Fragment &C, bool use_relu) noexcept
 	{
 		assert(A.dtype() == DTYPE_FLOAT32);
@@ -800,7 +800,7 @@ namespace ml
 				"%zmm26", "%zmm27", "%zmm28", "%zmm29", "%zmm30", "%zmm31", "%rax", "%rbx", "%rcx", "%rdx", "%r14", "%r15")
 	}
 
-	void pack_avx512_24xK_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept
+	void pack_avx512f_24xK_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept
 	{
 		assert(dst.stride() == 24);
 		assert(ml::cpu::is_aligned(dst.data(), register_size<ZMM>()));
@@ -935,7 +935,7 @@ namespace ml
 					"%r12", "%r13", "%r14")
 		}
 	}
-	void pack_avx512_16xK_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept
+	void pack_avx512f_16xK_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept
 	{
 		assert(dst.stride() == 16);
 		assert(ml::cpu::is_aligned(dst.data(), register_size<ZMM>()));
@@ -1062,7 +1062,7 @@ namespace ml
 		}
 	}
 
-	void pack_avx512_24xK_fp16_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept
+	void pack_avx512f_24xK_fp16_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept
 	{
 		assert(dst.stride() == 24);
 		assert(ml::cpu::is_aligned(dst.data(), register_size<ZMM>()));
@@ -1198,7 +1198,7 @@ namespace ml
 					"%r12", "%r13", "%r14")
 		}
 	}
-	void pack_avx512_16xK_fp16_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept
+	void pack_avx512f_16xK_fp16_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept
 	{
 		assert(dst.stride() == 16);
 		assert(ml::cpu::is_aligned(dst.data(), register_size<ZMM>()));
@@ -1325,24 +1325,24 @@ namespace ml
 		}
 	}
 #else
-	void gemm_avx512_24x16_fp32(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,
+	void gemm_avx512f_24x16_fp32(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,
 			bool use_relu) noexcept
 	{
 	}
-	void gemm_avx512_24x16_fp32_fp16(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr,
+	void gemm_avx512f_24x16_fp32_fp16(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr,
 			const Fragment &C, bool use_relu) noexcept
 	{
 	}
-	void pack_avx512_24xK_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept
+	void pack_avx512f_24xK_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept
 	{
 	}
-	void pack_avx512_24xK_fp16_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept
+	void pack_avx512f_24xK_fp16_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept
 	{
 	}
-	void pack_avx512_16xK_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept
+	void pack_avx512f_16xK_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept
 	{
 	}
-	void pack_avx512_16xK_fp16_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept
+	void pack_avx512f_16xK_fp16_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept
 	{
 	}
 #endif
