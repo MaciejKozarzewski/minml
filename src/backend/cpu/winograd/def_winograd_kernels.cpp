@@ -402,7 +402,8 @@ namespace
 			for (int row = 0; row < out_size; row++)
 			{
 				for (int col = 0; col < in_size; col++)
-					input_tile[col] = reinterpret_cast<ComputeType*>(workspace)[row * out_size + col];
+					input_tile[col] = reinterpret_cast<ComputeType*>(workspace)[row * in_size + col];
+
 				const std::array<ComputeType, out_size> transformed = transform(input_tile);
 				for (int col = 0; col < out_size; col++)
 				{

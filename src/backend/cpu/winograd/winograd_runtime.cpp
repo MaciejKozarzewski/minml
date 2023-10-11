@@ -163,7 +163,6 @@ namespace ml
 		const int width = shape.dim[2];
 		const int filters = shape.dim[3];
 
-		const int Padding = kernel_size / 2;
 		const int TransformSize = tile_size + kernel_size - 1;
 
 		const int tiles_h = (height + tile_size - 1) / tile_size;
@@ -178,7 +177,7 @@ namespace ml
 		const size_t ptr_out_size = round_up_to_multiple_of<64>(sizeof(void*) * tile_size * tile_size);
 		const size_t workspace_size = round_up_to_multiple_of<64>(SimdSize * TransformSize * TransformSize + WorkspaceAlignment);
 
-#pragma omp parallel
+//#pragma omp parallel
 		{
 			uint8_t *local_workspace = reinterpret_cast<uint8_t*>(workspace)
 					+ omp_get_thread_num() * (fake_storage_size + ptr_in_size + 2 * ptr_out_size + workspace_size);
@@ -196,22 +195,22 @@ namespace ml
 
 			void *transform_workspace = align_pointer_to<WorkspaceAlignment>(local_workspace);
 
-#pragma omp for
+//#pragma omp for
 			for (int tile_idx = 0; tile_idx < nb_of_tiles; tile_idx++)
 			{
 				const int batch = tile_idx / tiles_per_image;
 				const int tile_x = ((tile_idx % tiles_per_image) / tiles_w);
 				const int tile_y = ((tile_idx % tiles_per_image) % tiles_w);
 
-				for (int i = 0; i < tile_size * tile_size; i++)
+				for (int i = 0; i < TransformSize * TransformSize; i++)
 					ptr_in[i] = getPointer<uint8_t>(matrices) + matrices_indexer.at(i, tile_idx, 0);
 
 				int matrix_idx = 0;
-				for (int i = 0; i < TransformSize; i++)
-					for (int j = 0; j < TransformSize; j++, matrix_idx++)
+				for (int i = 0; i < tile_size; i++)
+					for (int j = 0; j < tile_size; j++, matrix_idx++)
 					{
-						const int x = tile_size * tile_x + i - Padding;
-						const int y = tile_size * tile_y + j - Padding;
+						const int x = tile_size * tile_x + i;
+						const int y = tile_size * tile_y + j;
 						if (x < height and y < width)
 						{
 							ptr_out[matrix_idx] = getPointer<uint8_t>(output) + output_indexer.at(batch, x, y, 0);
@@ -523,16 +522,16 @@ namespace ml
 		if (not use_relu)
 			cpu_activation_forward(context, dtype, output_shape, output, output, act);
 	}
-	void cpu_winograd_gradient_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape, mlShape_t gradient_shape,
-			const void *gradient, void *matrices)
-	{
-		get_runtime(context, tile_size, dtype, weight_shape).transformGradient(context, gradient_shape, gradient, matrices);
-	}
-	void cpu_winograd_update_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape, const void *matrices,
-			void *update)
-	{
-		get_runtime(context, tile_size, dtype, weight_shape).transformUpdate(context, weight_shape, matrices, update);
-	}
+//	void cpu_winograd_gradient_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape, mlShape_t gradient_shape,
+//			const void *gradient, void *matrices)
+//	{
+//		get_runtime(context, tile_size, dtype, weight_shape).transformGradient(context, gradient_shape, gradient, matrices);
+//	}
+//	void cpu_winograd_update_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape, const void *matrices,
+//			void *update)
+//	{
+//		get_runtime(context, tile_size, dtype, weight_shape).transformUpdate(context, weight_shape, matrices, update);
+//	}
 
 } /* namespace ml */
 
