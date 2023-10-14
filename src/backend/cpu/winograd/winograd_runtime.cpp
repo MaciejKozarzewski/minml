@@ -388,7 +388,7 @@ namespace ml
 
 	std::vector<WinogradTransformRuntime> get_sse2_winograd_runtime()
 	{
-		std::vector<WinogradTransformRuntime> result(2);
+		std::vector<WinogradTransformRuntime> result(3);
 		// 4x4 tile, 3x3 kernel, fp32
 		result[0] = WinogradTransformRuntime(4, 3, DTYPE_FLOAT32);
 		result[0].input_transform = winograd_input_transform_4x4_3x3_sse2_fp32;
@@ -399,11 +399,14 @@ namespace ml
 		result[1].input_transform = winograd_input_transform_5x5_3x3_sse2_fp32;
 		result[1].output_transform = winograd_output_transform_5x5_3x3_sse2_fp32;
 
+		// 2x2 tile, 5x5 kernel, fp32
+		result[2] = WinogradTransformRuntime(2, 5, DTYPE_FLOAT32);
+
 		return result;
 	}
 	std::vector<WinogradTransformRuntime> get_avx_winograd_runtime()
 	{
-		std::vector<WinogradTransformRuntime> result(4);
+		std::vector<WinogradTransformRuntime> result(5);
 		// 4x4 tile, 3x3 kernel, fp32
 		result[0] = WinogradTransformRuntime(4, 3, DTYPE_FLOAT32);
 		result[0].input_transform = winograd_input_transform_4x4_3x3_avx_fp32;
@@ -424,11 +427,14 @@ namespace ml
 		result[3].input_transform = winograd_input_transform_5x5_3x3_avx_fp16;
 		result[3].output_transform = winograd_output_transform_5x5_3x3_avx_fp16;
 
+		// 2x2 tile, 5x5 kernel, fp32
+		result[4] = WinogradTransformRuntime(2, 5, DTYPE_FLOAT32);
+
 		return result;
 	}
 	std::vector<WinogradTransformRuntime> get_avx2_fma_winograd_runtime()
 	{
-		std::vector<WinogradTransformRuntime> result(4);
+		std::vector<WinogradTransformRuntime> result(5);
 		// 4x4 tile, 3x3 kernel, fp32
 		result[0] = WinogradTransformRuntime(4, 3, DTYPE_FLOAT32);
 		result[0].input_transform = winograd_input_transform_4x4_3x3_avx2_fma_fp32;
@@ -449,11 +455,14 @@ namespace ml
 		result[3].input_transform = winograd_input_transform_5x5_3x3_avx2_fma_fp16;
 		result[3].output_transform = winograd_output_transform_5x5_3x3_avx2_fma_fp16;
 
+		// 2x2 tile, 5x5 kernel, fp32
+		result[4] = WinogradTransformRuntime(2, 5, DTYPE_FLOAT32);
+
 		return result;
 	}
 	std::vector<WinogradTransformRuntime> get_avx512f_winograd_runtime()
 	{
-		std::vector<WinogradTransformRuntime> result(4);
+		std::vector<WinogradTransformRuntime> result(5);
 		// 4x4 tile, 3x3 kernel, fp32
 		result[0] = WinogradTransformRuntime(4, 3, DTYPE_FLOAT32);
 		result[0].input_transform = winograd_input_transform_4x4_3x3_avx512f_fp32;
@@ -473,6 +482,9 @@ namespace ml
 		result[3] = WinogradTransformRuntime(5, 3, DTYPE_FLOAT16);
 		result[3].input_transform = winograd_input_transform_5x5_3x3_avx512f_fp16;
 		result[3].output_transform = winograd_output_transform_5x5_3x3_avx512f_fp16;
+
+		// 2x2 tile, 5x5 kernel, fp32
+		result[4] = WinogradTransformRuntime(2, 5, DTYPE_FLOAT32);
 
 		return result;
 	}
@@ -522,16 +534,16 @@ namespace ml
 		if (not use_relu)
 			cpu_activation_forward(context, dtype, output_shape, output, output, act);
 	}
-//	void cpu_winograd_gradient_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape, mlShape_t gradient_shape,
-//			const void *gradient, void *matrices)
-//	{
-//		get_runtime(context, tile_size, dtype, weight_shape).transformGradient(context, gradient_shape, gradient, matrices);
-//	}
-//	void cpu_winograd_update_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape, const void *matrices,
-//			void *update)
-//	{
-//		get_runtime(context, tile_size, dtype, weight_shape).transformUpdate(context, weight_shape, matrices, update);
-//	}
+	void cpu_winograd_gradient_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape, mlShape_t gradient_shape,
+			const void *gradient, void *matrices)
+	{
+		get_runtime(context, tile_size, dtype, weight_shape).transformGradient(context, gradient_shape, gradient, matrices);
+	}
+	void cpu_winograd_update_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape, const void *matrices,
+			void *update)
+	{
+		get_runtime(context, tile_size, dtype, weight_shape).transformUpdate(context, weight_shape, matrices, update);
+	}
 
 } /* namespace ml */
 

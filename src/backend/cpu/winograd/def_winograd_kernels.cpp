@@ -176,8 +176,8 @@ namespace
 				result[0] = line[0];
 				result[1] = c23 * (line[0] + line[1] + line[2]);
 				result[2] = c23 * (line[0] - line[1] + line[2]);
-				result[3] = c13 * line[0] + c23 * line[2] + c43 * line[2];
-				result[4] = c13 * line[0] - c23 * line[2] + c43 * line[2];
+				result[3] = c13 * line[0] + c23 * line[1] + c43 * line[2];
+				result[4] = c13 * line[0] - c23 * line[1] + c43 * line[2];
 				result[5] = c2 * line[2];
 				return result;
 			}
@@ -237,9 +237,9 @@ namespace
 			inline std::array<T, 3> operator()(const std::array<T, 6> &line) const noexcept
 			{
 				std::array<T, 3> result;
-				result[0] = line[0] + line[2] + line[3] + 0.25 * (line[3] + line[4]);
+				result[0] = line[0] + line[1] + line[2] + 0.25 * (line[3] + line[4]);
 				result[1] = line[1] - line[2] + 0.5 * (line[3] - line[4]);
-				result[2] = line[1] + line[2] + line[3] + line[4] + 2 * line[5];
+				result[2] = line[1] + line[2] + line[3] + line[4] + 2.0 * line[5];
 				return result;
 			}
 	};
@@ -320,7 +320,7 @@ namespace
 				result[1] = c23 * (line[0] + line[1] + line[2] + line[3] + line[4]);
 				result[2] = c23 * (line[0] - line[1] + line[2] - line[3] + line[4]);
 				result[3] = c16 * line[0] + c13 * (line[1] + line[3]) + line[3] + c23 * (line[2] + line[4]) + c2 * line[4];
-				result[4] = c16 * line[0] - c13 * (line[1] + line[3]) + line[3] + c23 * (line[2] + line[4]) + c2 * line[4];
+				result[4] = c16 * line[0] - c13 * (line[1] + line[3]) - line[3] + c23 * (line[2] + line[4]) + c2 * line[4];
 				result[5] = c2 * line[4];
 				return result;
 			}
