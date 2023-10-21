@@ -105,11 +105,11 @@ namespace
 
 		return result;
 	}
-	std::vector<GemmRuntime> get_avx512_gemm_runtime()
+	std::vector<GemmRuntime> get_avx512f_gemm_runtime()
 	{
 		std::vector<GemmRuntime> result(2);
 
-		// 12x8 fp32
+		// 24x16 fp32
 		result[0].type_configuration = { DTYPE_FLOAT32, DTYPE_FLOAT32, DTYPE_FLOAT32, DTYPE_FLOAT32, DTYPE_FLOAT32 };
 		result[0].inner_tile = { 24, 16, 1024 };
 		result[0].gemm_kernel = gemm_avx512f_24x16_fp32;
@@ -122,7 +122,7 @@ namespace
 		result[0].edge_b_packing = pack_def_MxK_fp32;
 		result[0].perf_estimator = PerfEstimator(62.8, 23.4);
 
-		// 12x8 fp16/fp32
+		// 24x16 fp16/fp32
 		result[1].type_configuration = { DTYPE_FLOAT16, DTYPE_FLOAT16, DTYPE_FLOAT16, DTYPE_FLOAT16, DTYPE_FLOAT32 };
 		result[1].inner_tile = { 24, 16, 1024 };
 		result[1].gemm_kernel = gemm_avx512f_24x16_fp32_fp16;
@@ -151,7 +151,7 @@ namespace
 			std::vector<GemmRuntime> result;
 			const cpu::SimdLevel simd = cpu::Context::getSimdLevel(context);
 			if (simd >= cpu::SimdLevel::AVX512F)
-				join_vectors(result, get_avx512_gemm_runtime());
+				join_vectors(result, get_avx512f_gemm_runtime());
 			if (simd >= cpu::SimdLevel::AVX2)
 				join_vectors(result, get_avx2_fma_gemm_runtime());
 			if (simd >= cpu::SimdLevel::AVX)

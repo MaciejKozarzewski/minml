@@ -31,6 +31,8 @@ namespace ml
 	}
 	TEST(TestSoftmax, ForwardOnCPU_fp16)
 	{
+		if (not Device::cpu().supportsType(DataType::FLOAT16))
+			GTEST_SKIP_("CPU does not support fp16");
 		Context context;
 		Tensor input = toTensor( { { 0.1f, -0.9f, 2.0f, 0.0f }, { 0.3f, -1.0f, 0.7f, -0.1f } });
 		Tensor correct_output = toTensor( { { 0.11162444f, 0.04106433f, 0.74630924f, 0.10100197f }, { 0.29114823f, 0.07934714f, 0.43434212f,

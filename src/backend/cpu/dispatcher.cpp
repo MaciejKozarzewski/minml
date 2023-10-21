@@ -9,9 +9,11 @@
 #include <minml/backend/backend_utils.hpp>
 
 #include "kernel_definitions.hpp"
+#include "misc_kernels.hpp"
 
 #include <functional>
 #include <iostream>
+#include <cstring>
 
 namespace
 {
@@ -53,6 +55,47 @@ namespace
 #  define DISPATCH_AND_CALL(function_name) SIMD_NAMESPACE::function_name
 #endif
 
+	using conversion_function = std::function<void(void*, const void*, size_t)>;
+	conversion_function get_conversion_function_fp32_to_fp16(ml::mlContext_t context)
+	{
+		if (ml::cpu::Context::getSimdLevel(context) >= ml::cpu::SimdLevel::AVX and ml::cpu::has_hardware_fp16_conversion())
+			return ml::cpu::avx_kernel_convert_fp32_to_fp16;
+		else
+			return ml::cpu::def_kernel_convert_fp32_to_fp16;
+	}
+	conversion_function get_conversion_function_fp16_to_fp32(ml::mlContext_t context)
+	{
+		if (ml::cpu::Context::getSimdLevel(context) >= ml::cpu::SimdLevel::AVX and ml::cpu::has_hardware_fp16_conversion())
+			return ml::cpu::avx_kernel_convert_fp16_to_fp32;
+		else
+			return ml::cpu::def_kernel_convert_fp16_to_fp32;
+	}
+
+	template<typename T>
+	T one_or_zero(bool b) noexcept;
+
+	template<>
+	float one_or_zero(bool b) noexcept
+	{
+		return b ? 1.0f : 0.0f;
+	}
+	template<>
+	uint16_t one_or_zero(bool b) noexcept
+	{
+		return b ? uint16_t { 0x3c00 } : uint16_t { 0x0000 };
+	}
+
+	template<typename T>
+	void kernel_unpack_input(T *dst, const uint32_t *src, int first_dim, int last_dim)
+	{
+		assert(last_dim <= 32);
+		for (int i = 0; i < first_dim; i++, dst += last_dim)
+		{
+			uint32_t mask = src[i];
+			for (int j = 0; j < last_dim; j++, mask >>= 1)
+				dst[j] = one_or_zero<T>(mask & 1u);
+		}
+	}
 }
 
 namespace ml
@@ -60,18 +103,51 @@ namespace ml
 
 	void cpu_unpack_input(mlContext_t context, mlShape_t shape, mlDataType_t dst_dtype, void *dst, const void *src)
 	{
-		CREATE_TABLE(cpu_kernel_unpack_input);
-		DISPATCH_AND_CALL(cpu_kernel_unpack_input)(context, shape, dst_dtype, dst, src);
+		const int first_dim = volume_without_last_dim(shape);
+		const int last_dim = get_last_dim(shape);
+
+		switch (dst_dtype)
+		{
+			case DTYPE_FLOAT16:
+				kernel_unpack_input(getPointer<uint16_t>(dst), getPointer<uint32_t>(src), first_dim, last_dim);
+				break;
+			case DTYPE_FLOAT32:
+				kernel_unpack_input(getPointer<float>(dst), getPointer<uint32_t>(src), first_dim, last_dim);
+				break;
+			default:
+				break;
+		}
+
+//		CREATE_TABLE(cpu_kernel_unpack_input);
+//		DISPATCH_AND_CALL(cpu_kernel_unpack_input)(context, shape, dst_dtype, dst, src);
 	}
 	void cpu_convert_type(mlContext_t context, void *dst, mlDataType_t dst_dtype, const void *src, mlDataType_t src_dtype, int elements)
 	{
-		CREATE_TABLE(cpu_kernel_convert_type);
-		DISPATCH_AND_CALL(cpu_kernel_convert_type)(context, dst, dst_dtype, src, src_dtype, elements);
+		if (dst_dtype == src_dtype)
+		{ // same type
+			if (dst != src)
+				std::memcpy(dst, src, size_of(dst_dtype) * elements); // different locations, can just copy memory
+			return;
+		}
+
+		if (dst_dtype == DTYPE_FLOAT16 and src_dtype == DTYPE_FLOAT32)
+		{
+			static const conversion_function func = get_conversion_function_fp32_to_fp16(context);
+			func(dst, src, elements);
+		}
+		if (dst_dtype == DTYPE_FLOAT32 and src_dtype == DTYPE_FLOAT16)
+		{
+			static const conversion_function func = get_conversion_function_fp16_to_fp32(context);
+			func(dst, src, elements);
+		}
+
+//		CREATE_TABLE(cpu_kernel_convert_type);
+//		DISPATCH_AND_CALL(cpu_kernel_convert_type)(context, dst, dst_dtype, src, src_dtype, elements);
 	}
 	void cpu_transpose_021(mlContext_t context, mlDataType_t dtype, mlShape_t shape, const void *input, void *output)
 	{
-		CREATE_TABLE(cpu_kernel_transpose_021);
-		DISPATCH_AND_CALL(cpu_kernel_transpose_021)(context, dtype, shape, input, output);
+//		CREATE_TABLE(cpu_kernel_transpose_021);
+//		DISPATCH_AND_CALL(cpu_kernel_transpose_021)(context, dtype, shape, input, output);
 	}
 
 //	void cpu_winograd_weight_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape, const void *weights,
@@ -109,9 +185,9 @@ namespace ml
 	void cpu_convolution_implicit_gemm_forward(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, mlShape_t weights_shape,
 			const void *input, const void *weights, void *output, const void *bias, const void *add, mlActivationType_t act)
 	{
-		CREATE_TABLE(cpu_kernel_convolution_implicit_gemm_forward);
-		DISPATCH_AND_CALL(cpu_kernel_convolution_implicit_gemm_forward)(context, dtype, input_shape, weights_shape, input, weights, output, bias, add,
-				act);
+//		CREATE_TABLE(cpu_kernel_convolution_implicit_gemm_forward);
+//		DISPATCH_AND_CALL(cpu_kernel_convolution_implicit_gemm_forward)(context, dtype, input_shape, weights_shape, input, weights, output, bias, add,
+//				act);
 	}
 
 	// implemented in 'global_pooling.cpp'
@@ -126,20 +202,105 @@ namespace ml
 
 	void cpu_add_bias_act(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *input, const void *bias, mlActivationType_t act)
 	{
-		CREATE_TABLE(cpu_kernel_add_bias_act);
-		DISPATCH_AND_CALL(cpu_kernel_add_bias_act)(context, dtype, shape, input, bias, act);
+		const int first_dim = volume_without_last_dim(shape);
+		const int last_dim = get_last_dim(shape);
+
+		switch (dtype)
+		{
+			case DTYPE_FLOAT16:
+			{
+				const cpu::SimdLevel simd_level = cpu::Context::getSimdLevel(context);
+				if (simd_level >= cpu::SimdLevel::AVX and cpu::has_hardware_fp16_conversion())
+					cpu::avx_kernel_add_bias_act_fp16(input, bias, first_dim, last_dim, act);
+				else
+					cpu::def_kernel_add_bias_act_fp16(input, bias, first_dim, last_dim, act);
+				break;
+			}
+			case DTYPE_FLOAT32:
+			{
+				cpu::def_kernel_add_bias_act_fp32(input, bias, first_dim, last_dim, act);
+				break;
+			}
+			default:
+				break;
+		}
+
+//		CREATE_TABLE(cpu_kernel_add_bias_act);
+//		DISPATCH_AND_CALL(cpu_kernel_add_bias_act)(context, dtype, shape, input, bias, act);
 	}
 
 	void cpu_activation_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input, mlActivationType_t act)
 	{
-		CREATE_TABLE(cpu_kernel_activation_forward);
-		DISPATCH_AND_CALL(cpu_kernel_activation_forward)(context, dtype, shape, output, input, act);
+		const cpu::SimdLevel simd_level = cpu::Context::getSimdLevel(context);
+		if (act == ACTIVATION_SOFTMAX)
+		{
+			const int first_dim = get_first_dim(shape);
+			const int last_dim = get_last_dim(shape);
+
+			assert(cpu::Context::getWorkspaceSize(context) >= sizeof(float) * last_dim);
+			float *workspace = cpu::Context::getWorkspace<float>(context);
+
+			switch (dtype)
+			{
+				case DTYPE_FLOAT16:
+				{
+					if (simd_level >= cpu::SimdLevel::AVX and cpu::has_hardware_fp16_conversion())
+					{
+						if (last_dim == 3)
+							cpu::avx_kernel_softmax_3_channels_fp16(output, input, first_dim);
+						else
+							cpu::avx_kernel_softmax_fp16(output, input, first_dim, last_dim, workspace);
+					}
+					else
+					{
+						if (last_dim == 3)
+							cpu::def_kernel_softmax_3_channels_fp16(output, input, first_dim);
+						else
+							cpu::def_kernel_softmax_fp16(output, input, first_dim, last_dim, workspace);
+					}
+					break;
+				}
+				case DTYPE_FLOAT32:
+				{
+					if (last_dim == 3)
+						cpu::def_kernel_softmax_3_channels_fp32(output, input, first_dim);
+					else
+						cpu::def_kernel_softmax_fp32(output, input, first_dim, last_dim, workspace);
+					break;
+				}
+				default:
+					break;
+			}
+		}
+		else
+		{
+			switch (dtype)
+			{
+				case DTYPE_FLOAT16:
+				{
+					if (simd_level >= cpu::SimdLevel::AVX and cpu::has_hardware_fp16_conversion())
+						cpu::avx_kernel_activation_forward_fp16(output, input, volume(shape), act);
+					else
+						cpu::def_kernel_activation_forward_fp16(output, input, volume(shape), act);
+					break;
+				}
+				case DTYPE_FLOAT32:
+					cpu::def_kernel_activation_forward_fp32(output, input, volume(shape), act);
+					break;
+				default:
+					break;
+			}
+		}
+
+//		CREATE_TABLE(cpu_kernel_activation_forward);
+//		DISPATCH_AND_CALL(cpu_kernel_activation_forward)(context, dtype, shape, output, input, act);
 	}
 	void cpu_activation_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next, const void *output,
 			mlActivationType_t act)
 	{
-		CREATE_TABLE(cpu_kernel_activation_backward);
-		DISPATCH_AND_CALL(cpu_kernel_activation_backward)(context, shape, gradient_prev, gradient_next, output, act);
+		cpu::def_kernel_activation_backward_fp32(gradient_prev, gradient_next, output, volume(shape), act);
+//		CREATE_TABLE(cpu_kernel_activation_backward);
+//		DISPATCH_AND_CALL(cpu_kernel_activation_backward)(context, shape, gradient_prev, gradient_next, output, act);
 	}
 
 } /* namespace avocado */

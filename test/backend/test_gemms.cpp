@@ -176,49 +176,49 @@ namespace ml
 		EXPECT_LT(data.getDifference(), 1.0e-4);
 	}
 
-	TEST(TestGemmOnCUDA, float16_AB)
+	TEST(TestGemmOnCPU, float16_AB)
 	{
-		if (Device::numberOfCudaDevices() == 0 or not Device::cuda(0).supportsType(DataType::FLOAT16))
-			GTEST_SKIP();
-		GemmTester data(23, 29, 37, 'n', 'n', DataType::FLOAT16);
+		if (not Device::cpu().supportsType(DataType::FLOAT16))
+			GTEST_SKIP_("CPU does not support fp16");
+
+		GemmTester data(23, 45, 67, 'n', 'n', DataType::FLOAT16);
 		data.gemm_baseline(1.1, 0.1);
 
-		data.moveTo(Device::cuda(0));
-		gemm(Context(Device::cuda(0)), 'n', 'n', data.C_tested, data.A, data.B, 1.1, 0.1);
-		EXPECT_LT(data.getDifference(), 1.0e-3);
+		gemm(Context(), 'n', 'n', data.C_tested, data.A, data.B, 1.1, 0.1);
+		EXPECT_LT(data.getDifference(), 1.0e-4);
 	}
-	TEST(TestGemmOnCUDA, float16_ABT)
+	TEST(TestGemmOnCPU, float16_ABT)
 	{
-		if (Device::numberOfCudaDevices() == 0 or not Device::cuda(0).supportsType(DataType::FLOAT16))
-			GTEST_SKIP();
-		GemmTester data(23, 29, 37, 'n', 't', DataType::FLOAT16);
+		if (not Device::cpu().supportsType(DataType::FLOAT16))
+			GTEST_SKIP_("CPU does not support fp16");
+
+		GemmTester data(23, 45, 67, 'n', 't', DataType::FLOAT16);
 		data.gemm_baseline(1.1, 0.1);
 
-		data.moveTo(Device::cuda(0));
-		gemm(Context(Device::cuda(0)), 'n', 't', data.C_tested, data.A, data.B, 1.1, 0.1);
-		EXPECT_LT(data.getDifference(), 2.0e-2);
+		gemm(Context(), 'n', 't', data.C_tested, data.A, data.B, 1.1, 0.1);
+		EXPECT_LT(data.getDifference(), 1.0e-4);
 	}
-	TEST(TestGemmOnCUDA, float16_ATB)
+	TEST(TestGemmOnCPU, float16_ATB)
 	{
-		if (Device::numberOfCudaDevices() == 0 or not Device::cuda(0).supportsType(DataType::FLOAT16))
-			GTEST_SKIP();
-		GemmTester data(23, 29, 37, 't', 'n', DataType::FLOAT16);
+		if (not Device::cpu().supportsType(DataType::FLOAT16))
+			GTEST_SKIP_("CPU does not support fp16");
+
+		GemmTester data(23, 45, 67, 't', 'n', DataType::FLOAT16);
 		data.gemm_baseline(1.1, 0.1);
 
-		data.moveTo(Device::cuda(0));
-		gemm(Context(Device::cuda(0)), 't', 'n', data.C_tested, data.A, data.B, 1.1, 0.1);
-		EXPECT_LT(data.getDifference(), 2.0e-3);
+		gemm(Context(), 't', 'n', data.C_tested, data.A, data.B, 1.1, 0.1);
+		EXPECT_LT(data.getDifference(), 1.0e-4);
 	}
-	TEST(TestGemmOnCUDA, float16_ATBT)
+	TEST(TestGemmOnCPU, float16_ATBT)
 	{
-		if (Device::numberOfCudaDevices() == 0 or not Device::cuda(0).supportsType(DataType::FLOAT16))
-			GTEST_SKIP();
-		GemmTester data(23, 29, 37, 't', 't', DataType::FLOAT16);
+		if (not Device::cpu().supportsType(DataType::FLOAT16))
+			GTEST_SKIP_("CPU does not support fp16");
+
+		GemmTester data(23, 45, 67, 't', 't', DataType::FLOAT16);
 		data.gemm_baseline(1.1, 0.1);
 
-		data.moveTo(Device::cuda(0));
-		gemm(Context(Device::cuda(0)), 't', 't', data.C_tested, data.A, data.B, 1.1, 0.1);
-		EXPECT_LT(data.getDifference(), 1.0e-3);
+		gemm(Context(), 't', 't', data.C_tested, data.A, data.B, 1.1, 0.1);
+		EXPECT_LT(data.getDifference(), 1.0e-4);
 	}
 
 	TEST(TestGemmOnCUDA, float32_AB)
@@ -264,6 +264,51 @@ namespace ml
 		data.moveTo(Device::cuda(0));
 		gemm(Context(Device::cuda(0)), 't', 't', data.C_tested, data.A, data.B, 1.1, 0.1);
 		EXPECT_LT(data.getDifference(), 1.0e-4);
+	}
+
+	TEST(TestGemmOnCUDA, float16_AB)
+	{
+		if (Device::numberOfCudaDevices() == 0 or not Device::cuda(0).supportsType(DataType::FLOAT16))
+			GTEST_SKIP();
+		GemmTester data(23, 29, 37, 'n', 'n', DataType::FLOAT16);
+		data.gemm_baseline(1.1, 0.1);
+
+		data.moveTo(Device::cuda(0));
+		gemm(Context(Device::cuda(0)), 'n', 'n', data.C_tested, data.A, data.B, 1.1, 0.1);
+		EXPECT_LT(data.getDifference(), 1.0e-3);
+	}
+	TEST(TestGemmOnCUDA, float16_ABT)
+	{
+		if (Device::numberOfCudaDevices() == 0 or not Device::cuda(0).supportsType(DataType::FLOAT16))
+			GTEST_SKIP();
+		GemmTester data(23, 29, 37, 'n', 't', DataType::FLOAT16);
+		data.gemm_baseline(1.1, 0.1);
+
+		data.moveTo(Device::cuda(0));
+		gemm(Context(Device::cuda(0)), 'n', 't', data.C_tested, data.A, data.B, 1.1, 0.1);
+		EXPECT_LT(data.getDifference(), 2.0e-2);
+	}
+	TEST(TestGemmOnCUDA, float16_ATB)
+	{
+		if (Device::numberOfCudaDevices() == 0 or not Device::cuda(0).supportsType(DataType::FLOAT16))
+			GTEST_SKIP();
+		GemmTester data(23, 29, 37, 't', 'n', DataType::FLOAT16);
+		data.gemm_baseline(1.1, 0.1);
+
+		data.moveTo(Device::cuda(0));
+		gemm(Context(Device::cuda(0)), 't', 'n', data.C_tested, data.A, data.B, 1.1, 0.1);
+		EXPECT_LT(data.getDifference(), 2.0e-3);
+	}
+	TEST(TestGemmOnCUDA, float16_ATBT)
+	{
+		if (Device::numberOfCudaDevices() == 0 or not Device::cuda(0).supportsType(DataType::FLOAT16))
+			GTEST_SKIP();
+		GemmTester data(23, 29, 37, 't', 't', DataType::FLOAT16);
+		data.gemm_baseline(1.1, 0.1);
+
+		data.moveTo(Device::cuda(0));
+		gemm(Context(Device::cuda(0)), 't', 't', data.C_tested, data.A, data.B, 1.1, 0.1);
+		EXPECT_LT(data.getDifference(), 1.0e-3);
 	}
 
 } /* namespace ml */
