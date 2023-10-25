@@ -31,6 +31,7 @@
 #include <memory>
 #include <cmath>
 #include <x86intrin.h>
+#include <omp.h>
 
 #include "../src/backend/cpu/vectors/vectors.hpp"
 
@@ -2756,7 +2757,8 @@ void test_packing(int rows, int columns, ml::MatrixOp op)
 	pack_def_MxK_fp16_fp32(correct, matrix, { 0, 0 }, op);
 //	pack_avx2_fma_12xK_fp32(fragment, matrix, { 0, 0 }, op);
 //	pack_avx2_fma_12xK_fp32(fragment, matrix, { 0, 0 }, op);
-	pack_avx_10xK_fp16_fp32(fragment, matrix, { 0, 0 }, op);
+//	pack_avx_10xK_fp16_fp32(fragment, matrix, { 0, 0 }, op);
+	pack_avx512f_16xK_fp16_fp32(fragment, matrix, { 0, 0 }, op);
 
 //	std::cout << "Correct\n";
 //	for (int k = 0; k < K; k++)
@@ -2813,7 +2815,8 @@ void test_packing(int rows, int columns, ml::MatrixOp op)
 	gemm::aligned_free(dst2, 4096);
 }
 
-void test_microkernel(const int M, const int N, const int K)
+void test_microkernel(const int M, const int N, const int K, mlDataType_t dtype,
+		std::function<void(Fragment&, const void*, const Fragment&, const Fragment&, const void*, const Fragment&, bool)> kernel)
 {
 	std::unique_ptr<float[]> matrix_c = std::make_unique<float[]>(1024 * 1024);
 	std::unique_ptr<float[]> matrix_d = std::make_unique<float[]>(1024 * 1024);
@@ -2827,9 +2830,9 @@ void test_microkernel(const int M, const int N, const int K)
 	std::memset(rhs, 0, size_in_bytes_rhs);
 
 	Fragment fragment_a(lhs, DTYPE_FLOAT32, M);
-	Fragment fragment_b(rhs, DTYPE_FLOAT32, N);
-	Fragment fragment_c(matrix_c.get(), DTYPE_FLOAT16, 1024);
-	Fragment fragment_d(matrix_d.get(), DTYPE_FLOAT16, 1024);
+	Fragment fragment_b(rhs, fragment_a.dtype(), N);
+	Fragment fragment_c(matrix_c.get(), dtype, 1024);
+	Fragment fragment_d(matrix_d.get(), fragment_c.dtype(), 1024);
 	Fragment correct_fragment_d(correct_d.get(), fragment_d.dtype(), 1024);
 	fragment_a.mark_as_packed_with_size( { K, M });
 	fragment_b.mark_as_packed_with_size( { K, N });
@@ -2865,51 +2868,54 @@ void test_microkernel(const int M, const int N, const int K)
 
 	const float alpha = 1.1f;
 	const float beta = 0.1f;
+	const bool use_relu = true;
 
-	gemm_def_MxN_fp32(correct_fragment_d, &alpha, fragment_a, fragment_b, &beta, fragment_c);
+	if (fragment_c.dtype() == DTYPE_FLOAT32)
+		gemm_def_MxN_fp32(correct_fragment_d, &alpha, fragment_a, fragment_b, &beta, fragment_c, use_relu);
+	if (fragment_c.dtype() == DTYPE_FLOAT16)
+		gemm_def_MxN_fp32_fp16(correct_fragment_d, &alpha, fragment_a, fragment_b, &beta, fragment_c, use_relu);
 
 //	std::cout << "Correct\n";
 //	for (int m = 0; m < M; m++)
 //	{
 //		for (int n = 0; n < N; n++)
-//			std::cout << half_to_float(correct_fragment_d.at<uint16_t>(m, n)) << ' ';
-////			std::cout << correct_fragment_d.at<float>(m, n) << ' ';
+//			if (correct_fragment_d.dtype() == DTYPE_FLOAT16)
+//				std::cout << half_to_float(correct_fragment_d.at<uint16_t>(m, n)) << ' ';
+//			else
+//				std::cout << correct_fragment_d.at<float>(m, n) << ' ';
 //		std::cout << '\n';
 //	}
 //	std::cout << "-------------------------------------------\n";
 
-//	gemm_avx2_fma_6x16_fp16_fp32(fragment_d, &alpha, fragment_a, fragment_b, &beta, fragment_c);
-//	gemm_avx2_fma_6x16_fp16_fp32(fragment_d, &alpha, fragment_a, fragment_b, &beta, fragment_c);
-//	gemm_avx_10x8_fp32(fragment_d, &alpha, fragment_a, fragment_b, &beta, fragment_c);
-//	gemm_avx2_fma_12x8_fp32(fragment_d, &alpha, fragment_a, fragment_b, &beta, fragment_c);
-	gemm_avx_10x8_fp32(fragment_d, &alpha, fragment_a, fragment_b, &beta, fragment_c);
-//	gemm_avx2_fma_24x4_fp32(fragment_d, &alpha, fragment_a, fragment_b, &beta, fragment_c);
-//	gemm_avx_10x8_fp32(fragment_d, &alpha, fragment_a, fragment_b, &beta, fragment_c);
+	kernel(fragment_d, &alpha, fragment_a, fragment_b, &beta, fragment_c, use_relu);
 
 //	std::cout << "Actual\n";
 //	for (int m = 0; m < M; m++)
 //	{
 //		for (int n = 0; n < N; n++)
-//			std::cout << half_to_float(fragment_d.at<uint16_t>(m, n)) << ' ';
-////			std::cout << fragment_d.at<float>(m, n) << ' ';
+//			if (fragment_d.dtype() == DTYPE_FLOAT16)
+//				std::cout << half_to_float(fragment_d.at<uint16_t>(m, n)) << ' ';
+//			else
+//				std::cout << fragment_d.at<float>(m, n) << ' ';
 //		std::cout << '\n';
 //	}
 
-//	double diff = 0.0;
-//	for (int m = 0; m < M; m++)
-//		for (int n = 0; n < N; n++)
-////			diff += std::fabs(half_to_float(correct_fragment_d.at<uint16_t>(m, n)) - half_to_float(fragment_d.at<uint16_t>(m, n)));
-//			diff += std::fabs(correct_fragment_d.at<float>(m, n) - fragment_d.at<float>(m, n));
-//	std::cout << "\ndiff = " << diff / (M * K) << '\n';
+	double diff = 0.0;
+	for (int m = 0; m < M; m++)
+		for (int n = 0; n < N; n++)
+			if (fragment_d.dtype() == DTYPE_FLOAT16)
+				diff += std::fabs(half_to_float(correct_fragment_d.at<uint16_t>(m, n)) - half_to_float(fragment_d.at<uint16_t>(m, n)));
+			else
+				diff += std::fabs(correct_fragment_d.at<float>(m, n) - fragment_d.at<float>(m, n));
+	if (diff > 1.0e-3)
+		std::cout << "\ndiff = " << diff / (M * K) << '\n';
 
 	const double repeats = 1.0e8;
 	const double start = getTime();
 	int i = 0;
 	for (; i < repeats; i++)
 	{
-//		gemm_avx_10x8_fp32(fragment_d, &alpha, fragment_a, fragment_b, &beta, fragment_c);
-		gemm_avx_10x8_fp32(fragment_d, &alpha, fragment_a, fragment_b, &beta, fragment_c);
-//		gemm_avx2_fma_24x4_fp32(fragment_d, &alpha, fragment_a, fragment_b, &beta, fragment_c);
+		kernel(fragment_d, &alpha, fragment_a, fragment_b, &beta, fragment_c, use_relu);
 		if ((getTime() - start) > 10.0)
 			break;
 	}
@@ -2946,7 +2952,7 @@ void kernel_transform_input(void *__restrict__ matrices, const void *__restrict_
 	{
 		const void *ptr_in[TransformSize * TransformSize];
 		void *ptr_out[TransformSize * TransformSize];
-		alignas(64) CT storage[8 * TransformSize * TransformSize];
+		alignas(64) CT storage[16 * TransformSize * TransformSize];
 //#pragma omp for
 		for (int tile_idx = 0; tile_idx < nb_of_tiles; tile_idx++)
 		{
@@ -2966,138 +2972,49 @@ void kernel_transform_input(void *__restrict__ matrices, const void *__restrict_
 					else
 						ptr_in[matrix_idx] = zero_line;
 				}
-
-			winograd_input_transform_5x5_3x3_avx2_fma_fp16(ptr_in, ptr_out, storage, input_filters);
+			if constexpr (std::is_same<DT, float>::value and std::is_same<CT, float>::value)
+			{
+				if constexpr (TileSize == 5)
+					winograd_input_transform_5x5_3x3_avx2_fma_fp32(ptr_in, ptr_out, storage, input_filters);
+				if constexpr (TileSize == 4)
+					winograd_input_transform_4x4_3x3_avx2_fma_fp32(ptr_in, ptr_out, storage, input_filters);
+			}
+			if constexpr (std::is_same<DT, float16>::value and std::is_same<CT, float>::value)
+			{
+				if constexpr (TileSize == 5)
+					winograd_input_transform_5x5_3x3_avx2_fma_fp16(ptr_in, ptr_out, storage, input_filters);
+				if constexpr (TileSize == 4)
+					winograd_input_transform_4x4_3x3_avx2_fma_fp16(ptr_in, ptr_out, storage, input_filters);
+			}
 		}
 	}
 }
-
-template<int Length, typename T>
-struct Line_v2
-{
-	private:
-		Vector<T> data[Length];
-	public:
-		template<typename U>
-		inline void load_row(U **ptr, const int row, const int offset, const int num, int columns) noexcept
-		{
-		}
-		template<typename U>
-		inline void load_row(const U **ptr, const int row, const int offset, const int num, int columns) noexcept
-		{
-		}
-		template<typename U>
-		inline void store_row(U **ptr, const int row, const int offset, const int num, int columns) const noexcept
-		{
-		}
-		template<typename U>
-		inline void load_column(const U **ptr, const int col, const int offset, const int num, int columns) noexcept
-		{
-		}
-		template<typename U>
-		inline void store_column(U **ptr, const int col, const int offset, const int num, int columns) const noexcept
-		{
-		}
-
-		inline void load_row(const Vector<T> *ptr, const int row, int columns) noexcept
-		{
-			for (int i = 0; i < Length; i++)
-				data[i] = ptr[row * columns + i];
-		}
-		inline void store_row(Vector<T> *ptr, const int row, int columns) const noexcept
-		{
-			for (int i = 0; i < Length; i++)
-				ptr[row * columns + i] = data[i];
-		}
-		inline void load_column(const Vector<T> *ptr, const int col, int columns) noexcept
-		{
-			for (int i = 0; i < Length; i++)
-				data[i] = ptr[i * columns + col];
-		}
-		inline void store_column(Vector<T> *ptr, const int col, int columns) const noexcept
-		{
-			for (int i = 0; i < Length; i++)
-				ptr[i * columns + col] = data[i];
-		}
-
-		inline int length() const noexcept
-		{
-			return Length;
-		}
-		inline Vector<T>& operator[](int index) noexcept
-		{
-			assert(index >= 0 && index < Length);
-			return data[index];
-		}
-		inline Vector<T> operator[](int index) const noexcept
-		{
-			assert(index >= 0 && index < Length);
-			return data[index];
-		}
-};
-
-template<typename DT, int Rows, int Columns>
-class TensorTile
-{
-		DT *pointers[Rows * Columns];
-
-	public:
-		template<typename CT>
-		Line_v2<Rows, CT> load_column(int c) const noexcept
-		{
-			Line_v2<Rows, CT> result;
-			for (int i = 0; i < Rows; i++)
-				result[i] = Vector<CT>(pointers[i * Columns + c]);
-			return result;
-		}
-};
-
-template<typename T>
-struct Transform_v2
-{
-		inline Line_v2<7, T> operator()(const Line_v2<7, T> &line) const noexcept
-		{
-			const Vector<T> c025(0.25);
-			const Vector<T> c050(0.5);
-			const Vector<T> c075(0.75);
-			const Vector<T> c200(2.0);
-
-			Line_v2<7, T> result;
-			result[0] = mul_add(c025, line[4] - line[2], c050 * (line[3] - line[5])) + mul_add(c200, line[3] - line[1], line[0] - line[2]);
-			result[1] = neg_mul_add(c050, line[5], line[2] - line[1]) + mul_add(c025, line[3] - line[4], c200 * line[3]);
-			result[2] = neg_mul_add(c075, line[3] + line[4], mul_add(c200, line[2], line[2])) + mul_sub(c050, line[5], line[1] + line[3]);
-			result[3] = mul_sub(c050, line[1] + line[5], line[3]) + c075 * (line[4] - line[2]);
-			result[4] = mul_add(c025, line[4] - line[2], line[4] - line[2]) + c050 * (line[1] - line[5]);
-			result[5] = mul_add(c025, line[5] - line[3], line[1] - line[3]);
-			result[6] = mul_add(c200, line[2] - line[4], line[3]) + mul_sub(c050, line[6] - line[4], line[1]) + c025 * (line[3] - line[5]);
-			return result;
-		}
-};
 template<typename DT, typename CT, int KernelSize, int TileSize>
-void kernel_transform_input_v2(void *__restrict__ matrices, const void *__restrict__ input, int batch_size, int height, int width, int input_filters,
-		void *__restrict__ workspace)
+void kernel_transform_output(const void *__restrict__ matrices, void *__restrict__ output, const void *__restrict__ ext,
+		const void *__restrict__ bias, int batch_size, int height, int width, int output_filters, void *__restrict__ workspace, bool use_relu)
 {
-	constexpr int Padding = KernelSize / 2;
 	constexpr int TransformSize = TileSize + KernelSize - 1;
 
 	const int tiles_h = (height + TileSize - 1) / TileSize;
 	const int tiles_w = (width + TileSize - 1) / TileSize;
 	const int tiles_per_image = tiles_h * tiles_w;
 	const int nb_of_tiles = batch_size * tiles_per_image;
-	const Indexer<3> matrices_indexer(TransformSize * TransformSize, nb_of_tiles, input_filters);
-	const Indexer<4> input_indexer(batch_size, height, width, input_filters);
+	const Indexer<3> matrices_indexer(TransformSize * TransformSize, nb_of_tiles, output_filters);
+	const Indexer<4> output_indexer(batch_size, height, width, output_filters);
 
-	const DT *input_ptr = getPointer<DT>(input);
-	DT *matrices_ptr = getPointer<DT>(matrices);
+	DT *output_ptr = getPointer<DT>(output);
+	const DT *matrices_ptr = getPointer<DT>(matrices);
+	const DT *ext_ptr = getPointer<DT>(ext);
 
 	DT *zero_line = getPointer<DT>(workspace);
-	std::memset(zero_line, 0, sizeof(DT) * input_filters);
+	DT *fake_storage = getPointer<DT>(workspace) + output_filters + 1024;
+	std::memset(zero_line, 0, sizeof(DT) * output_filters);
 
 //#pragma omp parallel
 	{
-		const DT *ptr_in[TransformSize * TransformSize];
-		DT *ptr_out[TransformSize * TransformSize];
-		Vector<CT> storage[TransformSize * TransformSize];
+		const void *ptr_in[TransformSize * TransformSize];
+		const void *ptr_ext[TileSize * TileSize];
+		void *ptr_out[TileSize * TileSize];
 //#pragma omp for
 		for (int tile_idx = 0; tile_idx < nb_of_tiles; tile_idx++)
 		{
@@ -3105,38 +3022,40 @@ void kernel_transform_input_v2(void *__restrict__ matrices, const void *__restri
 			int tile_x = ((tile_idx % tiles_per_image) / tiles_w);
 			int tile_y = ((tile_idx % tiles_per_image) % tiles_w);
 
+			for (int i = 0; i < TransformSize * TransformSize; i++)
+				ptr_in[i] = matrices_ptr + matrices_indexer.at(i, tile_idx, 0);
+
 			int matrix_idx = 0;
-			for (int i = 0; i < TransformSize; i++)
-				for (int j = 0; j < TransformSize; j++, matrix_idx++)
+			for (int i = 0; i < TileSize; i++)
+				for (int j = 0; j < TileSize; j++, matrix_idx++)
 				{
-					const int x = TileSize * tile_x + i - Padding;
-					const int y = TileSize * tile_y + j - Padding;
-					ptr_out[matrix_idx] = matrices_ptr + matrices_indexer.at(matrix_idx, tile_idx, 0);
-					if (x >= 0 and x < height and y >= 0 and y < width)
-						ptr_in[matrix_idx] = input_ptr + input_indexer.at(batch, x, y, 0);
+					const int x = TileSize * tile_x + i;
+					const int y = TileSize * tile_y + j;
+					if (x < height and y < width)
+					{
+						ptr_out[matrix_idx] = output_ptr + output_indexer.at(batch, x, y, 0);
+						ptr_ext[matrix_idx] = ext_ptr + output_indexer.at(batch, x, y, 0);
+					}
 					else
-						ptr_in[matrix_idx] = zero_line;
+					{
+						ptr_out[matrix_idx] = fake_storage;
+						ptr_ext[matrix_idx] = zero_line;
+					}
 				}
 
-			Transform_v2<CT> transform;
-			for (int in = 0; in < input_filters; in += Vector<CT>::size())
+			if constexpr (std::is_same<DT, float>::value and std::is_same<CT, float>::value)
 			{
-				const int elements_left = std::min(input_filters - in, Vector<CT>::size());
-				for (int col = 0; col < TransformSize; col++)
-				{
-					Line_v2<TransformSize, CT> column;
-					column.load_column(ptr_in, col, in, elements_left, TransformSize);
-					Line_v2<TransformSize, CT> transformed = transform(column);
-					transformed.store_column(storage, col, TransformSize);
-				}
-
-				for (int col = 0; col < TransformSize; col++)
-				{
-					Line_v2<TransformSize, CT> column;
-					column.load_row(storage, col, TransformSize);
-					Line_v2<TransformSize, CT> transformed = transform(column);
-					transformed.store_row(ptr_out, col, in, elements_left, TransformSize);
-				}
+				if constexpr (TileSize == 5)
+					winograd_output_transform_5x5_3x3_avx512f_fp32(ptr_in, ptr_out, workspace, output_filters, ptr_ext, bias, use_relu);
+				if constexpr (TileSize == 4)
+					winograd_output_transform_4x4_3x3_avx512f_fp32(ptr_in, ptr_out, workspace, output_filters, ptr_ext, bias, use_relu);
+			}
+			if constexpr (std::is_same<DT, float16>::value and std::is_same<CT, float>::value)
+			{
+				if constexpr (TileSize == 5)
+					winograd_output_transform_5x5_3x3_avx512f_fp16(ptr_in, ptr_out, workspace, output_filters, ptr_ext, bias, use_relu);
+				if constexpr (TileSize == 4)
+					winograd_output_transform_4x4_3x3_avx512f_fp16(ptr_in, ptr_out, workspace, output_filters, ptr_ext, bias, use_relu);
 			}
 		}
 	}
@@ -3163,7 +3082,7 @@ void test_winograd_transform()
 		}
 	}
 
-	winograd_input_transform_5x5_3x3_avx2_fma_fp32(src_ptrs, dst_ptrs, workspace, 3);
+	winograd_input_transform_5x5_3x3_avx2_fma_fp32(src_ptrs, dst_ptrs, workspace, 8);
 
 	for (int i = 0; i < 7; i++)
 	{
@@ -3191,87 +3110,363 @@ void test_winograd_transform()
 	gemm::aligned_free(workspace, 4096);
 }
 
+void benchmark_winograd_transform(int filters)
+{
+	Context context;
+	const Shape weight_shape( { filters, 3, 3, filters });
+	Tensor input( { 16, 15, 15, filters }, "float16", Device::cpu());
+	Tensor matrices( { 49, input.firstDim() * 3 * 3, filters }, "float16", Device::cpu());
+
+	testing::initForTest(input, 0.0, 1.0);
+
+	void *workspace = gemm::aligned_new(1024 * 1024, 4096);
+
+	const double repeats = 1.0e8;
+	const double start = getTime();
+	int i = 0;
+	for (; i < repeats; i++)
+	{
+		kernel_transform_input<float16, float, 3, 5>(matrices.data(), input.data(), input.dim(0), input.dim(1), input.dim(2), input.dim(3),
+				workspace);
+		if ((getTime() - start) > 10.0)
+			break;
+	}
+	const double stop = getTime();
+
+	const double gigabytes = (double) i * input.volume() * sizeOf(input.dtype()) / (1024.0 * 1024.0 * 1024.0);
+//	std::cout << i << " repeats " << 1.0e3 * (stop - start) / i << " ms " << gigabytes / (stop - start) << " GB/s\n";
+	std::cout << filters << " " << gigabytes / (stop - start) << '\n';
+
+	gemm::aligned_free(workspace, 4096);
+}
+
+template<size_t Alignment>
+size_t round_up_to_multiple_of(size_t x) noexcept
+{
+	const size_t remainder = x % Alignment;
+	const size_t shift = (remainder == 0) ? 0 : (Alignment - remainder);
+	return x + shift;
+}
+template<size_t Alignment, typename T>
+T* align_pointer_to(T *ptr) noexcept
+{
+	const size_t remainder = reinterpret_cast<std::uintptr_t>(ptr) % Alignment;
+	const size_t shift = (remainder == 0) ? 0 : (Alignment - remainder);
+	return reinterpret_cast<uint8_t*>(ptr) + shift;
+}
+
+void kernel_transform_input_v2(void *__restrict__ matrices, const void *__restrict__ input, int batch_size, int height, int width, int input_filters,
+		void *__restrict__ workspace, int kernel_size, int tile_size, DataType dtype)
+{
+	constexpr size_t StorageAlignment = 64;
+	const int simd_size = 512 / 8;
+
+	const int Padding = kernel_size / 2;
+	const int TransformSize = tile_size + kernel_size - 1;
+
+	const int tiles_h = (height + tile_size - 1) / tile_size;
+	const int tiles_w = (width + tile_size - 1) / tile_size;
+	const int tiles_per_image = tiles_h * tiles_w;
+	const int nb_of_tiles = batch_size * tiles_per_image;
+	const Indexer<3> matrices_indexer(TransformSize * TransformSize, nb_of_tiles, input_filters * sizeOf(dtype));
+	const Indexer<4> input_indexer(batch_size, height, width, input_filters * sizeOf(dtype));
+
+	const size_t zero_line_size = round_up_to_multiple_of<64>(sizeOf(dtype) * input_filters);
+	const size_t ptr_in_size = round_up_to_multiple_of<64>(sizeof(void*) * TransformSize * TransformSize);
+	const size_t ptr_out_size = round_up_to_multiple_of<64>(sizeof(void*) * TransformSize * TransformSize);
+	const size_t storage_size = round_up_to_multiple_of<64>(simd_size * TransformSize * TransformSize + StorageAlignment);
+
+	void *zero_line = workspace;
+	std::memset(zero_line, 0, zero_line_size);
+
+#pragma omp parallel
+	{
+		uint8_t *local_workspace = reinterpret_cast<uint8_t*>(workspace) + zero_line_size
+				+ omp_get_thread_num() * (ptr_in_size + ptr_out_size + storage_size);
+		const void **ptr_in = reinterpret_cast<const void**>(local_workspace);
+		local_workspace += ptr_in_size;
+
+		void **ptr_out = reinterpret_cast<void**>(local_workspace);
+		local_workspace += ptr_out_size;
+
+		void *storage = align_pointer_to<StorageAlignment>(local_workspace);
+
+#pragma omp for
+		for (int tile_idx = 0; tile_idx < nb_of_tiles; tile_idx++)
+		{
+			const int batch = tile_idx / tiles_per_image;
+			const int tile_x = ((tile_idx % tiles_per_image) / tiles_w);
+			const int tile_y = ((tile_idx % tiles_per_image) % tiles_w);
+
+			int matrix_idx = 0;
+			for (int i = 0; i < TransformSize; i++)
+				for (int j = 0; j < TransformSize; j++, matrix_idx++)
+				{
+					const int x = tile_size * tile_x + i - Padding;
+					const int y = tile_size * tile_y + j - Padding;
+					ptr_out[matrix_idx] = getPointer<uint8_t>(matrices) + matrices_indexer.at(matrix_idx, tile_idx, 0);
+					if (x >= 0 and x < height and y >= 0 and y < width)
+						ptr_in[matrix_idx] = getPointer<uint8_t>(input) + input_indexer.at(batch, x, y, 0);
+					else
+						ptr_in[matrix_idx] = zero_line;
+				}
+//			if constexpr (std::is_same<DT, float>::value and std::is_same<CT, float>::value)
+//			{
+//				if (tile_size == 5)
+//					winograd_input_transform_5x5_3x3_avx2_fma_fp32(ptr_in, ptr_out, storage, input_filters);
+//				if (tile_size == 4)
+//					winograd_input_transform_4x4_3x3_avx2_fma_fp32(ptr_in, ptr_out, storage, input_filters);
+//			}
+//			if constexpr (std::is_same<DT, float16>::value and std::is_same<CT, float>::value)
+//			{
+//				if (tile_size == 5)
+			winograd_input_transform_5x5_3x3_avx2_fma_fp16(ptr_in, ptr_out, storage, input_filters);
+//				if (tile_size == 4)
+//					winograd_input_transform_4x4_3x3_avx2_fma_fp16(ptr_in, ptr_out, storage, input_filters);
+//			}
+		}
+	}
+}
+
 int main()
 {
 	std::cout << "BEGIN" << std::endl;
-	if (false)
-	{
-		Context context;
-		const int filters = 128;
-		const Shape weight_shape( { filters, 3, 3, filters });
-		Tensor input( { 12, 15, 15, filters }, "float32", Device::cpu());
-		Tensor matrices_old( { 49, 12 * 3 * 3, filters }, "float32", Device::cpu());
-		Tensor matrices_new( { 49, 12 * 3 * 3, filters }, "float32", Device::cpu());
+//	for (int i = 1; i <= 1024; i++)
+//		test_packing(i, 16, ml::MatrixOp::TRANSPOSE);
 
+//	for (int i = 1; i <= 1024; i *= 2)
+//		benchmark_winograd_transform(i);
+//	return 0;
+
+//	{
+//		Context context;
+//		const int filters = 1;
+//		const Shape weight_shape( { filters, 3, 3, filters });
+//		Tensor weights(weight_shape, "float32", Device::cpu());
+//		Tensor matrices_old( { 49, filters, filters }, "float32", Device::cpu());
+//		Tensor matrices_new(matrices_old.shape(), "float32", Device::cpu());
+//
+//		testing::initForTest(weights, 0.0, 1.0);
+//		weights.setall(context, 1.0f);
+//
+//		{
+//			const double repeats = 1.0e8;
+//			const double start = getTime();
+//			int i = 1;
+//			for (; i < repeats; i++)
+//			{
+//				winogradWeightTransform(context, weights, matrices_old, false);
+////				if ((getTime() - start) > 30.0)
+//				break;
+//			}
+//			const double stop = getTime();
+//			std::cout << i << " repeats, " << 1.0e3 * (stop - start) / i << "ms\n";
+//		}
+//
+//		void *workspace = gemm::aligned_new(1024 * 1024, 4096);
+//
+//		omp_set_num_threads(1);
+//		//		matrices_new.zeroall(context);
+//		{
+//			const double repeats = 1.0e8;
+//			const double start = getTime();
+//			int i = 1;
+//			for (; i < repeats; i++)
+//			{
+//				cpu_winograd_weight_transform_v2(context.backend(), 5, DTYPE_FLOAT32, make_shape( { filters, 3, 3, filters }), weights.data(),
+//						matrices_new.data(), false);
+////				if ((getTime() - start) > 30.0)
+//				break;
+//			}
+//			const double stop = getTime();
+//			std::cout << i << " repeats, " << 1.0e3 * (stop - start) / i << "ms\n";
+//		}
+//		std::cout << "diff = " << testing::diffForTest(matrices_old, matrices_new) << '\n';
+//
+//		for (int i = 0; i < matrices_old.firstDim(); i++)
+//			std::cout << i << " : " << matrices_old.get( { i, 0, 0 }) << " vs " << matrices_new.get( { i, 0, 0 }) << '\n';
+//
+//		gemm::aligned_free(workspace, 4096);
+//	}
+//	return 0;
+
+//	if (true)
+//	{
+//		Context context;
+//		const int filters = 128;
+//		const Shape weight_shape( { filters, 3, 3, filters });
+//		Tensor input( { 12, 15, 15, filters }, "float16", Device::cpu());
+//		Tensor matrices_old( { 49, 12 * 3 * 3, filters }, "float16", Device::cpu());
+//		Tensor matrices_new(matrices_old.shape(), "float16", Device::cpu());
+//
 //		testing::initForTest(input, 0.0, 1.0);
-		input.setall(context, 1.0f);
-
-		{
-			const double repeats = 1.0e8;
-			const double start = getTime();
-			int i = 0;
-			for (; i < repeats; i++)
-			{
-				winogradInputTransform(context, weight_shape, input, matrices_old);
-				if ((getTime() - start) > 10.0)
-					break;
-			}
-			const double stop = getTime();
-			std::cout << i << " repeats, " << 1.0e3 * (stop - start) / i << "ms\n";
-		}
-
-		void *workspace = gemm::aligned_new(1024 * 1024, 4096);
-
-		{
-			const double repeats = 1.0e8;
-			const double start = getTime();
-			int i = 0;
-			for (; i < repeats; i++)
-			{
-				kernel_transform_input_v2<float, float, 3, 5>(matrices_new.data(), input.data(), input.dim(0), input.dim(1), input.dim(2),
-						input.dim(3), workspace);
-				if ((getTime() - start) > 10.0)
-					break;
-			}
-			const double stop = getTime();
-			std::cout << i << " repeats, " << 1.0e3 * (stop - start) / i << "ms\n";
-		}
-		std::cout << "diff = " << testing::diffForTest(matrices_old, matrices_new) << '\n';
-
-		matrices_new.zeroall(context);
-		{
-			const double repeats = 1.0e8;
-			const double start = getTime();
-			int i = 0;
-			for (; i < repeats; i++)
-			{
-				kernel_transform_input<float, float, 3, 5>(matrices_new.data(), input.data(), input.dim(0), input.dim(1), input.dim(2), input.dim(3),
-						workspace);
-				if ((getTime() - start) > 10.0)
-					break;
-			}
-			const double stop = getTime();
-			std::cout << i << " repeats, " << 1.0e3 * (stop - start) / i << "ms\n";
-		}
-		std::cout << "diff = " << testing::diffForTest(matrices_old, matrices_new) << '\n';
-
-//		for (int i = 0; i < 49; i++)
-//			std::cout << matrices_old.get( { i, 0, 0 }) << " vs " << matrices_new.get( { i, 0, 0 }) << '\n';
-
-		gemm::aligned_free(workspace, 4096);
-	}
+////		matrices_new.setall(context, 1.0f);
+////		input.setall(context, 1.0f);
+//
+//		{
+//			const double repeats = 1.0e8;
+//			const double start = getTime();
+//			int i = 1;
+//			for (; i < repeats; i++)
+//			{
+//				winogradInputTransform(context, weight_shape, input, matrices_old);
+//				if ((getTime() - start) > 30.0)
+//					break;
+//			}
+//			const double stop = getTime();
+//			std::cout << i << " repeats, " << 1.0e3 * (stop - start) / i << "ms\n";
+//		}
+//
+//		void *workspace = gemm::aligned_new(1024 * 1024, 4096);
+//
+//		omp_set_num_threads(1);
+////		matrices_new.zeroall(context);
+//		{
+//			const double repeats = 1.0e8;
+//			const double start = getTime();
+//			int i = 1;
+//			for (; i < repeats; i++)
+//			{
+////				kernel_transform_input<float16, float, 3, 5>(matrices_new.data(), input.data(), input.dim(0), input.dim(1), input.dim(2),
+////						input.dim(3), workspace);
+//				kernel_transform_input_v2(matrices_new.data(), input.data(), input.dim(0), input.dim(1), input.dim(2), input.dim(3), workspace, 3, 5,
+//						DataType::FLOAT16);
+//				if ((getTime() - start) > 30.0)
+//					break;
+//			}
+//			const double stop = getTime();
+//			std::cout << i << " repeats, " << 1.0e3 * (stop - start) / i << "ms\n";
+//		}
+//		std::cout << "diff = " << testing::diffForTest(matrices_old, matrices_new) << '\n';
+//
+////		for (int i = 0; i < matrices_old.firstDim(); i++)
+////			std::cout << matrices_old.get( { i, 0, 0 }) << " vs " << matrices_new.get( { i, 0, 0 }) << '\n';
+//
+//		for (int i = 0; i < matrices_old.dim(0); i++)
+//			for (int j = 0; j < matrices_old.dim(1); j++)
+//				for (int k = 0; k < matrices_old.dim(2); k++)
+//				{
+//					const float old_value = matrices_old.get( { i, j, k });
+//					const float new_value = matrices_new.get( { i, j, k });
+//					if (std::fabs(old_value - new_value) > 0.1f)
+//					{
+//						std::cout << "difference : ";
+//						std::cout << old_value << " vs " << new_value << '\n';
+//						std::cout << "at " << i << " " << j << " " << k << '\n';
+//						return 0;
+//					}
+//				}
+//
+//		gemm::aligned_free(workspace, 4096);
+//	}
 //	else
-//		test_winograd_transform();
+//	{
+//		Context context;
+//		const int filters = 23;
+//		const Shape weight_shape( { filters, 3, 3, filters });
+//		Tensor matrices( { 36, 12 * 4 * 4, filters }, "float16", Device::cpu());
+//		Tensor ext( { 12, 15, 15, filters }, "float16", Device::cpu());
+//		Tensor bias( { filters }, "float16", Device::cpu());
+//
+//		Tensor output_old( { 12, 15, 15, filters }, "float16", Device::cpu());
+//		Tensor output_new( { 12, 15, 15, filters }, "float16", Device::cpu());
+//
+//		testing::initForTest(matrices, 0.0, 1.0);
+//		testing::initForTest(ext, 0.0, 1.0);
+//		testing::initForTest(bias, 0.0, 1.0);
+////		matrices.setall(context, 1.0f);
+//
+//		{
+//			const double repeats = 1.0e8;
+//			const double start = getTime();
+//			int i = 0;
+//			for (; i < repeats; i++)
+//			{
+//				winogradOutputTransform(context, weight_shape, matrices, output_old, bias, ext, ActivationType::RELU);
+////				if ((getTime() - start) > 30.0)
+//				break;
+//			}
+//			const double stop = getTime();
+//			std::cout << i << " repeats, " << 1.0e3 * (stop - start) / i << "ms\n";
+//		}
+//
+//		void *workspace = gemm::aligned_new(1024 * 1024, 4096);
+//
+//		output_new.zeroall(context);
+//		{
+//			const double repeats = 1.0e8;
+//			const double start = getTime();
+//			int i = 0;
+//			for (; i < repeats; i++)
+//			{
+//				kernel_transform_output<float16, float, 3, 4>(matrices.data(), output_new.data(), ext.data(), bias.data(), output_new.dim(0),
+//						output_new.dim(1), output_new.dim(2), output_new.dim(3), workspace, true);
+////				if ((getTime() - start) > 30.0)
+//				break;
+//			}
+//			const double stop = getTime();
+//			std::cout << i << " repeats, " << 1.0e3 * (stop - start) / i << "ms\n";
+//		}
+//		std::cout << "diff = " << testing::diffForTest(output_old, output_new) << '\n';
+//
+//		for (int i = 0; i < 4; i++)
+//			for (int j = 0; j < 4; j++)
+//				std::cout << output_old.get( { 0, i, j, 0 }) << " vs " << output_new.get( { 0, i, j, 0 }) << '\n';
+//
+//		for (int i = 0; i < output_old.dim(0); i++)
+//			for (int j = 0; j < output_old.dim(1); j++)
+//				for (int k = 0; k < output_old.dim(2); k++)
+//					for (int l = 0; l < output_old.dim(3); l++)
+//					{
+//						const float old_value = output_old.get( { i, j, k, l });
+//						const float new_value = output_new.get( { i, j, k, l });
+//						if (std::fabs(old_value - new_value) > 0.01f)
+//						{
+//							std::cout << old_value << " " << new_value << '\n';
+//							std::cout << "at " << i << " " << j << " " << k << '\n';
+//							return 0;
+//						}
+//					}
+//
+//		gemm::aligned_free(workspace, 4096);
+//	}
+////		test_winograd_transform();
 //	std::cout << "END" << std::endl;
 //	return 0;
+
 //	for (int i = 1; i <= 1024; i++)
 //	int i = 8;
 //	{
 //		test_packing(i, 10, ml::MatrixOp::NORMAL);
 //		test_packing(i, 10, ml::MatrixOp::TRANSPOSE);
 //	}
-//	for (int i = 1; i <= 4096; i *= 2)
-//		test_microkernel(10, 8, i);
+	std::cout << "FP32 kernels\n";
+	std::cout << "SSE2\n";
+	for (int i = 1; i <= 1024; i *= 2)
+		test_microkernel(4, 8, i, DTYPE_FLOAT32, gemm_sse2_4x8_fp32);
+	std::cout << "AVX\n";
+	for (int i = 1; i <= 1024; i *= 2)
+		test_microkernel(10, 8, i, DTYPE_FLOAT32, gemm_avx_10x8_fp32);
+	std::cout << "AVX2\n";
+	for (int i = 1; i <= 1024; i *= 2)
+		test_microkernel(12, 8, i, DTYPE_FLOAT32, gemm_avx2_fma_12x8_fp32);
+	std::cout << "AVX512\n";
+	for (int i = 1; i <= 1024; i *= 2)
+		test_microkernel(24, 16, i, DTYPE_FLOAT32, gemm_avx512f_24x16_fp32);
+
+	std::cout << "FP16 kernels\n";
+	std::cout << "AVX\n";
+	for (int i = 1; i <= 1024; i *= 2)
+		test_microkernel(10, 8, i, DTYPE_FLOAT16, gemm_avx_10x8_fp32_fp16);
+	std::cout << "AVX2\n";
+	for (int i = 1; i <= 1024; i *= 2)
+		test_microkernel(12, 8, i, DTYPE_FLOAT16, gemm_avx2_fma_12x8_fp32_fp16);
+	std::cout << "AVX512\n";
+	for (int i = 1; i <= 1024; i *= 2)
+		test_microkernel(24, 16, i, DTYPE_FLOAT16, gemm_avx512f_24x16_fp32_fp16);
+
+	return 0;
+
 //	test_microkernel(24, 4, 64);
 //	test_microkernel(24, 4, 128);
 //	test_microkernel(24, 4, 256);
@@ -3502,26 +3697,27 @@ int main()
 		graph.load(fl.getJson()["model"], fl.getBinaryData());
 		graph.setInputShape(Shape( { batch_size, 15, 15, 8 }));
 		graph.moveTo(Device::cpu());
-		graph.convertTo(DataType::FLOAT32);
+		graph.convertTo(DataType::FLOAT16);
 
+		Tensor input(graph.getInputShape(), graph.dtype(), Device::cpu());
 		for (int i = 0; i < batch_size * 15 * 15; i++)
 		{
 			if (graph.dtype() == DataType::FLOAT32)
 			{
-				float *ptr = reinterpret_cast<float*>(graph.getInput(0).data()) + i * 8;
+				float *ptr = reinterpret_cast<float*>(input.data()) + i * 8;
 				ptr[0] = 1.0f;
 				ptr[3] = 1.0f;
 				ptr[4] = 1.0f;
 			}
 			if (graph.dtype() == DataType::FLOAT16)
 			{
-				uint16_t *ptr = reinterpret_cast<uint16_t*>(graph.getInput(0).data()) + i * 8;
+				uint16_t *ptr = reinterpret_cast<uint16_t*>(input.data()) + i * 8;
 				ptr[0] = 0x3c00;
 				ptr[3] = 0x3c00;
 				ptr[4] = 0x3c00;
 			}
 		}
-
+		graph.getInput().copyFrom(graph.context(), input);
 		graph.forward(batch_size);
 
 		std::cout << "starting benchmark\n";
@@ -3530,8 +3726,8 @@ int main()
 		for (; repeats < 10000; repeats++)
 		{
 			graph.forward(batch_size);
-			if ((getTime() - start) > 30.0)
-				break;
+//			if ((getTime() - start) > 30.0)
+			break;
 		}
 		const double stop = getTime();
 		const double time = stop - start;
