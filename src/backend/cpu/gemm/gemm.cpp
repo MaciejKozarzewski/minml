@@ -120,7 +120,7 @@ namespace
 		result[0].d_unpacking = unpack_def_MxK_fp32;
 		result[0].edge_a_packing = pack_def_MxK_fp32;
 		result[0].edge_b_packing = pack_def_MxK_fp32;
-		result[0].perf_estimator = PerfEstimator(62.8, 23.4);
+		result[0].perf_estimator = PerfEstimator(114.3, 42.8);
 
 		// 24x16 fp16/fp32
 		result[1].type_configuration = { DTYPE_FLOAT16, DTYPE_FLOAT16, DTYPE_FLOAT16, DTYPE_FLOAT16, DTYPE_FLOAT32 };
@@ -133,7 +133,7 @@ namespace
 		result[1].d_unpacking = unpack_def_MxK_fp16;
 		result[1].edge_a_packing = pack_def_MxK_fp16_fp32;
 		result[1].edge_b_packing = pack_def_MxK_fp16_fp32;
-		result[1].perf_estimator = PerfEstimator(61.2, 25.5);
+		result[1].perf_estimator = PerfEstimator(114.3, 42.8);
 
 		return result;
 	}
