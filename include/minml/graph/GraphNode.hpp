@@ -38,7 +38,7 @@ namespace ml
 			int64_t m_total_time = 0;
 			int64_t m_total_count = 0;
 		public:
-			TimedStat() noexcept = default;
+			TimedStat() = default;
 			TimedStat(const std::string &name) :
 					m_name(name)
 			{

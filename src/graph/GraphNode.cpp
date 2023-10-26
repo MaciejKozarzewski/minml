@@ -70,7 +70,7 @@ namespace ml
 		GraphNode::link(input_nodes, this);
 		resolveInputShapes();
 //		m_timer = TimedStat(
-//				m_layer->name() + " : " + m_layer->getInputShape() + " x " + m_layer->getWeightShape() + " -> " + m_layer->getOutputShape());
+//				m_layer->name() + " " + m_layer->getInputShape() + " x " + m_layer->getWeightShape() + " -> " + m_layer->getOutputShape());
 	}
 	GraphNode::~GraphNode()
 	{
