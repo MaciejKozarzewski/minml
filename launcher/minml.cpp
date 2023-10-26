@@ -27,6 +27,7 @@
 #include <minml/backend/cpu_backend.h>
 
 #include <iostream>
+#include <functional>
 #include <fstream>
 #include <memory>
 #include <cmath>

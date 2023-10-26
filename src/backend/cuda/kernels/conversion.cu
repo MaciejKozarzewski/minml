@@ -118,13 +118,13 @@ namespace ml
 			return;
 		}
 
-		if (dst_dtype == DTYPE_FLOAT16 and src_dtype == DTYPE_FLOAT32)
+		if (dst_dtype == DTYPE_FLOAT16 && src_dtype == DTYPE_FLOAT32)
 		{
 			assert(dst != src);
 			kernel_convert<<<gridDim, blockDim, 0, stream>>>(getPointer<half>(dst), getPointer<float>(src), elements);
 			return;
 		}
-		if (dst_dtype == DTYPE_FLOAT32 and src_dtype == DTYPE_FLOAT16)
+		if (dst_dtype == DTYPE_FLOAT32 && src_dtype == DTYPE_FLOAT16)
 		{
 
 			assert(dst != src);
