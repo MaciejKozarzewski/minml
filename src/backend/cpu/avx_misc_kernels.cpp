@@ -36,7 +36,7 @@ namespace
 		return static_cast<DstT>(x);
 	}
 	template<>
-	uint16_t convert(float x) noexcept
+	ml::cpu::float16 convert(float x) noexcept
 	{
 #if defined(__AVX__) && defined(__F16C__)
 		return _cvtss_sh(x, (_MM_FROUND_TO_ZERO |_MM_FROUND_NO_EXC));
@@ -45,10 +45,10 @@ namespace
 #endif
 	}
 	template<>
-	float convert(uint16_t x) noexcept
+	float convert(ml::cpu::float16 x) noexcept
 	{
 #if defined(__AVX__) && defined(__F16C__)
-		return _cvtsh_ss(x);
+		return _cvtsh_ss(x.m_data);
 #else
 		return 0.0f;
 #endif
@@ -183,7 +183,7 @@ namespace ml
 		void avx_kernel_convert_fp32_to_fp16(void *dst, const void *src, size_t elements)
 		{
 			const float *src_ptr = getPointer<float>(src);
-			uint16_t *dst_ptr = getPointer<uint16_t>(dst);
+			float16 *dst_ptr = getPointer<float16>(dst);
 			const uint64_t k_iter = elements / 16;
 			const uint64_t k_left = elements % 16;
 
@@ -239,7 +239,7 @@ namespace ml
 		void avx_kernel_convert_fp16_to_fp32(void *dst, const void *src, size_t elements)
 		{
 			const float *src_ptr = getPointer<float>(src);
-			uint16_t *dst_ptr = getPointer<uint16_t>(dst);
+			float16 *dst_ptr = getPointer<float16>(dst);
 			const uint64_t k_iter = elements / 16;
 			const uint64_t k_left = elements % 16;
 
@@ -295,16 +295,16 @@ namespace ml
 
 		void avx_kernel_softmax_3_channels_fp16(void *dst, const void *src, int first_dim)
 		{
-			kernel_softmax_3_channels<uint16_t>(dst, src, first_dim);
+			kernel_softmax_3_channels<float16>(dst, src, first_dim);
 		}
 		void avx_kernel_softmax_fp16(void *dst, const void *src, int first_dim, int last_dim, void *workspace)
 		{
-			kernel_softmax<uint16_t>(dst, src, first_dim, last_dim, workspace);
+			kernel_softmax<float16>(dst, src, first_dim, last_dim, workspace);
 		}
 
 		void avx_kernel_activation_forward_fp16(void *dst, const void *src, size_t elements, mlActivationType_t activation)
 		{
-			kernel_activation_forward<uint16_t>(dst, src, elements, activation);
+			kernel_activation_forward<float16>(dst, src, elements, activation);
 		}
 
 		void avx_kernel_add_bias_act_fp16(void *input, const void *bias, int first_dim, int last_dim, mlActivationType_t act)
@@ -313,19 +313,19 @@ namespace ml
 			{
 				default:
 				case ACTIVATION_LINEAR:
-					kernel_add_bias_act<uint16_t, ACTIVATION_LINEAR>(input, bias, first_dim, last_dim);
+					kernel_add_bias_act<float16, ACTIVATION_LINEAR>(input, bias, first_dim, last_dim);
 					break;
 				case ACTIVATION_SIGMOID:
-					kernel_add_bias_act<uint16_t, ACTIVATION_SIGMOID>(input, bias, first_dim, last_dim);
+					kernel_add_bias_act<float16, ACTIVATION_SIGMOID>(input, bias, first_dim, last_dim);
 					break;
 				case ACTIVATION_TANH:
-					kernel_add_bias_act<uint16_t, ACTIVATION_TANH>(input, bias, first_dim, last_dim);
+					kernel_add_bias_act<float16, ACTIVATION_TANH>(input, bias, first_dim, last_dim);
 					break;
 				case ACTIVATION_RELU:
-					kernel_add_bias_act<uint16_t, ACTIVATION_RELU>(input, bias, first_dim, last_dim);
+					kernel_add_bias_act<float16, ACTIVATION_RELU>(input, bias, first_dim, last_dim);
 					break;
 			}
 		}
-	}
-}
+	} /* namespace cpu */
+} /* namespace ml */
 

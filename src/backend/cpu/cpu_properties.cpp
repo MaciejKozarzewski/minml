@@ -14,15 +14,7 @@
 #include <algorithm>
 #include <iostream>
 #include <cassert>
-//#include <omp.h>
-
-#ifdef USE_OPENBLAS
-#  ifdef __linux__
-#    include <cblas.h>
-#  else
-#    include <openblas/cblas.h>
-#  endif
-#endif
+#include <omp.h>
 
 namespace
 {
@@ -30,26 +22,24 @@ namespace
 	using namespace ml::cpu;
 	SimdLevel check_supported_simd_level()
 	{
-//		if (supports_simd(AVOCADO_DEVICE_SUPPORTS_AVX512_VL_BW_DQ))
-//			return SimdLevel::AVX512VL_BW_DQ;
 		if (cpu_x86::get().supports("avx512-f") and cpu_x86::get().supports("os_avx512"))
 			return SimdLevel::AVX512F;
 		if (cpu_x86::get().supports("avx2") and cpu_x86::get().supports("os_avx") and cpu_x86::get().supports("fma3"))
 			return SimdLevel::AVX2;
 		if (cpu_x86::get().supports("avx") and cpu_x86::get().supports("os_avx"))
 			return SimdLevel::AVX;
-//		if (supports_simd(AVOCADO_DEVICE_SUPPORTS_SSE42))
-//			return SimdLevel::SSE42;
+		if (cpu_x86::get().supports("sse4.2"))
+			return SimdLevel::SSE42;
 		if (cpu_x86::get().supports("sse4.1"))
 			return SimdLevel::SSE41;
-//		if (supports_simd(AVOCADO_DEVICE_SUPPORTS_SSSE3))
-//			return SimdLevel::SSSE3;
-//		if (supports_simd(AVOCADO_DEVICE_SUPPORTS_SSE3))
-//			return SimdLevel::SSE3;
+		if (cpu_x86::get().supports("ssse3"))
+			return SimdLevel::SSSE3;
+		if (cpu_x86::get().supports("sse3"))
+			return SimdLevel::SSE3;
 		if (cpu_x86::get().supports("sse2"))
 			return SimdLevel::SSE2;
-//		if (supports_simd(AVOCADO_DEVICE_SUPPORTS_SSE))
-//			return SimdLevel::SSE;
+		if (cpu_x86::get().supports("sse"))
+			return SimdLevel::SSE;
 		return SimdLevel::NONE;
 	}
 	std::string get_device_info()
@@ -105,10 +95,7 @@ namespace ml
 
 	void cpu_set_number_of_threads(int number)
 	{
-//		omp_set_num_threads(number);
-//#ifdef USE_OPENBLAS
-//		openblas_set_num_threads(number);
-//#endif
+		omp_set_num_threads(number);
 	}
 	int cpu_get_number_of_cores()
 	{
@@ -128,12 +115,8 @@ namespace ml
 		{
 			case DTYPE_FLOAT16:
 			{
-#ifdef USE_OPENBLAS
-				return false;
-#else
 				static const bool result = cpu_x86::get().supports("avx") and cpu_x86::get().supports("f16c");
 				return result;
-#endif
 			}
 			case DTYPE_FLOAT32:
 				return true;
@@ -150,7 +133,6 @@ namespace ml
 	{
 		cpu_x86::get().print();
 		std::cout << "Detected SIMD level : " << cpu_get_simd_level() << '\n';
-
 	}
 
 } /* namespace ml */

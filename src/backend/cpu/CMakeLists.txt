@@ -1,5 +1,4 @@
 target_sources(${LibName} PRIVATE batchnorm.cpp
-				ComputeConfig.cpp
 				conv_im2row.cpp
 				cpu_context.cpp
 				cpu_memory.cpp
@@ -8,7 +7,6 @@ target_sources(${LibName} PRIVATE batchnorm.cpp
 				def_misc_kernels.cpp
 				dispatcher.cpp
 				fp16.cpp
-				openblas_gemm.cpp
 				training.cpp
 				utils.cpp)
 				
@@ -20,6 +18,5 @@ target_include_directories(misc_backend PUBLIC PUBLIC "${PROJECT_SOURCE_DIR}/inc
 set_source_files_properties(avx_misc_kernels.cpp PROPERTIES COMPILE_OPTIONS "-mavx;-mf16c")
 target_link_libraries(${LibName} PRIVATE misc_backend)
 								
-add_subdirectory("kernels")
 add_subdirectory("gemm")
 add_subdirectory("winograd")

@@ -9,12 +9,11 @@
 #include "Matrix.hpp"
 #include "gemm_kernels.hpp"
 #include "../utils.hpp"
-#include "../vectors/vectors.hpp"
-#include "../assembly_macros.hpp"
 
-#include <x86intrin.h>
 #include <cinttypes>
 #include <cassert>
+
+#include "../assembly_macros.hpp"
 
 namespace ml
 {
@@ -112,8 +111,8 @@ namespace ml
 		assert(D.columns() == B.columns());
 
 		assert(alpha_ptr != nullptr);
-		assert(cpu::is_aligned(A.data(), register_size<XMM>()));
-		assert(cpu::is_aligned(B.data(), register_size<XMM>()));
+		assert(cpu::is_aligned(A.data(), 16));
+		assert(cpu::is_aligned(B.data(), 16));
 		assert(beta_ptr != nullptr);
 
 		const float *A_ptr = A.data<float>();
@@ -512,7 +511,7 @@ namespace ml
 	void pack_sse2_4xK_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept
 	{
 		assert(dst.stride() == 4);
-		assert(ml::cpu::is_aligned(dst.data(), register_size<XMM>()));
+		assert(ml::cpu::is_aligned(dst.data(), 16));
 
 		const uint64_t src_stride = src.stride() * sizeof(float);
 		const void *src_ptr = src.pointer_at(src_pos.row, src_pos.column);
@@ -709,7 +708,7 @@ namespace ml
 	void pack_sse2_8xK_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept
 	{
 		assert(dst.stride() == 8);
-		assert(ml::cpu::is_aligned(dst.data(), register_size<XMM>()));
+		assert(ml::cpu::is_aligned(dst.data(), 16));
 
 		const uint64_t src_stride = src.stride() * sizeof(float);
 		const void *src_ptr = src.pointer_at(src_pos.row, src_pos.column);

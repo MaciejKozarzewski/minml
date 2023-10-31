@@ -18,6 +18,8 @@
 
 namespace
 {
+	using namespace ml::cpu;
+
 	float sigmoid(float x) noexcept
 	{
 		return 1.0f / (1.0f + std::exp(-x));
@@ -33,14 +35,14 @@ namespace
 		return static_cast<DstT>(x);
 	}
 	template<>
-	uint16_t convert(float x) noexcept
+	float16 convert(float x) noexcept
 	{
-		return ml::cpu::convert_fp32_to_fp16(x);
+		return convert_fp32_to_fp16(x);
 	}
 	template<>
-	float convert(uint16_t x) noexcept
+	float convert(float16 x) noexcept
 	{
-		return ml::cpu::convert_fp16_to_fp32(x);
+		return convert_fp16_to_fp32(x);
 	}
 
 	template<typename T>
@@ -172,12 +174,12 @@ namespace ml
 		void def_kernel_convert_fp32_to_fp16(void *dst, const void *src, size_t elements)
 		{
 			for (size_t i = 0; i < elements; i++)
-				reinterpret_cast<uint16_t*>(dst)[i] = convert_fp32_to_fp16(reinterpret_cast<const float*>(src)[i]);
+				reinterpret_cast<float16*>(dst)[i] = convert_fp32_to_fp16(reinterpret_cast<const float*>(src)[i]);
 		}
 		void def_kernel_convert_fp16_to_fp32(void *dst, const void *src, size_t elements)
 		{
 			for (size_t i = 0; i < elements; i++)
-				reinterpret_cast<float*>(dst)[i] = convert_fp16_to_fp32(reinterpret_cast<const uint16_t*>(src)[i]);
+				reinterpret_cast<float*>(dst)[i] = convert_fp16_to_fp32(reinterpret_cast<const float16*>(src)[i]);
 		}
 
 		void def_kernel_softmax_3_channels_fp32(void *dst, const void *src, int first_dim)
@@ -186,7 +188,7 @@ namespace ml
 		}
 		void def_kernel_softmax_3_channels_fp16(void *dst, const void *src, int first_dim)
 		{
-			kernel_softmax_3_channels<uint16_t>(dst, src, first_dim);
+			kernel_softmax_3_channels<float16>(dst, src, first_dim);
 		}
 		void def_kernel_softmax_fp32(void *dst, const void *src, int first_dim, int last_dim, void *workspace)
 		{
@@ -194,7 +196,7 @@ namespace ml
 		}
 		void def_kernel_softmax_fp16(void *dst, const void *src, int first_dim, int last_dim, void *workspace)
 		{
-			kernel_softmax<uint16_t>(dst, src, first_dim, last_dim, workspace);
+			kernel_softmax<float16>(dst, src, first_dim, last_dim, workspace);
 		}
 
 		void def_kernel_activation_forward_fp32(void *dst, const void *src, size_t elements, mlActivationType_t activation)
@@ -203,7 +205,7 @@ namespace ml
 		}
 		void def_kernel_activation_forward_fp16(void *dst, const void *src, size_t elements, mlActivationType_t activation)
 		{
-			kernel_activation_forward<uint16_t>(dst, src, elements, activation);
+			kernel_activation_forward<float16>(dst, src, elements, activation);
 		}
 
 		void def_kernel_activation_backward_fp32(void *gradient_prev, const void *gradient_next, const void *output, size_t elements,
@@ -264,16 +266,16 @@ namespace ml
 			{
 				default:
 				case ACTIVATION_LINEAR:
-					kernel_add_bias_act<uint16_t, ACTIVATION_LINEAR>(input, bias, first_dim, last_dim);
+					kernel_add_bias_act<float16, ACTIVATION_LINEAR>(input, bias, first_dim, last_dim);
 					break;
 				case ACTIVATION_SIGMOID:
-					kernel_add_bias_act<uint16_t, ACTIVATION_SIGMOID>(input, bias, first_dim, last_dim);
+					kernel_add_bias_act<float16, ACTIVATION_SIGMOID>(input, bias, first_dim, last_dim);
 					break;
 				case ACTIVATION_TANH:
-					kernel_add_bias_act<uint16_t, ACTIVATION_TANH>(input, bias, first_dim, last_dim);
+					kernel_add_bias_act<float16, ACTIVATION_TANH>(input, bias, first_dim, last_dim);
 					break;
 				case ACTIVATION_RELU:
-					kernel_add_bias_act<uint16_t, ACTIVATION_RELU>(input, bias, first_dim, last_dim);
+					kernel_add_bias_act<float16, ACTIVATION_RELU>(input, bias, first_dim, last_dim);
 					break;
 			}
 		}

@@ -21,30 +21,31 @@ namespace
 	template<typename T>
 	void setzero(T *ptr, int elements) noexcept
 	{
+		assert(ptr != nullptr);
 		for (int i = 0; i < elements; i++)
 			ptr[i] = static_cast<T>(0);
 	}
 	template<typename T>
-	T square(T x)
+	T square(T x) noexcept
 	{
 		return x * x;
 	}
-	float get_mean(const float *ptr, int idx, int last_dim)
+	float get_mean(const float *ptr, int idx, int last_dim) noexcept
 	{
 		assert(idx >= 0 && idx < last_dim);
 		return ptr[idx];
 	}
-	float get_stddev(const float *ptr, int idx, int last_dim)
+	float get_stddev(const float *ptr, int idx, int last_dim) noexcept
 	{
 		assert(idx >= 0 && idx < last_dim);
 		return std::sqrt(ptr[last_dim + idx] + epsilon);
 	}
-	float get_gamma(const float *ptr, int idx, int last_dim)
+	float get_gamma(const float *ptr, int idx, int last_dim) noexcept
 	{
 		assert(idx >= 0 && idx < last_dim);
 		return ptr[2 * last_dim + idx];
 	}
-	float get_beta(const float *ptr, int idx, int last_dim)
+	float get_beta(const float *ptr, int idx, int last_dim) noexcept
 	{
 		assert(idx >= 0 && idx < last_dim);
 		return ptr[3 * last_dim + idx];

@@ -34,8 +34,6 @@
 #include <x86intrin.h>
 #include <omp.h>
 
-#include "../src/backend/cpu/vectors/vectors.hpp"
-
 using namespace ml;
 
 class MNIST
@@ -2500,236 +2498,14 @@ namespace gemm
 	};
 }
 
-#include "../src/backend/cpu/utils.hpp"
-
-template<typename T>
-std::string print_type()
-{
-	if (std::is_same<T, float16>::value)
-		return "fp16";
-	if (std::is_same<T, float>::value)
-		return "fp32";
-	if (std::is_same<T, int>::value)
-		return "int32";
-	return "none";
-}
-
-template<typename DT, typename CT>
-void some_kernel(const void *input, void *output, int size)
-{
-	std::cout << "data = " << print_type<DT>() << ", compute = " << print_type<CT>() << '\n';
-}
-
-#define CONCAT_IMPL(a, b) a##b
-#define CONCAT(a, b) CONCAT_IMPL(a, b)
-
-//#define CREATE_KERNEL_TABLE(name) static auto name##_table = createFunctionTable(name<float, float>);	\
-//		name##_table.get(ml::cpu::Type::SW_BF16, ml::cpu::Type::FP32) = name<sw_bfloat16, float>;		\
-//		name##_table.get(ml::cpu::Type::BF16, ml::cpu::Type::FP32) = name<bfloat16, float>;				\
-//		name##_table.get(ml::cpu::Type::BF16, ml::cpu::Type::BF16) = name<bfloat16, bfloat16>;			\
-//		name##_table.get(ml::cpu::Type::SW_FP16, ml::cpu::Type::FP32) = name<sw_float16, float>;		\
-//		name##_table.get(ml::cpu::Type::FP16, ml::cpu::Type::FP32) = name<float16, float>;				\
-//		name##_table.get(ml::cpu::Type::FP16, ml::cpu::Type::FP16) = name<float16, float16>;			\
-//		name##_table.get(ml::cpu::Type::FP32, ml::cpu::Type::FP32) = name<float, float>
-//
-//#define REGISTER_KERNEL(name, dtype, ctype) name##_table.get(get_type<dtype>(), get_type<ctype>()) = name<dtype, ctype>
-//#define DISABLE_KERNEL(name, dtype, ctype) name##_table.get(get_type<dtype>(), get_type<ctype>()) = nullptr
-//
-//#define CALL_KERNEL(name, cfg) name##_table.get(cfg.data_type, cfg.compute_type)
-
-#include "../src/backend/cpu/cpu_x86.hpp"
-#include "../src/backend/cpu/vectors/vectors.hpp"
-using namespace SIMD_NAMESPACE;
-
-mlShape_t create_shape(int rows, int cols)
-{
-	mlShape_t result;
-	result.rank = 2;
-	result.dim[0] = rows;
-	result.dim[1] = cols;
-	return result;
-}
-mlShape_t create_shape(int batch, int rows, int cols)
-{
-	mlShape_t result;
-	result.rank = 3;
-	result.dim[0] = batch;
-	result.dim[1] = rows;
-	result.dim[2] = cols;
-	return result;
-}
-
-float fp16_to_fp32(const uint16_t x) noexcept
-{
-	uint32_t exponent = x & 0x7C00; // '0 11111 0000000000'
-	uint32_t mantissa = x & 0x03FF; // '0 00000 1111111111'
-
-	const uint32_t sign = (x & 0x8000) << 16; // '1 00000 0000000000'
-	if (exponent == 0x7C00)
-	{
-		exponent = 0x3FC00; // +/- Inf or +/- NaN (it's 0x7F800000 >> 13)
-		mantissa |= ((mantissa != 0) << 9); // set first bit of the mantissa in case of NaN, but preserve other bits
-	}
-	else
-	{
-		if (exponent != 0) // normalized
-			exponent += (112 << 10);
-		else
-		{
-			if (mantissa != 0)
-			{ // denormalized
-				const uint32_t v = as_uint((float) mantissa) >> 23; // evil log2 bit hack to count leading zeros in denormalized format
-				exponent = (v - 24) << 10;
-				mantissa = (mantissa << (137 - v)) & 0x03FF;
-			}
-		}
-	}
-	return as_float(sign | ((exponent | mantissa) << 13));
-}
-uint16_t fp32_to_fp16(const float x) noexcept
-{
-	const uint32_t original = as_uint(x);
-	const uint32_t rounded = original + 0x00001000; // round-to-nearest-even: add last bit after truncated mantissa
-	uint32_t exponent = (rounded & 0x7F800000) >> 23; // exponent
-	uint32_t mantissa = rounded & 0x007FFFFF; // mantissa; in line below: 0x007FF000 = 0x00800000-0x00001000 = decimal indicator flag - initial rounding
-
-	const uint32_t sign = (original & 0x80000000) >> 16;
-
-	if ((original & 0x7FFFFFFF) > 0x7F800000)
-	{ // check NaN
-		exponent = 0x7C00;
-		mantissa = ((original & 0x007FFFFF) >> 13) | 0x200; // set first mantissa bit but preserve others
-	}
-	else
-	{
-		if (exponent > 142)
-		{ // +/- Inf
-			exponent = 0x7C00;
-			mantissa = 0;
-		}
-		else
-		{
-			if (exponent > 112)
-			{ // normalized
-				exponent = ((exponent - 112) << 10) & 0x7C00;
-				mantissa >>= 13;
-			}
-			else
-			{ // denormalized
-				mantissa += 0x007FF000; // TODO figure out why it is here
-				mantissa >>= std::min(125u - exponent, 31u);
-				mantissa = (mantissa + 1) >> 1;
-				exponent = 0;
-			}
-		}
-	}
-	return sign | exponent | mantissa;
-}
-
-float bf16_to_fp32(const uint16_t x) noexcept
-{
-	return as_float(static_cast<uint32_t>(x) << 16);
-}
-uint16_t fp32_to_bf16(const float x) noexcept
-{
-	return as_uint(x) >> 16;
-}
-
-using namespace ml;
-template<typename SrcT, typename DstT>
-DstT convert(SrcT x) noexcept
-{
-	return static_cast<DstT>(x);
-}
-template<>
-float16 convert(float x) noexcept
-{
-	return float16 { fp32_to_fp16(x) };
-}
-template<>
-float convert(float16 x) noexcept
-{
-	return fp16_to_fp32(x.m_data);
-}
-
-template<typename DataType, typename ComputeType = float>
-void baseline_gemm(mlShape_t shape_D, void *D, float alpha, char opA, mlShape_t shape_A, const void *A, char opB, mlShape_t shape_B, const void *B,
-		float beta, mlShape_t shape_C, const void *C)
-{
-	const int M = (opA == 't') ? shape_A.dim[1] : shape_A.dim[0];
-	const int N = (opB == 't') ? shape_B.dim[0] : shape_B.dim[1];
-	const int K = (opA == 't') ? shape_A.dim[0] : shape_A.dim[1];
-
-	const int strides_a[2] = { (opA == 'n') ? K : 1, (opA == 'n') ? 1 : M };
-	const int strides_b[2] = { (opB == 'n') ? N : 1, (opB == 'n') ? 1 : K };
-	const int strides_c[2] = { N, 1 };
-
-	for (int m = 0; m < M; m++)
-		for (int n = 0; n < N; n++)
-		{
-			ComputeType tmp = static_cast<ComputeType>(0);
-			for (int k = 0; k < K; k++)
-			{
-				const ComputeType a = convert<DataType, ComputeType>(reinterpret_cast<const DataType*>(A)[m * strides_a[0] + k * strides_a[1]]);
-				const ComputeType b = convert<DataType, ComputeType>(reinterpret_cast<const DataType*>(B)[k * strides_b[0] + n * strides_b[1]]);
-				tmp += a * b;
-			}
-			tmp = alpha * tmp;
-			if (beta != 0.0f)
-			{
-				const ComputeType c = convert<DataType, ComputeType>(reinterpret_cast<const DataType*>(C)[m * strides_c[0] + n * strides_c[1]]);
-				tmp += beta * c;
-			}
-			reinterpret_cast<DataType*>(D)[m * strides_c[0] + n * strides_c[1]] = convert<ComputeType, DataType>(tmp);
-		}
-}
-
-template<typename DataType, typename ComputeType = float>
-void baseline_gemm_batched(mlShape_t shape_D, void *D, float alpha, char opA, mlShape_t shape_A, const void *A, char opB, mlShape_t shape_B,
-		const void *B, float beta, mlShape_t shape_C, const void *C)
-{
-	const int M = (opA == 't') ? shape_A.dim[2] : shape_A.dim[1];
-	const int N = (opB == 't') ? shape_B.dim[1] : shape_B.dim[2];
-	const int K = (opA == 't') ? shape_A.dim[1] : shape_A.dim[2];
-
-	const int strides_a[2] = { (opA == 'n') ? K : 1, (opA == 'n') ? 1 : M };
-	const int strides_b[2] = { (opB == 'n') ? N : 1, (opB == 'n') ? 1 : K };
-	const int strides_c[2] = { N, 1 };
-
-	const int MK = shape_A.dim[1] * shape_A.dim[2];
-	const int KN = shape_B.dim[1] * shape_B.dim[2];
-	const int MN = shape_C.dim[1] * shape_C.dim[2];
-
-	for (int batch = 0; batch < shape_D.dim[0]; batch++)
-		for (int m = 0; m < M; m++)
-			for (int n = 0; n < N; n++)
-			{
-				ComputeType tmp = static_cast<ComputeType>(0);
-				for (int k = 0; k < K; k++)
-				{
-					const ComputeType a = convert<DataType, ComputeType>(
-							reinterpret_cast<const DataType*>(A)[batch * MK + m * strides_a[0] + k * strides_a[1]]);
-					const ComputeType b = convert<DataType, ComputeType>(
-							reinterpret_cast<const DataType*>(B)[batch * KN + k * strides_b[0] + n * strides_b[1]]);
-					tmp += a * b;
-				}
-				tmp = alpha * tmp;
-				if (beta != 0.0f)
-				{
-					const ComputeType c = convert<DataType, ComputeType>(
-							reinterpret_cast<const DataType*>(C)[batch * MN + m * strides_c[0] + n * strides_c[1]]);
-					tmp += beta * c;
-				}
-				reinterpret_cast<DataType*>(D)[batch * MN + m * strides_c[0] + n * strides_c[1]] = convert<ComputeType, DataType>(tmp);
-			}
-}
 
 #include "../src/backend/cpu/gemm/utilities.hpp"
 #include "../src/backend/cpu/gemm/Fragment.hpp"
 #include "../src/backend/cpu/gemm/Matrix.hpp"
 #include "../src/backend/cpu/gemm/gemm_kernels.hpp"
-#include "../src/backend/cpu/helpers/indexers.hpp"
+#include "../src/backend/cpu/indexers.hpp"
 #include "../src/backend/cpu/winograd/winograd_kernels.hpp"
+#include "../src/backend/cpu/fp16.hpp"
 #include "minml/utils/testing_util.hpp"
 
 void test_packing(int rows, int columns, ml::MatrixOp op)
@@ -2980,7 +2756,7 @@ void kernel_transform_input(void *__restrict__ matrices, const void *__restrict_
 				if constexpr (TileSize == 4)
 					winograd_input_transform_4x4_3x3_avx2_fma_fp32(ptr_in, ptr_out, storage, input_filters);
 			}
-			if constexpr (std::is_same<DT, float16>::value and std::is_same<CT, float>::value)
+			if constexpr (std::is_same<DT, ml::cpu::float16>::value and std::is_same<CT, float>::value)
 			{
 				if constexpr (TileSize == 5)
 					winograd_input_transform_5x5_3x3_avx2_fma_fp16(ptr_in, ptr_out, storage, input_filters);
@@ -3051,7 +2827,7 @@ void kernel_transform_output(const void *__restrict__ matrices, void *__restrict
 				if constexpr (TileSize == 4)
 					winograd_output_transform_4x4_3x3_avx512f_fp32(ptr_in, ptr_out, workspace, output_filters, ptr_ext, bias, use_relu);
 			}
-			if constexpr (std::is_same<DT, float16>::value and std::is_same<CT, float>::value)
+			if constexpr (std::is_same<DT, ml::cpu::float16>::value and std::is_same<CT, float>::value)
 			{
 				if constexpr (TileSize == 5)
 					winograd_output_transform_5x5_3x3_avx512f_fp16(ptr_in, ptr_out, workspace, output_filters, ptr_ext, bias, use_relu);
@@ -3127,7 +2903,7 @@ void benchmark_winograd_transform(int filters)
 	int i = 0;
 	for (; i < repeats; i++)
 	{
-		kernel_transform_input<float16, float, 3, 5>(matrices.data(), input.data(), input.dim(0), input.dim(1), input.dim(2), input.dim(3),
+		kernel_transform_input<ml::cpu::float16, float, 3, 5>(matrices.data(), input.data(), input.dim(0), input.dim(1), input.dim(2), input.dim(3),
 				workspace);
 		if ((getTime() - start) > 10.0)
 			break;

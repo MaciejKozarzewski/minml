@@ -25,10 +25,6 @@ namespace ml
 {
 	namespace cpu
 	{
-		Context::Context() :
-				m_simd_level(getSimdSupport())
-		{
-		}
 
 		bool is_aligned(const void *ptr, size_t alignment) noexcept
 		{
@@ -40,23 +36,16 @@ namespace ml
 			static const bool result = cpu_x86::get().supports("f16c") or cpu_x86::get().supports("avx512-f");
 			return result;
 		}
-		bool has_hardware_bf16_conversion()
-		{
-			static const bool result = cpu_x86::get().supports("avx512-f") and cpu_x86::get().supports("avx512-bf16");
-			return result;
-		}
-
 		bool has_hardware_fp16_math()
 		{
 			static const bool result = cpu_x86::get().supports("avx512-fp16");
 			return result;
 		}
-		bool has_hardware_bf16_math()
-		{
-			static const bool result = cpu_x86::get().supports("avx512-f") and cpu_x86::get().supports("avx512-bf16");
-			return result;
-		}
 
+		Context::Context() :
+				m_simd_level(getSimdSupport())
+		{
+		}
 		SimdLevel Context::getSimdLevel(mlContext_t context)
 		{
 			if (context == nullptr)

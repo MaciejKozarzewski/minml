@@ -8,7 +8,7 @@
 #include <minml/backend/cpu_backend.h>
 #include <minml/backend/backend_utils.hpp>
 
-#include "helpers/indexers.hpp"
+#include "indexers.hpp"
 
 #include <cstring>
 #include <cinttypes>

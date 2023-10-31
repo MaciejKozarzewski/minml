@@ -9,9 +9,8 @@
 #include "Matrix.hpp"
 #include "gemm_kernels.hpp"
 #include "../utils.hpp"
-#include "../vectors/vectors.hpp"
+#include "../fp16.hpp"
 
-#include <x86intrin.h>
 #include <cinttypes>
 #include <cassert>
 
@@ -520,6 +519,7 @@
 
 namespace ml
 {
+	using namespace ml::cpu;
 #ifdef __AVX512F__
 	void gemm_avx512f_24x16_fp32(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,
 			bool use_relu) noexcept
@@ -536,7 +536,7 @@ namespace ml
 
 		assert(alpha_ptr != nullptr);
 		assert(beta_ptr != nullptr);
-		assert(cpu::is_aligned(B.data(), register_size<ZMM>()));
+		assert(cpu::is_aligned(B.data(), 64));
 
 		const float *A_ptr = A.data<float>();
 		const float *B_ptr = B.data<float>();
@@ -674,7 +674,7 @@ namespace ml
 
 		assert(alpha_ptr != nullptr);
 		assert(beta_ptr != nullptr);
-		assert(cpu::is_aligned(B.data(), register_size<ZMM>()));
+		assert(cpu::is_aligned(B.data(), 64));
 
 		const float *A_ptr = A.data<float>();
 		const float *B_ptr = B.data<float>();
@@ -803,7 +803,7 @@ namespace ml
 	void pack_avx512f_24xK_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept
 	{
 		assert(dst.stride() == 24);
-		assert(ml::cpu::is_aligned(dst.data(), register_size<ZMM>()));
+		assert(ml::cpu::is_aligned(dst.data(), 64));
 
 		const uint64_t k_iter = dst.rows() / 16;
 		const uint64_t k_left = dst.rows() % 16;
@@ -938,7 +938,7 @@ namespace ml
 	void pack_avx512f_16xK_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept
 	{
 		assert(dst.stride() == 16);
-		assert(ml::cpu::is_aligned(dst.data(), register_size<ZMM>()));
+		assert(ml::cpu::is_aligned(dst.data(), 64));
 
 		const uint64_t k_iter = dst.rows() / 16;
 		const uint64_t k_left = dst.rows() % 16;
@@ -1065,7 +1065,7 @@ namespace ml
 	void pack_avx512f_24xK_fp16_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept
 	{
 		assert(dst.stride() == 24);
-		assert(ml::cpu::is_aligned(dst.data(), register_size<ZMM>()));
+		assert(ml::cpu::is_aligned(dst.data(), 64));
 
 		const uint64_t k_iter = dst.rows() / 16;
 		const uint64_t k_left = dst.rows() % 16;
@@ -1201,7 +1201,7 @@ namespace ml
 	void pack_avx512f_16xK_fp16_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept
 	{
 		assert(dst.stride() == 16);
-		assert(ml::cpu::is_aligned(dst.data(), register_size<ZMM>()));
+		assert(ml::cpu::is_aligned(dst.data(), 64));
 
 		const uint64_t k_iter = dst.rows() / 16;
 		const uint64_t k_left = dst.rows() % 16;

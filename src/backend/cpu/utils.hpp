@@ -36,10 +36,7 @@ namespace ml
 		SimdLevel getSimdSupport() noexcept;
 
 		bool has_hardware_fp16_conversion();
-		bool has_hardware_bf16_conversion();
-
 		bool has_hardware_fp16_math();
-		bool has_hardware_bf16_math();
 
 		bool is_aligned(const void *ptr, size_t alignment) noexcept;
 

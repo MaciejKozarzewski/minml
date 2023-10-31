@@ -10,7 +10,7 @@
 #include <minml/backend/backend_utils.hpp>
 
 #include "../utils.hpp"
-#include "../helpers/indexers.hpp"
+#include "../indexers.hpp"
 #include "winograd_kernels.hpp"
 #include "winograd_runtime.hpp"
 

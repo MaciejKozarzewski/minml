@@ -197,7 +197,6 @@ namespace
 
 namespace ml
 {
-#ifndef USE_OPENBLAS
 	void cpu_gemm(mlContext_t context, mlDataType_t dtype, mlShape_t shape_C, void *C, mlShape_t shape_A, const void *A, mlShape_t shape_B,
 			const void *B, char opA, char opB, float alpha, float beta)
 	{
@@ -227,7 +226,6 @@ namespace ml
 			rt.run();
 		}
 	}
-#endif
 
 	void cpu_gemm_ex(mlContext_t context, mlDataType_t dtype, mlShape_t shape_D, void *D, float alpha, char opA, mlShape_t shape_A, const void *A,
 			char opB, mlShape_t shape_B, const void *B, float beta, mlShape_t shape_C, const void *C, mlActivationType_t act)

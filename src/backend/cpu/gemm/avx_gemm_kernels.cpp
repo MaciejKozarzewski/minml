@@ -9,9 +9,8 @@
 #include "Fragment.hpp"
 #include "Matrix.hpp"
 #include "../utils.hpp"
-#include "../vectors/vectors.hpp"
+#include "../fp16.hpp"
 
-#include <x86intrin.h>
 #include <cinttypes>
 #include <cassert>
 
@@ -217,6 +216,7 @@
 
 namespace ml
 {
+	using namespace ml::cpu;
 
 	void gemm_avx_10x8_fp32(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,
 			bool use_relu) noexcept
@@ -232,8 +232,8 @@ namespace ml
 		assert(D.columns() == B.columns());
 
 		assert(alpha_ptr != nullptr);
-		assert(cpu::is_aligned(A.data(), register_size<YMM>()));
-		assert(cpu::is_aligned(B.data(), register_size<YMM>()));
+		assert(cpu::is_aligned(A.data(), 32));
+		assert(cpu::is_aligned(B.data(), 32));
 		assert(beta_ptr != nullptr);
 
 		const float *A_ptr = A.data<float>();
@@ -353,8 +353,8 @@ namespace ml
 		assert(D.columns() == B.columns());
 
 		assert(alpha_ptr != nullptr);
-		assert(cpu::is_aligned(A.data(), register_size<YMM>()));
-		assert(cpu::is_aligned(B.data(), register_size<YMM>()));
+		assert(cpu::is_aligned(A.data(), 32));
+		assert(cpu::is_aligned(B.data(), 32));
 		assert(beta_ptr != nullptr);
 
 		const float *A_ptr = A.data<float>();
@@ -467,7 +467,7 @@ namespace ml
 		assert(dst.dtype() == DTYPE_FLOAT32);
 		assert(src.dtype() == DTYPE_FLOAT32);
 		assert(dst.stride() == 10);
-		assert(ml::cpu::is_aligned(dst.data(), register_size<YMM>()));
+		assert(ml::cpu::is_aligned(dst.data(), 32));
 
 		uint64_t k_iter = dst.rows() / 8;
 		uint64_t k_left = dst.rows() % 8;
@@ -935,7 +935,7 @@ namespace ml
 		assert(dst.dtype() == DTYPE_FLOAT32);
 		assert(src.dtype() == DTYPE_FLOAT16);
 		assert(dst.stride() == 10);
-		assert(ml::cpu::is_aligned(dst.data(), register_size<YMM>()));
+		assert(ml::cpu::is_aligned(dst.data(), 32));
 
 		uint64_t k_iter = dst.rows() / 8;
 		uint64_t k_left = dst.rows() % 8;
@@ -1179,7 +1179,7 @@ namespace ml
 		assert(dst.dtype() == DTYPE_FLOAT32);
 		assert(src.dtype() == DTYPE_FLOAT32);
 		assert(dst.stride() == 8);
-		assert(ml::cpu::is_aligned(dst.data(), register_size<YMM>()));
+		assert(ml::cpu::is_aligned(dst.data(), 32));
 
 		uint64_t k_iter = dst.rows() / 8;
 		uint64_t k_left = dst.rows() % 8;
@@ -1397,7 +1397,7 @@ namespace ml
 		assert(dst.dtype() == DTYPE_FLOAT32);
 		assert(src.dtype() == DTYPE_FLOAT16);
 		assert(dst.stride() == 8);
-		assert(ml::cpu::is_aligned(dst.data(), register_size<YMM>()));
+		assert(ml::cpu::is_aligned(dst.data(), 32));
 
 		uint64_t k_iter = dst.rows() / 8;
 		uint64_t k_left = dst.rows() % 8;

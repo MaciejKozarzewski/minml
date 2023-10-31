@@ -10,7 +10,6 @@
 #include "gemm_kernels.hpp"
 #include "utilities.hpp"
 #include "../utils.hpp"
-#include "../vectors/types.hpp"
 #include "../fp16.hpp"
 
 #include <x86intrin.h>
@@ -132,6 +131,8 @@ namespace
 	}
 
 	using namespace ml;
+	using namespace ml::cpu;
+
 	template<typename SrcT, typename DstT>
 	DstT convert(SrcT x) noexcept
 	{
@@ -140,12 +141,12 @@ namespace
 	template<>
 	float16 convert(float x) noexcept
 	{
-		return float16 { cpu::convert_fp32_to_fp16(x) };
+		return cpu::convert_fp32_to_fp16(x);
 	}
 	template<>
 	float convert(float16 x) noexcept
 	{
-		return cpu::convert_fp16_to_fp32(x.m_data);
+		return cpu::convert_fp16_to_fp32(x);
 	}
 	float relu(float x) noexcept
 	{
