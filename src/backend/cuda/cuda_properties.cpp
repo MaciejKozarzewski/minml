@@ -75,15 +75,14 @@ namespace
 	std::string to_hex(uint8_t x)
 	{
 		static const std::array<char, 16> text ( { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f' });
-		return std::to_string(text[x / 16]) + std::to_string(text[x % 16]);
+		return std::string(1, text[x / 16]) + std::string(1, text[x % 16]);
 	}
 	template<typename T>
 	void print_hex(const std::string &name, T x, const char *info = nullptr)
 	{
-		std::cout << name << " : [";
+		std::cout << name << " : 0x";
 		for (int i = 0; i < sizeof(T); i++)
 			std::cout << ((i == 0) ? "" : ", ") << to_hex(reinterpret_cast<const uint8_t*>(&x)[i]);
-		std::cout << "]";
 		if (info != nullptr)
 			std::cout << "   (" << info << ")";
 		std::cout << '\n';
@@ -254,12 +253,6 @@ namespace ml
 		{
 			const int sm_ver = cuda::get_compute_capability(cuda::Context::getDeviceIndex(context));
 			return sm_ver == 53 || sm_ver == 60 || sm_ver >= 62;
-		}
-
-		bool has_bf16_math(mlContext_t context)
-		{
-			const int sm_ver = cuda::get_compute_capability(cuda::Context::getDeviceIndex(context));
-			return sm_ver >= 80;
 		}
 
 		bool has_tensor_cores(mlContext_t context)
