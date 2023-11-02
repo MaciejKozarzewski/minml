@@ -16,6 +16,7 @@
 
 #include <minml/backend/cpu_backend.h>
 #include <minml/backend/cuda_backend.h>
+#include <minml/backend/opencl_backend.h>
 
 #include <vector>
 #include <memory>
@@ -139,6 +140,13 @@ namespace ml
 					cuda_print_device_features(device.index());
 					std::cout << "Supports fp32 : " << (cuda_supports_type(device.index(), DTYPE_FLOAT32) ? "YES" : "NO") << '\n';
 					std::cout << "Supports fp16 : " << (cuda_supports_type(device.index(), DTYPE_FLOAT16) ? "YES" : "NO") << '\n';
+					return 0;
+				}
+				case DeviceType::OPENCL:
+				{
+					opencl_print_device_features(device.index());
+					std::cout << "Supports fp32 : " << (opencl_supports_type(device.index(), DTYPE_FLOAT32) ? "YES" : "NO") << '\n';
+					std::cout << "Supports fp16 : " << (opencl_supports_type(device.index(), DTYPE_FLOAT16) ? "YES" : "NO") << '\n';
 					return 0;
 				}
 				default:

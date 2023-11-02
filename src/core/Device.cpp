@@ -8,9 +8,11 @@
 #include <minml/core/Device.hpp>
 #include <minml/core/DataType.hpp>
 #include <minml/core/ml_exceptions.hpp>
+#include <minml/utils/string_util.hpp>
 
 #include <minml/backend/cpu_backend.h>
 #include <minml/backend/cuda_backend.h>
+#include <minml/backend/opencl_backend.h>
 
 #include <cstring>
 #include <vector>
@@ -36,17 +38,22 @@ namespace ml
 			throw IllegalDevice(METHOD_NAME, { DeviceType::CUDA, index });
 		return Device(DeviceType::CUDA, index);
 	}
+	Device Device::opencl(int index)
+	{
+		if (index < 0 or index >= Device::numberOfOpenCLDevices())
+			throw IllegalDevice(METHOD_NAME, { DeviceType::OPENCL, index });
+		return Device(DeviceType::OPENCL, index);
+	}
 	Device Device::fromString(const std::string &str)
 	{
-		if (str == "CPU" or str == "cpu")
+		const std::string tmp = toLowerCase(str);
+		if (tmp == "cpu")
 			return Device::cpu();
-		else
-		{
-			if (str.substr(0, 5) == "CUDA:" or str.substr(0, 5) == "cuda:")
-				return Device::cuda(std::atoi(str.data() + 5));
-			else
-				throw LogicError(METHOD_NAME, "Illegal device '" + str + "'");
-		}
+		if (startsWith(tmp, "cuda:"))
+			return Device::cuda(std::atoi(str.data() + 5));
+		if (startsWith(tmp, "opencl:"))
+			return Device::opencl(std::atoi(str.data() + 7));
+		throw LogicError(METHOD_NAME, "Illegal device '" + str + "'");
 	}
 
 	int Device::index() const noexcept
@@ -65,6 +72,10 @@ namespace ml
 	{
 		return type() == DeviceType::CUDA;
 	}
+	bool Device::isOPENCL() const noexcept
+	{
+		return type() == DeviceType::OPENCL;
+	}
 
 //flags
 	bool Device::supportsType(DataType t) const noexcept
@@ -75,6 +86,8 @@ namespace ml
 				return cpu_supports_type(static_cast<mlDataType_t>(t));
 			case DeviceType::CUDA:
 				return cuda_supports_type(index(), static_cast<mlDataType_t>(t));
+			case DeviceType::OPENCL:
+				return opencl_supports_type(index(), static_cast<mlDataType_t>(t));
 			default:
 				return false;
 		}
@@ -88,6 +101,8 @@ namespace ml
 				return cpu_get_memory();
 			case DeviceType::CUDA:
 				return cuda_get_memory(index());
+			case DeviceType::OPENCL:
+				return opencl_get_memory(index());
 			default:
 				return 0;
 		}
@@ -107,6 +122,11 @@ namespace ml
 		static const int result = cuda_get_number_of_devices();
 		return result;
 	}
+	int Device::numberOfOpenCLDevices()
+	{
+		static const int result = opencl_get_number_of_devices();
+		return result;
+	}
 	void Device::setNumberOfThreads(int t)
 	{
 		cpu_set_number_of_threads(t);
@@ -116,6 +136,8 @@ namespace ml
 		std::string result = Device::cpu().toString() + " : " + Device::cpu().info() + '\n';
 		for (int i = 0; i < Device::numberOfCudaDevices(); i++)
 			result += Device::cuda(i).toString() + " : " + Device::cuda(i).info() + '\n';
+		for (int i = 0; i < Device::numberOfOpenCLDevices(); i++)
+			result += Device::opencl(i).toString() + " : " + Device::opencl(i).info() + '\n';
 		return result;
 	}
 
@@ -127,6 +149,8 @@ namespace ml
 				return "CPU";
 			case DeviceType::CUDA:
 				return "CUDA:" + std::to_string(index());
+			case DeviceType::OPENCL:
+				return "OPENCL:" + std::to_string(index());
 		}
 		return "Illegal device";
 	}
@@ -138,6 +162,8 @@ namespace ml
 				return cpu_get_device_info();
 			case DeviceType::CUDA:
 				return cuda_get_device_info(index());
+			case DeviceType::OPENCL:
+				return opencl_get_device_info(index());
 			default:
 				return std::string();
 		}

@@ -5,7 +5,11 @@
  *      Author: Maciej Kozarzewski
  */
 
-#ifndef USE_CUDA
+#ifdef USE_CUDA
+#  ifdef USE_OPENCL
+#    error "CUDA and OPENCL cannot be used at the same time"
+#  endif
+#else
 #include <minml/backend/cuda_backend.h>
 #include <minml/core/ml_exceptions.hpp>
 

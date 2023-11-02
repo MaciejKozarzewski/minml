@@ -22,7 +22,8 @@ namespace ml
 	enum class DeviceType
 	{
 		CPU,
-		CUDA
+		CUDA,
+		OPENCL
 	};
 
 	enum class CpuSimd
@@ -50,12 +51,14 @@ namespace ml
 			// device creation
 			static Device cpu() noexcept;
 			static Device cuda(int index);
+			static Device opencl(int index);
 			static Device fromString(const std::string &str);
 
 			DeviceType type() const noexcept;
 			int index() const noexcept;
 			bool isCPU() const noexcept;
 			bool isCUDA() const noexcept;
+			bool isOPENCL() const noexcept;
 
 			bool supportsType(DataType t) const noexcept;
 
@@ -69,6 +72,7 @@ namespace ml
 			static CpuSimd cpuSimdLevel();
 			static int numberOfCpuCores();
 			static int numberOfCudaDevices();
+			static int numberOfOpenCLDevices();
 			static void setNumberOfThreads(int t);
 			static std::string hardwareInfo();
 

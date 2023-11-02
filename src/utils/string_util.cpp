@@ -7,10 +7,11 @@
 
 #include <minml/utils/string_util.hpp>
 
+#include <algorithm>
 #include <iostream>
 #include <cstring>
 #include <cstdlib>
-#include <math.h>
+#include <cmath>
 
 bool equals(const char *str1, const char *str2)
 {
@@ -22,6 +23,13 @@ int occurence(const std::string &str, char c)
 	for (size_t i = 0; i < str.length(); i++)
 		result += str[i] == c;
 	return result;
+}
+
+std::string toLowerCase(std::string s)
+{
+	std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c)
+	{	return std::tolower(c);});
+	return s;
 }
 
 bool startsWith(const std::string &str, const std::string &seek)

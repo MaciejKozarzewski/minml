@@ -14,6 +14,8 @@
 bool equals(const char *str1, const char *str2);
 int occurence(const std::string &str, char c);
 
+std::string toLowerCase(std::string s);
+
 bool startsWith(const std::string &str, const std::string &seek);
 bool endsWith(const std::string &str, const std::string &seek);
 std::string trim(const std::string &str);

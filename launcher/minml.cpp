@@ -25,6 +25,7 @@
 #include <minml/utils/selfcheck.hpp>
 
 #include <minml/backend/cpu_backend.h>
+#include <minml/backend/opencl_backend.h>
 
 #include <iostream>
 #include <functional>
@@ -2498,7 +2499,6 @@ namespace gemm
 	};
 }
 
-
 #include "../src/backend/cpu/gemm/utilities.hpp"
 #include "../src/backend/cpu/gemm/Fragment.hpp"
 #include "../src/backend/cpu/gemm/Matrix.hpp"
@@ -3008,6 +3008,13 @@ void kernel_transform_input_v2(void *__restrict__ matrices, const void *__restri
 int main()
 {
 	std::cout << "BEGIN" << std::endl;
+	std::cout << ml::Device::hardwareInfo();
+
+	std::cout << "Detailed properties" << std::endl;
+	opencl_print_device_features(0);
+	std::cout << "END" << std::endl;
+	return 0;
+
 //	for (int i = 1; i <= 1024; i++)
 //		test_packing(i, 16, ml::MatrixOp::TRANSPOSE);
 
