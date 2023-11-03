@@ -28,7 +28,12 @@ namespace ml
 		std::vector<cl::Platform> get_list_of_platforms()
 		{
 			std::vector<cl::Platform> result;
-			cl::Platform::get(&result);
+			try
+			{
+				cl::Platform::get(&result);
+			} catch (std::exception &e)
+			{
+			}
 			return result;
 		}
 		std::vector<cl::Device> get_devices_for_platform(const cl::Platform &p)

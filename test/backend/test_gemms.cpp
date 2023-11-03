@@ -224,7 +224,7 @@ namespace ml
 	TEST(TestGemmOnCUDA, float32_AB)
 	{
 		if (Device::numberOfCudaDevices() == 0)
-			GTEST_SKIP();
+			GTEST_SKIP_("No CUDA devices");
 		GemmTester data(23, 29, 37, 'n', 'n', DataType::FLOAT32);
 		data.gemm_baseline(1.1, 0.1);
 
@@ -235,7 +235,7 @@ namespace ml
 	TEST(TestGemmOnCUDA, float32_ABT)
 	{
 		if (Device::numberOfCudaDevices() == 0)
-			GTEST_SKIP();
+			GTEST_SKIP_("No CUDA devices");
 		GemmTester data(23, 29, 37, 'n', 't', DataType::FLOAT32);
 		data.gemm_baseline(1.1, 0.1);
 
@@ -246,7 +246,7 @@ namespace ml
 	TEST(TestGemmOnCUDA, float32_ATB)
 	{
 		if (Device::numberOfCudaDevices() == 0)
-			GTEST_SKIP();
+			GTEST_SKIP_("No CUDA devices");
 		GemmTester data(23, 29, 37, 't', 'n', DataType::FLOAT32);
 		data.gemm_baseline(1.1, 0.1);
 
@@ -257,7 +257,7 @@ namespace ml
 	TEST(TestGemmOnCUDA, float32_ATBT)
 	{
 		if (Device::numberOfCudaDevices() == 0)
-			GTEST_SKIP();
+			GTEST_SKIP_("No CUDA devices");
 		GemmTester data(23, 29, 37, 't', 't', DataType::FLOAT32);
 		data.gemm_baseline(1.1, 0.1);
 
@@ -269,7 +269,7 @@ namespace ml
 	TEST(TestGemmOnCUDA, float16_AB)
 	{
 		if (Device::numberOfCudaDevices() == 0 or not Device::cuda(0).supportsType(DataType::FLOAT16))
-			GTEST_SKIP();
+			GTEST_SKIP_("No CUDA devices supporting fp16");
 		GemmTester data(23, 29, 37, 'n', 'n', DataType::FLOAT16);
 		data.gemm_baseline(1.1, 0.1);
 
@@ -280,7 +280,7 @@ namespace ml
 	TEST(TestGemmOnCUDA, float16_ABT)
 	{
 		if (Device::numberOfCudaDevices() == 0 or not Device::cuda(0).supportsType(DataType::FLOAT16))
-			GTEST_SKIP();
+			GTEST_SKIP_("No CUDA devices supporting fp16");
 		GemmTester data(23, 29, 37, 'n', 't', DataType::FLOAT16);
 		data.gemm_baseline(1.1, 0.1);
 
@@ -291,7 +291,7 @@ namespace ml
 	TEST(TestGemmOnCUDA, float16_ATB)
 	{
 		if (Device::numberOfCudaDevices() == 0 or not Device::cuda(0).supportsType(DataType::FLOAT16))
-			GTEST_SKIP();
+			GTEST_SKIP_("No CUDA devices supporting fp16");
 		GemmTester data(23, 29, 37, 't', 'n', DataType::FLOAT16);
 		data.gemm_baseline(1.1, 0.1);
 
@@ -302,12 +302,102 @@ namespace ml
 	TEST(TestGemmOnCUDA, float16_ATBT)
 	{
 		if (Device::numberOfCudaDevices() == 0 or not Device::cuda(0).supportsType(DataType::FLOAT16))
-			GTEST_SKIP();
+			GTEST_SKIP_("No CUDA devices supporting fp16");
 		GemmTester data(23, 29, 37, 't', 't', DataType::FLOAT16);
 		data.gemm_baseline(1.1, 0.1);
 
 		data.moveTo(Device::cuda(0));
 		gemm(Context(Device::cuda(0)), 't', 't', data.C_tested, data.A, data.B, 1.1, 0.1);
+		EXPECT_LT(data.getDifference(), 1.0e-3);
+	}
+
+	TEST(TestGemmOnOPENCL, float32_AB)
+	{
+		if (Device::numberOfOpenCLDevices() == 0)
+			GTEST_SKIP_("No OpenCL devices");
+		GemmTester data(23, 29, 37, 'n', 'n', DataType::FLOAT32);
+		data.gemm_baseline(1.1, 0.1);
+
+		data.moveTo(Device::opencl(0));
+		gemm(Context(Device::opencl(0)), 'n', 'n', data.C_tested, data.A, data.B, 1.1, 0.1);
+		EXPECT_LT(data.getDifference(), 1.0e-4);
+	}
+	TEST(TestGemmOnOPENCL, float32_ABT)
+	{
+		if (Device::numberOfOpenCLDevices() == 0)
+			GTEST_SKIP_("No OpenCL devices");
+		GemmTester data(23, 29, 37, 'n', 't', DataType::FLOAT32);
+		data.gemm_baseline(1.1, 0.1);
+
+		data.moveTo(Device::opencl(0));
+		gemm(Context(Device::opencl(0)), 'n', 't', data.C_tested, data.A, data.B, 1.1, 0.1);
+		EXPECT_LT(data.getDifference(), 1.0e-4);
+	}
+	TEST(TestGemmOnOPENCL, float32_ATB)
+	{
+		if (Device::numberOfOpenCLDevices() == 0)
+			GTEST_SKIP_("No OpenCL devices");
+		GemmTester data(23, 29, 37, 't', 'n', DataType::FLOAT32);
+		data.gemm_baseline(1.1, 0.1);
+
+		data.moveTo(Device::opencl(0));
+		gemm(Context(Device::opencl(0)), 't', 'n', data.C_tested, data.A, data.B, 1.1, 0.1);
+		EXPECT_LT(data.getDifference(), 1.0e-4);
+	}
+	TEST(TestGemmOnOPENCL, float32_ATBT)
+	{
+		if (Device::numberOfOpenCLDevices() == 0)
+			GTEST_SKIP_("No OpenCL devices");
+		GemmTester data(23, 29, 37, 't', 't', DataType::FLOAT32);
+		data.gemm_baseline(1.1, 0.1);
+
+		data.moveTo(Device::opencl(0));
+		gemm(Context(Device::opencl(0)), 't', 't', data.C_tested, data.A, data.B, 1.1, 0.1);
+		EXPECT_LT(data.getDifference(), 1.0e-4);
+	}
+
+	TEST(TestGemmOnOPENCL, float16_AB)
+	{
+		if (Device::numberOfOpenCLDevices() == 0 or not Device::opencl(0).supportsType(DataType::FLOAT16))
+			GTEST_SKIP_("No OpenCL devices supporting fp16");
+		GemmTester data(23, 29, 37, 'n', 'n', DataType::FLOAT16);
+		data.gemm_baseline(1.1, 0.1);
+
+		data.moveTo(Device::opencl(0));
+		gemm(Context(Device::opencl(0)), 'n', 'n', data.C_tested, data.A, data.B, 1.1, 0.1);
+		EXPECT_LT(data.getDifference(), 1.0e-3);
+	}
+	TEST(TestGemmOnOPENCL, float16_ABT)
+	{
+		if (Device::numberOfOpenCLDevices() == 0 or not Device::opencl(0).supportsType(DataType::FLOAT16))
+			GTEST_SKIP_("No OpenCL devices supporting fp16");
+		GemmTester data(23, 29, 37, 'n', 't', DataType::FLOAT16);
+		data.gemm_baseline(1.1, 0.1);
+
+		data.moveTo(Device::opencl(0));
+		gemm(Context(Device::opencl(0)), 'n', 't', data.C_tested, data.A, data.B, 1.1, 0.1);
+		EXPECT_LT(data.getDifference(), 2.0e-2);
+	}
+	TEST(TestGemmOnOPENCL, float16_ATB)
+	{
+		if (Device::numberOfOpenCLDevices() == 0 or not Device::opencl(0).supportsType(DataType::FLOAT16))
+			GTEST_SKIP_("No OpenCL devices supporting fp16");
+		GemmTester data(23, 29, 37, 't', 'n', DataType::FLOAT16);
+		data.gemm_baseline(1.1, 0.1);
+
+		data.moveTo(Device::opencl(0));
+		gemm(Context(Device::opencl(0)), 't', 'n', data.C_tested, data.A, data.B, 1.1, 0.1);
+		EXPECT_LT(data.getDifference(), 2.0e-3);
+	}
+	TEST(TestGemmOnOPENCL, float16_ATBT)
+	{
+		if (Device::numberOfOpenCLDevices() == 0 or not Device::opencl(0).supportsType(DataType::FLOAT16))
+			GTEST_SKIP_("No OpenCL devices supporting fp16");
+		GemmTester data(23, 29, 37, 't', 't', DataType::FLOAT16);
+		data.gemm_baseline(1.1, 0.1);
+
+		data.moveTo(Device::opencl(0));
+		gemm(Context(Device::opencl(0)), 't', 't', data.C_tested, data.A, data.B, 1.1, 0.1);
 		EXPECT_LT(data.getDifference(), 1.0e-3);
 	}
 

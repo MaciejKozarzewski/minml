@@ -15,6 +15,7 @@
 
 #include <minml/backend/cpu_backend.h>
 #include <minml/backend/cuda_backend.h>
+#include <minml/backend/opencl_backend.h>
 
 namespace
 {
@@ -149,6 +150,9 @@ namespace ml
 			case DeviceType::CUDA:
 				cuda_unpack_input(get(context), get_shape(dst), get(dst.dtype()), dst.data(), src.data());
 				break;
+//			case DeviceType::OPENCL:
+//				opencl_unpack_input(get(context), get_shape(dst), get(dst.dtype()), dst.data(), src.data());
+//				break;
 		}
 	}
 	void convertType(const Context &context, void *dst, DataType dst_dtype, const void *src, DataType src_dtype, int elements)
@@ -163,6 +167,9 @@ namespace ml
 			case DeviceType::CUDA:
 				cuda_convert_type(get(context), dst, get(dst_dtype), src, get(src_dtype), elements);
 				break;
+//			case DeviceType::OPENCL:
+//				opencl_convert_type(get(context), dst, get(dst_dtype), src, get(src_dtype), elements);
+//				break;
 		}
 	}
 	void transpose_021(const Context &context, const Tensor &input, Tensor &output)
@@ -180,6 +187,9 @@ namespace ml
 				break;
 			case DeviceType::CUDA:
 				cuda_transpose_021(get(context), get(input.dtype()), get_shape(input), input.data(), output.data());
+				break;
+			case DeviceType::OPENCL:
+				// TODO
 				break;
 		}
 	}
@@ -200,6 +210,10 @@ namespace ml
 				cuda_winograd_weight_transform(get(context), tile_size, get(weights.dtype()), get_shape(weights), weights.data(), matrices.data(),
 						invert);
 				break;
+//			case DeviceType::OPENCL:
+//				opencl_winograd_weight_transform(get(context), tile_size, get(weights.dtype()), get_shape(weights), weights.data(), matrices.data(),
+//						invert);
+//				break;
 		}
 	}
 	void winogradInputTransform(const Context &context, const Shape &weight_shape, const Tensor &input, Tensor &matrices)
@@ -218,6 +232,10 @@ namespace ml
 				cuda_winograd_input_transform(get(context), tile_size, get(input.dtype()), get(weight_shape), get_shape(input), input.data(),
 						matrices.data());
 				break;
+//			case DeviceType::OPENCL:
+//				opencl_winograd_input_transform(get(context), tile_size, get(input.dtype()), get(weight_shape), get_shape(input), input.data(),
+//						matrices.data());
+//				break;
 		}
 	}
 	void winogradOutputTransform(const Context &context, const Shape &weight_shape, const Tensor &matrices, Tensor &output, const Tensor &bias,
@@ -237,6 +255,10 @@ namespace ml
 				cuda_winograd_output_transform(get(context), tile_size, get(output.dtype()), get(weight_shape), get_shape(output), matrices.data(),
 						output.data(), bias.data(), add.data(), get(act));
 				break;
+//			case DeviceType::OPENCL:
+//				opencl_winograd_output_transform(get(context), tile_size, get(output.dtype()), get(weight_shape), get_shape(output), matrices.data(),
+//						output.data(), bias.data(), add.data(), get(act));
+//				break;
 		}
 	}
 	void winogradGradientTransform(const Context &context, const Shape &weight_shape, const Tensor &gradient, Tensor &matrices)
@@ -252,6 +274,9 @@ namespace ml
 				cuda_winograd_gradient_transform(get(context), tile_size, get(gradient.dtype()), get(weight_shape), get_shape(gradient),
 						gradient.data(), matrices.data());
 				break;
+			case DeviceType::OPENCL:
+				// TODO
+				break;
 		}
 	}
 	void winogradUpdateTransform(const Context &context, const Tensor &matrices, Tensor &update)
@@ -265,6 +290,9 @@ namespace ml
 			case DeviceType::CUDA:
 				cuda_winograd_update_transform(get(context), tile_size, get(matrices.dtype()), get_shape(update), matrices.data(), update.data());
 				break;
+			case DeviceType::OPENCL:
+				// TODO
+				break;
 		}
 	}
 
@@ -276,6 +304,9 @@ namespace ml
 				cpu_im2row(get(context), get(input.dtype()), get(weight_shape), get_shape(input), input.data(), matrix.data());
 				break;
 			case DeviceType::CUDA:
+				// TODO
+				break;
+			case DeviceType::OPENCL:
 				// TODO
 				break;
 		}
@@ -294,6 +325,9 @@ namespace ml
 				cuda_convolution_implicit_gemm_forward(get(context), get(weights.dtype()), get_shape(input), get_shape(weights), input.data(),
 						weights.data(), output.data(), bias.data(), add.data(), get(act));
 				break;
+			case DeviceType::OPENCL:
+				// TODO
+				break;
 		}
 	}
 
@@ -310,6 +344,10 @@ namespace ml
 				cuda_gemm(get(context), get(C.dtype()), get_shape(C), C.data(), get_shape(A), A.data(), get_shape(B), B.data(), opA, opB, alpha,
 						beta);
 				break;
+			case DeviceType::OPENCL:
+				opencl_gemm(get(context), get(C.dtype()), get_shape(C), C.data(), get_shape(A), A.data(), get_shape(B), B.data(), opA, opB, alpha,
+						beta);
+				break;
 		}
 	}
 	void gemmBatched(const Context &context, char opA, char opB, Tensor &C, const Tensor &A, const Tensor &B, float alpha, float beta)
@@ -324,6 +362,10 @@ namespace ml
 				break;
 			case DeviceType::CUDA:
 				cuda_gemm_batched(get(context), get(C.dtype()), get_shape(C), C.data(), get_shape(A), A.data(), get_shape(B), B.data(), opA, opB,
+						alpha, beta);
+				break;
+			case DeviceType::OPENCL:
+				opencl_gemm_batched(get(context), get(C.dtype()), get_shape(C), C.data(), get_shape(A), A.data(), get_shape(B), B.data(), opA, opB,
 						alpha, beta);
 				break;
 		}
@@ -354,6 +396,11 @@ namespace ml
 						beta);
 				break;
 			}
+			case DeviceType::OPENCL:
+			{
+				// FIXME
+				break;
+			}
 		}
 	}
 
@@ -369,6 +416,9 @@ namespace ml
 			case DeviceType::CUDA:
 				cuda_add_bias_act(get(context), get(input.dtype()), get_shape(input), input.data(), bias.data(), get(act));
 				break;
+//			case DeviceType::OPENCL:
+//				opencl_add_bias_act(get(context), get(input.dtype()), get_shape(input), input.data(), bias.data(), get(act));
+//				break;
 		}
 	}
 
@@ -381,6 +431,9 @@ namespace ml
 				break;
 			case DeviceType::CUDA:
 				cuda_batchnorm_inference(get(context), get_shape(input), input.data(), output.data(), weights.data(), get(act));
+				break;
+			case DeviceType::OPENCL:
+				// TODO
 				break;
 		}
 	}
@@ -397,6 +450,9 @@ namespace ml
 				cuda_batchnorm_forward(get(context), get_shape(input), input.data(), output.data(), weights.data(), running_stats.data(),
 						running_stat_idx, get(act));
 				break;
+			case DeviceType::OPENCL:
+				// TODO
+				break;
 		}
 	}
 	void batchnormBackward(const Context &context, const Tensor &input, const Tensor &output, Tensor &gradient_prev, Tensor &gradient_next,
@@ -412,6 +468,9 @@ namespace ml
 				cuda_batchnorm_backward(get(context), get_shape(input), input.data(), output.data(), gradient_prev.data(), gradient_next.data(),
 						weights.data(), weights_update.data(), running_stats.data(), running_stat_idx, get(act));
 				break;
+			case DeviceType::OPENCL:
+				// TODO
+				break;
 		}
 	}
 	void batchnormUpdate(const Context &context, const Tensor &running_stat, int stats_to_average, Tensor &weights, bool use_gamma, bool use_beta)
@@ -426,6 +485,9 @@ namespace ml
 			case DeviceType::CUDA:
 				cuda_batchnorm_update(get(context), shape, running_stat.data(), weights.data(), use_gamma, use_beta);
 				break;
+			case DeviceType::OPENCL:
+				// TODO
+				break;
 		}
 	}
 	void foldBatchnorm(const Context &context, Tensor &layer_weights, Tensor &layer_bias, const Tensor &batchnorm_weights)
@@ -438,6 +500,9 @@ namespace ml
 			case DeviceType::CUDA:
 				cuda_fold_batchnorm(get(context), get_shape(layer_weights), layer_weights.data(), layer_bias.data(), batchnorm_weights.data());
 				break;
+//			case DeviceType::OPENCL:
+//				opencl_fold_batchnorm(get(context), get_shape(layer_weights), layer_weights.data(), layer_bias.data(), batchnorm_weights.data());
+//				break;
 		}
 		context.synchronize();
 	}
@@ -454,6 +519,9 @@ namespace ml
 			case DeviceType::CUDA:
 				cuda_activation_forward(get(context), get(input.dtype()), get_shape(input), output.data(), input.data(), get(act));
 				break;
+//			case DeviceType::OPENCL:
+//				opencl_activation_forward(get(context), get(input.dtype()), get_shape(input), output.data(), input.data(), get(act));
+//				break;
 		}
 	}
 	void activationBackward(const Context &context, Tensor &gradient_prev, const Tensor &gradient_next, const Tensor &output, ActivationType act)
@@ -465,6 +533,9 @@ namespace ml
 				break;
 			case DeviceType::CUDA:
 				cuda_activation_backward(get(context), get_shape(gradient_prev), gradient_prev.data(), gradient_next.data(), output.data(), get(act));
+				break;
+			case DeviceType::OPENCL:
+				// TODO
 				break;
 		}
 	}
@@ -481,6 +552,9 @@ namespace ml
 			case DeviceType::CUDA:
 				cuda_emulate_low_precision(get(context), get_shape(dst), dst.data(), src.data());
 				break;
+//			case DeviceType::OPENCL:
+//				opencl_emulate_low_precision(get(context), get_shape(dst), dst.data(), src.data());
+//				break;
 		}
 	}
 	void sumOverFirstDim(const Context &context, Tensor &dst, const Tensor &src, float beta)
@@ -492,6 +566,9 @@ namespace ml
 				break;
 			case DeviceType::CUDA:
 				cuda_sum_over_first_dim(get(context), get_shape(src), dst.data(), src.data(), beta);
+				break;
+			case DeviceType::OPENCL:
+				// TODO
 				break;
 		}
 	}
@@ -505,6 +582,9 @@ namespace ml
 			case DeviceType::CUDA:
 				cuda_add_tensors(get(context), get(dst.dtype()), get_shape(dst), dst.data(), src1.data(), src2.data());
 				break;
+			case DeviceType::OPENCL:
+				// TODO
+				break;
 		}
 	}
 	float meanSquaredLoss(const Context &context, const Tensor &output, const Tensor &target)
@@ -515,6 +595,8 @@ namespace ml
 				return cpu_mean_squared_loss(get(context), get_shape(output), output.data(), target.data());
 			case DeviceType::CUDA:
 				return cuda_mean_squared_loss(get(context), get_shape(output), output.data(), target.data());
+			case DeviceType::OPENCL:
+				return 0; // TODO
 		}
 		return 0.0f;
 	}
@@ -528,6 +610,9 @@ namespace ml
 			case DeviceType::CUDA:
 				cuda_mean_squared_gradient(get(context), get_shape(output), gradient.data(), output.data(), target.data(), weight);
 				break;
+			case DeviceType::OPENCL:
+				// TODO
+				break;
 		}
 	}
 	float crossEntropyLoss(const Context &context, const Tensor &output, const Tensor &target)
@@ -538,6 +623,8 @@ namespace ml
 				return cpu_cross_entropy_loss(get(context), get_shape(output), output.data(), target.data());
 			case DeviceType::CUDA:
 				return cuda_cross_entropy_loss(get(context), get_shape(output), output.data(), target.data());
+			case DeviceType::OPENCL:
+				return 0; // TODO
 		}
 		return 0.0f;
 	}
@@ -550,6 +637,9 @@ namespace ml
 				break;
 			case DeviceType::CUDA:
 				cuda_cross_entropy_gradient(get(context), get_shape(output), gradient.data(), output.data(), target.data(), weight);
+				break;
+			case DeviceType::OPENCL:
+				// TODO
 				break;
 		}
 	}
@@ -566,6 +656,9 @@ namespace ml
 				cuda_adam_optimize(get(context), get_shape(weight), weight.data(), update.data(), momentum.data(), variance.data(), learning_rate,
 						beta1, beta2);
 				break;
+			case DeviceType::OPENCL:
+				// TODO
+				break;
 		}
 	}
 	void l2Regularization(const Context &context, Tensor &gradient, const Tensor &param, float coefficient, float offset)
@@ -577,6 +670,9 @@ namespace ml
 				break;
 			case DeviceType::CUDA:
 				cuda_l2_regularization(get(context), get_shape(gradient), gradient.data(), param.data(), coefficient, offset);
+				break;
+			case DeviceType::OPENCL:
+				// TODO
 				break;
 		}
 	}

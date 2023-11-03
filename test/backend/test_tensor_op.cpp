@@ -73,6 +73,16 @@ namespace ml
 		for (int i = 0; i < t.volume(); i++)
 			EXPECT_EQ(t.get( { i }), 1.23f);
 	}
+	TEST(TestTensorOp, setall_opencl)
+	{
+		if (Device::numberOfOpenCLDevices() == 0)
+			GTEST_SKIP();
+		Tensor t( { 123 }, "float32", Device::opencl(0));
+		t.setall(Context(Device::opencl(0)), 1.23f);
+
+		for (int i = 0; i < t.volume(); i++)
+			EXPECT_EQ(t.get( { i }), 1.23f);
+	}
 
 	TEST(TestTensorOp, addBiasAct_fp32)
 	{

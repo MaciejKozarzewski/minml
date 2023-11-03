@@ -16,8 +16,6 @@
 
 #include <cstring>
 #include <memory>
-#include <thread>
-#include <chrono>
 
 namespace
 {
@@ -118,7 +116,7 @@ namespace
 						if (dst_device == src_device)
 							opencl_memcpy_within_device(context, dst_ptr, dst_offset, src_ptr, src_offset, count);
 						else
-						{ // copy between devices must go via host (TODO unless devices support peer-to-peer transfer)
+						{ // copy between devices goes via host (TODO in OpenCL it is not a must)
 							std::unique_ptr<uint8_t[]> buffer = std::make_unique<uint8_t[]>(count);
 							opencl_memcpy_to_host(context, buffer.get(), src_ptr, src_offset, count);
 							opencl_memcpy_from_host(context, dst_ptr, dst_offset, buffer.get(), count);
