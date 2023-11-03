@@ -176,7 +176,7 @@ namespace ml
 			case ACTIVATION_LINEAR:
 			{
 				if (output != input)
-					ml::cuda_memcpy_within_device(context, output, 0, input, size_of(dtype) * volume(shape));
+					ml::cuda_memcpy_within_device(context, output, 0, input, 0, size_of(dtype) * volume(shape));
 				break;
 			}
 			case ACTIVATION_SIGMOID:
@@ -303,7 +303,7 @@ namespace ml
 			case ACTIVATION_LINEAR:
 			{
 				if (gradient_prev != gradient_next)
-					ml::cuda_memcpy_within_device(context, gradient_prev, 0, gradient_next, sizeof(float) * volume(shape));
+					ml::cuda_memcpy_within_device(context, gradient_prev, 0, gradient_next, 0, sizeof(float) * volume(shape));
 				break;
 			}
 			case ACTIVATION_SIGMOID:

@@ -62,14 +62,6 @@ namespace ml
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
-	void opencl_page_lock(void *ptr, int count)
-	{
-		throw NotImplemented(METHOD_NAME);
-	}
-	void opencl_page_unlock(void *ptr)
-	{
-		throw NotImplemented(METHOD_NAME);
-	}
 	void opencl_free(void *ptr)
 	{
 		throw NotImplemented(METHOD_NAME);
@@ -82,7 +74,7 @@ namespace ml
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
-	void opencl_memcpy_within_device(mlContext_t context, void *dst, int dst_offset, const void *src, int count)
+	void opencl_memcpy_within_device(mlContext_t context, void *dst, int dst_offset, const void *src, int src_offset, int count)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}

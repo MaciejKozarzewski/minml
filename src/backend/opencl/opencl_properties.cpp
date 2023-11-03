@@ -20,63 +20,6 @@
 
 namespace
 {
-
-	std::vector<cl::Platform> get_list_of_platforms()
-	{
-		std::vector<cl::Platform> result;
-		cl::Platform::get(&result);
-		return result;
-	}
-	std::vector<cl::Device> get_devices_for_platform(const cl::Platform &p)
-	{
-		// necessary to suppress unwanted printing from 'getDevices'
-#if defined(_WIN32)
-		freopen("NUL", "w", stdout); // redirect stdout to the windows version of /dev/null
-#elif defined(__linux__)
-		FILE *tmp = stderr;
-		stderr = tmpfile();
-#endif
-
-		std::vector<cl::Device> result;
-		try
-		{
-			cl_int err = p.getDevices(CL_DEVICE_TYPE_ALL, &result);
-			std::cout << "err = " << err << '\n';
-		} catch (std::exception &e)
-		{
-		}
-
-#if defined(_WIN32)
-		freopen("CON", "w", stdout); // redirect stdout back to the console
-#elif defined(__linux__)
-		fclose(stderr);
-		stderr = tmp;
-#endif
-		return result;
-	}
-
-	const std::vector<cl::Device>& get_list_of_devices()
-	{
-		static const std::vector<cl::Device> devices = []()
-		{
-			std::vector<cl::Device> result;
-			const auto platforms = get_list_of_platforms();
-			for (size_t i = 0; i < platforms.size(); i++)
-			{
-				const auto tmp = get_devices_for_platform(platforms[i]);
-				result.insert(result.end(), tmp.begin(), tmp.end());
-			}
-			return result;
-		}();
-		return devices;
-	}
-
-	int get_number_of_devices()
-	{
-		static const int number = get_list_of_devices().size();
-		return number;
-	}
-
 	struct openclDeviceProp
 	{
 			cl_device_type type;
@@ -129,7 +72,6 @@ namespace
 
 			cl_uint mem_base_add_align;
 
-			cl_device_fp_config half_fp_config;
 			cl_device_fp_config single_fp_config;
 			cl_device_fp_config double_fp_config;
 
@@ -190,7 +132,7 @@ namespace
 
 			openclDeviceProp(int index)
 			{
-				const cl::Device &device = get_list_of_devices().at(index);
+				const cl::Device &device = ml::opencl::get_list_of_devices().at(index);
 				device.getInfo(CL_DEVICE_TYPE, &type);
 				device.getInfo(CL_DEVICE_VENDOR_ID, &vendor_id);
 				device.getInfo(CL_DEVICE_MAX_COMPUTE_UNITS, &max_compute_units);
@@ -233,7 +175,6 @@ namespace
 				device.getInfo(CL_DEVICE_PIPE_MAX_PACKET_SIZE, &pipe_max_packet_size);
 				device.getInfo(CL_DEVICE_MAX_PARAMETER_SIZE, &max_parameter_size);
 				device.getInfo(CL_DEVICE_MEM_BASE_ADDR_ALIGN, &mem_base_add_align);
-				device.getInfo(CL_DEVICE_HALF_FP_CONFIG, &half_fp_config);
 				device.getInfo(CL_DEVICE_SINGLE_FP_CONFIG, &single_fp_config);
 				device.getInfo(CL_DEVICE_DOUBLE_FP_CONFIG, &double_fp_config);
 				device.getInfo(CL_DEVICE_GLOBAL_MEM_CACHE_TYPE, &global_mem_cache_type);
@@ -287,7 +228,7 @@ namespace
 		static const std::vector<openclDeviceProp> properties = []()
 		{
 			std::vector<openclDeviceProp> result;
-			for (int i = 0; i < get_number_of_devices(); i++)
+			for (size_t i = 0; i < ml::opencl::get_list_of_devices().size(); i++)
 				result.push_back(openclDeviceProp(i));
 			return result;
 		}();
@@ -350,7 +291,7 @@ namespace ml
 {
 	int opencl_get_number_of_devices()
 	{
-		static const int result = get_number_of_devices();
+		static const int result = ml::opencl::get_list_of_devices().size();
 		return result;
 	}
 	int opencl_get_memory(int index)
@@ -438,7 +379,6 @@ namespace ml
 			print_field("max_parameter_size", prop.max_parameter_size);
 			print_field("mem_base_add_align", prop.mem_base_add_align);
 
-			print_field("half_fp_config", prop.half_fp_config);
 			print_field("single_fp_config", prop.single_fp_config);
 			print_field("double_fp_config", prop.double_fp_config);
 

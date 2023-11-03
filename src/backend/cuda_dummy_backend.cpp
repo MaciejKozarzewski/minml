@@ -82,7 +82,7 @@ namespace ml
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
-	void cuda_memcpy_within_device(mlContext_t context, void *dst, int dst_offset, const void *src, int count)
+	void cuda_memcpy_within_device(mlContext_t context, void *dst, int dst_offset, const void *src, int src_offset, int count)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}

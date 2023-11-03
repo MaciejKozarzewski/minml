@@ -212,19 +212,20 @@ namespace ml
 			}
 		}
 	}
-	void cuda_memcpy_within_device(mlContext_t context, void *dst, int dst_offset, const void *src, int count)
+	void cuda_memcpy_within_device(mlContext_t context, void *dst, int dst_offset, const void *src, int src_offset, int count)
 	{
 		assert(dst != nullptr);
 		assert(src != nullptr);
 		if (context == nullptr)
 		{
-			cudaError_t status = cudaMemcpy(getPointer<uint8_t>(dst) + dst_offset, src, count, cudaMemcpyDeviceToDevice);
+			cudaError_t status = cudaMemcpy(getPointer<uint8_t>(dst) + dst_offset, getPointer<uint8_t>(src) + src_offset, count,
+					cudaMemcpyDeviceToDevice);
 			assert(status == cudaSuccess);
 		}
 		else
 		{
-			cudaError_t status = cudaMemcpyAsync(getPointer<uint8_t>(dst) + dst_offset, src, count, cudaMemcpyDeviceToDevice,
-					cuda::Context::getStream(context));
+			cudaError_t status = cudaMemcpyAsync(getPointer<uint8_t>(dst) + dst_offset, getPointer<uint8_t>(src) + src_offset, count,
+					cudaMemcpyDeviceToDevice, cuda::Context::getStream(context));
 			assert(status == cudaSuccess);
 
 		}

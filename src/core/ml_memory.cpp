@@ -12,6 +12,7 @@
 
 #include <minml/backend/cpu_backend.h>
 #include <minml/backend/cuda_backend.h>
+#include <minml/backend/opencl_backend.h>
 
 #include <cstring>
 #include <memory>
@@ -49,6 +50,9 @@ namespace
 			case DeviceType::CUDA:
 				cuda_memset(context, dst, dst_offset, dst_count, src, src_count);
 				break;
+			case DeviceType::OPENCL:
+				opencl_memset(context, dst, dst_offset, dst_count, src, src_count);
+				break;
 		}
 	}
 	void memcpy_impl(void *context, Device dst_device, void *dst_ptr, size_t dst_offset, Device src_device, const void *src_ptr, size_t src_offset,
@@ -69,6 +73,9 @@ namespace
 					case DeviceType::CUDA: // CPU -> CUDA
 						cuda_memcpy_from_host(context, dst_ptr, dst_offset, apply_offset(src_ptr, src_offset), count);
 						break;
+					case DeviceType::OPENCL: // CPU -> OPENCL
+						opencl_memcpy_from_host(context, dst_ptr, dst_offset, apply_offset(src_ptr, src_offset), count);
+						break;
 				}
 				break;
 			}
@@ -81,12 +88,40 @@ namespace
 						break;
 					case DeviceType::CUDA: // CUDA -> CUDA
 						if (dst_device == src_device)
-							cuda_memcpy_within_device(context, dst_ptr, dst_offset, src_ptr, count);
+							cuda_memcpy_within_device(context, dst_ptr, dst_offset, src_ptr, src_offset, count);
 						else
 						{ // copy between devices must go via host (TODO unless devices support peer-to-peer transfer)
 							std::unique_ptr<uint8_t[]> buffer = std::make_unique<uint8_t[]>(count);
 							cuda_memcpy_to_host(context, buffer.get(), src_ptr, src_offset, count);
 							cuda_memcpy_from_host(context, dst_ptr, dst_offset, buffer.get(), count);
+						}
+						break;
+					case DeviceType::OPENCL: // CUDA -> OPENCL
+						throw std::runtime_error(
+								"It is not possible to copy memory from device '" + src_device.toString() + "' to device '" + dst_device.toString()
+										+ "'");
+				}
+				break;
+			}
+			case DeviceType::OPENCL:
+			{
+				switch (dst_device.type())
+				{
+					case DeviceType::CPU: // OPENCL -> CPU
+						opencl_memcpy_to_host(context, apply_offset(dst_ptr, dst_offset), src_ptr, src_offset, count);
+						break;
+					case DeviceType::CUDA: // OPENCL -> CUDA
+						throw std::runtime_error(
+								"It is not possible to copy memory from device '" + src_device.toString() + "' to device '" + dst_device.toString()
+										+ "'");
+					case DeviceType::OPENCL: // OPENCL -> OPENCL
+						if (dst_device == src_device)
+							opencl_memcpy_within_device(context, dst_ptr, dst_offset, src_ptr, src_offset, count);
+						else
+						{ // copy between devices must go via host (TODO unless devices support peer-to-peer transfer)
+							std::unique_ptr<uint8_t[]> buffer = std::make_unique<uint8_t[]>(count);
+							opencl_memcpy_to_host(context, buffer.get(), src_ptr, src_offset, count);
+							opencl_memcpy_from_host(context, dst_ptr, dst_offset, buffer.get(), count);
 						}
 						break;
 				}
@@ -103,9 +138,11 @@ namespace ml
 		switch (device.type())
 		{
 			case DeviceType::CPU:
-					return cpu_malloc(count);
+				return cpu_malloc(count);
 			case DeviceType::CUDA:
-					return cuda_malloc(device.index(), count);
+				return cuda_malloc(device.index(), count);
+			case DeviceType::OPENCL:
+				return opencl_malloc(device.index(), count);
 			default:
 				return nullptr;
 		}
@@ -118,6 +155,8 @@ namespace ml
 				return cpu_view(src, offset, count);
 			case DeviceType::CUDA:
 				return cuda_view(src, offset, count);
+			case DeviceType::OPENCL:
+				return opencl_view(src, offset, count);
 			default:
 				return nullptr;
 		}
@@ -131,6 +170,9 @@ namespace ml
 				break;
 			case DeviceType::CUDA:
 				cuda_free(ptr);
+				break;
+			case DeviceType::OPENCL:
+				opencl_free(ptr);
 				break;
 		}
 	}

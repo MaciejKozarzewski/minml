@@ -10,6 +10,7 @@
 
 #include <minml/backend/cpu_backend.h>
 #include <minml/backend/cuda_backend.h>
+#include <minml/backend/opencl_backend.h>
 
 #include <algorithm>
 
@@ -25,6 +26,9 @@ namespace ml
 				break;
 			case DeviceType::CUDA:
 				m_data = cuda_create_context(d.index());
+				break;
+			case DeviceType::OPENCL:
+				m_data = opencl_create_context(d.index());
 				break;
 		}
 		if (m_data == nullptr)
@@ -51,6 +55,9 @@ namespace ml
 				break;
 			case DeviceType::CUDA:
 				cuda_destroy_context(backend());
+				break;
+			case DeviceType::OPENCL:
+				opencl_destroy_context(backend());
 				break;
 		}
 	}
@@ -80,6 +87,9 @@ namespace ml
 			case DeviceType::CUDA:
 				cuda_synchronize_with_context(backend());
 				break;
+			case DeviceType::OPENCL:
+				opencl_synchronize_with_context(backend());
+				break;
 		}
 	}
 	bool Context::isReady() const
@@ -89,7 +99,9 @@ namespace ml
 			case DeviceType::CPU:
 				return cpu_is_context_ready(backend());
 			case DeviceType::CUDA:
-				return cpu_is_context_ready(backend());
+				return cuda_is_context_ready(backend());
+			case DeviceType::OPENCL:
+				return opencl_is_context_ready(backend());
 			default:
 				return false;
 		}

@@ -10,7 +10,13 @@
 
 #include <minml/backend/backend_types.h>
 
-#define CL_HPP_TARGET_OPENCL_VERSION 200
+#ifndef CL_HPP_ENABLE_EXCEPTIONS
+#  define CL_HPP_ENABLE_EXCEPTIONS
+#endif
+
+#ifndef CL_HPP_TARGET_OPENCL_VERSION
+#  define CL_HPP_TARGET_OPENCL_VERSION 200
+#endif
 
 namespace ml
 {
@@ -38,12 +44,10 @@ namespace ml
 
 		// implemented in 'opencl_memory.cu'
 		DLL_PUBLIC void* opencl_malloc(int device_index, int count);
-		DLL_PUBLIC void opencl_page_lock(void *ptr, int count);
-		DLL_PUBLIC void opencl_page_unlock(void *ptr);
 		DLL_PUBLIC void opencl_free(void *ptr);
 		DLL_PUBLIC void* opencl_view(void *src, int offset, int count);
 		DLL_PUBLIC void opencl_memset(mlContext_t context, void *dst, int dst_offset, int dst_count, const void *src, int src_count);
-		DLL_PUBLIC void opencl_memcpy_within_device(mlContext_t context, void *dst, int dst_offset, const void *src, int count);
+		DLL_PUBLIC void opencl_memcpy_within_device(mlContext_t context, void *dst, int dst_offset, const void *src, int src_offset, int count);
 		DLL_PUBLIC void opencl_memcpy_from_host(mlContext_t context, void *dst, int dst_offset, const void *src, int count);
 		DLL_PUBLIC void opencl_memcpy_to_host(mlContext_t context, void *dst, const void *src, int src_offset, int count);
 
