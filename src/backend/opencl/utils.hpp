@@ -25,6 +25,30 @@ namespace ml
 		std::vector<cl::Device> get_devices_for_platform(const cl::Platform &p);
 		const std::vector<cl::Device>& get_list_of_devices();
 		cl::Context& get_cl_context();
+		cl::Program compile_program(const std::string &name, const std::string &source, const std::string &options);
+
+		template<int MaxDim0 = std::numeric_limits<int>::max()>
+		cl::NDRange get_nd_range(int dim0) noexcept
+		{
+			assert(dim0 >= 0);
+			return cl::NDRange(std::min(dim0, MaxDim0));
+		}
+		template<int MaxDim0 = std::numeric_limits<int>::max(), int MaxDim1 = std::numeric_limits<int>::max()>
+		cl::NDRange get_nd_range(int dim0, int dim1) noexcept
+		{
+			assert(dim0 >= 0);
+			assert(dim1 >= 0);
+			return cl::NDRange(std::min(dim0, MaxDim0), std::min(dim1, MaxDim1));
+		}
+		template<int MaxDim0 = std::numeric_limits<int>::max(), int MaxDim1 = std::numeric_limits<int>::max(), int MaxDim2 =
+				std::numeric_limits<int>::max()>
+		cl::NDRange get_nd_range(int dim0, int dim1, int dim2) noexcept
+		{
+			assert(dim0 >= 0);
+			assert(dim1 >= 0);
+			assert(dim2 >= 0);
+			return cl::NDRange(std::min(dim0, MaxDim0), std::min(dim1, MaxDim1), std::min(dim2, MaxDim2));
+		}
 
 		[[maybe_unused]] static cl::Buffer& get_buffer(void *buf) noexcept
 		{

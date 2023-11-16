@@ -12,6 +12,7 @@
 
 #include <memory>
 #include <cassert>
+#include <iostream>
 
 namespace
 {
@@ -62,7 +63,6 @@ namespace ml
 #endif
 			return result;
 		}
-
 		const std::vector<cl::Device>& get_list_of_devices()
 		{
 			static const std::vector<cl::Device> devices = []()
@@ -78,13 +78,38 @@ namespace ml
 			}();
 			return devices;
 		}
-
 		cl::Context& get_cl_context()
 		{
 			static cl::Context context(get_list_of_devices());
 			return context;
 		}
+		cl::Program compile_program(const std::string &name, const std::string &source, const std::string &options)
+		{
+			cl::Program result(opencl::get_cl_context(), source);
 
+			try
+			{
+				const cl_int status = result.build(get_list_of_devices(), options.c_str());
+				if (status != CL_SUCCESS)
+				{
+					std::cout << "Compilation status = " << status << '\n';
+					throw std::runtime_error("");
+				}
+			} catch (std::exception &e)
+			{
+				const auto info = result.getBuildInfo<CL_PROGRAM_BUILD_LOG>();
+				for (size_t i = 0; i < info.size(); i++)
+				{
+					std::cout << "Build log for program " << name << " on device OPENCL:" << i << " - " << opencl_get_device_info(i) << ":\n";
+					std::cout << info[i].second << '\n';
+				}
+			}
+			return result;
+		}
+
+		/*
+		 * Context
+		 */
 		Context::Context(int device_index) :
 				m_command_queue(get_cl_context(), get_list_of_devices().at(device_index)),
 				m_device_index(device_index)

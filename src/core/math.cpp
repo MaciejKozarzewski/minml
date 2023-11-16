@@ -150,9 +150,9 @@ namespace ml
 			case DeviceType::CUDA:
 				cuda_unpack_input(get(context), get_shape(dst), get(dst.dtype()), dst.data(), src.data());
 				break;
-//			case DeviceType::OPENCL:
-//				opencl_unpack_input(get(context), get_shape(dst), get(dst.dtype()), dst.data(), src.data());
-//				break;
+			case DeviceType::OPENCL:
+				opencl_unpack_input(get(context), get_shape(dst), get(dst.dtype()), dst.data(), src.data());
+				break;
 		}
 	}
 	void convertType(const Context &context, void *dst, DataType dst_dtype, const void *src, DataType src_dtype, int elements)
@@ -167,9 +167,9 @@ namespace ml
 			case DeviceType::CUDA:
 				cuda_convert_type(get(context), dst, get(dst_dtype), src, get(src_dtype), elements);
 				break;
-//			case DeviceType::OPENCL:
-//				opencl_convert_type(get(context), dst, get(dst_dtype), src, get(src_dtype), elements);
-//				break;
+			case DeviceType::OPENCL:
+				opencl_convert_type(get(context), dst, get(dst_dtype), src, get(src_dtype), elements);
+				break;
 		}
 	}
 	void transpose_021(const Context &context, const Tensor &input, Tensor &output)
