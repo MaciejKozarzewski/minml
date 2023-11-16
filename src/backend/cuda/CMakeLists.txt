@@ -21,7 +21,6 @@ else()
 	add_library(${CUDA_BACKEND_NAME} STATIC ${codesrc})
 
 	target_link_libraries(${LibName} PUBLIC ${CUDA_BACKEND_NAME})
-	target_compile_definitions(${CUDA_BACKEND_NAME} PRIVATE USE_CUDA)
 	target_link_directories(${CUDA_BACKEND_NAME} PUBLIC ${CUDAToolkit_LIBRARY_DIR})
 	target_link_libraries(${CUDA_BACKEND_NAME} PUBLIC cudart cublas)
 
