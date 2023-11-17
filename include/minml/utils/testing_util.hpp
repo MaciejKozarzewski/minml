@@ -11,6 +11,8 @@
 namespace ml /* forward declarations */
 {
 	class Tensor;
+	class Device;
+	enum class DataType;
 }
 
 namespace ml
@@ -22,6 +24,9 @@ namespace ml
 		double normForTest(const Tensor &tensor);
 		double sumForTest(const Tensor &tensor);
 		void abs(Tensor &tensor);
+
+		bool has_device_supporting(DataType dtype);
+		Device get_device_for_test();
 	}
 }
 

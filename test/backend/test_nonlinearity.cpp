@@ -78,5 +78,40 @@ namespace ml
 		EXPECT_LE(testing::diffForTest(input, correct_output), 1.0e-3f);
 	}
 
+	TEST(TestSoftmax, ForwardOnOpenCL_fp32)
+	{
+		if (Device::numberOfOpenCLDevices() == 0)
+			GTEST_SKIP_("No OpenCL enabled devices");
+
+		Context context(Device::opencl(0));
+		Tensor input = toTensor( { { 0.1f, -0.9f, 2.0f, 0.0f }, { 0.3f, -1.0f, 0.7f, -0.1f } });
+		Tensor correct_output = toTensor( { { 0.11162444f, 0.04106433f, 0.74630924f, 0.10100197f }, { 0.29114823f, 0.07934714f, 0.43434212f,
+				0.19516249f } });
+
+		input.moveTo(context.device());
+
+		activationForward(context, input, input, ActivationType::SOFTMAX);
+		context.synchronize();
+		EXPECT_LE(testing::diffForTest(input, correct_output), 1.0e-4f);
+	}
+	TEST(TestSoftmax, ForwardOnOpenCL_fp16)
+	{
+		if (Device::numberOfOpenCLDevices() == 0 or not Device::opencl(0).supportsType(DataType::FLOAT16))
+			GTEST_SKIP_("No OpenCL enabled devices supporting fp16");
+
+		Context context(Device::opencl(0));
+		Tensor input = toTensor( { { 0.1f, -0.9f, 2.0f, 0.0f }, { 0.3f, -1.0f, 0.7f, -0.1f } });
+		Tensor correct_output = toTensor( { { 0.11162444f, 0.04106433f, 0.74630924f, 0.10100197f }, { 0.29114823f, 0.07934714f, 0.43434212f,
+				0.19516249f } });
+
+		input.moveTo(context.device());
+		input.convertTo(context, DataType::FLOAT16);
+		correct_output.convertTo(Context(), DataType::FLOAT16);
+
+		activationForward(context, input, input, ActivationType::SOFTMAX);
+		context.synchronize();
+		EXPECT_LE(testing::diffForTest(input, correct_output), 1.0e-3f);
+	}
+
 } /* namespace ml */
 

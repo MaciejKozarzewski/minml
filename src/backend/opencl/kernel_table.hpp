@@ -14,13 +14,20 @@ namespace ml
 {
 	namespace opencl
 	{
-		std::string get_activation_kernels_source();
-		std::string get_batchnorm_kernels_source();
-		std::string get_conversion_kernels_source();
-		std::string get_global_pooling_kernels_source();
-		std::string get_training_kernels_source();
-		std::string get_winograd_nonfused_kernels_source();
+		namespace kernels
+		{
+			extern std::string activations_backward;
+			extern std::string activations_forward;
+			extern std::string add_bias_act;
+			extern std::string batchnorm;
+			extern std::string common;
+			extern std::string conversion;
+			extern std::string global_pooling;
+			extern std::string reductions;
+			extern std::string training;
+			extern std::string winograd_nonfused;
 
+		} /* namespace kernels */
 	} /* namespace opencl */
 } /* namespace ml */
 

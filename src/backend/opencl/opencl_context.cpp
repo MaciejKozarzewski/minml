@@ -20,7 +20,8 @@ namespace ml
 	}
 	void opencl_synchronize_with_context(mlContext_t context)
 	{
-		opencl::Context::getCommandQueue(context).finish();
+		cl_int status = opencl::Context::getCommandQueue(context).finish();
+		assert(status == CL_SUCCESS);
 	}
 	bool opencl_is_context_ready(mlContext_t context)
 	{

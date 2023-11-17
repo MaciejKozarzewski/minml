@@ -306,8 +306,9 @@ namespace ml
 			{
 				case DTYPE_FLOAT16:
 				{
-					static const bool result = get_device_properties().at(index).extensions.find("cl_khr_fp16") != std::string::npos;
-					return result;
+//					static const bool result = get_device_properties().at(index).extensions.find("cl_khr_fp16") != std::string::npos;
+//					return result;
+					return false; // TODO
 				}
 				case DTYPE_FLOAT32:
 					return true;

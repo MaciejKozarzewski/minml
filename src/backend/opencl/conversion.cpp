@@ -19,7 +19,7 @@ namespace
 {
 	const cl::Program& get_program()
 	{
-		static const cl::Program program = ml::opencl::compile_program("conversions", ml::opencl::get_conversion_kernels_source(), "");
+		static const cl::Program program = ml::opencl::compile_program("conversions", ml::opencl::kernels::conversion, "");
 		return program;
 	}
 }
@@ -31,7 +31,6 @@ namespace ml
 		const int first_dim = volume_without_last_dim(shape);
 		const int last_dim = get_last_dim(shape);
 
-		auto program = get_program();
 		cl::Kernel kernel;
 
 		switch (dst_dtype)
@@ -62,16 +61,11 @@ namespace ml
 	{
 		if (dst_dtype == src_dtype and dst != src)
 		{ // same type, different locations, can just copy memory
-			const int size_in_bytes = elements * size_of(dst_dtype);
-			cl_int status = opencl::Context::getCommandQueue(context).enqueueCopyBuffer(opencl::get_buffer(src), opencl::get_buffer(dst), 0, 0,
-					size_in_bytes);
-			assert(status == CL_SUCCESS);
+			ml::opencl_memcpy_within_device(context, dst, 0, src, 0, size_of(dst_dtype) * elements);
 			return;
 		}
 
-		auto program = get_program();
 		cl::Kernel kernel;
-
 		if (dst_dtype == DTYPE_FLOAT16 and src_dtype == DTYPE_FLOAT32)
 		{
 			assert(dst != src);

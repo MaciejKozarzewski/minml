@@ -416,9 +416,9 @@ namespace ml
 			case DeviceType::CUDA:
 				cuda_add_bias_act(get(context), get(input.dtype()), get_shape(input), input.data(), bias.data(), get(act));
 				break;
-//			case DeviceType::OPENCL:
-//				opencl_add_bias_act(get(context), get(input.dtype()), get_shape(input), input.data(), bias.data(), get(act));
-//				break;
+			case DeviceType::OPENCL:
+				opencl_add_bias_act(get(context), get(input.dtype()), get_shape(input), input.data(), bias.data(), get(act));
+				break;
 		}
 	}
 
@@ -519,9 +519,9 @@ namespace ml
 			case DeviceType::CUDA:
 				cuda_activation_forward(get(context), get(input.dtype()), get_shape(input), output.data(), input.data(), get(act));
 				break;
-//			case DeviceType::OPENCL:
-//				opencl_activation_forward(get(context), get(input.dtype()), get_shape(input), output.data(), input.data(), get(act));
-//				break;
+			case DeviceType::OPENCL:
+				opencl_activation_forward(get(context), get(input.dtype()), get_shape(input), output.data(), input.data(), get(act));
+				break;
 		}
 	}
 	void activationBackward(const Context &context, Tensor &gradient_prev, const Tensor &gradient_next, const Tensor &output, ActivationType act)
@@ -535,7 +535,8 @@ namespace ml
 				cuda_activation_backward(get(context), get_shape(gradient_prev), gradient_prev.data(), gradient_next.data(), output.data(), get(act));
 				break;
 			case DeviceType::OPENCL:
-				// TODO
+				opencl_activation_backward(get(context), get_shape(gradient_prev), gradient_prev.data(), gradient_next.data(), output.data(),
+						get(act));
 				break;
 		}
 	}
@@ -552,9 +553,9 @@ namespace ml
 			case DeviceType::CUDA:
 				cuda_emulate_low_precision(get(context), get_shape(dst), dst.data(), src.data());
 				break;
-//			case DeviceType::OPENCL:
-//				opencl_emulate_low_precision(get(context), get_shape(dst), dst.data(), src.data());
-//				break;
+			case DeviceType::OPENCL:
+				opencl_emulate_low_precision(get(context), get_shape(dst), dst.data(), src.data());
+				break;
 		}
 	}
 	void sumOverFirstDim(const Context &context, Tensor &dst, const Tensor &src, float beta)
@@ -568,7 +569,7 @@ namespace ml
 				cuda_sum_over_first_dim(get(context), get_shape(src), dst.data(), src.data(), beta);
 				break;
 			case DeviceType::OPENCL:
-				// TODO
+				opencl_sum_over_first_dim(get(context), get_shape(src), dst.data(), src.data(), beta);
 				break;
 		}
 	}
@@ -583,7 +584,7 @@ namespace ml
 				cuda_add_tensors(get(context), get(dst.dtype()), get_shape(dst), dst.data(), src1.data(), src2.data());
 				break;
 			case DeviceType::OPENCL:
-				// TODO
+				opencl_add_tensors(get(context), get(dst.dtype()), get_shape(dst), dst.data(), src1.data(), src2.data());
 				break;
 		}
 	}
@@ -596,7 +597,7 @@ namespace ml
 			case DeviceType::CUDA:
 				return cuda_mean_squared_loss(get(context), get_shape(output), output.data(), target.data());
 			case DeviceType::OPENCL:
-				return 0; // TODO
+				return opencl_mean_squared_loss(get(context), get_shape(output), output.data(), target.data());
 		}
 		return 0.0f;
 	}
@@ -611,7 +612,7 @@ namespace ml
 				cuda_mean_squared_gradient(get(context), get_shape(output), gradient.data(), output.data(), target.data(), weight);
 				break;
 			case DeviceType::OPENCL:
-				// TODO
+				opencl_mean_squared_gradient(get(context), get_shape(output), gradient.data(), output.data(), target.data(), weight);
 				break;
 		}
 	}
@@ -624,7 +625,7 @@ namespace ml
 			case DeviceType::CUDA:
 				return cuda_cross_entropy_loss(get(context), get_shape(output), output.data(), target.data());
 			case DeviceType::OPENCL:
-				return 0; // TODO
+				return opencl_cross_entropy_loss(get(context), get_shape(output), output.data(), target.data());
 		}
 		return 0.0f;
 	}
@@ -639,7 +640,7 @@ namespace ml
 				cuda_cross_entropy_gradient(get(context), get_shape(output), gradient.data(), output.data(), target.data(), weight);
 				break;
 			case DeviceType::OPENCL:
-				// TODO
+				opencl_cross_entropy_gradient(get(context), get_shape(output), gradient.data(), output.data(), target.data(), weight);
 				break;
 		}
 	}
@@ -657,7 +658,8 @@ namespace ml
 						beta1, beta2);
 				break;
 			case DeviceType::OPENCL:
-				// TODO
+				opencl_adam_optimize(get(context), get_shape(weight), weight.data(), update.data(), momentum.data(), variance.data(), learning_rate,
+						beta1, beta2);
 				break;
 		}
 	}
@@ -672,7 +674,7 @@ namespace ml
 				cuda_l2_regularization(get(context), get_shape(gradient), gradient.data(), param.data(), coefficient, offset);
 				break;
 			case DeviceType::OPENCL:
-				// TODO
+				opencl_l2_regularization(get(context), get_shape(gradient), gradient.data(), param.data(), coefficient, offset);
 				break;
 		}
 	}

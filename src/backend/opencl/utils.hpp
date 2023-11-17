@@ -65,6 +65,7 @@ namespace ml
 		{
 				static constexpr size_t default_workspace_size = 8 * 1024 * 1024; // 8MB
 
+				size_t m_workspace_size = 0;
 				cl::Buffer m_workspace;
 				cl::CommandQueue m_command_queue;
 				int m_device_index = 0;

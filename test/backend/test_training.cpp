@@ -14,11 +14,6 @@
 
 #include <gtest/gtest.h>
 
-namespace
-{
-	using namespace ml;
-}
-
 namespace ml
 {
 	TEST(TestTraining, cross_entropy_loss)
@@ -34,16 +29,19 @@ namespace ml
 
 		const float cpu_loss = crossEntropyLoss(Context(), output, target);
 
-		if (Device::numberOfCudaDevices() == 0)
-			GTEST_SKIP();
-		Context context(Device::cuda(0));
-		output.moveTo(context.device());
-		target.moveTo(context.device());
-		const float cuda_loss = crossEntropyLoss(context, output, target);
-		context.synchronize();
+		if (testing::has_device_supporting(DataType::FLOAT32))
+		{
+			const Device device = testing::get_device_for_test();
 
-		const float diff = std::abs(cpu_loss - cuda_loss) / output.volume();
-		EXPECT_LE(diff, 1.0e-4f);
+			Context context(device);
+			output.moveTo(device);
+			target.moveTo(device);
+			const float device_loss = crossEntropyLoss(context, output, target);
+			context.synchronize();
+
+			const float diff = std::abs(cpu_loss - device_loss) / output.volume();
+			EXPECT_LE(diff, 1.0e-4f);
+		}
 	}
 	TEST(TestTraining, cross_entropy_gradient)
 	{
@@ -59,16 +57,19 @@ namespace ml
 		Tensor cpu_gradient(output.shape(), "float32", Device::cpu());
 		crossEntropyGradient(Context(), cpu_gradient, output, target, 1.23f);
 
-		if (Device::numberOfCudaDevices() == 0)
-			GTEST_SKIP();
-		Context context(Device::cuda(0));
-		output.moveTo(context.device());
-		target.moveTo(context.device());
-		Tensor cuda_gradient(output.shape(), "float32", context.device());
-		crossEntropyGradient(context, cuda_gradient, output, target, 1.23f);
-		context.synchronize();
+		if (testing::has_device_supporting(DataType::FLOAT32))
+		{
+			const Device device = testing::get_device_for_test();
 
-		EXPECT_LE(testing::diffForTest(cpu_gradient, cuda_gradient), 1.0e-4f);
+			Context context(device);
+			output.moveTo(device);
+			target.moveTo(device);
+			Tensor device_gradient(output.shape(), "float32", device);
+			crossEntropyGradient(context, device_gradient, output, target, 1.23f);
+			context.synchronize();
+
+			EXPECT_LE(testing::diffForTest(cpu_gradient, device_gradient), 1.0e-4f);
+		}
 	}
 
 	TEST(TestTraining, adam_optimize)
@@ -86,25 +87,27 @@ namespace ml
 			adamOptimize(Context(), cpu_weights, gradient, cpu_momentum, cpu_variance, 1.0e-3f, 0.9f, 0.999f);
 		}
 
-		if (Device::numberOfCudaDevices() == 0)
-			GTEST_SKIP();
-
-		Context context(Device::cuda(0));
-		gradient.moveTo(context.device());
-		Tensor cuda_weights(shape, "float32", context.device());
-		testing::initForTest(cuda_weights, 0.0f);
-		Tensor cuda_momentum(shape, "float32", context.device());
-		Tensor cuda_variance(shape, "float32", context.device());
-		for (int i = 0; i < 1000; i++)
+		if (testing::has_device_supporting(DataType::FLOAT32))
 		{
-			testing::initForTest(gradient, 1.0f + 0.01f * i);
-			adamOptimize(context, cuda_weights, gradient, cuda_momentum, cuda_variance, 1.0e-3f, 0.9f, 0.999f);
-			context.synchronize();
-		}
+			const Device device = testing::get_device_for_test();
 
-		EXPECT_LE(testing::diffForTest(cpu_momentum, cuda_momentum), 1.0e-4f);
-		EXPECT_LE(testing::diffForTest(cpu_variance, cuda_variance), 1.0e-4f);
-		EXPECT_LE(testing::diffForTest(cpu_weights, cuda_weights), 1.0e-4f);
+			Context context(device);
+			gradient.moveTo(device);
+			Tensor device_weights(shape, "float32", device);
+			testing::initForTest(device_weights, 0.0f);
+			Tensor device_momentum(shape, "float32", device);
+			Tensor device_variance(shape, "float32", device);
+			for (int i = 0; i < 1000; i++)
+			{
+				testing::initForTest(gradient, 1.0f + 0.01f * i);
+				adamOptimize(context, device_weights, gradient, device_momentum, device_variance, 1.0e-3f, 0.9f, 0.999f);
+				context.synchronize();
+			}
+
+			EXPECT_LE(testing::diffForTest(cpu_momentum, device_momentum), 1.0e-4f);
+			EXPECT_LE(testing::diffForTest(cpu_variance, device_variance), 1.0e-4f);
+			EXPECT_LE(testing::diffForTest(cpu_weights, device_weights), 1.0e-4f);
+		}
 	}
 
 	TEST(TestTraining, l2_regularization)
@@ -118,15 +121,18 @@ namespace ml
 
 		l2Regularization(Context(), gradient, cpu_weights, 0.123f, 0.456f);
 
-		if (Device::numberOfCudaDevices() == 0)
-			GTEST_SKIP();
-		Context context(Device::cuda(0));
-		gradient.moveTo(context.device());
-		Tensor cuda_weights(shape, "float32", context.device());
-		testing::initForTest(cuda_weights, 0.0f);
-		l2Regularization(context, gradient, cuda_weights, 0.123f, 0.456f);
+		if (testing::has_device_supporting(DataType::FLOAT32))
+		{
+			const Device device = testing::get_device_for_test();
 
-		EXPECT_LE(testing::diffForTest(cpu_weights, cuda_weights), 1.0e-4f);
+			Context context(device);
+			gradient.moveTo(device);
+			Tensor device_weights(shape, "float32", device);
+			testing::initForTest(device_weights, 0.0f);
+			l2Regularization(context, gradient, device_weights, 0.123f, 0.456f);
+
+			EXPECT_LE(testing::diffForTest(cpu_weights, device_weights), 1.0e-4f);
+		}
 	}
 
 } /* namespace ml */

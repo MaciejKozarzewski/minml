@@ -11,31 +11,41 @@ namespace ml
 {
 	namespace opencl
 	{
-
-		std::string get_activation_kernels_source()
+		namespace kernels
 		{
-
-		}
-		std::string get_batchnorm_kernels_source()
-		{
-		}
-		std::string get_conversion_kernels_source()
-		{
-			const char* c =
+		std::string activations_backward =
+#include "kernels/activations_backward.opencl"
+		;
+		std::string activations_forward =
+#include "kernels/activations_forward.opencl"
+		;
+		std::string add_bias_act =
+#include "kernels/add_bias_act.opencl"
+		;
+		std::string batchnorm =
+#include "kernels/batchnorm.opencl"
+		;
+		std::string common =
+#include "kernels/common.opencl"
+		;
+		std::string conversion =
 #include "kernels/conversion.opencl"
-					;
-			return std::string(c);
-		}
-		std::string get_global_pooling_kernels_source()
-		{
-		}
-		std::string get_training_kernels_source()
-		{
-		}
-		std::string get_winograd_nonfused_kernels_source()
-		{
-		}
+		;
+		std::string global_pooling =
+#include "kernels/global_pooling.opencl"
+		;
+		std::string reductions =
+#include "kernels/reductions.opencl"
+		;
+		std::string training =
+#include "kernels/training.opencl"
+		;
+		std::string winograd_nonfused =
+#include "kernels/winograd_nonfused.opencl"
+		;
 
-	} /* namespace opencl */
+	}
+/* namespace kernels */
+} /* namespace opencl */
 } /* namespace ml */
 

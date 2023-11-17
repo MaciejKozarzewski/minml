@@ -143,13 +143,13 @@ namespace ml
 		{
 			if (context == nullptr)
 			{
-				static cl::Buffer buffer;
+				static cl::Buffer buffer(get_cl_context(), CL_MEM_READ_WRITE, 0);
 				return buffer;
 			}
 			else
 			{
 				if (getWorkspaceSize(context) == 0)
-					get(context)->m_workspace = cl::Buffer(get_cl_context(), CL_MEM_READ_WRITE, default_workspace_size);
+					setWorkspaceSize(context, default_workspace_size);
 				return get(context)->m_workspace;
 			}
 		}
@@ -158,16 +158,15 @@ namespace ml
 			if (context == nullptr)
 				return 0;
 			else
-			{
-				size_t result;
-				return get(context)->m_workspace.getInfo(CL_MEM_SIZE, &result);
-				return result;
-			}
+				return get(context)->m_workspace_size;
 		}
 		void Context::setWorkspaceSize(mlContext_t context, size_t bytes)
 		{
-			if (context != nullptr && bytes > getWorkspaceSize(context))
+			if (context != nullptr and bytes > getWorkspaceSize(context))
+			{
+				get(context)->m_workspace_size = bytes;
 				get(context)->m_workspace = cl::Buffer(get_cl_context(), CL_MEM_READ_WRITE, bytes);
+			}
 		}
 
 	} /* namespace opencl */

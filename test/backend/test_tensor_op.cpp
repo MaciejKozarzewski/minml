@@ -12,6 +12,7 @@
 #include <minml/utils/testing_util.hpp>
 
 #include <gtest/gtest.h>
+#include <cmath>
 
 namespace
 {
@@ -66,7 +67,7 @@ namespace ml
 	TEST(TestTensorOp, setall_cuda)
 	{
 		if (Device::numberOfCudaDevices() == 0)
-			GTEST_SKIP();
+			GTEST_SKIP_("No CUDA devices");
 		Tensor t( { 123 }, "float32", Device::cuda(0));
 		t.setall(Context(Device::cuda(0)), 1.23f);
 
@@ -76,7 +77,7 @@ namespace ml
 	TEST(TestTensorOp, setall_opencl)
 	{
 		if (Device::numberOfOpenCLDevices() == 0)
-			GTEST_SKIP();
+			GTEST_SKIP_("No OpenCL devices");
 		Tensor t( { 123 }, "float32", Device::opencl(0));
 		t.setall(Context(Device::opencl(0)), 1.23f);
 
@@ -99,12 +100,13 @@ namespace ml
 		addBiasAct(context, output, bias, ActivationType::SIGMOID);
 		EXPECT_LE(testing::diffForTest(correct_output, output), 1.0e-6);
 
-		if (Device::numberOfCudaDevices() > 0)
+		if (testing::has_device_supporting(DataType::FLOAT32))
 		{
-			Context context(Device::cuda(0));
+			const Device device = testing::get_device_for_test();
+			Context context(device);
 			testing::initForTest(output, 1.57f);
-			bias.moveTo(context.device());
-			output.moveTo(context.device());
+			bias.moveTo(device);
+			output.moveTo(device);
 			addBiasAct(context, output, bias, ActivationType::SIGMOID);
 			context.synchronize();
 			EXPECT_LE(testing::diffForTest(correct_output, output), 1.0e-6);
@@ -127,12 +129,13 @@ namespace ml
 		output.convertTo(context, DataType::FLOAT32);
 		EXPECT_LE(testing::diffForTest(correct_output, output), 1.0e-3);
 
-		if (Device::numberOfCudaDevices() > 0)
+		if (testing::has_device_supporting(DataType::FLOAT16))
 		{
-			Context context(Device::cuda(0));
+			const Device device = testing::get_device_for_test();
+			Context context(device);
 			testing::initForTest(output, 1.57f);
-			bias.moveTo(context.device());
-			output.moveTo(context.device());
+			bias.moveTo(device);
+			output.moveTo(device);
 			output.convertTo(context, DataType::FLOAT16);
 			addBiasAct(context, output, bias, ActivationType::SIGMOID);
 			output.convertTo(context, DataType::FLOAT32);
@@ -140,36 +143,6 @@ namespace ml
 			EXPECT_LE(testing::diffForTest(correct_output, output), 1.0e-3);
 		}
 	}
-//	TEST(TestTensorOp, addBiasAct_bf16)
-//	{
-//		Context context;
-//		Tensor correct_output( { 123, 34 }, DataType::FLOAT32, Device::cpu());
-//		Tensor output( { 123, 34 }, DataType::BFLOAT16, Device::cpu());
-//		Tensor bias( { 34 }, DataType::FLOAT32, Device::cpu());
-//		testing::initForTest(bias, 0.0f);
-//		testing::initForTest(output, 1.57f);
-//		testing::initForTest(correct_output, 1.57f);
-//
-//		baseline_add_bias_act(correct_output, bias, ActivationType::SIGMOID);
-//
-//		bias.convertTo(context, DataType::BFLOAT16);
-//		addBiasAct(context, output, bias, ActivationType::SIGMOID);
-//		output.convertTo(context, DataType::FLOAT32);
-//		EXPECT_LE(testing::diffForTest(correct_output, output), 1.0e-2);
-//
-//		if (Device::numberOfCudaDevices() > 0)
-//		{
-//			Context context(Device::cuda(0));
-//			testing::initForTest(output, 1.57f);
-//			bias.moveTo(context.device());
-//			output.moveTo(context.device());
-//			output.convertTo(context, DataType::BFLOAT16);
-//			addBiasAct(context, output, bias, ActivationType::SIGMOID);
-//			output.convertTo(context, DataType::FLOAT32);
-//			context.synchronize();
-//			EXPECT_LE(testing::diffForTest(correct_output, output), 1.0e-2);
-//		}
-//	}
 
 	TEST(TestTensorOp, sumOverFirstDim)
 	{
@@ -186,12 +159,13 @@ namespace ml
 		sumOverFirstDim(Context(), dst, src, beta);
 		EXPECT_LE(testing::diffForTest(correct, dst), 1.0e-4);
 
-		if (Device::numberOfCudaDevices() > 0)
+		if (testing::has_device_supporting(DataType::FLOAT32))
 		{
+			const Device device = testing::get_device_for_test();
+			Context context(device);
 			testing::initForTest(dst, 1.0f);
-			Context context(Device::cuda(0));
-			src.moveTo(context.device());
-			dst.moveTo(context.device());
+			src.moveTo(device);
+			dst.moveTo(device);
 			sumOverFirstDim(context, dst, src, beta);
 			context.synchronize();
 			EXPECT_LE(testing::diffForTest(correct, dst), 1.0e-4);
@@ -213,12 +187,13 @@ namespace ml
 		addTensors(context, dst, src1, src2);
 		EXPECT_LE(testing::diffForTest(correct, dst), 1.0e-6);
 
-		if (Device::numberOfCudaDevices() > 0)
+		if (testing::has_device_supporting(DataType::FLOAT32))
 		{
-			Context context(Device::cuda(0));
-			src1.moveTo(Device::cuda(0));
-			src2.moveTo(Device::cuda(0));
-			dst.moveTo(Device::cuda(0));
+			const Device device = testing::get_device_for_test();
+			Context context(device);
+			src1.moveTo(device);
+			src2.moveTo(device);
+			dst.moveTo(device);
 			dst.zeroall(context);
 			addTensors(context, dst, src1, src2);
 			context.synchronize();

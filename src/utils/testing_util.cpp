@@ -173,6 +173,35 @@ namespace ml
 			}
 			tensor.copyFrom(Context(), tmp);
 		}
-	}
-}
+
+		bool has_device_supporting(DataType dtype)
+		{
+			if (Device::numberOfCudaDevices() > 0)
+			{
+				assert(Device::numberOfOpenCLDevices() == 0);
+				return Device::cuda(0).supportsType(dtype);
+			}
+			if (Device::numberOfOpenCLDevices() > 0)
+			{
+				assert(Device::numberOfCudaDevices() == 0);
+				return Device::opencl(0).supportsType(dtype);
+			}
+			return false;
+		}
+		Device get_device_for_test()
+		{
+			if (Device::numberOfCudaDevices() > 0)
+			{
+				assert(Device::numberOfOpenCLDevices() == 0);
+				return Device::cuda(0);
+			}
+			else
+			{
+				assert(Device::numberOfOpenCLDevices() > 0);
+				return Device::opencl(0);
+			}
+		}
+
+	} /* namespace testing */
+} /* namespace ml */
 
