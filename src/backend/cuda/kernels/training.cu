@@ -281,7 +281,7 @@ namespace ml
 	}
 	void cuda_mean_squared_gradient(mlContext_t context, mlShape_t shape, void *gradient, const void *output, const void *target, float weight)
 	{
-		cuda_cross_entropy_loss(context, shape, output, target); // in this case both gradients are the same
+		cuda_cross_entropy_gradient(context, shape, gradient, output, target, weight); // in this case both gradients are the same
 	}
 	float cuda_cross_entropy_loss(mlContext_t context, mlShape_t shape, const void *output, const void *target)
 	{
