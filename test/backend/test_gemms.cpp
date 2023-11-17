@@ -228,8 +228,10 @@ namespace ml
 		GemmTester data(23, 29, 37, 'n', 'n', DataType::FLOAT32);
 		data.gemm_baseline(1.1, 0.1);
 
-		data.moveTo(Device::cuda(0));
-		gemm(Context(Device::cuda(0)), 'n', 'n', data.C_tested, data.A, data.B, 1.1, 0.1);
+		Context context(Device::cuda(0));
+		data.moveTo(context.device());
+		gemm(context, 'n', 'n', data.C_tested, data.A, data.B, 1.1, 0.1);
+		context.synchronize();
 		EXPECT_LT(data.getDifference(), 1.0e-4);
 	}
 	TEST(TestGemmOnCUDA, float32_ABT)
@@ -239,8 +241,10 @@ namespace ml
 		GemmTester data(23, 29, 37, 'n', 't', DataType::FLOAT32);
 		data.gemm_baseline(1.1, 0.1);
 
-		data.moveTo(Device::cuda(0));
-		gemm(Context(Device::cuda(0)), 'n', 't', data.C_tested, data.A, data.B, 1.1, 0.1);
+		Context context(Device::cuda(0));
+		data.moveTo(context.device());
+		gemm(context, 'n', 't', data.C_tested, data.A, data.B, 1.1, 0.1);
+		context.synchronize();
 		EXPECT_LT(data.getDifference(), 1.0e-4);
 	}
 	TEST(TestGemmOnCUDA, float32_ATB)
@@ -250,8 +254,10 @@ namespace ml
 		GemmTester data(23, 29, 37, 't', 'n', DataType::FLOAT32);
 		data.gemm_baseline(1.1, 0.1);
 
-		data.moveTo(Device::cuda(0));
-		gemm(Context(Device::cuda(0)), 't', 'n', data.C_tested, data.A, data.B, 1.1, 0.1);
+		Context context(Device::cuda(0));
+		data.moveTo(context.device());
+		gemm(context, 't', 'n', data.C_tested, data.A, data.B, 1.1, 0.1);
+		context.synchronize();
 		EXPECT_LT(data.getDifference(), 1.0e-4);
 	}
 	TEST(TestGemmOnCUDA, float32_ATBT)
@@ -261,8 +267,10 @@ namespace ml
 		GemmTester data(23, 29, 37, 't', 't', DataType::FLOAT32);
 		data.gemm_baseline(1.1, 0.1);
 
-		data.moveTo(Device::cuda(0));
-		gemm(Context(Device::cuda(0)), 't', 't', data.C_tested, data.A, data.B, 1.1, 0.1);
+		Context context(Device::cuda(0));
+		data.moveTo(context.device());
+		gemm(context, 't', 't', data.C_tested, data.A, data.B, 1.1, 0.1);
+		context.synchronize();
 		EXPECT_LT(data.getDifference(), 1.0e-4);
 	}
 
@@ -273,8 +281,10 @@ namespace ml
 		GemmTester data(23, 29, 37, 'n', 'n', DataType::FLOAT16);
 		data.gemm_baseline(1.1, 0.1);
 
-		data.moveTo(Device::cuda(0));
-		gemm(Context(Device::cuda(0)), 'n', 'n', data.C_tested, data.A, data.B, 1.1, 0.1);
+		Context context(Device::cuda(0));
+		data.moveTo(context.device());
+		gemm(context, 'n', 'n', data.C_tested, data.A, data.B, 1.1, 0.1);
+		context.synchronize();
 		EXPECT_LT(data.getDifference(), 1.0e-3);
 	}
 	TEST(TestGemmOnCUDA, float16_ABT)
@@ -284,8 +294,10 @@ namespace ml
 		GemmTester data(23, 29, 37, 'n', 't', DataType::FLOAT16);
 		data.gemm_baseline(1.1, 0.1);
 
-		data.moveTo(Device::cuda(0));
-		gemm(Context(Device::cuda(0)), 'n', 't', data.C_tested, data.A, data.B, 1.1, 0.1);
+		Context context(Device::cuda(0));
+		data.moveTo(context.device());
+		gemm(context, 'n', 't', data.C_tested, data.A, data.B, 1.1, 0.1);
+		context.synchronize();
 		EXPECT_LT(data.getDifference(), 2.0e-2);
 	}
 	TEST(TestGemmOnCUDA, float16_ATB)
@@ -295,8 +307,10 @@ namespace ml
 		GemmTester data(23, 29, 37, 't', 'n', DataType::FLOAT16);
 		data.gemm_baseline(1.1, 0.1);
 
-		data.moveTo(Device::cuda(0));
-		gemm(Context(Device::cuda(0)), 't', 'n', data.C_tested, data.A, data.B, 1.1, 0.1);
+		Context context(Device::cuda(0));
+		data.moveTo(context.device());
+		gemm(context, 't', 'n', data.C_tested, data.A, data.B, 1.1, 0.1);
+		context.synchronize();
 		EXPECT_LT(data.getDifference(), 2.0e-3);
 	}
 	TEST(TestGemmOnCUDA, float16_ATBT)
@@ -306,8 +320,10 @@ namespace ml
 		GemmTester data(23, 29, 37, 't', 't', DataType::FLOAT16);
 		data.gemm_baseline(1.1, 0.1);
 
-		data.moveTo(Device::cuda(0));
-		gemm(Context(Device::cuda(0)), 't', 't', data.C_tested, data.A, data.B, 1.1, 0.1);
+		Context context(Device::cuda(0));
+		data.moveTo(context.device());
+		gemm(context, 't', 't', data.C_tested, data.A, data.B, 1.1, 0.1);
+		context.synchronize();
 		EXPECT_LT(data.getDifference(), 1.0e-3);
 	}
 
@@ -318,8 +334,10 @@ namespace ml
 		GemmTester data(23, 29, 37, 'n', 'n', DataType::FLOAT32);
 		data.gemm_baseline(1.1, 0.1);
 
-		data.moveTo(Device::opencl(0));
-		gemm(Context(Device::opencl(0)), 'n', 'n', data.C_tested, data.A, data.B, 1.1, 0.1);
+		Context context(Device::opencl(0));
+		data.moveTo(context.device());
+		gemm(context, 'n', 'n', data.C_tested, data.A, data.B, 1.1, 0.1);
+		context.synchronize();
 		EXPECT_LT(data.getDifference(), 1.0e-4);
 	}
 	TEST(TestGemmOnOPENCL, float32_ABT)
@@ -329,8 +347,10 @@ namespace ml
 		GemmTester data(23, 29, 37, 'n', 't', DataType::FLOAT32);
 		data.gemm_baseline(1.1, 0.1);
 
-		data.moveTo(Device::opencl(0));
-		gemm(Context(Device::opencl(0)), 'n', 't', data.C_tested, data.A, data.B, 1.1, 0.1);
+		Context context(Device::opencl(0));
+		data.moveTo(context.device());
+		gemm(context, 'n', 't', data.C_tested, data.A, data.B, 1.1, 0.1);
+		context.synchronize();
 		EXPECT_LT(data.getDifference(), 1.0e-4);
 	}
 	TEST(TestGemmOnOPENCL, float32_ATB)
@@ -340,8 +360,10 @@ namespace ml
 		GemmTester data(23, 29, 37, 't', 'n', DataType::FLOAT32);
 		data.gemm_baseline(1.1, 0.1);
 
-		data.moveTo(Device::opencl(0));
-		gemm(Context(Device::opencl(0)), 't', 'n', data.C_tested, data.A, data.B, 1.1, 0.1);
+		Context context(Device::opencl(0));
+		data.moveTo(context.device());
+		gemm(context, 't', 'n', data.C_tested, data.A, data.B, 1.1, 0.1);
+		context.synchronize();
 		EXPECT_LT(data.getDifference(), 1.0e-4);
 	}
 	TEST(TestGemmOnOPENCL, float32_ATBT)
@@ -351,8 +373,10 @@ namespace ml
 		GemmTester data(23, 29, 37, 't', 't', DataType::FLOAT32);
 		data.gemm_baseline(1.1, 0.1);
 
-		data.moveTo(Device::opencl(0));
-		gemm(Context(Device::opencl(0)), 't', 't', data.C_tested, data.A, data.B, 1.1, 0.1);
+		Context context(Device::opencl(0));
+		data.moveTo(context.device());
+		gemm(context, 't', 't', data.C_tested, data.A, data.B, 1.1, 0.1);
+		context.synchronize();
 		EXPECT_LT(data.getDifference(), 1.0e-4);
 	}
 
@@ -363,8 +387,10 @@ namespace ml
 		GemmTester data(23, 29, 37, 'n', 'n', DataType::FLOAT16);
 		data.gemm_baseline(1.1, 0.1);
 
-		data.moveTo(Device::opencl(0));
-		gemm(Context(Device::opencl(0)), 'n', 'n', data.C_tested, data.A, data.B, 1.1, 0.1);
+		Context context(Device::opencl(0));
+		data.moveTo(context.device());
+		gemm(context, 'n', 'n', data.C_tested, data.A, data.B, 1.1, 0.1);
+		context.synchronize();
 		EXPECT_LT(data.getDifference(), 1.0e-3);
 	}
 	TEST(TestGemmOnOPENCL, float16_ABT)
@@ -374,8 +400,10 @@ namespace ml
 		GemmTester data(23, 29, 37, 'n', 't', DataType::FLOAT16);
 		data.gemm_baseline(1.1, 0.1);
 
-		data.moveTo(Device::opencl(0));
-		gemm(Context(Device::opencl(0)), 'n', 't', data.C_tested, data.A, data.B, 1.1, 0.1);
+		Context context(Device::opencl(0));
+		data.moveTo(context.device());
+		gemm(context, 'n', 't', data.C_tested, data.A, data.B, 1.1, 0.1);
+		context.synchronize();
 		EXPECT_LT(data.getDifference(), 2.0e-2);
 	}
 	TEST(TestGemmOnOPENCL, float16_ATB)
@@ -385,8 +413,10 @@ namespace ml
 		GemmTester data(23, 29, 37, 't', 'n', DataType::FLOAT16);
 		data.gemm_baseline(1.1, 0.1);
 
-		data.moveTo(Device::opencl(0));
-		gemm(Context(Device::opencl(0)), 't', 'n', data.C_tested, data.A, data.B, 1.1, 0.1);
+		Context context(Device::opencl(0));
+		data.moveTo(context.device());
+		gemm(context, 't', 'n', data.C_tested, data.A, data.B, 1.1, 0.1);
+		context.synchronize();
 		EXPECT_LT(data.getDifference(), 2.0e-3);
 	}
 	TEST(TestGemmOnOPENCL, float16_ATBT)
@@ -396,8 +426,10 @@ namespace ml
 		GemmTester data(23, 29, 37, 't', 't', DataType::FLOAT16);
 		data.gemm_baseline(1.1, 0.1);
 
-		data.moveTo(Device::opencl(0));
-		gemm(Context(Device::opencl(0)), 't', 't', data.C_tested, data.A, data.B, 1.1, 0.1);
+		Context context(Device::opencl(0));
+		data.moveTo(context.device());
+		gemm(context, 't', 't', data.C_tested, data.A, data.B, 1.1, 0.1);
+		context.synchronize();
 		EXPECT_LT(data.getDifference(), 1.0e-3);
 	}
 
