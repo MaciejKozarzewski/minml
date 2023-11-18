@@ -210,10 +210,10 @@ namespace ml
 				cuda_winograd_weight_transform(get(context), tile_size, get(weights.dtype()), get_shape(weights), weights.data(), matrices.data(),
 						invert);
 				break;
-//			case DeviceType::OPENCL:
-//				opencl_winograd_weight_transform(get(context), tile_size, get(weights.dtype()), get_shape(weights), weights.data(), matrices.data(),
-//						invert);
-//				break;
+			case DeviceType::OPENCL:
+				opencl_winograd_weight_transform(get(context), tile_size, get(weights.dtype()), get_shape(weights), weights.data(), matrices.data(),
+						invert);
+				break;
 		}
 	}
 	void winogradInputTransform(const Context &context, const Shape &weight_shape, const Tensor &input, Tensor &matrices)
@@ -232,10 +232,10 @@ namespace ml
 				cuda_winograd_input_transform(get(context), tile_size, get(input.dtype()), get(weight_shape), get_shape(input), input.data(),
 						matrices.data());
 				break;
-//			case DeviceType::OPENCL:
-//				opencl_winograd_input_transform(get(context), tile_size, get(input.dtype()), get(weight_shape), get_shape(input), input.data(),
-//						matrices.data());
-//				break;
+			case DeviceType::OPENCL:
+				opencl_winograd_input_transform(get(context), tile_size, get(input.dtype()), get(weight_shape), get_shape(input), input.data(),
+						matrices.data());
+				break;
 		}
 	}
 	void winogradOutputTransform(const Context &context, const Shape &weight_shape, const Tensor &matrices, Tensor &output, const Tensor &bias,
@@ -255,10 +255,10 @@ namespace ml
 				cuda_winograd_output_transform(get(context), tile_size, get(output.dtype()), get(weight_shape), get_shape(output), matrices.data(),
 						output.data(), bias.data(), add.data(), get(act));
 				break;
-//			case DeviceType::OPENCL:
-//				opencl_winograd_output_transform(get(context), tile_size, get(output.dtype()), get(weight_shape), get_shape(output), matrices.data(),
-//						output.data(), bias.data(), add.data(), get(act));
-//				break;
+			case DeviceType::OPENCL:
+				opencl_winograd_output_transform(get(context), tile_size, get(output.dtype()), get(weight_shape), get_shape(output), matrices.data(),
+						output.data(), bias.data(), add.data(), get(act));
+				break;
 		}
 	}
 	void winogradGradientTransform(const Context &context, const Shape &weight_shape, const Tensor &gradient, Tensor &matrices)
@@ -275,7 +275,8 @@ namespace ml
 						gradient.data(), matrices.data());
 				break;
 			case DeviceType::OPENCL:
-				// TODO
+				opencl_winograd_gradient_transform(get(context), tile_size, get(gradient.dtype()), get(weight_shape), get_shape(gradient),
+						gradient.data(), matrices.data());
 				break;
 		}
 	}
@@ -291,7 +292,7 @@ namespace ml
 				cuda_winograd_update_transform(get(context), tile_size, get(matrices.dtype()), get_shape(update), matrices.data(), update.data());
 				break;
 			case DeviceType::OPENCL:
-				// TODO
+				opencl_winograd_update_transform(get(context), tile_size, get(matrices.dtype()), get_shape(update), matrices.data(), update.data());
 				break;
 		}
 	}
@@ -433,7 +434,7 @@ namespace ml
 				cuda_batchnorm_inference(get(context), get_shape(input), input.data(), output.data(), weights.data(), get(act));
 				break;
 			case DeviceType::OPENCL:
-				// TODO
+				opencl_batchnorm_inference(get(context), get_shape(input), input.data(), output.data(), weights.data(), get(act));
 				break;
 		}
 	}
@@ -451,7 +452,8 @@ namespace ml
 						running_stat_idx, get(act));
 				break;
 			case DeviceType::OPENCL:
-				// TODO
+				opencl_batchnorm_forward(get(context), get_shape(input), input.data(), output.data(), weights.data(), running_stats.data(),
+						running_stat_idx, get(act));
 				break;
 		}
 	}
@@ -469,7 +471,8 @@ namespace ml
 						weights.data(), weights_update.data(), running_stats.data(), running_stat_idx, get(act));
 				break;
 			case DeviceType::OPENCL:
-				// TODO
+				opencl_batchnorm_backward(get(context), get_shape(input), input.data(), output.data(), gradient_prev.data(), gradient_next.data(),
+						weights.data(), weights_update.data(), running_stats.data(), running_stat_idx, get(act));
 				break;
 		}
 	}
@@ -486,7 +489,7 @@ namespace ml
 				cuda_batchnorm_update(get(context), shape, running_stat.data(), weights.data(), use_gamma, use_beta);
 				break;
 			case DeviceType::OPENCL:
-				// TODO
+				opencl_batchnorm_update(get(context), shape, running_stat.data(), weights.data(), use_gamma, use_beta);
 				break;
 		}
 	}
@@ -500,9 +503,9 @@ namespace ml
 			case DeviceType::CUDA:
 				cuda_fold_batchnorm(get(context), get_shape(layer_weights), layer_weights.data(), layer_bias.data(), batchnorm_weights.data());
 				break;
-//			case DeviceType::OPENCL:
-//				opencl_fold_batchnorm(get(context), get_shape(layer_weights), layer_weights.data(), layer_bias.data(), batchnorm_weights.data());
-//				break;
+			case DeviceType::OPENCL:
+				opencl_fold_batchnorm(get(context), get_shape(layer_weights), layer_weights.data(), layer_bias.data(), batchnorm_weights.data());
+				break;
 		}
 		context.synchronize();
 	}

@@ -69,5 +69,13 @@ compute_type relu(compute_type x)
 {
 	return max(zero(), x);
 }
+float square(float x)
+{
+	return x * x;
+}
+float safe_log(float x)
+{
+	return log(1.0e-8f + x);
+}
 
 )"

@@ -156,8 +156,9 @@ namespace
 		}
 	}
 
-	void add_scalar_so_tensor(Tensor &tensor, float scalar)
+	void add_scalar_to_tensor(Tensor &tensor, float scalar)
 	{
+		assert(tensor.device().isCPU());
 		for (int i = 0; i < tensor.volume(); i++)
 			reinterpret_cast<float*>(tensor.data())[i] += scalar;
 	}
@@ -182,7 +183,7 @@ namespace ml
 		Tensor correct_stats( { (int) output.size(), 3 * filters }, "float32", Device::cpu());
 
 		testing::initForTest(weight, 0.0f);
-		add_scalar_so_tensor(weight, 1.001f);
+		add_scalar_to_tensor(weight, 1.001f);
 
 		std::vector<Tensor> correct;
 		for (size_t i = 0; i < output.size(); i++)
@@ -200,17 +201,18 @@ namespace ml
 			EXPECT_LE(testing::diffForTest(stats1, stats2), 1.0e-4f);
 		}
 
-		if (Device::numberOfCudaDevices() > 0)
+		if (testing::has_device_supporting(DataType::FLOAT32))
 		{
-			Context context(Device::cuda(0));
-			input.moveTo(Device::cuda(0));
+			const Device device = testing::get_device_for_test();
+			Context context(device);
+			input.moveTo(device);
 			for (size_t i = 0; i < output.size(); i++)
 			{
-				output[i].moveTo(Device::cuda(0));
+				output[i].moveTo(device);
 				output[i].zeroall(context);
 			}
-			weight.moveTo(Device::cuda(0));
-			running_stats.moveTo(Device::cuda(0));
+			weight.moveTo(device);
+			running_stats.moveTo(device);
 			running_stats.zeroall(context);
 
 			for (size_t i = 0; i < output.size(); i++)
@@ -234,7 +236,7 @@ namespace ml
 
 		testing::initForTest(input, 0.0f);
 		testing::initForTest(weight, 0.0f);
-		add_scalar_so_tensor(weight, 1.1f);
+		add_scalar_to_tensor(weight, 1.1f);
 
 		Tensor correct(output.shape(), "float32", Device::cpu());
 		baseline_inference(input, correct, weight, ActivationType::TANH);
@@ -242,12 +244,14 @@ namespace ml
 		batchnormInference(Context(), input, output, weight, ActivationType::TANH);
 		EXPECT_LE(testing::diffForTest(correct, output), 1.0e-4f);
 
-		if (Device::numberOfCudaDevices() > 0)
+		if (testing::has_device_supporting(DataType::FLOAT32))
 		{
-			Context context(Device::cuda(0));
-			input.moveTo(Device::cuda(0));
-			output.moveTo(Device::cuda(0));
-			weight.moveTo(Device::cuda(0));
+			const Device device = testing::get_device_for_test();
+			Context context(device);
+			input.moveTo(device);
+			output.moveTo(device);
+			weight.moveTo(device);
+			output.zeroall(context);
 			context.synchronize();
 
 			batchnormInference(context, input, output, weight, ActivationType::TANH);
@@ -277,7 +281,7 @@ namespace ml
 		testing::initForTest(input, 0.0f);
 		testing::initForTest(gradient_next, 1.57f);
 		testing::initForTest(weight, 0.0f);
-		add_scalar_so_tensor(weight, 1.1f);
+		add_scalar_to_tensor(weight, 1.1f);
 
 		testing::initForTest(weight_update, 0.1f);
 
@@ -300,19 +304,20 @@ namespace ml
 		EXPECT_LE(testing::diffForTest(correct_prev, gradient_prev), 1.0e-4f);
 		EXPECT_LE(testing::diffForTest(correct_weight_update, weight_update), 1.0e-4f);
 
-		if (Device::numberOfCudaDevices() > 0)
+		if (testing::has_device_supporting(DataType::FLOAT32))
 		{
-			Context context(Device::cuda(0));
+			const Device device = testing::get_device_for_test();
+			Context context(device);
 			testing::initForTest(weight_update, 0.1f);
 			testing::initForTest(gradient_next, 1.57f);
 
-			weight_update.moveTo(Device::cuda(0));
-			input.moveTo(Device::cuda(0));
-			output.moveTo(Device::cuda(0));
-			gradient_prev.moveTo(Device::cuda(0));
-			gradient_next.moveTo(Device::cuda(0));
-			weight.moveTo(Device::cuda(0));
-			running_stats.moveTo(Device::cuda(0));
+			weight_update.moveTo(device);
+			input.moveTo(device);
+			output.moveTo(device);
+			gradient_prev.moveTo(device);
+			gradient_next.moveTo(device);
+			weight.moveTo(device);
+			running_stats.moveTo(device);
 
 			output.zeroall(context);
 			running_stats.zeroall(context);

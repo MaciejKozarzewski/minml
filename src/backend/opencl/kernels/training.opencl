@@ -4,17 +4,9 @@ float round_small_to_zero(float x)
 {
 	return (fabs(x) < 1.0e-6f) ? 0.0f : x;
 }
-float safe_log(float x)
-{
-	return log(1.0e-8f + x);
-}
 float cross_entropy(float output, float target)
 {
 	return -target * safe_log(output) - (1.0f - target) * safe_log(1.0f - output);
-}
-float square(float x)
-{
-	return x * x;
 }
 
 __kernel void loss_gradient(__global float *gradient, const __global float *output, const __global float *target, int elements, float inv_batch_size)
