@@ -23,6 +23,8 @@ namespace ml
 			extern std::string common;
 			extern std::string conversion;
 			extern std::string global_pooling;
+			extern std::string indexers;
+			extern std::string lines_and_tiles;
 			extern std::string reductions;
 			extern std::string training;
 			extern std::string winograd_nonfused;

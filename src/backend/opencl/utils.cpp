@@ -169,6 +169,11 @@ namespace ml
 			}
 		}
 
+		bool has_fp16_math(mlContext_t context)
+		{
+			return false;
+		}
+
 	} /* namespace opencl */
 } /* namespace ml */
 

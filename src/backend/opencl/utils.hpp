@@ -85,6 +85,7 @@ namespace ml
 		{
 			return std::min(maxBlocks, (problemSize + blockSize - 1) / blockSize);
 		}
+		bool has_fp16_math(mlContext_t context);
 
 	} /* namespace opencl */
 } /* namespace ml */
