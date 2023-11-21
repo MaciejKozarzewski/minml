@@ -74,6 +74,7 @@ namespace ml
 			void reshape(const Shape &newShape);
 
 			void convertTo(const Context &context, DataType newType);
+			void zeroall();
 			void zeroall(const Context &context);
 			void setall(const Context &context, float value);
 			void copyToHost(const Context &context, void *ptr, size_t bytes) const;

@@ -6,6 +6,7 @@
  */
 
 #include <minml/core/Context.hpp>
+#include <minml/core/Event.hpp>
 #include <minml/core/ml_exceptions.hpp>
 
 #include <minml/backend/cpu_backend.h>
@@ -69,12 +70,13 @@ namespace ml
 	{
 		switch (m_device.type())
 		{
+			default:
 			case DeviceType::CPU:
 				return true;
 			case DeviceType::CUDA:
 				return false;
-			default:
-				return true;
+			case DeviceType::OPENCL:
+				return false;
 		}
 	}
 	void Context::synchronize() const
@@ -109,6 +111,10 @@ namespace ml
 	void* Context::backend() const noexcept
 	{
 		return m_data;
+	}
+	Event Context::createEvent() const
+	{
+		return Event(*this);
 	}
 
 	ContextError::ContextError(const char *function) :

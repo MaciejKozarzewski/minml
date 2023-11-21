@@ -56,12 +56,7 @@ namespace ml
 		} mlActivationType_t;
 
 		typedef void *mlContext_t;
-
-		typedef struct
-		{
-				mlDataType_t data_type;
-				mlDataType_t compute_type;
-		} mlComputeConfig_t;
+		typedef void *mlEvent_t;
 
 #ifdef __cplusplus
 	}

@@ -19,8 +19,10 @@ namespace ml /* forward declarations */
 namespace ml
 {
 	void* malloc(Device device, size_t count);
-	void* view(Device device, void* src, size_t offset, size_t count);
 	void free(Device device, void *ptr);
+
+	void* create_view(Device device, void *src, size_t offset, size_t count);
+	void destroy_view(Device device, void *ptr);
 
 	void memzero(Device dst_device, void *dst, size_t dst_offset, size_t dst_count);
 	void memset(Device dst_device, void *dst, size_t dst_offset, size_t dst_count, const void *src, size_t src_count);

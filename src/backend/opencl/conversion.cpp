@@ -19,7 +19,7 @@ namespace
 {
 	const cl::Program& get_program()
 	{
-		static const cl::Program program = ml::opencl::compile_program("conversions", ml::opencl::kernels::conversion, "");
+		static const cl::Program program = ml::opencl::compileProgram("conversions", ml::opencl::kernels::conversion, "");
 		return program;
 	}
 }
@@ -36,26 +36,25 @@ namespace ml
 		switch (dst_dtype)
 		{
 			case DTYPE_FLOAT16:
-				kernel = cl::Kernel(get_program(), "unpack_input_fp16");
+				kernel = opencl::getKernel(get_program(), "unpack_input_fp16");
 				break;
 			case DTYPE_FLOAT32:
-				kernel = cl::Kernel(get_program(), "unpack_input_fp32");
+				kernel = opencl::getKernel(get_program(), "unpack_input_fp32");
 				break;
 			case DTYPE_INT32:
 			case DTYPE_UNKNOWN:
 				break;
 		}
 
-		kernel.setArg(0, opencl::get_buffer(dst));
-		kernel.setArg(1, opencl::get_buffer(src));
+		kernel.setArg(0, opencl::getBuffer(dst));
+		kernel.setArg(1, opencl::getBuffer(src));
 		kernel.setArg(2, first_dim);
 		kernel.setArg(3, last_dim);
 
 		const cl::NDRange global = opencl::get_nd_range<1024>(first_dim, 32);
 		const cl::NDRange local = opencl::get_nd_range(1, 32);
 
-		cl_int status = opencl::Context::getCommandQueue(context).enqueueNDRangeKernel(kernel, cl::NullRange, global, local);
-		assert(status == CL_SUCCESS);
+		opencl::runKernel(context, kernel, global, local);
 	}
 	void opencl_convert_type(mlContext_t context, void *dst, mlDataType_t dst_dtype, const void *src, mlDataType_t src_dtype, int elements)
 	{
@@ -69,25 +68,21 @@ namespace ml
 		if (dst_dtype == DTYPE_FLOAT16 and src_dtype == DTYPE_FLOAT32)
 		{
 			assert(dst != src);
-			kernel = cl::Kernel(get_program(), "convert_fp32_to_fp16");
+			kernel = opencl::getKernel(get_program(), "convert_fp32_to_fp16");
 		}
 		if (dst_dtype == DTYPE_FLOAT32 and src_dtype == DTYPE_FLOAT16)
 		{
 			assert(dst != src);
-			kernel = cl::Kernel(get_program(), "convert_fp16_to_fp32");
+			kernel = opencl::getKernel(get_program(), "convert_fp16_to_fp32");
 		}
-//		int info;
-//		kernel.getInfo(CL_KERNEL_NUM_ARGS, &info);
-//		std::cout << info << std::endl;
 
-		kernel.setArg(0, opencl::get_buffer(dst));
-		kernel.setArg(1, opencl::get_buffer(src));
+		kernel.setArg(0, opencl::getBuffer(dst));
+		kernel.setArg(1, opencl::getBuffer(src));
 		kernel.setArg(2, elements);
 
 		const cl::NDRange global = opencl::get_nd_range<65536>(elements);
 
-		cl_int status = opencl::Context::getCommandQueue(context).enqueueNDRangeKernel(kernel, cl::NullRange, global, cl::NullRange);
-		assert(status == CL_SUCCESS);
+		opencl::runKernel(context, kernel, global);
 	}
 
 	void opencl_transpose_021(mlContext_t context, mlDataType_t dtype, mlShape_t shape, const void *input, void *output)

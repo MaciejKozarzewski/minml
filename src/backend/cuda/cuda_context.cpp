@@ -26,18 +26,7 @@ namespace ml
 	bool cuda_is_context_ready(mlContext_t context)
 	{
 		cudaError_t status = cudaStreamQuery(cuda::Context::getStream(context));
-		if (status == cudaSuccess)
-			return true;
-		else
-		{
-			if (status == cudaErrorNotReady)
-				return false;
-			else
-			{
-				assert(status == cudaSuccess);
-				return false;
-			}
-		}
+		return status == cudaSuccess;
 	}
 	void cuda_destroy_context(mlContext_t context)
 	{

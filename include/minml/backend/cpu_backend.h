@@ -36,7 +36,8 @@ namespace ml
 
 		void* cpu_malloc(int count);
 		void cpu_free(void *ptr);
-		void* cpu_view(void *src, int offset, int count);
+		void* cpu_create_view(void *src, int offset, int count);
+		void cpu_destroy_view(void *ptr);
 
 		void cpu_memset(mlContext_t context, void *dst, int dst_offset, int dst_count, const void *src, int src_count);
 		void cpu_memcpy(mlContext_t context, void *dst, int dst_offset, const void *src, int src_offset, int count);

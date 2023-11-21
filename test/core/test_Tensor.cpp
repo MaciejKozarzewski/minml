@@ -110,7 +110,7 @@ namespace ml
 		{
 			EXPECT_EQ(tensor.get( { i }), 11);
 		}
-		tensor.zeroall(Context());
+		tensor.zeroall();
 		for (int i = 0; i < tensor.volume(); i++)
 		{
 			EXPECT_EQ(tensor.get( { i }), 0);
@@ -190,7 +190,7 @@ namespace ml
 		{
 			EXPECT_EQ(tensor.get( { i }), 11);
 		}
-		tensor.zeroall(context);
+		tensor.zeroall();
 		for (int i = 0; i < tensor.volume(); i++)
 		{
 			EXPECT_EQ(tensor.get( { i }), 0);

@@ -20,12 +20,11 @@ namespace ml
 	}
 	void opencl_synchronize_with_context(mlContext_t context)
 	{
-		cl_int status = opencl::Context::getCommandQueue(context).finish();
-		assert(status == CL_SUCCESS);
+		opencl::Context::synchronizeWith(context);
 	}
 	bool opencl_is_context_ready(mlContext_t context)
 	{
-		return false; // FIXME
+		return opencl::Context::isReady(context);
 	}
 	void opencl_destroy_context(mlContext_t context)
 	{
@@ -33,5 +32,4 @@ namespace ml
 	}
 
 } /* namespace ml */
-
 

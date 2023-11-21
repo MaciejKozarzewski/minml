@@ -347,7 +347,7 @@ namespace ml
 			{
 				const float beta = (add == nullptr) ? 0.0f : 1.0f;
 				if (add != nullptr)
-					cuda_memcpy_within_device(context, output, 0, add, size_of(dtype) * volume(output_shape));
+					cuda_memcpy_within_device(context, output, 0, add, 0, size_of(dtype) * volume(output_shape));
 
 				cudnnStatus_t status = cudnnConvolutionForward(handle, &alpha1, xDesc, input, wDesc, weights, convDesc, convDesc.getAlgorithm(),
 						workspace, workspace_size, &beta, yDesc, output);

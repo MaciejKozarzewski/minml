@@ -43,14 +43,14 @@ namespace
 		{
 			if (tile_size == 2)
 			{
-				const static cl::Program program_3x3_2x2 = ml::opencl::compile_program("winograd_transforms_3x3_2x2",
+				const static cl::Program program_3x3_2x2 = ml::opencl::compileProgram("winograd_transforms_3x3_2x2",
 						ml::opencl::kernels::common + ml::opencl::kernels::indexers + ml::opencl::kernels::lines_and_tiles
 								+ get_defines(kernel_size, tile_size) + ml::opencl::kernels::winograd_nonfused, "");
 				return program_3x3_2x2;
 			}
 			if (tile_size == 4)
 			{
-				const static cl::Program program_3x3_4x4 = ml::opencl::compile_program("winograd_transforms_3x3_4x4",
+				const static cl::Program program_3x3_4x4 = ml::opencl::compileProgram("winograd_transforms_3x3_4x4",
 						ml::opencl::kernels::common + ml::opencl::kernels::indexers + ml::opencl::kernels::lines_and_tiles
 								+ get_defines(kernel_size, tile_size) + ml::opencl::kernels::winograd_nonfused, "");
 				return program_3x3_4x4;
@@ -58,7 +58,7 @@ namespace
 		}
 		if (kernel_size == 5 and tile_size == 2)
 		{
-			const static cl::Program program_5x5_2x2 = ml::opencl::compile_program("winograd_transforms_5x5_2x2",
+			const static cl::Program program_5x5_2x2 = ml::opencl::compileProgram("winograd_transforms_5x5_2x2",
 					ml::opencl::kernels::common + ml::opencl::kernels::indexers + ml::opencl::kernels::lines_and_tiles
 							+ get_defines(kernel_size, tile_size) + ml::opencl::kernels::winograd_nonfused, "");
 			return program_5x5_2x2;
@@ -85,86 +85,124 @@ namespace ml
 		cl::NDRange local(max_threads);
 		cl::NDRange global(max_threads, filters_out);
 
-		kernel.setArg(0, opencl::get_buffer(matrices));
-		kernel.setArg(1, opencl::get_buffer(weights));
+		kernel.setArg(0, opencl::getBuffer(matrices));
+		kernel.setArg(1, opencl::getBuffer(weights));
 		kernel.setArg(2, filters_out);
 		kernel.setArg(3, filters_in);
 		kernel.setArg(4, static_cast<int>(invert));
 
-		cl_int status = opencl::Context::getCommandQueue(context).enqueueNDRangeKernel(kernel, cl::NullRange, global, local);
-		assert(status == CL_SUCCESS);
+		opencl::runKernel(context, kernel, global, local);
 	}
 	void opencl_winograd_input_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape, mlShape_t input_shape,
 			const void *input, void *matrices)
 	{
+		const int batch_size = input_shape.dim[0];
+		const int height = input_shape.dim[1];
+		const int width = input_shape.dim[2];
+		const int filters = input_shape.dim[3];
+
+		const int kernel_size = get_kernel_size(weight_shape);
+
+		const int tiles_h = get_number_of_tiles(height, tile_size);
+		const int tiles_w = get_number_of_tiles(width, tile_size);
+		const int max_threads = opencl::has_fp16_math(context) ? 64 : 128;
+
+		cl::Kernel kernel(get_program(kernel_size, tile_size), "transform_input");
+		cl::NDRange local(max_threads);
+		cl::NDRange global(max_threads * tiles_h, tiles_w, input_shape.dim[0]);
+
+		kernel.setArg(0, opencl::getBuffer(matrices));
+		kernel.setArg(1, opencl::getBuffer(input));
+		kernel.setArg(2, batch_size);
+		kernel.setArg(3, height);
+		kernel.setArg(4, width);
+		kernel.setArg(5, filters);
+
+		opencl::runKernel(context, kernel, global, local);
 	}
 	void opencl_winograd_output_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape, mlShape_t output_shape,
 			const void *matrices, void *output, const void *bias, const void *add, mlActivationType_t act)
 	{
+		const int batch_size = output_shape.dim[0];
+		const int height = output_shape.dim[1];
+		const int width = output_shape.dim[2];
+		const int filters = output_shape.dim[3];
+
+		const int kernel_size = get_kernel_size(weight_shape);
+
+		const int tiles_h = get_number_of_tiles(height, tile_size);
+		const int tiles_w = get_number_of_tiles(width, tile_size);
+		const int max_threads = opencl::has_fp16_math(context) ? 64 : 128;
+
+		cl::Kernel kernel(get_program(kernel_size, tile_size), "transform_output");
+		cl::NDRange local(max_threads);
+		cl::NDRange global(max_threads * tiles_h, tiles_w, batch_size);
+
+		cl::Buffer &workspace = opencl::Context::getWorkspace(context);
+
+		const bool use_add = (add != nullptr);
+		const bool use_bias = (bias != nullptr);
+
+		kernel.setArg(0, opencl::getBuffer(matrices));
+		kernel.setArg(1, opencl::getBuffer(output));
+		kernel.setArg(2, use_add ? opencl::getBuffer(add) : workspace);
+		kernel.setArg(3, static_cast<int>(use_add));
+		kernel.setArg(4, use_bias ? opencl::getBuffer(bias) : workspace);
+		kernel.setArg(5, static_cast<int>(use_bias));
+		kernel.setArg(6, static_cast<int>(act));
+		kernel.setArg(7, batch_size);
+		kernel.setArg(8, height);
+		kernel.setArg(9, width);
+		kernel.setArg(10, filters);
+
+		opencl::runKernel(context, kernel, global, local);
 	}
 	void opencl_winograd_gradient_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape, mlShape_t gradient_shape,
 			const void *gradient, void *matrices)
 	{
-//		const int batch_size = gradient_shape.dim[0];
-//		const int height = gradient_shape.dim[1];
-//		const int width = gradient_shape.dim[2];
-//		const int filters = gradient_shape.dim[3];
-//
-//		const int kernel_size = get_kernel_size(weight_shape);
-//
-//		const int tiles_h = get_number_of_tiles(height, tile_size);
-//		const int tiles_w = get_number_of_tiles(width, tile_size);
-//		cudaStream_t stream = cuda::Context::getStream(context);
-//
-//		const int max_threads = cuda::has_fp16_math(context) ? 64 : 128;
-//		dim3 blockSize(std::min(max_threads, filters));
-//		dim3 gridSize(tiles_h, tiles_w, gradient_shape.dim[0]);
-//
-//		if (kernel_size == 3)
-//		{
-//			if (tile_size == 2)
-//				kernel_transform_gradient<3, 2> <<<gridSize, blockSize, 0, stream>>>(getPointer<float>(matrices), getPointer<float>(gradient),
-//						batch_size, height, width, filters);
-//			if (tile_size == 4)
-//				kernel_transform_gradient<3, 4> <<<gridSize, blockSize, 0, stream>>>(getPointer<float>(matrices), getPointer<float>(gradient),
-//						batch_size, height, width, filters);
-//		}
-//		if (kernel_size == 5 && tile_size == 2)
-//		{
-//			kernel_transform_gradient<5, 2> <<<gridSize, blockSize, 0, stream>>>(getPointer<float>(matrices), getPointer<float>(gradient), batch_size,
-//					height, width, filters);
-//		}
-//		assert(cudaGetLastError() == cudaSuccess);
+		const int batch_size = gradient_shape.dim[0];
+		const int height = gradient_shape.dim[1];
+		const int width = gradient_shape.dim[2];
+		const int filters = gradient_shape.dim[3];
+
+		const int kernel_size = get_kernel_size(weight_shape);
+
+		const int tiles_h = get_number_of_tiles(height, tile_size);
+		const int tiles_w = get_number_of_tiles(width, tile_size);
+		const int max_threads = opencl::has_fp16_math(context) ? 64 : 128;
+
+		cl::Kernel kernel(get_program(kernel_size, tile_size), "transform_gradient");
+		cl::NDRange local(max_threads);
+		cl::NDRange global(max_threads * tiles_h, tiles_w, gradient_shape.dim[0]);
+
+		kernel.setArg(0, opencl::getBuffer(matrices));
+		kernel.setArg(1, opencl::getBuffer(gradient));
+		kernel.setArg(2, batch_size);
+		kernel.setArg(3, height);
+		kernel.setArg(4, width);
+		kernel.setArg(5, filters);
+
+		opencl::runKernel(context, kernel, global, local);
 	}
 	void opencl_winograd_update_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape, const void *matrices,
 			void *update)
 	{
-//		const int filters_out = weight_shape.dim[0];
-//		const int filters_in = weight_shape.dim[3];
-//
-//		const int kernel_size = get_kernel_size(weight_shape);
-//
-//		const int max_threads = cuda::has_fp16_math(context) ? 64 : 128;
-//		dim3 blockSize(std::min(max_threads, filters_in));
-//		dim3 gridSize(1, filters_out);
-//		cudaStream_t stream = cuda::Context::getStream(context);
-//
-//		if (kernel_size == 3)
-//		{
-//			if (tile_size == 2)
-//				kernel_transform_update<3, 2> <<<gridSize, blockSize, 0, stream>>>(getPointer<float>(matrices), getPointer<float>(update),
-//						filters_out, filters_in);
-//			if (tile_size == 4)
-//				kernel_transform_update<3, 4> <<<gridSize, blockSize, 0, stream>>>(getPointer<float>(matrices), getPointer<float>(update),
-//						filters_out, filters_in);
-//		}
-//		if (kernel_size == 5 && tile_size == 2)
-//		{
-//			kernel_transform_update<5, 2> <<<gridSize, blockSize, 0, stream>>>(getPointer<float>(matrices), getPointer<float>(update), filters_out,
-//					filters_in);
-//		}
-//
-//		assert(cudaGetLastError() == cudaSuccess);
+		const int filters_out = weight_shape.dim[0];
+		const int filters_in = weight_shape.dim[3];
+
+		const int kernel_size = get_kernel_size(weight_shape);
+		const int max_threads = opencl::has_fp16_math(context) ? 64 : 128;
+
+		cl::Kernel kernel(get_program(kernel_size, tile_size), "transform_update");
+		cl::NDRange local(max_threads);
+		cl::NDRange global(max_threads, filters_out);
+
+		kernel.setArg(0, opencl::getBuffer(matrices));
+		kernel.setArg(1, opencl::getBuffer(update));
+		kernel.setArg(2, filters_out);
+		kernel.setArg(3, filters_in);
+
+		opencl::runKernel(context, kernel, global, local);
 	}
 
 } /* namespace ml */

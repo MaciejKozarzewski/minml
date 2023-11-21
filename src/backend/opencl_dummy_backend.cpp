@@ -57,6 +57,24 @@ namespace ml
 		throw NotImplemented(METHOD_NAME);
 	}
 
+	// implemented in 'opencl_event.cpp'
+	mlEvent_t opencl_create_event(mlContext_t context)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+	void opencl_wait_for_event(mlEvent_t event)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+	bool opencl_is_event_ready(mlEvent_t event)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+	void opencl_destroy_event(mlEvent_t event)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+
 	// implemented in 'opencl_memory.cu'
 	void* opencl_malloc(int device_index, int count)
 	{
@@ -66,7 +84,11 @@ namespace ml
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
-	void* opencl_view(void *src, int offset, int count)
+	void* opencl_create_view(void *src, int offset, int count)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+	void opencl_destroy_view(void *ptr)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
@@ -172,7 +194,8 @@ namespace ml
 		throw NotImplemented(METHOD_NAME);
 	}
 
-	void opencl_batchnorm_inference(mlContext_t context, mlShape_t shape, const void *input, void *output, const void *weights, mlActivationType_t act)
+	void opencl_batchnorm_inference(mlContext_t context, mlShape_t shape, const void *input, void *output, const void *weights,
+			mlActivationType_t act)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
@@ -247,5 +270,4 @@ namespace ml
 } /* namespace ml */
 
 #endif
-
 

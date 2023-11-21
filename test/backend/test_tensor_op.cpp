@@ -194,7 +194,7 @@ namespace ml
 			src1.moveTo(device);
 			src2.moveTo(device);
 			dst.moveTo(device);
-			dst.zeroall(context);
+			dst.zeroall();
 			addTensors(context, dst, src1, src2);
 			context.synchronize();
 			EXPECT_LE(testing::diffForTest(correct, dst), 1.0e-6);

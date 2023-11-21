@@ -145,20 +145,6 @@ namespace ml
 				return nullptr;
 		}
 	}
-	void* view(Device device, void *src, size_t offset, size_t count)
-	{
-		switch (device.type())
-		{
-			case DeviceType::CPU:
-				return cpu_view(src, offset, count);
-			case DeviceType::CUDA:
-				return cuda_view(src, offset, count);
-			case DeviceType::OPENCL:
-				return opencl_view(src, offset, count);
-			default:
-				return nullptr;
-		}
-	}
 	void free(Device device, void *ptr)
 	{
 		switch (device.type())
@@ -171,6 +157,36 @@ namespace ml
 				break;
 			case DeviceType::OPENCL:
 				opencl_free(ptr);
+				break;
+		}
+	}
+
+	void* create_view(Device device, void *src, size_t offset, size_t count)
+	{
+		switch (device.type())
+		{
+			case DeviceType::CPU:
+				return cpu_create_view(src, offset, count);
+			case DeviceType::CUDA:
+				return cuda_create_view(src, offset, count);
+			case DeviceType::OPENCL:
+				return opencl_create_view(src, offset, count);
+			default:
+				return nullptr;
+		}
+	}
+	void destroy_view(Device device, void *ptr)
+	{
+		switch (device.type())
+		{
+			case DeviceType::CPU:
+				cpu_destroy_view(ptr);
+				break;
+			case DeviceType::CUDA:
+				cuda_destroy_view(ptr);
+				break;
+			case DeviceType::OPENCL:
+				opencl_destroy_view(ptr);
 				break;
 		}
 	}

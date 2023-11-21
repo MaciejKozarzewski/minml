@@ -23,6 +23,8 @@ namespace
 //#define USE_TIMING
 
 #ifdef USE_TIMING
+#define SYNC() context.synchronize()
+
 	struct Timer
 	{
 			std::string m_name;
@@ -38,7 +40,24 @@ namespace
 			~Timer()
 			{
 				if (m_count > 0)
-					std::cout << m_name << " : " << 1.0e3 * m_total_time / m_count << " ms (" << m_count << ")\n";
+				{
+					double time = m_total_time / m_count;
+					char unit = ' ';
+					if (time < 1.0e-3)
+					{
+						time *= 1.0e6;
+						unit = 'u';
+					}
+					else
+					{
+						if (time < 1.0)
+						{
+							time *= 1.0e3;
+							unit = 'm';
+						}
+					}
+					std::cout << m_name << " : " << time << " " << unit << "s (" << m_count << ")\n";
+				}
 			}
 			void start() noexcept
 			{
@@ -56,6 +75,7 @@ namespace
 			}
 	};
 #else
+#define SYNC()
 	struct Timer
 	{
 			Timer(const std::string &name)
@@ -100,10 +120,6 @@ namespace
 	mlDataType_t get(DataType dtype) noexcept
 	{
 		return static_cast<mlDataType_t>(dtype);
-	}
-	mlDeviceType_t get(DeviceType type) noexcept
-	{
-		return static_cast<mlDeviceType_t>(type);
 	}
 	mlActivationType_t get(ActivationType act) noexcept
 	{
@@ -154,6 +170,7 @@ namespace ml
 				opencl_unpack_input(get(context), get_shape(dst), get(dst.dtype()), dst.data(), src.data());
 				break;
 		}
+		SYNC();
 	}
 	void convertType(const Context &context, void *dst, DataType dst_dtype, const void *src, DataType src_dtype, int elements)
 	{
@@ -171,6 +188,7 @@ namespace ml
 				opencl_convert_type(get(context), dst, get(dst_dtype), src, get(src_dtype), elements);
 				break;
 		}
+		SYNC();
 	}
 	void transpose_021(const Context &context, const Tensor &input, Tensor &output)
 	{
@@ -215,6 +233,7 @@ namespace ml
 						invert);
 				break;
 		}
+		SYNC();
 	}
 	void winogradInputTransform(const Context &context, const Shape &weight_shape, const Tensor &input, Tensor &matrices)
 	{
@@ -237,6 +256,7 @@ namespace ml
 						matrices.data());
 				break;
 		}
+		SYNC();
 	}
 	void winogradOutputTransform(const Context &context, const Shape &weight_shape, const Tensor &matrices, Tensor &output, const Tensor &bias,
 			const Tensor &add, ActivationType act)
@@ -260,6 +280,7 @@ namespace ml
 						output.data(), bias.data(), add.data(), get(act));
 				break;
 		}
+		SYNC();
 	}
 	void winogradGradientTransform(const Context &context, const Shape &weight_shape, const Tensor &gradient, Tensor &matrices)
 	{
@@ -350,6 +371,7 @@ namespace ml
 						beta);
 				break;
 		}
+		SYNC();
 	}
 	void gemmBatched(const Context &context, char opA, char opB, Tensor &C, const Tensor &A, const Tensor &B, float alpha, float beta)
 	{
@@ -370,6 +392,7 @@ namespace ml
 						alpha, beta);
 				break;
 		}
+		SYNC();
 	}
 
 	void gemm_ex(const Context &context, Tensor &D, float alpha, char opA, const Tensor &A, char opB, const Tensor &B, float beta, const Tensor &C,
@@ -403,6 +426,7 @@ namespace ml
 				break;
 			}
 		}
+		SYNC();
 	}
 
 	void addBiasAct(const Context &context, Tensor &input, const Tensor &bias, ActivationType act)
@@ -421,6 +445,7 @@ namespace ml
 				opencl_add_bias_act(get(context), get(input.dtype()), get_shape(input), input.data(), bias.data(), get(act));
 				break;
 		}
+		SYNC();
 	}
 
 	void batchnormInference(const Context &context, const Tensor &input, Tensor &output, const Tensor &weights, ActivationType act)
@@ -526,6 +551,7 @@ namespace ml
 				opencl_activation_forward(get(context), get(input.dtype()), get_shape(input), output.data(), input.data(), get(act));
 				break;
 		}
+		SYNC();
 	}
 	void activationBackward(const Context &context, Tensor &gradient_prev, const Tensor &gradient_next, const Tensor &output, ActivationType act)
 	{

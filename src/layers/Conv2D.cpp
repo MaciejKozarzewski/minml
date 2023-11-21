@@ -345,6 +345,7 @@ namespace ml
 						break;
 					}
 					case DeviceType::CUDA:
+					case DeviceType::OPENCL:
 					{
 						m_winograd_tile_size = (m_kernel_size == 3) ? 4 : 2;
 						break;

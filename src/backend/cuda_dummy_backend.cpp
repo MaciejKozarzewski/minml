@@ -57,6 +57,24 @@ namespace ml
 		throw NotImplemented(METHOD_NAME);
 	}
 
+	// implemented in 'cuda_event.cpp'
+	mlEvent_t cuda_create_event(mlContext_t context)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+	void cuda_wait_for_event(mlEvent_t event)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+	bool cuda_is_event_ready(mlEvent_t event)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+	void cuda_destroy_event(mlEvent_t event)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+
 	// implemented in 'cuda_memory.cu'
 	void* cuda_malloc(int device_index, int count)
 	{
@@ -74,7 +92,11 @@ namespace ml
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
-	void* cuda_view(void *src, int offset, int count)
+	void* cuda_create_view(void *src, int offset, int count)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+	void cuda_destroy_view(void *ptr)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}

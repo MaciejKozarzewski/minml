@@ -35,7 +35,7 @@ namespace
 		const int pad_h = -kernel_height / 2; //TODO handle padding
 		const int pad_w = -kernel_width / 2; //TODO handle padding
 
-		output.zeroall(ml::Context());
+		output.zeroall();
 		for (int b = 0; b < batch; b++)
 			for (int out = 0; out < filters_out; out++)
 				for (int h = 0; h < height; h++)
@@ -72,7 +72,7 @@ namespace
 		const int pad_w = -kernel_width / 2; //TODO handle padding
 
 		ml::activationBackward(ml::Context(), gradient_next, gradient_next, output, act);
-		gradient_prev.zeroall(ml::Context());
+		gradient_prev.zeroall();
 		for (int b = 0; b < batch; b++)
 			for (int out = 0; out < filters_out; out++)
 				for (int h = 0; h < height; h++)
@@ -102,7 +102,7 @@ namespace
 
 		const int pad_h = -kernel_height / 2; //TODO handle padding
 		const int pad_w = -kernel_width / 2; //TODO handle padding
-		weight_update.zeroall(ml::Context());
+		weight_update.zeroall();
 
 		for (int b = 0; b < batch; b++)
 			for (int out = 0; out < filters_out; out++)
@@ -146,18 +146,19 @@ namespace ml
 		addBiasAct(context, output, bias, ActivationType::SIGMOID);
 		EXPECT_LE(testing::diffForTest(correct_output, output), 1.0e-4f);
 
-		if (Device::numberOfCudaDevices() > 0)
+		if (testing::has_device_supporting(DataType::FLOAT32))
 		{
-			Context context(Device::cuda(0));
-			input.moveTo(context.device());
-			output.moveTo(context.device());
-			weights.moveTo(context.device());
-			bias.moveTo(context.device());
+			const Device device = testing::get_device_for_test();
+			Context context(device);
+			input.moveTo(device);
+			output.moveTo(device);
+			weights.moveTo(device);
+			bias.moveTo(device);
 			Tensor weight_matrices = weights.view(Shape( { 21, 1 * 1 * 35 }));
 			Tensor input_matrices = input.view(Shape( { 12 * 13 * 17, 35 }));
 			Tensor output_matrices = output.view(Shape( { 12 * 13 * 17, 21 }));
 
-			output_matrices.zeroall(context);
+			output_matrices.zeroall();
 
 			gemm(context, 'n', 't', output_matrices, input_matrices, weight_matrices, 1.0f, 0.0f);
 			addBiasAct(context, output, bias, ActivationType::SIGMOID);
@@ -188,15 +189,16 @@ namespace ml
 		gemm(context, 'n', 'n', gradient_prev_matrices, gradient_next_matrices, weight_matrices, 1, 0);
 		EXPECT_LE(testing::diffForTest(correct_gradient_prev, gradient_prev), 1.0e-4f);
 
-		if (Device::numberOfCudaDevices() > 0)
+		if (testing::has_device_supporting(DataType::FLOAT32))
 		{
-			Context context(Device::cuda(0));
-			gradient_prev.moveTo(context.device());
-			output.moveTo(context.device());
-			gradient_next.moveTo(context.device());
-			weights.moveTo(context.device());
+			const Device device = testing::get_device_for_test();
+			Context context(device);
+			gradient_prev.moveTo(device);
+			output.moveTo(device);
+			gradient_next.moveTo(device);
+			weights.moveTo(device);
 
-			gradient_prev.zeroall(context);
+			gradient_prev.zeroall();
 
 			Tensor weight_matrices = weights.view( { 21, 1 * 1 * 35 });
 			Tensor gradient_prev_matrices = gradient_prev.view( { 12 * 13 * 17, 35 });
@@ -229,13 +231,14 @@ namespace ml
 		gemm(context, 't', 'n', weight_update_matrix, gradient_next_matrix, input_matrix, 1, 0);
 		EXPECT_LE(testing::diffForTest(correct_weight_update, weight_update), 1.0e-4f);
 
-		if (Device::numberOfCudaDevices() > 0)
+		if (testing::has_device_supporting(DataType::FLOAT32))
 		{
+			const Device device = testing::get_device_for_test();
+			Context context(device);
 			testing::initForTest(weight_update, 1.57f);
-			Context context(Device::cuda(0));
-			input.moveTo(context.device());
-			gradient_next.moveTo(context.device());
-			weight_update.moveTo(context.device());
+			input.moveTo(device);
+			gradient_next.moveTo(device);
+			weight_update.moveTo(device);
 
 			Tensor weight_update_matrix = weight_update.view( { 21, 35 });
 			Tensor input_matrix = input.view( { 12 * 13 * 17, 35 });
@@ -282,7 +285,7 @@ namespace ml
 			weights.moveTo(context.device());
 			bias.moveTo(context.device());
 
-			output.zeroall(context);
+			output.zeroall();
 
 			convolutionImplicitGemmForward(context, input, weights, output, bias, add, ActivationType::RELU);
 			output.convertTo(context, DataType::FLOAT32);
@@ -338,7 +341,7 @@ namespace ml
 			weights.moveTo(context.device());
 			bias.moveTo(context.device());
 
-			output.zeroall(context);
+			output.zeroall();
 
 			convolutionImplicitGemmForward(context, input, weights, output, bias, add, ActivationType::RELU);
 			output.convertTo(context, DataType::FLOAT32);
@@ -380,7 +383,7 @@ namespace ml
 			weights.moveTo(context.device());
 			bias.moveTo(context.device());
 
-			output.zeroall(context);
+			output.zeroall();
 
 			convolutionImplicitGemmForward(context, input, weights, output, bias, add, ActivationType::RELU);
 			output.convertTo(context, DataType::FLOAT32);
@@ -416,20 +419,21 @@ namespace ml
 		winogradOutputTransform(context, weights.shape(), output_matrices, output, bias, Tensor(), ActivationType::SIGMOID);
 		EXPECT_LE(testing::diffForTest(correct_output, output), 1.0e-4f);
 
-		if (Device::numberOfCudaDevices() > 0)
+		if (testing::has_device_supporting(DataType::FLOAT32))
 		{
-			Context context(Device::cuda(0));
-			input.moveTo(context.device());
-			output.moveTo(context.device());
-			weights.moveTo(context.device());
-			bias.moveTo(context.device());
-			weight_matrices.moveTo(context.device());
-			input_matrices.moveTo(context.device());
-			output_matrices.moveTo(context.device());
+			const Device device = testing::get_device_for_test();
+			Context context(device);
+			input.moveTo(device);
+			output.moveTo(device);
+			weights.moveTo(device);
+			bias.moveTo(device);
+			weight_matrices.moveTo(device);
+			input_matrices.moveTo(device);
+			output_matrices.moveTo(device);
 
-			weight_matrices.zeroall(context);
-			input_matrices.zeroall(context);
-			output_matrices.zeroall(context);
+			weight_matrices.zeroall();
+			input_matrices.zeroall();
+			output_matrices.zeroall();
 
 			winogradWeightTransform(context, weights, weight_matrices, false);
 			winogradInputTransform(context, weights.shape(), input, input_matrices);
@@ -466,20 +470,21 @@ namespace ml
 		winogradOutputTransform(context, weights.shape(), gradient_prev_matrices, gradient_prev, Tensor(), Tensor(), ActivationType::LINEAR);
 		EXPECT_LE(testing::diffForTest(correct_gradient_prev, gradient_prev), 1.0e-4f);
 
-		if (Device::numberOfCudaDevices() > 0)
+		if (testing::has_device_supporting(DataType::FLOAT32))
 		{
-			Context context(Device::cuda(0));
-			gradient_prev.moveTo(context.device());
-			output.moveTo(context.device());
-			gradient_next.moveTo(context.device());
-			weights.moveTo(context.device());
-			weight_matrices.moveTo(context.device());
-			gradient_prev_matrices.moveTo(context.device());
-			gradient_next_matrices.moveTo(context.device());
+			const Device device = testing::get_device_for_test();
+			Context context(device);
+			gradient_prev.moveTo(device);
+			output.moveTo(device);
+			gradient_next.moveTo(device);
+			weights.moveTo(device);
+			weight_matrices.moveTo(device);
+			gradient_prev_matrices.moveTo(device);
+			gradient_next_matrices.moveTo(device);
 
-			weight_matrices.zeroall(context);
-			gradient_prev_matrices.zeroall(context);
-			gradient_next_matrices.zeroall(context);
+			weight_matrices.zeroall();
+			gradient_prev_matrices.zeroall();
+			gradient_next_matrices.zeroall();
 
 			ml::testing::initForTest(gradient_next, 1.0f);
 			activationBackward(context, gradient_next, gradient_next, output, ActivationType::SIGMOID);
@@ -516,21 +521,22 @@ namespace ml
 
 		EXPECT_LE(testing::diffForTest(correct_weight_update, weight_update), 1.0e-4f);
 
-		if (Device::numberOfCudaDevices() > 0)
+		if (testing::has_device_supporting(DataType::FLOAT32))
 		{
+			const Device device = testing::get_device_for_test();
+			Context context(device);
 			testing::initForTest(weight_update, 1.57f);
-			Context context(Device::cuda(0));
-			input.moveTo(context.device());
-			gradient_next.moveTo(context.device());
-			weight_update.moveTo(context.device());
-			storage.moveTo(context.device());
-			weight_update_matrices.moveTo(context.device());
-			gradient_prev_matrices.moveTo(context.device());
-			gradient_next_matrices.moveTo(context.device());
+			input.moveTo(device);
+			gradient_next.moveTo(device);
+			weight_update.moveTo(device);
+			storage.moveTo(device);
+			weight_update_matrices.moveTo(device);
+			gradient_prev_matrices.moveTo(device);
+			gradient_next_matrices.moveTo(device);
 
-			weight_update_matrices.zeroall(context);
-			gradient_prev_matrices.zeroall(context);
-			gradient_next_matrices.zeroall(context);
+			weight_update_matrices.zeroall();
+			gradient_prev_matrices.zeroall();
+			gradient_next_matrices.zeroall();
 
 			winogradGradientTransform(context, weight_update.shape(), gradient_next, gradient_next_matrices);
 			winogradInputTransform(context, weight_update.shape(), input, gradient_prev_matrices);
@@ -565,20 +571,21 @@ namespace ml
 		winogradOutputTransform(context, weights.shape(), output_matrices, output, bias, Tensor(), ActivationType::SIGMOID);
 		EXPECT_LE(testing::diffForTest(correct_output, output), 1.0e-4f);
 
-		if (Device::numberOfCudaDevices() > 0)
+		if (testing::has_device_supporting(DataType::FLOAT32))
 		{
-			Context context(Device::cuda(0));
-			input.moveTo(context.device());
-			output.moveTo(context.device());
-			weights.moveTo(context.device());
-			bias.moveTo(context.device());
-			weight_matrices.moveTo(context.device());
-			input_matrices.moveTo(context.device());
-			output_matrices.moveTo(context.device());
+			const Device device = testing::get_device_for_test();
+			Context context(device);
+			input.moveTo(device);
+			output.moveTo(device);
+			weights.moveTo(device);
+			bias.moveTo(device);
+			weight_matrices.moveTo(device);
+			input_matrices.moveTo(device);
+			output_matrices.moveTo(device);
 
-			weight_matrices.zeroall(context);
-			input_matrices.zeroall(context);
-			output_matrices.zeroall(context);
+			weight_matrices.zeroall();
+			input_matrices.zeroall();
+			output_matrices.zeroall();
 
 			winogradWeightTransform(context, weights, weight_matrices, false);
 			winogradInputTransform(context, weights.shape(), input, input_matrices);
@@ -615,20 +622,21 @@ namespace ml
 		winogradOutputTransform(context, weights.shape(), gradient_prev_matrices, gradient_prev, Tensor(), Tensor(), ActivationType::LINEAR);
 		EXPECT_LE(testing::diffForTest(correct_gradient_prev, gradient_prev), 1.0e-4f);
 
-		if (Device::numberOfCudaDevices() > 0)
+		if (testing::has_device_supporting(DataType::FLOAT32))
 		{
-			Context context(Device::cuda(0));
-			gradient_prev.moveTo(context.device());
-			output.moveTo(context.device());
-			gradient_next.moveTo(context.device());
-			weights.moveTo(context.device());
-			weight_matrices.moveTo(context.device());
-			gradient_prev_matrices.moveTo(context.device());
-			gradient_next_matrices.moveTo(context.device());
+			const Device device = testing::get_device_for_test();
+			Context context(device);
+			gradient_prev.moveTo(device);
+			output.moveTo(device);
+			gradient_next.moveTo(device);
+			weights.moveTo(device);
+			weight_matrices.moveTo(device);
+			gradient_prev_matrices.moveTo(device);
+			gradient_next_matrices.moveTo(device);
 
-			weight_matrices.zeroall(context);
-			gradient_prev_matrices.zeroall(context);
-			gradient_next_matrices.zeroall(context);
+			weight_matrices.zeroall();
+			gradient_prev_matrices.zeroall();
+			gradient_next_matrices.zeroall();
 
 			ml::testing::initForTest(gradient_next, 1.0f);
 			activationBackward(context, gradient_next, gradient_next, output, ActivationType::SIGMOID);
@@ -670,20 +678,21 @@ namespace ml
 
 		EXPECT_LE(testing::diffForTest(correct_weight_update, weight_update), 1.0e-4f);
 
-		if (Device::numberOfCudaDevices() > 0)
+		if (testing::has_device_supporting(DataType::FLOAT32))
 		{
+			const Device device = testing::get_device_for_test();
+			Context context(device);
 			testing::initForTest(weight_update, 1.57f);
-			Context context(Device::cuda(0));
-			input.moveTo(context.device());
-			gradient_next.moveTo(context.device());
-			weight_update.moveTo(context.device());
-			weight_update_matrices.moveTo(context.device());
-			gradient_prev_matrices.moveTo(context.device());
-			gradient_next_matrices.moveTo(context.device());
+			input.moveTo(device);
+			gradient_next.moveTo(device);
+			weight_update.moveTo(device);
+			weight_update_matrices.moveTo(device);
+			gradient_prev_matrices.moveTo(device);
+			gradient_next_matrices.moveTo(device);
 
-			weight_update_matrices.zeroall(context);
-			gradient_prev_matrices.zeroall(context);
-			gradient_next_matrices.zeroall(context);
+			weight_update_matrices.zeroall();
+			gradient_prev_matrices.zeroall();
+			gradient_next_matrices.zeroall();
 
 			winogradGradientTransform(context, weight_update.shape(), gradient_next, gradient_next_matrices);
 			winogradInputTransform(context, weight_update.shape(), input, gradient_prev_matrices);

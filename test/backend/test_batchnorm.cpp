@@ -209,11 +209,11 @@ namespace ml
 			for (size_t i = 0; i < output.size(); i++)
 			{
 				output[i].moveTo(device);
-				output[i].zeroall(context);
+				output[i].zeroall();
 			}
 			weight.moveTo(device);
 			running_stats.moveTo(device);
-			running_stats.zeroall(context);
+			running_stats.zeroall();
 
 			for (size_t i = 0; i < output.size(); i++)
 			{
@@ -251,7 +251,7 @@ namespace ml
 			input.moveTo(device);
 			output.moveTo(device);
 			weight.moveTo(device);
-			output.zeroall(context);
+			output.zeroall();
 			context.synchronize();
 
 			batchnormInference(context, input, output, weight, ActivationType::TANH);
@@ -296,7 +296,7 @@ namespace ml
 		baseline_update(input, gradient_next, stats, stat_id, correct_weight_update);
 
 		Tensor running_stats( { 64, 3 * filters }, "float32", Device::cpu());
-		output.zeroall(context);
+		output.zeroall();
 		testing::initForTest(gradient_next, 1.57f);
 		batchnormForward(context, input, output, weight, running_stats, stat_id, ActivationType::SIGMOID);
 		batchnormBackward(context, input, output, gradient_prev, gradient_next, weight, weight_update, running_stats, stat_id,
@@ -319,9 +319,9 @@ namespace ml
 			weight.moveTo(device);
 			running_stats.moveTo(device);
 
-			output.zeroall(context);
-			running_stats.zeroall(context);
-			gradient_prev.zeroall(context);
+			output.zeroall();
+			running_stats.zeroall();
+			gradient_prev.zeroall();
 
 			batchnormForward(context, input, output, weight, running_stats, stat_id, ActivationType::SIGMOID);
 			batchnormBackward(context, input, output, gradient_prev, gradient_next, weight, weight_update, running_stats, stat_id,

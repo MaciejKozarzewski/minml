@@ -11,6 +11,7 @@ else()
 		kernels/training.cu
 		kernels/winograd_nonfused.cu
 		cuda_context.cpp
+		cuda_event.cpp
 		cuda_memory.cu
 		cuda_properties.cpp
 		cudnn_conv.cpp

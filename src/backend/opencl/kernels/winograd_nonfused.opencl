@@ -396,8 +396,7 @@ __kernel void transform_weights(__global float * matrices, const __global float 
 	#define SET_LINE_AT_FUNCTION set_line6_at
 #endif
 
-__kernel void transform_input(__global float *__restrict__ matrices, const __global float *__restrict__ input, int batch_size, int height, int width,
-		int input_filters)
+__kernel void transform_input(__global float * matrices, const __global float * input, int batch_size, int height, int width, int input_filters)
 {
 	const int Padding = KERNEL_SIZE / 2;
 
@@ -570,13 +569,12 @@ __kernel void transform_output(const __global float * matrices, __global float *
 	#define GET_ROW_FROM_TILE_FUNCTION get_row_from_tile2x2
 	#define SET_LINE_AT_FUNCTION set_line2_at
 #endif
-__kernel void transform_gradient(__global float * matrices, const __global float * gradient, int batch_size, int height, int width,
-		int output_filters)
+__kernel void transform_gradient(__global float * matrices, const __global float * gradient, int batch_size, int height, int width, int filters)
 {
 	struct TILE_TYPE tile;
-	for (int f = get_local_id(0); f < output_filters; f += get_local_size(0))
+	for (int f = get_local_id(0); f < filters; f += get_local_size(0))
 	{
-		struct Indexer4D indexer = create_indexer_4D(batch_size, height, width, output_filters);
+		struct Indexer4D indexer = create_indexer_4D(batch_size, height, width, filters);
 		for (int col = 0; col < TRANSFORM_SIZE; col++)
 			for (int row = 0; row < TRANSFORM_SIZE; row++)
 			{
@@ -589,7 +587,7 @@ __kernel void transform_gradient(__global float * matrices, const __global float
 			}
 
 		const int tile_index = (get_group_id(2) * get_num_groups(0) + get_group_id(0)) * get_num_groups(1) + get_group_id(1);
-		indexer = create_indexer_4D(TILE_SIZE, TILE_SIZE, get_num_groups(0) * get_num_groups(1) * get_num_groups(2), output_filters);
+		indexer = create_indexer_4D(TILE_SIZE, TILE_SIZE, get_num_groups(0) * get_num_groups(1) * get_num_groups(2), filters);
 		for (int row = 0; row < TILE_SIZE; row++)
 		{
 			struct LINE_TYPE line;

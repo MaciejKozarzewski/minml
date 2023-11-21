@@ -10,6 +10,11 @@
 
 #include <minml/core/Device.hpp>
 
+namespace ml /* forward declarations */
+{
+	class Event;
+}
+
 namespace ml
 {
 	class Context
@@ -29,6 +34,7 @@ namespace ml
 			void synchronize() const;
 			bool isReady() const;
 			void* backend() const noexcept;
+			Event createEvent() const;
 	};
 
 	class ContextError: public std::logic_error

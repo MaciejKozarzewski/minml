@@ -168,12 +168,15 @@ namespace ml
 			assert(status == cudaSuccess);
 		}
 	}
-	void* cuda_view(void *src, int offset, int count)
+	void* cuda_create_view(void *src, int offset, int count)
 	{
 		if (src == nullptr)
 			return nullptr;
 		else
 			return getPointer<uint8_t>(src) + offset;
+	}
+	void cuda_destroy_view(void *ptr)
+	{
 	}
 
 	void cuda_memset(mlContext_t context, void *dst, int dst_offset, int dst_count, const void *src, int src_count)

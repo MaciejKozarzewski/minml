@@ -36,10 +36,11 @@ namespace ml
 		const int LDB = get_last_dim(shape_B);
 		const int LDC = get_last_dim(shape_C);
 
-		cl::CommandQueue queue = opencl::Context::getCommandQueue(context);
-		cl::Buffer a_buffer = opencl::get_buffer(A);
-		cl::Buffer b_buffer = opencl::get_buffer(B);
-		cl::Buffer c_buffer = opencl::get_buffer(C);
+		cl::CommandQueue &queue = opencl::Context::getCommandQueue(context);
+		const cl::Buffer &a_buffer = opencl::getBuffer(A);
+		const cl::Buffer &b_buffer = opencl::getBuffer(B);
+		cl::Buffer &c_buffer = opencl::getBuffer(C);
+		cl::Event &event = *opencl::Context::getLastEvent(context);
 
 		switch (dtype)
 		{
@@ -48,8 +49,8 @@ namespace ml
 				const cl_half _alpha = FloatToHalf(alpha);
 				const cl_half _beta = FloatToHalf(beta);
 				clblast::StatusCode status = clblast::Gemm(clblast::Layout::kRowMajor, op_A, op_B, M, N, K, _alpha, a_buffer(), 0, LDA, b_buffer(), 0,
-						LDB, _beta, c_buffer(), 0, LDC, &queue());
-				assert(status == clblast::StatusCode::kSuccess);
+						LDB, _beta, c_buffer(), 0, LDC, &queue(), &event());
+				CHECK_OPENCL_STATUS(static_cast<cl_int>(status));
 				break;
 			}
 			case DTYPE_FLOAT32:
@@ -57,8 +58,8 @@ namespace ml
 				const float _alpha = alpha;
 				const float _beta = beta;
 				clblast::StatusCode status = clblast::Gemm(clblast::Layout::kRowMajor, op_A, op_B, M, N, K, _alpha, a_buffer(), 0, LDA, b_buffer(), 0,
-						LDB, _beta, c_buffer(), 0, LDC, &queue());
-				assert(status == clblast::StatusCode::kSuccess);
+						LDB, _beta, c_buffer(), 0, LDC, &queue(), &event());
+				CHECK_OPENCL_STATUS(static_cast<cl_int>(status));
 				break;
 			}
 			default:
@@ -88,10 +89,11 @@ namespace ml
 		const int strideB = volume_without_first_dim(shape_B);
 		const int strideC = volume_without_first_dim(shape_C);
 
-		cl::CommandQueue queue = opencl::Context::getCommandQueue(context);
-		cl::Buffer a_buffer = opencl::get_buffer(A);
-		cl::Buffer b_buffer = opencl::get_buffer(B);
-		cl::Buffer c_buffer = opencl::get_buffer(C);
+		cl::CommandQueue &queue = opencl::Context::getCommandQueue(context);
+		const cl::Buffer &a_buffer = opencl::getBuffer(A);
+		const cl::Buffer &b_buffer = opencl::getBuffer(B);
+		cl::Buffer &c_buffer = opencl::getBuffer(C);
+		cl::Event &event = *opencl::Context::getLastEvent(context);
 
 		switch (dtype)
 		{
@@ -100,7 +102,7 @@ namespace ml
 				const cl_half _alpha = FloatToHalf(alpha);
 				const cl_half _beta = FloatToHalf(beta);
 				clblast::StatusCode status = clblast::GemmStridedBatched(clblast::Layout::kRowMajor, op_A, op_B, M, N, K, _alpha, a_buffer(), 0, LDA,
-						strideA, b_buffer(), 0, LDB, strideB, _beta, c_buffer(), 0, LDC, strideC, batch, &queue());
+						strideA, b_buffer(), 0, LDB, strideB, _beta, c_buffer(), 0, LDC, strideC, batch, &queue(), &event());
 				assert(status == clblast::StatusCode::kSuccess);
 				break;
 			}
@@ -109,7 +111,7 @@ namespace ml
 				const float _alpha = alpha;
 				const float _beta = beta;
 				clblast::StatusCode status = clblast::GemmStridedBatched(clblast::Layout::kRowMajor, op_A, op_B, M, N, K, _alpha, a_buffer(), 0, LDA,
-						strideA, b_buffer(), 0, LDB, strideB, _beta, c_buffer(), 0, LDC, strideC, batch, &queue());
+						strideA, b_buffer(), 0, LDB, strideB, _beta, c_buffer(), 0, LDC, strideC, batch, &queue(), &event());
 				assert(status == clblast::StatusCode::kSuccess);
 				break;
 			}

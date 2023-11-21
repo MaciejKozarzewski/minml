@@ -26,12 +26,15 @@ namespace ml
 		if (ptr != nullptr)
 			::operator delete[](ptr, std::align_val_t(64));
 	}
-	void* cpu_view(void *src, int offset, int count)
+	void* cpu_create_view(void *src, int offset, int count)
 	{
 		if (src == nullptr)
 			return nullptr;
 		else
 			return reinterpret_cast<uint8_t*>(src) + offset;
+	}
+	void cpu_destroy_view(void *ptr)
+	{
 	}
 
 	void cpu_memset(mlContext_t context, void *dst, int dst_offset, int dst_count, const void *src, int src_count)

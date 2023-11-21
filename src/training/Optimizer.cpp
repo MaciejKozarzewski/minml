@@ -63,9 +63,9 @@ namespace ml
 	{
 		m_steps = 0;
 		if (m_momentum != nullptr)
-			m_momentum->zeroall(context);
+			m_momentum->zeroall();
 		if (m_variance != nullptr)
-			m_variance->zeroall(context);
+			m_variance->zeroall();
 	}
 	void Optimizer::moveTo(Device newDevice)
 	{

@@ -13,7 +13,6 @@
 
 namespace ml /* forward declarations */
 {
-	class DeviceContext;
 	enum class DataType;
 }
 

@@ -29,7 +29,7 @@ namespace ml
 			m_is_owning(true)
 	{
 		m_data = ml::malloc(device, sizeInBytes());
-		ml::memzero(device, m_data, 0, sizeInBytes());
+		zeroall();
 		create_stride();
 	}
 	Tensor::Tensor(const Shape &shape, const std::string &dtype, Device device) :
@@ -247,11 +247,15 @@ namespace ml
 		}
 		m_dtype = newType;
 	}
+	void Tensor::zeroall()
+	{
+		ml::memzero(device(), data(), 0, sizeInBytes());
+	}
 	void Tensor::zeroall(const Context &context)
 	{
 		if (context.device() != this->device())
 			throw DeviceMismatch(METHOD_NAME, "context on " + context.device().toString() + ", Tensor on " + device().toString());
-		ml::memzero(device(), data(), 0, sizeInBytes());
+		ml::memzero_async(context, device(), data(), 0, sizeInBytes());
 	}
 	void Tensor::setall(const Context &context, float value)
 	{
@@ -269,7 +273,7 @@ namespace ml
 			default:
 				throw DataTypeMismatch(METHOD_NAME, "unknown data type");
 		}
-		ml::memset(device(), data(), 0, sizeInBytes(), tmp, sizeOf(dtype()));
+		ml::memset_async(context, device(), data(), 0, sizeInBytes(), tmp, sizeOf(dtype()));
 	}
 	void Tensor::copyToHost(const Context &context, void *ptr, size_t bytes) const
 	{
@@ -366,7 +370,7 @@ namespace ml
 		if (offsetInElements + shape.volume() > static_cast<size_t>(this->volume()))
 			throw ShapeMismatch(METHOD_NAME, "view would extend beyond the original tensor");
 
-		void *tmp = ml::view(device(), const_cast<void*>(data()), sizeOf(dtype()) * offsetInElements, sizeOf(dtype()) * shape.volume());
+		void *tmp = ml::create_view(device(), const_cast<void*>(data()), sizeOf(dtype()) * offsetInElements, sizeOf(dtype()) * shape.volume());
 		if (tmp == nullptr)
 			throw LogicError(METHOD_NAME, "could not create tensor view");
 
@@ -519,6 +523,8 @@ namespace ml
 				pageUnlock();
 			ml::free(device(), data());
 		}
+		else
+			ml::destroy_view(device(), data());
 	}
 
 	Tensor toTensor(std::initializer_list<float> data)
