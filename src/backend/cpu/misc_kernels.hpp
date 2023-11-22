@@ -33,8 +33,19 @@ namespace ml
 		void def_kernel_activation_backward_fp32(void *gradient_prev, const void *gradient_next, const void *output, size_t elements,
 				mlActivationType_t activation);
 
-		void def_kernel_add_bias_act_fp32(void *input, const void *bias, int first_dim, int last_dim, mlActivationType_t act);
-		void def_kernel_add_bias_act_fp16(void *input, const void *bias, int first_dim, int last_dim, mlActivationType_t act);
+		void def_kernel_add_bias_act_fp32(void *output, const void *input, const void *bias, int first_dim, int last_dim, mlActivationType_t act);
+		void def_kernel_add_bias_act_fp16(void *output, const void *input, const void *bias, int first_dim, int last_dim, mlActivationType_t act);
+
+		void def_kernel_global_avg_and_max_pooling_forward_fp32(mlContext_t context, mlShape_t shape, const void *input, void *output);
+		void def_kernel_global_avg_and_max_pooling_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next,
+				const void *input);
+
+		/*
+		 * SSE kernels
+		 */
+		void sse2_kernel_global_avg_and_max_pooling_forward_fp32(mlContext_t context, mlShape_t shape, const void *input, void *output);
+		void sse2_kernel_global_avg_and_max_pooling_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next,
+				const void *input);
 
 		/*
 		 * AVX kernels
@@ -47,8 +58,10 @@ namespace ml
 
 		void avx_kernel_activation_forward_fp16(void *dst, const void *src, size_t elements, mlActivationType_t activation);
 
-		void avx_kernel_add_bias_act_fp16(void *input, const void *bias, int first_dim, int last_dim, mlActivationType_t act);
+		void avx_kernel_add_bias_act_fp16(void *output, const void *input, const void *bias, int first_dim, int last_dim, mlActivationType_t act);
 
+		void avx_kernel_global_avg_and_max_pooling_forward_fp32(mlContext_t context, mlShape_t shape, const void *input, void *output);
+		void avx_kernel_global_avg_and_max_pooling_forward_fp16(mlContext_t context, mlShape_t shape, const void *input, void *output);
 	} /* namespace cpu */
 } /* namespace ml */
 

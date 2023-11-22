@@ -173,13 +173,12 @@ namespace ml
 	}
 
 	// implemented in 'global_pooling.cu'
-	void cuda_global_avg_and_max_pooling_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, const void *input, void *output,
-			const void *weights)
+	void cuda_global_avg_and_max_pooling_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, const void *input, void *output)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
 	void cuda_global_avg_and_max_pooling_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next,
-			const void *input, const void *weights)
+			const void *input)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
@@ -197,7 +196,7 @@ namespace ml
 	}
 
 	// implemented in 'add_bias_act.cu'
-	void cuda_add_bias_act(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *input, const void *bias, mlActivationType_t act)
+	void cuda_add_bias_act(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input, const void *bias, mlActivationType_t act)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}

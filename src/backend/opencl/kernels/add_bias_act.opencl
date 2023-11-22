@@ -1,6 +1,6 @@
 R"(
 
-__kernel void add_bias_act_fp32(__global storage_type *input, const __global storage_type *bias, int first_dim, int last_dim, int act)
+__kernel void add_bias_act_fp32(__global storage_type *output, const __global storage_type *input, const __global storage_type *bias, int first_dim, int last_dim, int act)
 {
 	for (int j = get_global_id(0); j < last_dim; j += get_global_size(0))
 	{
@@ -24,7 +24,7 @@ __kernel void add_bias_act_fp32(__global storage_type *input, const __global sto
 				case 4: // softmax
 					break;
 			}
-			store(tmp, input, i * last_dim + j);	
+			store(tmp, output, i * last_dim + j);	
 		}
 	}
 }

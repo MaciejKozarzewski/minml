@@ -63,7 +63,7 @@ namespace
 		__shared__ float workspace[1024];
 		__shared__ cg::block_tile_memory<128> btm;
 		cg::thread_block thb = cg::this_thread_block(btm);
-		cg::thread_block_tile<128> tile = cg::tiled_partition<128>(thb);
+		cg::thread_block_tile < 128 > tile = cg::tiled_partition<128>(thb);
 
 		for (int i = blockIdx.x; i < first_dim; i += gridDim.x)
 		{
@@ -136,14 +136,15 @@ namespace
 	}
 
 	template<typename T>
-	__global__ void kernel_add_to_last_dim(T *input, const T *bias, int first_dim, int last_dim, ml::mlActivationType_t act)
+	__global__ void kernel_add_to_last_dim(T *output, const T *input, const T *bias, int first_dim, int last_dim, ml::mlActivationType_t act)
 	{
 		assert(last_dim <= 1024);
 		assert(blockDim.x == 128);
 
 		ConstTensorWrapper<1, T> bias_wrapper(bias, last_dim);
 
-		TensorWrapper<2, T> input_wrapper(input, first_dim, last_dim);
+		ConstTensorWrapper<2, T> input_wrapper(input, first_dim, last_dim);
+		TensorWrapper<2, T> output_wrapper(output, first_dim, last_dim);
 		for (int j = (blockIdx.x * blockDim.x + threadIdx.x) * vector_length<T>(); j < last_dim; j += gridDim.x * blockDim.x * vector_length<T>())
 		{
 			Vector<T> _bias = bias_wrapper.load(j);
@@ -157,7 +158,7 @@ namespace
 					tmp = vectors::tanh(tmp);
 				if (act == ml::ACTIVATION_SIGMOID)
 					tmp = vector_one<T>() / (vector_one<T>() + vectors::exp(-tmp));
-				input_wrapper.store(tmp, i, j);
+				output_wrapper.store(tmp, i, j);
 			}
 		}
 	}
@@ -185,10 +186,6 @@ namespace ml
 				dim3 gridDim = cuda::gridSize<1024>(volume(shape), 256);
 				switch (dtype)
 				{
-//					case DTYPE_BFLOAT16:
-//						kernel_sigmoid_forward<<<gridDim, blockDim, 0, stream>>>(getPointer<__nv_bfloat16 >(output),
-//								getPointer<__nv_bfloat16 >(input), volume(shape));
-//						break;
 					case DTYPE_FLOAT16:
 						kernel_sigmoid_forward<<<gridDim, blockDim, 0, stream>>>(getPointer<half>(output), getPointer<half>(input), volume(shape));
 						break;
@@ -205,10 +202,6 @@ namespace ml
 				dim3 gridDim = cuda::gridSize<1024>(volume(shape), 256);
 				switch (dtype)
 				{
-//					case DTYPE_BFLOAT16:
-//						kernel_tanh_forward<<<gridDim, blockDim, 0, stream>>>(getPointer<__nv_bfloat16 >(output), getPointer<__nv_bfloat16 >(input),
-//								volume(shape));
-//						break;
 					case DTYPE_FLOAT16:
 						kernel_tanh_forward<<<gridDim, blockDim, 0, stream>>>(getPointer<half>(output), getPointer<half>(input), volume(shape));
 						break;
@@ -225,10 +218,6 @@ namespace ml
 				dim3 gridDim = cuda::gridSize<1024>(volume(shape), 256);
 				switch (dtype)
 				{
-//					case DTYPE_BFLOAT16:
-//						kernel_relu_forward<<<gridDim, blockDim, 0, stream>>>(getPointer<__nv_bfloat16 >(output), getPointer<__nv_bfloat16 >(input),
-//								volume(shape));
-//						break;
 					case DTYPE_FLOAT16:
 						kernel_relu_forward<<<gridDim, blockDim, 0, stream>>>(getPointer<half>(output), getPointer<half>(input), volume(shape));
 						break;
@@ -251,10 +240,6 @@ namespace ml
 					dim3 gridDim((first_dim + 255) / 256);
 					switch (dtype)
 					{
-//						case DTYPE_BFLOAT16:
-//							kernel_softmax_3_channels<<<gridDim, blockDim, 0, stream>>>(getPointer<__nv_bfloat16 >(output),
-//									getPointer<__nv_bfloat16 >(input), first_dim);
-//							break;
 						case DTYPE_FLOAT16:
 							kernel_softmax_3_channels<<<gridDim, blockDim, 0, stream>>>(getPointer<half>(output), getPointer<half>(input), first_dim);
 							break;
@@ -270,10 +255,6 @@ namespace ml
 					dim3 gridDim(std::min(1024, first_dim));
 					switch (dtype)
 					{
-//						case DTYPE_BFLOAT16:
-//							kernel_softmax_generic<<<gridDim, blockDim, 0, stream>>>(getPointer<__nv_bfloat16 >(output),
-//									getPointer<__nv_bfloat16 >(input), first_dim, last_dim);
-//							break;
 						case DTYPE_FLOAT16:
 							kernel_softmax_generic<<<gridDim, blockDim, 0, stream>>>(getPointer<half>(output), getPointer<half>(input), first_dim,
 									last_dim);
@@ -336,7 +317,8 @@ namespace ml
 		assert(cudaGetLastError() == cudaSuccess);
 	}
 
-	void cuda_add_bias_act(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *input, const void *bias, mlActivationType_t act)
+	void cuda_add_bias_act(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input, const void *bias,
+			mlActivationType_t act)
 	{
 		assert(input != nullptr);
 		assert(bias != nullptr);
@@ -349,15 +331,13 @@ namespace ml
 
 		switch (dtype)
 		{
-//			case DTYPE_BFLOAT16:
-//				kernel_add_to_last_dim<<<gridDim, blockDim, 0, stream>>>(getPointer<__nv_bfloat16 >(input), getPointer<__nv_bfloat16 >(bias),
-//						first_dim, last_dim, act);
-//				break;
 			case DTYPE_FLOAT16:
-				kernel_add_to_last_dim<<<gridDim, blockDim, 0, stream>>>(getPointer<half>(input), getPointer<half>(bias), first_dim, last_dim, act);
+				kernel_add_to_last_dim<<<gridDim, blockDim, 0, stream>>>(getPointer<half>(output), getPointer<half>(input), getPointer<half>(bias),
+						first_dim, last_dim, act);
 				break;
 			case DTYPE_FLOAT32:
-				kernel_add_to_last_dim<<<gridDim, blockDim, 0, stream>>>(getPointer<float>(input), getPointer<float>(bias), first_dim, last_dim, act);
+				kernel_add_to_last_dim<<<gridDim, blockDim, 0, stream>>>(getPointer<float>(output), getPointer<float>(input), getPointer<float>(bias),
+						first_dim, last_dim, act);
 				break;
 		}
 		assert(cudaGetLastError() == cudaSuccess);

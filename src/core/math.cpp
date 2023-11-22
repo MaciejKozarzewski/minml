@@ -169,8 +169,7 @@ namespace ml
 			case DeviceType::OPENCL:
 				opencl_unpack_input(get(context), get_shape(dst), get(dst.dtype()), dst.data(), src.data());
 				break;
-		}
-		SYNC();
+		} SYNC();
 	}
 	void convertType(const Context &context, void *dst, DataType dst_dtype, const void *src, DataType src_dtype, int elements)
 	{
@@ -187,8 +186,7 @@ namespace ml
 			case DeviceType::OPENCL:
 				opencl_convert_type(get(context), dst, get(dst_dtype), src, get(src_dtype), elements);
 				break;
-		}
-		SYNC();
+		} SYNC();
 	}
 	void transpose_021(const Context &context, const Tensor &input, Tensor &output)
 	{
@@ -232,8 +230,7 @@ namespace ml
 				opencl_winograd_weight_transform(get(context), tile_size, get(weights.dtype()), get_shape(weights), weights.data(), matrices.data(),
 						invert);
 				break;
-		}
-		SYNC();
+		} SYNC();
 	}
 	void winogradInputTransform(const Context &context, const Shape &weight_shape, const Tensor &input, Tensor &matrices)
 	{
@@ -255,8 +252,7 @@ namespace ml
 				opencl_winograd_input_transform(get(context), tile_size, get(input.dtype()), get(weight_shape), get_shape(input), input.data(),
 						matrices.data());
 				break;
-		}
-		SYNC();
+		} SYNC();
 	}
 	void winogradOutputTransform(const Context &context, const Shape &weight_shape, const Tensor &matrices, Tensor &output, const Tensor &bias,
 			const Tensor &add, ActivationType act)
@@ -279,8 +275,7 @@ namespace ml
 				opencl_winograd_output_transform(get(context), tile_size, get(output.dtype()), get(weight_shape), get_shape(output), matrices.data(),
 						output.data(), bias.data(), add.data(), get(act));
 				break;
-		}
-		SYNC();
+		} SYNC();
 	}
 	void winogradGradientTransform(const Context &context, const Shape &weight_shape, const Tensor &gradient, Tensor &matrices)
 	{
@@ -353,6 +348,13 @@ namespace ml
 		}
 	}
 
+	void globalAvgAndMaxPoolingForward(const Context &context, const Tensor &input, Tensor &output)
+	{
+	}
+	void globalAvgAndMaxPoolingBackward(const Context &context, Tensor &gradient_prev, const Tensor &gradient_next, const Tensor &input)
+	{
+	}
+
 	void gemm(const Context &context, char opA, char opB, Tensor &C, const Tensor &A, const Tensor &B, float alpha, float beta)
 	{
 		static Timer timer("gemm");
@@ -370,8 +372,7 @@ namespace ml
 				opencl_gemm(get(context), get(C.dtype()), get_shape(C), C.data(), get_shape(A), A.data(), get_shape(B), B.data(), opA, opB, alpha,
 						beta);
 				break;
-		}
-		SYNC();
+		} SYNC();
 	}
 	void gemmBatched(const Context &context, char opA, char opB, Tensor &C, const Tensor &A, const Tensor &B, float alpha, float beta)
 	{
@@ -391,8 +392,7 @@ namespace ml
 				opencl_gemm_batched(get(context), get(C.dtype()), get_shape(C), C.data(), get_shape(A), A.data(), get_shape(B), B.data(), opA, opB,
 						alpha, beta);
 				break;
-		}
-		SYNC();
+		} SYNC();
 	}
 
 	void gemm_ex(const Context &context, Tensor &D, float alpha, char opA, const Tensor &A, char opB, const Tensor &B, float beta, const Tensor &C,
@@ -425,27 +425,25 @@ namespace ml
 				// FIXME
 				break;
 			}
-		}
-		SYNC();
+		} SYNC();
 	}
 
-	void addBiasAct(const Context &context, Tensor &input, const Tensor &bias, ActivationType act)
+	void addBiasAct(const Context &context, Tensor &output, const Tensor &input, const Tensor &bias, ActivationType act)
 	{
 		static Timer timer("addBiasAct");
 		TimerGuard tg(timer);
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
-				cpu_add_bias_act(get(context), get(input.dtype()), get_shape(input), input.data(), bias.data(), get(act));
+				cpu_add_bias_act(get(context), get(input.dtype()), get_shape(input), output.data(), input.data(), bias.data(), get(act));
 				break;
 			case DeviceType::CUDA:
-				cuda_add_bias_act(get(context), get(input.dtype()), get_shape(input), input.data(), bias.data(), get(act));
+				cuda_add_bias_act(get(context), get(input.dtype()), get_shape(input), output.data(), input.data(), bias.data(), get(act));
 				break;
 			case DeviceType::OPENCL:
-				opencl_add_bias_act(get(context), get(input.dtype()), get_shape(input), input.data(), bias.data(), get(act));
+				opencl_add_bias_act(get(context), get(input.dtype()), get_shape(input), output.data(), input.data(), bias.data(), get(act));
 				break;
-		}
-		SYNC();
+		} SYNC();
 	}
 
 	void batchnormInference(const Context &context, const Tensor &input, Tensor &output, const Tensor &weights, ActivationType act)
@@ -550,8 +548,7 @@ namespace ml
 			case DeviceType::OPENCL:
 				opencl_activation_forward(get(context), get(input.dtype()), get_shape(input), output.data(), input.data(), get(act));
 				break;
-		}
-		SYNC();
+		} SYNC();
 	}
 	void activationBackward(const Context &context, Tensor &gradient_prev, const Tensor &gradient_next, const Tensor &output, ActivationType act)
 	{

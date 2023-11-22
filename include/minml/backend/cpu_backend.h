@@ -73,7 +73,8 @@ namespace ml
 		void cpu_gemm_ex(mlContext_t context, mlDataType_t dtype, mlShape_t shape_D, void *D, float alpha, char opA, mlShape_t shape_A, const void *A,
 				char opB, mlShape_t shape_B, const void *B, float beta, mlShape_t shape_C, const void *C, mlActivationType_t act);
 
-		void cpu_add_bias_act(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *input, const void *bias, mlActivationType_t act);
+		void cpu_add_bias_act(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input, const void *bias,
+				mlActivationType_t act);
 
 		void cpu_batchnorm_inference(mlContext_t context, mlShape_t shape, const void *input, void *output, const void *weights,
 				mlActivationType_t act);
@@ -91,10 +92,9 @@ namespace ml
 				mlActivationType_t act);
 
 		// implemented in 'global_pooling.cu'
-		void cpu_global_avg_and_max_pooling_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, const void *input, void *output,
-				const void *weights);
+		void cpu_global_avg_and_max_pooling_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, const void *input, void *output);
 		void cpu_global_avg_and_max_pooling_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next,
-				const void *input, const void *weights);
+				const void *input);
 
 		// used for training
 		void cpu_emulate_low_precision(mlContext_t context, mlShape_t shape, void *dst, const void *src);

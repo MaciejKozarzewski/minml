@@ -164,7 +164,7 @@ namespace ml
 		opencl::runKernel(context, kernel, global, local);
 	}
 
-	void opencl_add_bias_act(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *input, const void *bias, mlActivationType_t act)
+	void opencl_add_bias_act(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input, const void *bias, mlActivationType_t act)
 	{
 		static const cl::Program program = ml::opencl::compileProgram("add_bias_act",
 				ml::opencl::kernels::common + ml::opencl::kernels::add_bias_act, "");
@@ -188,11 +188,12 @@ namespace ml
 				break;
 		}
 
-		kernel.setArg(0, opencl::getBuffer(input));
-		kernel.setArg(1, opencl::getBuffer(bias));
-		kernel.setArg(2, first_dim);
-		kernel.setArg(3, last_dim);
-		kernel.setArg(4, static_cast<int>(act));
+		kernel.setArg(0, opencl::getBuffer(output));
+		kernel.setArg(1, opencl::getBuffer(input));
+		kernel.setArg(2, opencl::getBuffer(bias));
+		kernel.setArg(3, first_dim);
+		kernel.setArg(4, last_dim);
+		kernel.setArg(5, static_cast<int>(act));
 
 		opencl::runKernel(context, kernel, global, local);
 	}

@@ -143,7 +143,7 @@ namespace ml
 		Tensor output_matrices = output.view(Shape( { 12 * 13 * 17, 21 }));
 
 		gemm(context, 'n', 't', output_matrices, input_matrices, weight_matrices, 1.0f, 0.0f);
-		addBiasAct(context, output, bias, ActivationType::SIGMOID);
+		addBiasAct(context, output, output, bias, ActivationType::SIGMOID);
 		EXPECT_LE(testing::diffForTest(correct_output, output), 1.0e-4f);
 
 		if (testing::has_device_supporting(DataType::FLOAT32))
@@ -161,7 +161,7 @@ namespace ml
 			output_matrices.zeroall();
 
 			gemm(context, 'n', 't', output_matrices, input_matrices, weight_matrices, 1.0f, 0.0f);
-			addBiasAct(context, output, bias, ActivationType::SIGMOID);
+			addBiasAct(context, output, output, bias, ActivationType::SIGMOID);
 			context.synchronize();
 			EXPECT_LE(testing::diffForTest(correct_output, output), 1.0e-4f);
 		}

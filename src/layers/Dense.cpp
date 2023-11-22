@@ -139,7 +139,7 @@ namespace ml
 			{
 				gemm(context(), 'n', 't', output, flatten_input_tensor(input[0]), getWeights().getParam(), 1, 0);
 				if (isUsingBias())
-					addBiasAct(context(), output, getBias().getParam(), m_activation);
+					addBiasAct(context(), output, output, getBias().getParam(), m_activation);
 				else
 					activationForward(context(), output, output, m_activation);
 			}
@@ -149,7 +149,7 @@ namespace ml
 		{
 			output.copyFrom(context(), flatten_input_tensor(input[0]));
 			if (isUsingBias())
-				addBiasAct(context(), output, getBias().getParam(), m_activation);
+				addBiasAct(context(), output, output, getBias().getParam(), m_activation);
 			else
 				activationForward(context(), output, output, m_activation);
 		}

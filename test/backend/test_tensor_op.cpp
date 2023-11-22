@@ -97,7 +97,7 @@ namespace ml
 
 		baseline_add_bias_act(correct_output, bias, ActivationType::SIGMOID);
 
-		addBiasAct(context, output, bias, ActivationType::SIGMOID);
+		addBiasAct(context, output, output, bias, ActivationType::SIGMOID);
 		EXPECT_LE(testing::diffForTest(correct_output, output), 1.0e-6);
 
 		if (testing::has_device_supporting(DataType::FLOAT32))
@@ -107,7 +107,7 @@ namespace ml
 			testing::initForTest(output, 1.57f);
 			bias.moveTo(device);
 			output.moveTo(device);
-			addBiasAct(context, output, bias, ActivationType::SIGMOID);
+			addBiasAct(context, output, output, bias, ActivationType::SIGMOID);
 			context.synchronize();
 			EXPECT_LE(testing::diffForTest(correct_output, output), 1.0e-6);
 		}
@@ -125,7 +125,7 @@ namespace ml
 		baseline_add_bias_act(correct_output, bias, ActivationType::SIGMOID);
 
 		bias.convertTo(context, DataType::FLOAT16);
-		addBiasAct(context, output, bias, ActivationType::SIGMOID);
+		addBiasAct(context, output, output, bias, ActivationType::SIGMOID);
 		output.convertTo(context, DataType::FLOAT32);
 		EXPECT_LE(testing::diffForTest(correct_output, output), 1.0e-3);
 
@@ -137,7 +137,7 @@ namespace ml
 			bias.moveTo(device);
 			output.moveTo(device);
 			output.convertTo(context, DataType::FLOAT16);
-			addBiasAct(context, output, bias, ActivationType::SIGMOID);
+			addBiasAct(context, output, output, bias, ActivationType::SIGMOID);
 			output.convertTo(context, DataType::FLOAT32);
 			context.synchronize();
 			EXPECT_LE(testing::diffForTest(correct_output, output), 1.0e-3);

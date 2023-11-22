@@ -135,9 +135,10 @@ namespace
 	}
 
 	template<typename T, ml::mlActivationType_t ACT>
-	void kernel_add_bias_act(void *input, const void *bias, int first_dim, int last_dim)
+	void kernel_add_bias_act(void *output, const void *input, const void *bias, int first_dim, int last_dim)
 	{
-		T *input_ptr = ml::getPointer<T>(input);
+		T *output_ptr = ml::getPointer<T>(output);
+		const T *input_ptr = ml::getPointer<T>(input);
 		const T *bias_ptr = ml::getPointer<T>(bias);
 
 		for (int i = 0; i < first_dim; i++)
@@ -160,8 +161,9 @@ namespace
 						tmp = relu(tmp);
 						break;
 				}
-				input_ptr[j] = convert<float, T>(tmp);
+				output_ptr[j] = convert<float, T>(tmp);
 			}
+			output_ptr += last_dim;
 			input_ptr += last_dim;
 		}
 	}
@@ -241,41 +243,41 @@ namespace ml
 			}
 		}
 
-		void def_kernel_add_bias_act_fp32(void *input, const void *bias, int first_dim, int last_dim, mlActivationType_t act)
+		void def_kernel_add_bias_act_fp32(void* output, const void *input, const void *bias, int first_dim, int last_dim, mlActivationType_t act)
 		{
 			switch (act)
 			{
 				default:
 				case ACTIVATION_LINEAR:
-					kernel_add_bias_act<float, ACTIVATION_LINEAR>(input, bias, first_dim, last_dim);
+					kernel_add_bias_act<float, ACTIVATION_LINEAR>(output, input, bias, first_dim, last_dim);
 					break;
 				case ACTIVATION_SIGMOID:
-					kernel_add_bias_act<float, ACTIVATION_SIGMOID>(input, bias, first_dim, last_dim);
+					kernel_add_bias_act<float, ACTIVATION_SIGMOID>(output, input, bias, first_dim, last_dim);
 					break;
 				case ACTIVATION_TANH:
-					kernel_add_bias_act<float, ACTIVATION_TANH>(input, bias, first_dim, last_dim);
+					kernel_add_bias_act<float, ACTIVATION_TANH>(output, input, bias, first_dim, last_dim);
 					break;
 				case ACTIVATION_RELU:
-					kernel_add_bias_act<float, ACTIVATION_RELU>(input, bias, first_dim, last_dim);
+					kernel_add_bias_act<float, ACTIVATION_RELU>(output, input, bias, first_dim, last_dim);
 					break;
 			}
 		}
-		void def_kernel_add_bias_act_fp16(void *input, const void *bias, int first_dim, int last_dim, mlActivationType_t act)
+		void def_kernel_add_bias_act_fp16(void* output, const void *input, const void *bias, int first_dim, int last_dim, mlActivationType_t act)
 		{
 			switch (act)
 			{
 				default:
 				case ACTIVATION_LINEAR:
-					kernel_add_bias_act<float16, ACTIVATION_LINEAR>(input, bias, first_dim, last_dim);
+					kernel_add_bias_act<float16, ACTIVATION_LINEAR>(output, input, bias, first_dim, last_dim);
 					break;
 				case ACTIVATION_SIGMOID:
-					kernel_add_bias_act<float16, ACTIVATION_SIGMOID>(input, bias, first_dim, last_dim);
+					kernel_add_bias_act<float16, ACTIVATION_SIGMOID>(output, input, bias, first_dim, last_dim);
 					break;
 				case ACTIVATION_TANH:
-					kernel_add_bias_act<float16, ACTIVATION_TANH>(input, bias, first_dim, last_dim);
+					kernel_add_bias_act<float16, ACTIVATION_TANH>(output, input, bias, first_dim, last_dim);
 					break;
 				case ACTIVATION_RELU:
-					kernel_add_bias_act<float16, ACTIVATION_RELU>(input, bias, first_dim, last_dim);
+					kernel_add_bias_act<float16, ACTIVATION_RELU>(output, input, bias, first_dim, last_dim);
 					break;
 			}
 		}

@@ -111,17 +111,16 @@ namespace ml
 	{
 	}
 
-	// implemented in 'global_pooling.cpp'
-	void cpu_global_avg_and_max_pooling_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, const void *input, void *output,
-			void *max_indices)
+	void cpu_global_avg_and_max_pooling_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, const void *input, void *output)
 	{
 	}
 	void cpu_global_avg_and_max_pooling_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next,
-			const void *max_indices)
+			const void *input)
 	{
 	}
 
-	void cpu_add_bias_act(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *input, const void *bias, mlActivationType_t act)
+	void cpu_add_bias_act(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input, const void *bias,
+			mlActivationType_t act)
 	{
 		const int first_dim = volume_without_last_dim(shape);
 		const int last_dim = get_last_dim(shape);
@@ -132,14 +131,14 @@ namespace ml
 			{
 				const cpu::SimdLevel simd_level = cpu::Context::getSimdLevel(context);
 				if (simd_level >= cpu::SimdLevel::AVX and cpu::has_hardware_fp16_conversion())
-					cpu::avx_kernel_add_bias_act_fp16(input, bias, first_dim, last_dim, act);
+					cpu::avx_kernel_add_bias_act_fp16(output, input, bias, first_dim, last_dim, act);
 				else
-					cpu::def_kernel_add_bias_act_fp16(input, bias, first_dim, last_dim, act);
+					cpu::def_kernel_add_bias_act_fp16(output, input, bias, first_dim, last_dim, act);
 				break;
 			}
 			case DTYPE_FLOAT32:
 			{
-				cpu::def_kernel_add_bias_act_fp32(input, bias, first_dim, last_dim, act);
+				cpu::def_kernel_add_bias_act_fp32(output, input, bias, first_dim, last_dim, act);
 				break;
 			}
 			default:

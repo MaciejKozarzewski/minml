@@ -13,6 +13,7 @@
 #include <minml/utils/json.hpp>
 #include <minml/utils/testing_util.hpp>
 #include <minml/utils/string_util.hpp>
+#include <minml/utils/time_util.hpp>
 
 namespace
 {
@@ -196,7 +197,7 @@ namespace ml
 					output.copyFrom(context(), input[1]);
 					gemm(context(), 'n', 't', output_matrix, input_matrix, weight_matrix, 1, 1);
 					if (isUsingBias())
-						addBiasAct(context(), output, getBias().getParam(), m_activation);
+						addBiasAct(context(), output, output, getBias().getParam(), m_activation);
 					else
 						activationForward(context(), output, output, m_activation);
 				}
@@ -218,7 +219,7 @@ namespace ml
 					{
 						gemm(context(), 'n', 't', output_matrix, input_matrix, weight_matrix, 1, 0);
 						if (isUsingBias())
-							addBiasAct(context(), output, getBias().getParam(), m_activation);
+							addBiasAct(context(), output, output, getBias().getParam(), m_activation);
 						else
 							activationForward(context(), output, output, m_activation);
 					}

@@ -10,10 +10,6 @@
 
 #include <minml/backend/backend_types.h>
 
-//#ifndef CL_HPP_ENABLE_EXCEPTIONS
-//#  define CL_HPP_ENABLE_EXCEPTIONS
-//#endif
-
 #ifndef CL_HPP_TARGET_OPENCL_VERSION
 #  define CL_HPP_TARGET_OPENCL_VERSION 200
 #endif
@@ -48,7 +44,7 @@ namespace ml
 		DLL_PUBLIC bool opencl_is_event_ready(mlEvent_t event);
 		DLL_PUBLIC void opencl_destroy_event(mlEvent_t event);
 
-		// implemented in 'opencl_memory.cu'
+		// implemented in 'opencl_memory.cpp'
 		DLL_PUBLIC void* opencl_malloc(int device_index, int count);
 		DLL_PUBLIC void opencl_free(void *ptr);
 		DLL_PUBLIC void* opencl_create_view(void *src, int offset, int count);
@@ -58,13 +54,13 @@ namespace ml
 		DLL_PUBLIC void opencl_memcpy_from_host(mlContext_t context, void *dst, int dst_offset, const void *src, int count);
 		DLL_PUBLIC void opencl_memcpy_to_host(mlContext_t context, void *dst, const void *src, int src_offset, int count);
 
-		// implemented in 'conversion.cu'
+		// implemented in 'conversion.cpp'
 		DLL_PUBLIC void opencl_unpack_input(mlContext_t context, mlShape_t shape, mlDataType_t dst_dtype, void *dst, const void *src);
 		DLL_PUBLIC void opencl_convert_type(mlContext_t context, void *dst, mlDataType_t dst_dtype, const void *src, mlDataType_t src_dtype,
 				int elements);
 		DLL_PUBLIC void opencl_transpose_021(mlContext_t context, mlDataType_t dtype, mlShape_t shape, const void *input, void *output);
 
-		// implemented in 'winograd_non_fused.cu'
+		// implemented in 'winograd_non_fused.cpp'
 		DLL_PUBLIC void opencl_winograd_weight_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape,
 				const void *weights, void *matrices, bool invert);
 		DLL_PUBLIC void opencl_winograd_input_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape,
@@ -76,16 +72,16 @@ namespace ml
 		DLL_PUBLIC void opencl_winograd_update_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape,
 				const void *matrices, void *update);
 
-		// implemented in 'implicit_gemm_conv.cu'
+		// implemented in 'implicit_gemm_conv.cpp'
 		DLL_PUBLIC void opencl_convolution_implicit_gemm_forward(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape,
 				mlShape_t weights_shape, const void *input, const void *weights, void *output, const void *bias, const void *add,
 				mlActivationType_t act);
 
-		// implemented in 'global_pooling.cu'
+		// implemented in 'global_pooling.cpp'
 		DLL_PUBLIC void opencl_global_avg_and_max_pooling_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, const void *input,
-				void *output, const void *weights);
-		DLL_PUBLIC void opencl_global_avg_and_max_pooling_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next,
-				const void *input, const void *weights);
+				void *output);
+		DLL_PUBLIC void opencl_global_avg_and_max_pooling_backward(mlContext_t context, mlShape_t shape, void *gradient_prev,
+				const void *gradient_next, const void *input);
 
 		// implemented in 'gemms.cpp'
 		DLL_PUBLIC void opencl_gemm(mlContext_t context, mlDataType_t dtype, mlShape_t shape_C, void *C, mlShape_t shape_A, const void *A,
@@ -93,9 +89,9 @@ namespace ml
 		DLL_PUBLIC void opencl_gemm_batched(mlContext_t context, mlDataType_t dtype, mlShape_t shape_C, void *C, mlShape_t shape_A, const void *A,
 				mlShape_t shape_B, const void *B, char opA, char opB, float alpha, float beta);
 
-		// implemented in 'add_bias_act.cu'
-		DLL_PUBLIC void opencl_add_bias_act(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *input, const void *bias,
-				mlActivationType_t act);
+		// implemented in 'add_bias_act.cpp'
+		DLL_PUBLIC void opencl_add_bias_act(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input,
+				const void *bias, mlActivationType_t act);
 
 		DLL_PUBLIC void opencl_batchnorm_inference(mlContext_t context, mlShape_t shape, const void *input, void *output, const void *weights,
 				mlActivationType_t act);
@@ -114,7 +110,7 @@ namespace ml
 		DLL_PUBLIC void opencl_activation_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next,
 				const void *output, mlActivationType_t act);
 
-		// implemented in 'training.cu'
+		// implemented in 'training.cpp'
 		DLL_PUBLIC void opencl_emulate_low_precision(mlContext_t context, mlShape_t shape, void *dst, const void *src);
 		DLL_PUBLIC void opencl_add_tensors(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *dst, const void *src1, const void *src2);
 		DLL_PUBLIC void opencl_sum_over_first_dim(mlContext_t context, mlShape_t shape, void *dst, const void *src, float beta);
@@ -133,7 +129,5 @@ namespace ml
 	}
 #endif
 } /* namespace ml */
-
-
 
 #endif /* MINML_BACKEND_OPENCL_BACKEND_H_ */

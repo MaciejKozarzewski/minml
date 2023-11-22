@@ -163,7 +163,7 @@ namespace ml
 
 		nonlinearity.start();
 		if (isUsingBias())
-			addBiasAct(context(), output, getBias().getParam(), m_activation);
+			addBiasAct(context(), output, output, getBias().getParam(), m_activation);
 		else
 			activationForward(context(), output, output, m_activation);
 		nonlinearity.stop();

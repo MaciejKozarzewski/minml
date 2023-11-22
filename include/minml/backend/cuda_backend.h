@@ -77,9 +77,9 @@ namespace ml
 
 		// implemented in 'global_pooling.cu'
 		DLL_PUBLIC void cuda_global_avg_and_max_pooling_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, const void *input,
-				void *output, const void *weights);
+				void *output);
 		DLL_PUBLIC void cuda_global_avg_and_max_pooling_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next,
-				const void *input, const void *weights);
+				const void *input);
 
 		// implemented in 'gemms.cpp'
 		DLL_PUBLIC void cuda_gemm(mlContext_t context, mlDataType_t dtype, mlShape_t shape_C, void *C, mlShape_t shape_A, const void *A,
@@ -88,7 +88,7 @@ namespace ml
 				mlShape_t shape_B, const void *B, char opA, char opB, float alpha, float beta);
 
 		// implemented in 'add_bias_act.cu'
-		DLL_PUBLIC void cuda_add_bias_act(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *input, const void *bias,
+		DLL_PUBLIC void cuda_add_bias_act(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input, const void *bias,
 				mlActivationType_t act);
 
 		DLL_PUBLIC void cuda_batchnorm_inference(mlContext_t context, mlShape_t shape, const void *input, void *output, const void *weights,
