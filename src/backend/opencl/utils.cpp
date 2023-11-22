@@ -44,7 +44,7 @@ namespace ml
 #endif
 
 			std::vector<cl::Device> result;
-			const cl_int status = p.getDevices(CL_DEVICE_TYPE_ALL, &result);
+			const cl_int status = p.getDevices(CL_DEVICE_TYPE_GPU, &result);
 			CHECK_OPENCL_STATUS(status);
 
 #if defined(_WIN32)

@@ -164,13 +164,24 @@ namespace ml
 		throw NotImplemented(METHOD_NAME);
 	}
 
-	// implemented in 'global_pooling.cu'
-	void opencl_global_avg_and_max_pooling_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, const void *input, void *output)
+	// implemented in 'global_pooling.cpp'
+	void opencl_global_avg_and_max_pooling_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output,
+			const void *input)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
-	void opencl_global_avg_and_max_pooling_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next,
-			const void *input)
+	void opencl_global_avg_and_max_pooling_backward(mlContext_t context, mlShape_t shape, void *gradient_prev,
+			const void *gradient_next, const void *input, const void *output)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+	void opencl_global_broadcasting_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input,
+			const void *bias, const void *add, mlActivationType_t act)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+	void opencl_global_broadcasting_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, void *gradient_next,
+			const void *output, mlActivationType_t act)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}

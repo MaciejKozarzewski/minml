@@ -306,7 +306,7 @@ namespace ml
 	}
 	bool opencl_supports_type(int index, mlDataType_t dtype)
 	{
-		if (0 <= index && index < opencl_get_number_of_devices())
+		if (0 <= index and index < opencl_get_number_of_devices())
 		{
 			switch (dtype)
 			{
@@ -327,14 +327,14 @@ namespace ml
 	const char* opencl_get_device_info(int index)
 	{
 		static const std::vector<std::string> infos = get_device_infos();
-		if (0 <= index && index < opencl_get_number_of_devices())
+		if (0 <= index and index < opencl_get_number_of_devices())
 			return infos.at(index).data();
 		else
 			return nullptr;
 	}
 	void opencl_print_device_features(int index)
 	{
-		if (0 <= index && index < opencl_get_number_of_devices())
+		if (0 <= index and index < opencl_get_number_of_devices())
 		{
 			const openclDeviceProp &prop = get_device_properties().at(index);
 			print_field("type", prop.type);

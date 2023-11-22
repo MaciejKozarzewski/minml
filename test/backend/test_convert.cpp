@@ -29,10 +29,10 @@ namespace
 				}
 	}
 
-	ml::Shape transpose(const ml::Shape &shape)
-	{
-		return ml::Shape( { shape[0], shape[2], shape[1] });
-	}
+//	ml::Shape transpose(const ml::Shape &shape)
+//	{
+//		return ml::Shape( { shape[0], shape[2], shape[1] });
+//	}
 
 }
 namespace ml

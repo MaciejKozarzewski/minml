@@ -19,6 +19,75 @@
 #include <memory>
 #include <algorithm>
 
+namespace
+{
+	class Data
+	{
+			uint16_t m_data[2] = { 0u, 0u };
+			ml::DataType m_dtype = ml::DataType::UNKNOWN;
+		public:
+			Data(ml::DataType dtype) noexcept :
+					m_dtype(dtype)
+			{
+			}
+			Data(ml::DataType dtype, float value) :
+					m_dtype(dtype)
+			{
+				switch (m_dtype)
+				{
+					case ml::DataType::FLOAT16:
+						m_data[0] = ml::convert_fp32_to_fp16(value);
+						break;
+					case ml::DataType::FLOAT32:
+						std::memcpy(m_data, &value, sizeof(float));
+						break;
+					case ml::DataType::INT32:
+					{
+						const int tmp = static_cast<int>(value);
+						std::memcpy(m_data, &tmp, sizeof(int));
+						break;
+					}
+					default:
+						throw ml::DataTypeMismatch(METHOD_NAME, "unknown data type");
+				}
+			}
+			float get() const
+			{
+				switch (m_dtype)
+				{
+					case ml::DataType::FLOAT16:
+						return ml::convert_fp16_to_fp32(m_data[0]);
+					case ml::DataType::FLOAT32:
+					{
+						float x;
+						std::memcpy(&x, m_data, sizeof(float));
+						return x;
+					}
+					case ml::DataType::INT32:
+					{
+						int x;
+						std::memcpy(&x, m_data, sizeof(int));
+						return static_cast<float>(x);
+					}
+					default:
+						throw ml::DataTypeMismatch(METHOD_NAME, "unknown data type");
+				}
+			}
+			void* data() noexcept
+			{
+				return m_data;
+			}
+			const void* data() const noexcept
+			{
+				return m_data;
+			}
+			size_t size() const noexcept
+			{
+				return ml::sizeOf(m_dtype);
+			}
+	};
+}
+
 namespace ml
 {
 
@@ -124,15 +193,14 @@ namespace ml
 		if (full)
 		{
 			std::string result;
-			result += std::string("device     : ") + device() + '\n';
-			result += std::string("data type  : ") + dtype() + '\n';
-			result += std::string("size       : ") + std::to_string(sizeInBytes()) + '\n';
-			result += std::string("volume     : ") + std::to_string(volume()) + '\n';
-			result += std::string("is owning  : ") + std::to_string(isOwning()) + '\n';
-			result += std::string("is view    : ") + std::to_string(isView()) + '\n';
-			result += std::string("rank       : ") + std::to_string(rank()) + '\n';
-			result += std::string("is locked  : ") + std::to_string(isPageLocked()) + '\n';
-//			result += "data       : " + std::to_string(data()) + '\n';
+			result += std::string("device    : ") + device() + '\n';
+			result += std::string("data type : ") + dtype() + '\n';
+			result += std::string("shape     : ") + shape().toString() + '\n';
+			result += std::string("volume    : ") + std::to_string(volume()) + '\n';
+			result += std::string("bytes     : ") + std::to_string(sizeInBytes()) + '\n';
+			result += std::string("is owning : ") + std::to_string(isOwning()) + '\n';
+			result += std::string("is view   : ") + std::to_string(isView()) + '\n';
+			result += std::string("is locked : ") + std::to_string(isPageLocked()) + '\n';
 			return result;
 		}
 		else
@@ -257,55 +325,58 @@ namespace ml
 			throw DeviceMismatch(METHOD_NAME, "context on " + context.device().toString() + ", Tensor on " + device().toString());
 		ml::memzero_async(context, device(), data(), 0, sizeInBytes());
 	}
+	void Tensor::setall(float value)
+	{
+		const Data tmp(dtype(), value);
+		ml::memset(device(), data(), 0, sizeInBytes(), tmp.data(), tmp.size());
+	}
 	void Tensor::setall(const Context &context, float value)
 	{
 		if (context.device() != this->device())
 			throw DeviceMismatch(METHOD_NAME, "context on " + context.device().toString() + ", Tensor on " + device().toString());
-		uint16_t tmp[2] = { 0, 0 };
-		switch (dtype())
-		{
-			case DataType::FLOAT16:
-				tmp[0] = convert_fp32_to_fp16(value);
-				break;
-			case DataType::FLOAT32:
-				std::memcpy(tmp, &value, sizeof(float));
-				break;
-			default:
-				throw DataTypeMismatch(METHOD_NAME, "unknown data type");
-		}
-		ml::memset_async(context, device(), data(), 0, sizeInBytes(), tmp, sizeOf(dtype()));
+
+		const Data tmp(dtype(), value);
+		ml::memset_async(context, device(), data(), 0, sizeInBytes(), tmp.data(), tmp.size());
 	}
-	void Tensor::copyToHost(const Context &context, void *ptr, size_t bytes) const
+	void Tensor::copyToHost(void *dst, size_t bytes) const
 	{
 		if (bytes > static_cast<size_t>(this->sizeInBytes()))
 			throw IllegalArgument(METHOD_NAME, "bytes", "must be lower than tensor size in bytes", bytes);
 		if (bytes == 0)
 			return; // no elements copied
 
-		if (context.device().isCPU())
-			ml::memcpy(Device::cpu(), ptr, 0, this->device(), this->data(), 0, bytes);
-		else
-		{
-			if (context.device() != this->device())
-				throw DeviceMismatch(METHOD_NAME, "context on " + context.device().toString() + ", Tensor on " + device().toString());
-			ml::memcpy_async(context, Device::cpu(), ptr, 0, this->device(), this->data(), 0, bytes);
-		}
+		ml::memcpy(Device::cpu(), dst, 0, this->device(), this->data(), 0, bytes);
 	}
-	void Tensor::copyFromHost(const Context &context, const void *ptr, size_t bytes)
+	void Tensor::copyToHost(const Context &context, void *dst, size_t bytes) const
+	{
+		if (bytes > static_cast<size_t>(this->sizeInBytes()))
+			throw IllegalArgument(METHOD_NAME, "bytes", "must be lower than tensor size in bytes", bytes);
+		if (bytes == 0)
+			return; // no elements copied
+		if (context.device() != this->device())
+			throw DeviceMismatch(METHOD_NAME, "context on " + context.device().toString() + ", Tensor on " + device().toString());
+
+		ml::memcpy_async(context, Device::cpu(), dst, 0, this->device(), this->data(), 0, bytes);
+	}
+	void Tensor::copyFromHost(const void *src, size_t bytes)
 	{
 		if (bytes > static_cast<size_t>(this->sizeInBytes()))
 			throw IllegalArgument(METHOD_NAME, "bytes", "must be lower than tensor size in bytes", bytes);
 		if (bytes == 0)
 			return; // no elements copied
 
-		if (context.device().isCPU())
-			ml::memcpy(this->device(), this->data(), 0, Device::cpu(), ptr, 0, bytes);
-		else
-		{
-			if (context.device() != this->device())
-				throw DeviceMismatch(METHOD_NAME, "context on " + context.device().toString() + ", Tensor on " + device().toString());
-			ml::memcpy_async(context, this->device(), this->data(), 0, Device::cpu(), ptr, 0, bytes);
-		}
+		ml::memcpy(this->device(), this->data(), 0, Device::cpu(), src, 0, bytes);
+	}
+	void Tensor::copyFromHost(const Context &context, const void *src, size_t bytes)
+	{
+		if (bytes > static_cast<size_t>(this->sizeInBytes()))
+			throw IllegalArgument(METHOD_NAME, "bytes", "must be lower than tensor size in bytes", bytes);
+		if (bytes == 0)
+			return; // no elements copied
+		if (context.device() != this->device())
+			throw DeviceMismatch(METHOD_NAME, "context on " + context.device().toString() + ", Tensor on " + device().toString());
+
+		ml::memcpy_async(context, this->device(), this->data(), 0, Device::cpu(), src, 0, bytes);
 	}
 	void Tensor::copyFrom(const Context &context, const Tensor &other)
 	{
@@ -395,46 +466,14 @@ namespace ml
 	}
 	float Tensor::get(std::initializer_list<int> idx) const
 	{
-		uint16_t tmp[2] = { 0, 0 };
-		ml::memcpy(Device::cpu(), tmp, 0, device(), data(), sizeOf(dtype()) * get_index(idx.begin(), idx.size()), sizeOf(dtype()));
-		switch (dtype())
-		{
-			case DataType::FLOAT16:
-				return convert_fp16_to_fp32(tmp[0]);
-			case DataType::FLOAT32:
-			{
-				float x;
-				std::memcpy(&x, tmp, sizeof(float));
-				return x;
-			}
-			case DataType::INT32:
-			{
-				int x;
-				std::memcpy(&x, tmp, sizeof(int));
-				return x;
-			}
-			default:
-				throw DataTypeMismatch(METHOD_NAME, "unknown data type");
-		}
+		Data tmp(dtype());
+		ml::memcpy(Device::cpu(), tmp.data(), 0, device(), data(), sizeOf(dtype()) * get_index(idx.begin(), idx.size()), tmp.size());
+		return tmp.get();
 	}
 	void Tensor::set(float value, std::initializer_list<int> idx)
 	{
-		uint16_t tmp[2] = { 0, 0 };
-		switch (dtype())
-		{
-			case DataType::FLOAT16:
-				tmp[0] = convert_fp32_to_fp16(value);
-				break;
-			case DataType::FLOAT32:
-				std::memcpy(tmp, &value, sizeof(float));
-				break;
-			case DataType::INT32:
-				std::memcpy(tmp, &value, sizeof(int));
-				break;
-			default:
-				throw DataTypeMismatch(METHOD_NAME, "unknown data type");
-		}
-		ml::memcpy(device(), data(), sizeOf(dtype()) * get_index(idx.begin(), idx.size()), Device::cpu(), tmp, 0, sizeOf(dtype()));
+		const Data tmp(dtype(), value);
+		ml::memcpy(device(), data(), sizeOf(dtype()) * get_index(idx.begin(), idx.size()), Device::cpu(), tmp.data(), 0, tmp.size());
 	}
 
 	Json Tensor::serialize(SerializedObject &binary_data) const

@@ -59,7 +59,7 @@ namespace ml
 	TEST(TestTensorOp, setall_cpu)
 	{
 		Tensor t( { 123 }, "float32", Device::cpu());
-		t.setall(Context(), 1.23f);
+		t.setall(1.23f);
 
 		for (int i = 0; i < t.volume(); i++)
 			EXPECT_EQ(t.get( { i }), 1.23f);
@@ -69,7 +69,7 @@ namespace ml
 		if (Device::numberOfCudaDevices() == 0)
 			GTEST_SKIP_("No CUDA devices");
 		Tensor t( { 123 }, "float32", Device::cuda(0));
-		t.setall(Context(Device::cuda(0)), 1.23f);
+		t.setall(1.23f);
 
 		for (int i = 0; i < t.volume(); i++)
 			EXPECT_EQ(t.get( { i }), 1.23f);
@@ -79,7 +79,7 @@ namespace ml
 		if (Device::numberOfOpenCLDevices() == 0)
 			GTEST_SKIP_("No OpenCL devices");
 		Tensor t( { 123 }, "float32", Device::opencl(0));
-		t.setall(Context(Device::opencl(0)), 1.23f);
+		t.setall(1.23f);
 
 		for (int i = 0; i < t.volume(); i++)
 			EXPECT_EQ(t.get( { i }), 1.23f);

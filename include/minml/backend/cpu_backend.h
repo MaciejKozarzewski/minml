@@ -92,9 +92,13 @@ namespace ml
 				mlActivationType_t act);
 
 		// implemented in 'global_pooling.cu'
-		void cpu_global_avg_and_max_pooling_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, const void *input, void *output);
+		void cpu_global_avg_and_max_pooling_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input);
 		void cpu_global_avg_and_max_pooling_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next,
-				const void *input);
+				const void *input, const void *output);
+		void cpu_global_broadcasting_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input,
+				const void *bias, mlActivationType_t act);
+		void cpu_global_broadcasting_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, void *gradient_next, const void *output,
+				mlActivationType_t act);
 
 		// used for training
 		void cpu_emulate_low_precision(mlContext_t context, mlShape_t shape, void *dst, const void *src);

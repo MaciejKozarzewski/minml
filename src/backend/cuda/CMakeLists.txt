@@ -8,6 +8,7 @@ else()
 	set(codesrc 	kernels/activations.cu
 		kernels/batchnorm.cu
 		kernels/conversion.cu
+		kernels/global_pooling.cu
 		kernels/training.cu
 		kernels/winograd_nonfused.cu
 		cuda_context.cpp

@@ -76,9 +76,12 @@ namespace ml
 			void convertTo(const Context &context, DataType newType);
 			void zeroall();
 			void zeroall(const Context &context);
+			void setall(float value);
 			void setall(const Context &context, float value);
-			void copyToHost(const Context &context, void *ptr, size_t bytes) const;
-			void copyFromHost(const Context &context, const void *ptr, size_t bytes);
+			void copyToHost(void *dst, size_t bytes) const;
+			void copyToHost(const Context &context, void *dst, size_t bytes) const;
+			void copyFromHost(const void *src, size_t bytes);
+			void copyFromHost(const Context &context, const void *src, size_t bytes);
 			void copyFrom(const Context &context, const Tensor &other);
 			void copyFrom(const Context &context, const Tensor &other, size_t elements);
 
