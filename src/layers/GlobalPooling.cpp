@@ -91,9 +91,10 @@ namespace ml
 				}
 
 		};
-		static Timer pooling("pooling   ");
-		static Timer matrix_multiply("gemm      ");
+
 		static Timer broadcasting("broadcast ");
+		static Timer matrix_multiply("gemm      ");
+		static Timer pooling("pooling   ");
 
 		assert(input.size() == 1);
 //		const bool emulate_low_precision = false; //isTrainable() and dtype() == DataType::FLOAT32;
