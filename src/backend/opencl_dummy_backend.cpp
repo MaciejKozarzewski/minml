@@ -75,7 +75,7 @@ namespace ml
 		throw NotImplemented(METHOD_NAME);
 	}
 
-	// implemented in 'opencl_memory.cu'
+	// implemented in 'opencl_memory.cpp'
 	void* opencl_malloc(int device_index, int count)
 	{
 		throw NotImplemented(METHOD_NAME);
@@ -109,7 +109,7 @@ namespace ml
 		throw NotImplemented(METHOD_NAME);
 	}
 
-	// implemented in 'conversion.cu'
+	// implemented in 'conversion.cpp'
 	void opencl_unpack_input(mlContext_t context, mlShape_t shape, mlDataType_t dst_dtype, void *dst, const void *src)
 	{
 		throw NotImplemented(METHOD_NAME);
@@ -123,7 +123,7 @@ namespace ml
 		throw NotImplemented(METHOD_NAME);
 	}
 
-	// implemented in 'winograd_non_fused.cu'
+	// implemented in 'winograd_non_fused.cpp'
 	void opencl_winograd_weight_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape, const void *weights,
 			void *matrices, bool invert)
 	{
@@ -150,14 +150,14 @@ namespace ml
 		throw NotImplemented(METHOD_NAME);
 	}
 
-	// implemented in 'implicit_gemm_conv.cu'
+	// implemented in 'implicit_gemm_conv.cpp'
 	void opencl_convolution_implicit_gemm_forward(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, mlShape_t weights_shape,
 			const void *input, const void *weights, void *output, const void *bias, const void *add, mlActivationType_t act)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
 
-	// implemented in 'winograd_fused.cu'
+	// implemented in 'winograd_fused.cpp'
 	void opencl_convolution_fused_winograd_forward(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, mlShape_t weights_shape,
 			const void *input, const void *weights, void *output, const void *bias, const void *add, mlActivationType_t act)
 	{
@@ -165,23 +165,22 @@ namespace ml
 	}
 
 	// implemented in 'global_pooling.cpp'
-	void opencl_global_avg_and_max_pooling_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output,
-			const void *input)
+	void opencl_global_avg_and_max_pooling_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
-	void opencl_global_avg_and_max_pooling_backward(mlContext_t context, mlShape_t shape, void *gradient_prev,
-			const void *gradient_next, const void *input, const void *output)
+	void opencl_global_avg_and_max_pooling_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next,
+			const void *input, const void *output)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
 	void opencl_global_broadcasting_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input,
-			const void *bias, const void *add, mlActivationType_t act)
+			const void *bias, mlActivationType_t act)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
-	void opencl_global_broadcasting_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, void *gradient_next,
-			const void *output, mlActivationType_t act)
+	void opencl_global_broadcasting_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, void *gradient_next, const void *output,
+			mlActivationType_t act)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
@@ -198,8 +197,9 @@ namespace ml
 		throw NotImplemented(METHOD_NAME);
 	}
 
-	// implemented in 'add_bias_act.cu'
-	void opencl_add_bias_act(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input, const void *bias, mlActivationType_t act)
+	// implemented in 'add_bias_act.cpp'
+	void opencl_add_bias_act(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input, const void *bias,
+			mlActivationType_t act)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
@@ -238,7 +238,7 @@ namespace ml
 		throw NotImplemented(METHOD_NAME);
 	}
 
-	// implemented in 'training.cu'
+	// implemented in 'training.cpp'
 	void opencl_emulate_low_precision(mlContext_t context, mlShape_t shape, void *dst, const void *src)
 	{
 		throw NotImplemented(METHOD_NAME);
