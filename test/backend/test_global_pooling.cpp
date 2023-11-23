@@ -7,7 +7,6 @@
 
 #include <minml/core/math.hpp>
 #include <minml/layers/Layer.hpp>
-#include <minml/layers/BatchNormalization.hpp>
 #include <minml/core/Context.hpp>
 #include <minml/core/Tensor.hpp>
 #include <minml/utils/testing_util.hpp>
@@ -113,7 +112,7 @@ namespace ml
 	TEST(TestGlobalPooling, forward_fp32)
 	{
 		Context context;
-		Tensor input( { 12, 13, 14, 34 }, "float32", Device::cpu());
+		Tensor input( { 12, 13, 14, 134 }, "float32", Device::cpu());
 		Tensor output( { input.firstDim(), 2, input.lastDim() }, input.dtype(), Device::cpu());
 		Tensor correct_output(output.shape(), input.dtype(), Device::cpu());
 
@@ -123,9 +122,6 @@ namespace ml
 		globalAvgAndMaxPoolingForward(context, input, output);
 
 		EXPECT_LE(testing::diffForTest(correct_output, output), 1.0e-6f);
-
-//		for (int i = 0; i < 34; i++)
-//			std::cout << correct_output.get( { 0, 1, i }) << " vs " << output.get( { 0, 1, i }) << '\n';
 
 		if (testing::has_device_supporting(DataType::FLOAT32))
 		{
@@ -177,20 +173,8 @@ namespace ml
 			globalAvgAndMaxPoolingBackward(context, gradient_prev, gradient_next, input, output);
 			context.synchronize();
 
-//			for (int i = 0; i < 12; i++)
-//				for (int j = 0; j < 13; j++)
-//					for (int k = 0; k < 14; k++)
-//						for (int l = 0; l < 34; l++)
-//							if (std::fabs(correct_gradient_prev.get( { i, j, k, l }) - gradient_prev.get( { i, j, k, l })) > 1.0e-3)
-//							{
-//								std::cout << i << " " << j << " " << k << " " << l << " : " << correct_gradient_prev.get( { i, j, k, l }) << " vs "
-//										<< gradient_prev.get( { i, j, k, l }) << '\n';
-//								exit(0);
-//							}
-
 			EXPECT_LE(testing::diffForTest(correct_gradient_prev, gradient_prev), 1.0e-6f);
 		}
-//		exit(0);
 	}
 
 	TEST(TestGlobalBroadcasting, forward_fp32)
@@ -221,23 +205,8 @@ namespace ml
 			globalBroadcastingForward(context, input, output, bias, ActivationType::SIGMOID);
 			context.synchronize();
 
-//			for (int i = 0; i < 34; i++)
-//				std::cout << correct_output.get( { 1, 0, 0, i }) << " vs " << output.get( { 1, 0, 0, i }) << '\n';
-//
-//			for (int i = 0; i < 12; i++)
-//				for (int j = 0; j < 13; j++)
-//					for (int k = 0; k < 14; k++)
-//						for (int l = 0; l < 34; l++)
-//							if (std::fabs(correct_output.get( { i, j, k, l }) - output.get( { i, j, k, l })) > 1.0e-3)
-//							{
-//								std::cout << i << " " << j << " " << k << " " << l << " : " << correct_output.get( { i, j, k, l }) << " vs "
-//										<< output.get( { i, j, k, l }) << '\n';
-//								exit(0);
-//							}
-
 			EXPECT_LE(testing::diffForTest(correct_output, output), 1.0e-6f);
 		}
-//		exit(0);
 	}
 	TEST(TestGlobalBroadcasting, backward)
 	{
@@ -251,6 +220,8 @@ namespace ml
 		testing::initForTest(output, 0.0);
 
 		baseline_broadcasting_backward(correct_gradient_prev, gradient_next, output, ActivationType::SIGMOID);
+
+		testing::initForTest(gradient_next, 0.0);
 		globalBroadcastingBackward(context, gradient_prev, gradient_next, output, ActivationType::SIGMOID);
 
 		EXPECT_LE(testing::diffForTest(correct_gradient_prev, gradient_prev), 1.0e-6f);
@@ -267,19 +238,74 @@ namespace ml
 			globalBroadcastingBackward(context, gradient_prev, gradient_next, output, ActivationType::SIGMOID);
 			context.synchronize();
 
-//			for (int i = 0; i < 34; i++)
-//				std::cout << correct_output.get( { 1, 0, 0, i }) << " vs " << output.get( { 1, 0, 0, i }) << '\n';
-//
-//			for (int i = 0; i < 12; i++)
-//				for (int j = 0; j < 34; j++)
-//					if (std::fabs(correct_gradient_prev.get( { i, j }) - gradient_prev.get( { i, j })) > 1.0e-4)
-//					{
-//						std::cout << i << " " << j << " : " << correct_gradient_prev.get( { i, j }) << " vs " << gradient_prev.get( { i, j }) << '\n';
-//						exit(0);
-//					}
-
 			EXPECT_LE(testing::diffForTest(correct_gradient_prev, gradient_prev), 1.0e-4f);
 		}
 	}
+
+	TEST(TestGlobalPooling, forward_fp16)
+	{
+		Context context;
+		Tensor input( { 12, 13, 14, 34 }, "float16", Device::cpu());
+		Tensor output( { input.firstDim(), 2, input.lastDim() }, input.dtype(), Device::cpu());
+		Tensor correct_output(output.shape(), input.dtype(), Device::cpu());
+
+		testing::initForTest(input, 0.0);
+
+		baseline_pooling_forward(input, correct_output);
+
+		if (Device::cpu().supportsType(DataType::FLOAT16))
+		{
+			globalAvgAndMaxPoolingForward(context, input, output);
+			EXPECT_LE(testing::diffForTest(correct_output, output), 1.0e-3);
+		}
+
+		if (testing::has_device_supporting(DataType::FLOAT16))
+		{
+			const Device device = testing::get_device_for_test();
+			Context context(device);
+			testing::initForTest(output, 1.57f);
+			input.moveTo(device);
+			output.moveTo(device);
+			output.zeroall();
+			globalAvgAndMaxPoolingForward(context, input, output);
+			context.synchronize();
+
+			EXPECT_LE(testing::diffForTest(correct_output, output), 1.0e-3);
+		}
+	}
+	TEST(TestGlobalBroadcasting, forward_fp16)
+	{
+		Context context;
+		Tensor input( { 12, 13, 14, 34 }, "float16", Device::cpu());
+		Tensor bias( { input.firstDim(), input.lastDim() }, "float16", Device::cpu());
+		Tensor output(input.shape(), "float16", Device::cpu());
+		Tensor correct_output(output.shape(), "float16", Device::cpu());
+
+		testing::initForTest(input, 0.0);
+		testing::initForTest(bias, 1.0);
+
+		baseline_broadcasting_forward(input, correct_output, bias, ActivationType::SIGMOID);
+
+		if (Device::cpu().supportsType(DataType::FLOAT16))
+		{
+			globalBroadcastingForward(context, input, output, bias, ActivationType::SIGMOID);
+			EXPECT_LE(testing::diffForTest(correct_output, output), 1.0e-3);
+		}
+
+		if (testing::has_device_supporting(DataType::FLOAT16))
+		{
+			const Device device = testing::get_device_for_test();
+			Context context(device);
+			input.moveTo(device);
+			bias.moveTo(device);
+			output.moveTo(device);
+			output.zeroall();
+			globalBroadcastingForward(context, input, output, bias, ActivationType::SIGMOID);
+			context.synchronize();
+
+			EXPECT_LE(testing::diffForTest(correct_output, output), 1.0e-3);
+		}
+	}
+
 } /* namespace ml */
 

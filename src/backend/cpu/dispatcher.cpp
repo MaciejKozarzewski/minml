@@ -113,18 +113,58 @@ namespace ml
 
 	void cpu_global_avg_and_max_pooling_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input)
 	{
+		switch (dtype)
+		{
+			case DTYPE_FLOAT16:
+			{
+				assert(cpu_supports_type(DTYPE_FLOAT16));
+				cpu::avx_kernel_global_avg_and_max_pooling_forward_fp16(context, shape, input, output);
+				break;
+			}
+			case DTYPE_FLOAT32:
+			{
+				if (cpu::getSimdSupport() >= cpu::SimdLevel::AVX)
+					cpu::avx_kernel_global_avg_and_max_pooling_forward_fp32(context, shape, input, output);
+				else
+					cpu::def_kernel_global_avg_and_max_pooling_forward_fp32(context, shape, input, output);
+				break;
+			}
+			default:
+				break;
+		}
 	}
 	void cpu_global_avg_and_max_pooling_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next,
 			const void *input, const void *output)
 	{
+		cpu::def_kernel_global_avg_and_max_pooling_backward(context, shape, gradient_prev, gradient_next, input, output);
 	}
 	void cpu_global_broadcasting_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input, const void *bias,
 			mlActivationType_t act)
 	{
+		switch (dtype)
+		{
+			case DTYPE_FLOAT16:
+			{
+				assert(cpu_supports_type(DTYPE_FLOAT16));
+				cpu::avx_kernel_global_broadcasting_forward_fp16(context, shape, output, input, bias, act);
+				break;
+			}
+			case DTYPE_FLOAT32:
+			{
+				if (cpu::getSimdSupport() >= cpu::SimdLevel::AVX)
+					cpu::avx_kernel_global_broadcasting_forward_fp32(context, shape, output, input, bias, act);
+				else
+					cpu::def_kernel_global_broadcasting_forward_fp32(context, shape, output, input, bias, act);
+				break;
+			}
+			default:
+				break;
+		}
 	}
 	void cpu_global_broadcasting_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, void *gradient_next, const void *output,
 			mlActivationType_t act)
 	{
+		cpu::def_kernel_global_broadcasting_backward(context, shape, gradient_prev, gradient_next, output, act);
 	}
 
 	void cpu_add_bias_act(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input, const void *bias,
@@ -137,11 +177,8 @@ namespace ml
 		{
 			case DTYPE_FLOAT16:
 			{
-				const cpu::SimdLevel simd_level = cpu::Context::getSimdLevel(context);
-				if (simd_level >= cpu::SimdLevel::AVX and cpu::has_hardware_fp16_conversion())
-					cpu::avx_kernel_add_bias_act_fp16(output, input, bias, first_dim, last_dim, act);
-				else
-					cpu::def_kernel_add_bias_act_fp16(output, input, bias, first_dim, last_dim, act);
+				assert(cpu_supports_type(DTYPE_FLOAT16));
+				cpu::avx_kernel_add_bias_act_fp16(output, input, bias, first_dim, last_dim, act);
 				break;
 			}
 			case DTYPE_FLOAT32:
@@ -156,7 +193,6 @@ namespace ml
 
 	void cpu_activation_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input, mlActivationType_t act)
 	{
-		const cpu::SimdLevel simd_level = cpu::Context::getSimdLevel(context);
 		if (act == ACTIVATION_SOFTMAX)
 		{
 			const int first_dim = get_first_dim(shape);
@@ -169,20 +205,11 @@ namespace ml
 			{
 				case DTYPE_FLOAT16:
 				{
-					if (simd_level >= cpu::SimdLevel::AVX and cpu::has_hardware_fp16_conversion())
-					{
-						if (last_dim == 3)
-							cpu::avx_kernel_softmax_3_channels_fp16(output, input, first_dim);
-						else
-							cpu::avx_kernel_softmax_fp16(output, input, first_dim, last_dim, workspace);
-					}
+					assert(cpu_supports_type(DTYPE_FLOAT16));
+					if (last_dim == 3)
+						cpu::avx_kernel_softmax_3_channels_fp16(output, input, first_dim);
 					else
-					{
-						if (last_dim == 3)
-							cpu::def_kernel_softmax_3_channels_fp16(output, input, first_dim);
-						else
-							cpu::def_kernel_softmax_fp16(output, input, first_dim, last_dim, workspace);
-					}
+						cpu::avx_kernel_softmax_fp16(output, input, first_dim, last_dim, workspace);
 					break;
 				}
 				case DTYPE_FLOAT32:
@@ -203,10 +230,8 @@ namespace ml
 			{
 				case DTYPE_FLOAT16:
 				{
-					if (simd_level >= cpu::SimdLevel::AVX and cpu::has_hardware_fp16_conversion())
-						cpu::avx_kernel_activation_forward_fp16(output, input, volume(shape), act);
-					else
-						cpu::def_kernel_activation_forward_fp16(output, input, volume(shape), act);
+					assert(cpu_supports_type(DTYPE_FLOAT16));
+					cpu::avx_kernel_activation_forward_fp16(output, input, volume(shape), act);
 					break;
 				}
 				case DTYPE_FLOAT32:
