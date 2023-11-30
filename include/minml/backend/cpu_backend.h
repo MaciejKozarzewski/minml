@@ -34,6 +34,13 @@ namespace ml
 		bool cpu_is_context_ready(mlContext_t context);
 		void cpu_destroy_context(mlContext_t context);
 
+		// implemented in 'cpu_event.cpp'
+		mlEvent_t cpu_create_event(mlContext_t context);
+		double cpu_get_time_between_events(mlEvent_t start, mlEvent_t end);
+		void cpu_wait_for_event(mlEvent_t event);
+		bool cpu_is_event_ready(mlEvent_t event);
+		void cpu_destroy_event(mlEvent_t event);
+
 		void* cpu_malloc(int count);
 		void cpu_free(void *ptr);
 		void* cpu_create_view(void *src, int offset, int count);

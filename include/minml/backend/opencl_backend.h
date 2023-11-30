@@ -40,6 +40,7 @@ namespace ml
 
 		// implemented in 'opencl_event.cpp'
 		DLL_PUBLIC mlEvent_t opencl_create_event(mlContext_t context);
+		DLL_PUBLIC double opencl_get_time_between_events(mlEvent_t start, mlEvent_t end);
 		DLL_PUBLIC void opencl_wait_for_event(mlEvent_t event);
 		DLL_PUBLIC bool opencl_is_event_ready(mlEvent_t event);
 		DLL_PUBLIC void opencl_destroy_event(mlEvent_t event);

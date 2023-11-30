@@ -23,6 +23,15 @@ namespace ml
 		assert(status == cudaSuccess);
 		return reinterpret_cast<mlEvent_t*>(result);
 	}
+	double cuda_get_time_between_events(mlEvent_t start, mlEvent_t end)
+	{
+		assert(start != nullptr);
+		assert(end != nullptr);
+		float dt;
+		cudaError_t status = cudaEventElapsedTime(&dt, *reinterpret_cast<cudaEvent_t*>(start), *reinterpret_cast<cudaEvent_t*>(end));
+		assert(status == cudaSuccess);
+		return dt * 1.0e-3;
+	}
 	void cuda_wait_for_event(mlEvent_t event)
 	{
 		cudaError_t status = cudaEventSynchronize(*reinterpret_cast<cudaEvent_t*>(event));

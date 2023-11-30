@@ -23,6 +23,7 @@ namespace ml
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
+				m_data = cpu_create_event(context.backend());
 				break;
 			case DeviceType::CUDA:
 				m_data = cuda_create_event(context.backend());
@@ -49,6 +50,7 @@ namespace ml
 		switch (device().type())
 		{
 			case DeviceType::CPU:
+				cpu_destroy_event(backend());
 				break;
 			case DeviceType::CUDA:
 				cuda_destroy_event(backend());
@@ -67,6 +69,7 @@ namespace ml
 		switch (m_device.type())
 		{
 			case DeviceType::CPU:
+				cpu_wait_for_event(backend());
 				break;
 			case DeviceType::CUDA:
 				cuda_wait_for_event(backend());
@@ -82,7 +85,7 @@ namespace ml
 		{
 			default:
 			case DeviceType::CPU:
-				return true;
+				return cpu_is_event_ready(backend());
 			case DeviceType::CUDA:
 				return cuda_is_event_ready(backend());
 			case DeviceType::OPENCL:
@@ -92,6 +95,22 @@ namespace ml
 	void* Event::backend() const noexcept
 	{
 		return m_data;
+	}
+
+	double Event::getElapsedTime(const Event &start, const Event &end)
+	{
+		if (start.device() != end.device())
+			throw std::runtime_error("Event::getElapsedTime() events come from different devices");
+		switch (start.device().type())
+		{
+			default:
+			case DeviceType::CPU:
+				return cpu_get_time_between_events(start.backend(), end.backend());
+			case DeviceType::CUDA:
+				return cuda_get_time_between_events(start.backend(), end.backend());
+			case DeviceType::OPENCL:
+				return opencl_get_time_between_events(start.backend(), end.backend());
+		}
 	}
 
 } /* namespace ml */

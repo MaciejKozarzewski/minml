@@ -1,6 +1,7 @@
 target_sources(${LibName} PRIVATE batchnorm.cpp
 				conv_im2row.cpp
 				cpu_context.cpp
+				cpu_event.cpp
 				cpu_memory.cpp
 				cpu_properties.cpp
 				cpu_x86.cpp

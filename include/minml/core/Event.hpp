@@ -33,6 +33,8 @@ namespace ml
 			void synchronize() const;
 			bool isReady() const;
 			void* backend() const noexcept;
+
+			static double getElapsedTime(const Event &start, const Event &end);
 	};
 
 } /* namespace ml */

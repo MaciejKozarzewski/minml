@@ -134,7 +134,7 @@ namespace ml
 			m_command_queue = cl::CommandQueue(get_cl_context(), get_list_of_devices().at(device_index), 0, &status);
 			CHECK_OPENCL_STATUS(status);
 
-			status = m_command_queue.enqueueBarrierWithWaitList(nullptr, &m_last_event);
+			status = m_command_queue.enqueueMarkerWithWaitList(nullptr, &m_last_event);
 			CHECK_OPENCL_STATUS(status);
 		}
 		void Context::synchronizeWith(mlContext_t context)

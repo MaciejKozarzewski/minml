@@ -62,6 +62,10 @@ namespace ml
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
+	double cuda_get_time_between_events(mlEvent_t start, mlEvent_t end)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
 	void cuda_wait_for_event(mlEvent_t event)
 	{
 		throw NotImplemented(METHOD_NAME);
@@ -173,12 +177,23 @@ namespace ml
 	}
 
 	// implemented in 'global_pooling.cu'
-	void cuda_global_avg_and_max_pooling_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, const void *input, void *output)
+	void cuda_global_avg_and_max_pooling_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output,
+					const void *input)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
 	void cuda_global_avg_and_max_pooling_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next,
-			const void *input)
+			const void *input, const void *output)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+	void cuda_global_broadcasting_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input,
+			const void *bias, mlActivationType_t act)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+	void cuda_global_broadcasting_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, void *gradient_next,
+			const void *output, mlActivationType_t act)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}

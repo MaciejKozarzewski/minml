@@ -13,10 +13,11 @@ namespace ml
 {
 	mlContext_t cpu_create_context()
 	{
-		return new cpu::Context();
+		return reinterpret_cast<mlContext_t*>(new cpu::Context());
 	}
 	void cpu_synchronize_with_context(mlContext_t context)
 	{
+		// intentionally empty
 	}
 	bool cpu_is_context_ready(mlContext_t context)
 	{

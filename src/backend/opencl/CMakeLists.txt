@@ -5,6 +5,7 @@ set(codesrc 	activations.cpp
 				global_pooling.cpp
 				kernel_table.cpp
 				opencl_context.cpp
+				opencl_event.cpp
 				opencl_memory.cpp
 				opencl_properties.cpp
 				training.cpp

@@ -62,6 +62,10 @@ namespace ml
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
+	double opencl_get_time_between_events(mlEvent_t start, mlEvent_t end)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
 	void opencl_wait_for_event(mlEvent_t event)
 	{
 		throw NotImplemented(METHOD_NAME);
