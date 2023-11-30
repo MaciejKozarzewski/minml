@@ -131,7 +131,7 @@ namespace ml
 				m_device_index(device_index)
 		{
 			cl_int status;
-			m_command_queue = cl::CommandQueue(get_cl_context(), get_list_of_devices().at(device_index), 0, &status);
+			m_command_queue = cl::CommandQueue(get_cl_context(), get_list_of_devices().at(device_index), CL_QUEUE_PROFILING_ENABLE, &status);
 			CHECK_OPENCL_STATUS(status);
 
 			status = m_command_queue.enqueueMarkerWithWaitList(nullptr, &m_last_event);
