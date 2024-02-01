@@ -165,6 +165,9 @@ namespace ml
 
 //		m_timer.start();
 		getLayer().forward(input, output);
+//		getLayer().context().synchronize();
+//		std::cout << m_layer->name() + " " + m_layer->getInputShape() + " x " + m_layer->getWeightShape() + " -> " + m_layer->getOutputShape()
+//				<< " = " << testing::normForTest(output) << '\n';
 //		m_timer.stop();
 
 		const bool emulate_low_precision = false; // getLayer().isTrainable() and getLayer().dtype() == DataType::FLOAT32;

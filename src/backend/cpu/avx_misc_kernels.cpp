@@ -251,15 +251,15 @@ namespace
 		const int hw = shape.dim[1] * shape.dim[2];
 		const int channels = shape.dim[3];
 
-		constexpr int length = 32;
-		const int k_iter = channels - (channels % length);
+		constexpr int Length = 32;
+		const int k_iter = channels - (channels % Length);
 
 		const T *input_ptr = reinterpret_cast<const T*>(input);
 		T *output_ptr = reinterpret_cast<T*>(output);
 
-		Line<length> avg;
-		Line<length> max;
-		Line<length> tmp;
+		Line<Length> avg;
+		Line<Length> max;
+		Line<Length> tmp;
 
 		const float inv = 1.0f / hw;
 		for (int i = 0; i < batch_size; i++)
@@ -272,7 +272,7 @@ namespace
 
 			for (int j = 0; j < hw; j++)
 			{
-				for (int k = 0; k < k_iter; k += length)
+				for (int k = 0; k < k_iter; k += Length)
 				{
 					avg.load(workspace + k);
 					max.load(workspace + channels + k);

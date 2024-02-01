@@ -186,7 +186,7 @@ namespace
 	class JsonDeserializer
 	{
 			std::string m_data;
-			size_t offset = 0;
+			size_t m_offset = 0;
 		public:
 			explicit JsonDeserializer(const std::string &str)
 			{
@@ -194,47 +194,47 @@ namespace
 			}
 			Json load()
 			{
-				if (m_data[offset] == '{') // start object
+				if (m_data[m_offset] == '{') // start object
 				{
-					offset++;
+					m_offset++;
 					Json result(JsonType::Object);
-					while (m_data[offset] != '}')
+					while (m_data[m_offset] != '}')
 					{
 						std::string key = load_string();
-						if (m_data[offset] != ':')
+						if (m_data[m_offset] != ':')
 							throw JsonParsingError(METHOD_NAME, "invalid json");
-						offset++;
+						m_offset++;
 						result[key] = load();
-						if (m_data[offset] == ',')
-							offset++;
+						if (m_data[m_offset] == ',')
+							m_offset++;
 						else
 						{
-							if (m_data[offset] != '}')
+							if (m_data[m_offset] != '}')
 								throw JsonParsingError(METHOD_NAME, "invalid json");
 						}
 					}
-					offset++;
+					m_offset++;
 					return result;
 				}
-				if (m_data[offset] == '[') // start array
+				if (m_data[m_offset] == '[') // start array
 				{
-					offset++;
+					m_offset++;
 					Json result(JsonType::Array);
-					while (m_data[offset] != ']')
+					while (m_data[m_offset] != ']')
 					{
 						result[result.size()] = load();
-						if (m_data[offset] == ',')
-							offset++;
+						if (m_data[m_offset] == ',')
+							m_offset++;
 						else
 						{
-							if (m_data[offset] != ']')
+							if (m_data[m_offset] != ']')
 								throw JsonParsingError(METHOD_NAME, "invalid json");
 						}
 					}
-					offset++;
+					m_offset++;
 					return result;
 				}
-				if (m_data[offset] == '\"') // load string
+				if (m_data[m_offset] == '\"') // load string
 				{
 					std::string str = load_string();
 					return Json(str);
@@ -249,15 +249,19 @@ namespace
 				bool is_escape_character = false;
 				for (size_t i = 0; i < str.size(); i++)
 				{
-					if ((!isspace(str[i]) || is_string) && str[i] != '\n')
+					if ((is_string or not isspace(str[i])) and str[i] != '\n')
 						m_data.push_back(str[i]);
 
 					if (is_escape_character)
+					{
+						if (str[i] == 'u')
+							i += 4; // unicode character
 						is_escape_character = false;
+					}
 					else
 					{
 						if (str[i] == '\"')
-							is_string = !is_string;
+							is_string = not is_string;
 					}
 
 					if (str[i] == '\\')
@@ -267,29 +271,29 @@ namespace
 
 			Json load_primitive_type()
 			{
-				const char *string_to_load = m_data.c_str() + offset;
-				if (m_data.size() - offset >= 4 && memcmp(string_to_load, "null", 4) == 0)
+				const char *string_to_load = m_data.c_str() + m_offset;
+				if (m_data.size() - m_offset >= 4 and memcmp(string_to_load, "null", 4) == 0)
 				{
-					offset += 4;
+					m_offset += 4;
 					return Json();
 				}
-				if (m_data.size() - offset >= 4 && memcmp(string_to_load, "true", 4) == 0)
+				if (m_data.size() - m_offset >= 4 and memcmp(string_to_load, "true", 4) == 0)
 				{
-					offset += 4;
+					m_offset += 4;
 					return Json(true);
 				}
-				if (m_data.size() - offset >= 5 && memcmp(string_to_load, "false", 5) == 0)
+				if (m_data.size() - m_offset >= 5 and memcmp(string_to_load, "false", 5) == 0)
 				{
-					offset += 5;
+					m_offset += 5;
 					return Json(false);
 				}
 
 				char *end = nullptr;
 				double val = strtod(string_to_load, &end);
 
-				if ((end != string_to_load) && (val != HUGE_VAL))
+				if ((end != string_to_load) and (val != HUGE_VAL))
 				{
-					offset += static_cast<size_t>(end - string_to_load);
+					m_offset += static_cast<size_t>(end - string_to_load);
 					return val;
 				}
 				else
@@ -297,25 +301,29 @@ namespace
 			}
 			std::string load_string()
 			{
-				if (m_data[offset] != '\"')
+				if (m_data[m_offset] != '\"')
 					throw JsonParsingError(METHOD_NAME, "string never started");
-				offset++;
-				size_t start_index = offset;
+				m_offset++;
+				size_t start_index = m_offset;
 				bool is_escape_character = false;
-				for (; offset < m_data.size(); offset++)
+				for (; m_offset < m_data.size(); m_offset++)
 				{
 					if (is_escape_character)
+					{
+						if (m_data[m_offset] == 'u')
+							m_offset += 4; // unicode character
 						is_escape_character = false;
+					}
 					else
 					{
-						if (m_data.at(offset) == '\"')
+						if (m_data[m_offset] == '\"')
 						{
-							offset++;
-							return m_data.substr(start_index, offset - 1 - start_index);
+							m_offset++;
+							return m_data.substr(start_index, m_offset - 1 - start_index);
 						}
 					}
 
-					if (m_data.at(offset) == '\\')
+					if (m_data[m_offset] == '\\')
 						is_escape_character = true;
 				}
 				throw JsonParsingError(METHOD_NAME, "string never ended");
@@ -385,7 +393,7 @@ Json::Json(const std::initializer_list<Json> &list)
 {
 	bool is_object = std::all_of(list.begin(), list.end(), [](const Json &element)
 	{
-		return element.isArray() && element.size() == 2 && element[0].isString();
+		return element.isArray() and element.size() == 2 and element[0].isString();
 	});
 
 	if (is_object)
@@ -435,7 +443,7 @@ bool Json::isArrayOfPrimitives() const noexcept
 	if (not isArray())
 		return false;
 	for (auto element = as_array().begin(); element < as_array().end(); element++)
-		if ((element->isObject() || element->isArray()) && element->size() > 0)
+		if ((element->isObject() or element->isArray()) and element->size() > 0)
 			return false;
 	return true;
 }

@@ -59,53 +59,7 @@ namespace ml
 
 	void GlobalPooling::forward(const std::vector<Tensor> &input, Tensor &output)
 	{
-		struct Timer
-		{
-				std::string m_name;
-				double m_start = 0.0;
-				double m_total_time = 0.0;
-				int m_count = 0;
-				bool m_init = false;
-
-				Timer(const std::string &name) :
-						m_name(name)
-				{
-				}
-				~Timer()
-				{
-					std::cout << m_name << " : " << 1.0e3 * m_total_time / m_count << " ms\n";
-				}
-				void start() noexcept
-				{
-					m_start = getTime();
-				}
-				void stop() noexcept
-				{
-					if (m_init)
-					{
-						m_total_time += getTime() - m_start;
-						m_count++;
-					}
-					else
-						m_init = true;
-				}
-
-		};
-
-		static Timer broadcasting("broadcast ");
-		static Timer matrix_multiply("gemm      ");
-		static Timer pooling("pooling   ");
-
 		assert(input.size() == 1);
-//		const bool emulate_low_precision = false; //isTrainable() and dtype() == DataType::FLOAT32;
-//		Tensor tmp_w;
-//		if (emulate_low_precision)
-//		{
-//			tmp_w = m_workspace.lock()->view(getWeightShape());
-//			emulateLowPrecision(context(), tmp_w, getWeights().getParam());
-//		}
-//		else
-//			tmp_w = getWeights().getParam().view();
 
 		const int batch_size = input[0].firstDim();
 		const int channels = input[0].lastDim();
@@ -113,32 +67,16 @@ namespace ml
 		Tensor avg_max = m_workspace.lock()->view(Shape( { batch_size, 2, channels }));
 		Tensor shifts = m_workspace.lock()->view(Shape( { batch_size, channels }), avg_max.volume());
 
-		pooling.start();
 		globalAvgAndMaxPoolingForward(context(), input[0], avg_max);
-		pooling.stop();
 
 		avg_max.reshape( { batch_size, 2 * channels });
-		matrix_multiply.start();
 		gemm(context(), 'n', 't', shifts, avg_max, getWeights().getParam(), 1.0f, 0.0f);
-		matrix_multiply.stop();
 
-		broadcasting.start();
 		globalBroadcastingForward(context(), input[0], output, shifts, m_activation);
-		broadcasting.stop();
 	}
 	void GlobalPooling::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next)
 	{
 		assert(input.size() == 1);
-
-		const bool emulate_low_precision = false; //isTrainable() and dtype() == DataType::FLOAT32;
-//		Tensor tmp_w;
-//		if (emulate_low_precision)
-//		{
-//			tmp_w = m_workspace.lock()->view(getWeightShape());
-//			emulateLowPrecision(context(), tmp_w, getWeights().getParam());
-//		}
-//		else
-//			tmp_w = getWeights().getParam().view();
 
 		const int batch_size = input[0].firstDim();
 		const int channels = input[0].lastDim();

@@ -144,7 +144,6 @@ namespace ml
 					activationForward(context(), output, output, m_activation);
 			}
 		}
-
 		else
 		{
 			output.copyFrom(context(), flatten_input_tensor(input[0]));
