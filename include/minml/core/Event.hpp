@@ -20,8 +20,9 @@ namespace ml
 	class Event
 	{
 			void *m_data = nullptr;
-			Device m_device;
+			Device m_device = Device::cpu();
 		public:
+			Event() noexcept = default;
 			Event(const Context &context);
 			Event(const Event &other) = delete;
 			Event(Event &&other) noexcept;

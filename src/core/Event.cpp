@@ -101,6 +101,10 @@ namespace ml
 	{
 		if (start.device() != end.device())
 			throw std::runtime_error("Event::getElapsedTime() events come from different devices");
+		if (start.backend() == nullptr)
+			throw std::runtime_error("Event::getElapsedTime() start event is null");
+		if (end.backend() == nullptr)
+			throw std::runtime_error("Event::getElapsedTime() end event is null");
 		switch (start.device().type())
 		{
 			default:
