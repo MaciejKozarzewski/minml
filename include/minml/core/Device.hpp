@@ -45,7 +45,7 @@ namespace ml
 		private:
 			DeviceType m_type;
 			int m_index;
-			Device(DeviceType type, int index);
+			Device(DeviceType type, int index) noexcept;
 		public:
 			// device creation
 			static Device cpu() noexcept;
@@ -75,8 +75,8 @@ namespace ml
 			static void setNumberOfThreads(int t);
 			static std::string hardwareInfo();
 
-			friend bool operator==(const Device &lhs, const Device &rhs);
-			friend bool operator!=(const Device &lhs, const Device &rhs);
+			friend bool operator==(const Device &lhs, const Device &rhs) noexcept;
+			friend bool operator!=(const Device &lhs, const Device &rhs) noexcept;
 	};
 
 	std::ostream& operator<<(std::ostream &stream, const Device &d);

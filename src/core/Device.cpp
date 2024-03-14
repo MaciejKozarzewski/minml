@@ -21,7 +21,7 @@
 namespace ml
 {
 
-	Device::Device(DeviceType type, int index) :
+	Device::Device(DeviceType type, int index) noexcept:
 			m_type(type),
 			m_index(index)
 	{
@@ -169,11 +169,11 @@ namespace ml
 		}
 	}
 
-	bool operator==(const Device &lhs, const Device &rhs)
+	bool operator==(const Device &lhs, const Device &rhs) noexcept
 	{
 		return lhs.type() == rhs.type() and lhs.index() == rhs.index();
 	}
-	bool operator!=(const Device &lhs, const Device &rhs)
+	bool operator!=(const Device &lhs, const Device &rhs) noexcept
 	{
 		return not (lhs == rhs);
 	}

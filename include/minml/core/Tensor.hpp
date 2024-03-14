@@ -39,7 +39,7 @@ namespace ml
 			uint32_t m_stride[Shape::max_dimension];
 
 		public:
-			Tensor() = default;
+			Tensor() noexcept = default;
 			Tensor(const Shape &shape, DataType dtype, Device device);
 			Tensor(const Shape &shape, const std::string &dtype, Device device);
 			Tensor(const Json &json, const SerializedObject &binary_data);
@@ -54,9 +54,9 @@ namespace ml
 
 			std::string info(bool full = false) const;
 
-			Device device() const;
-			DataType dtype() const;
-			size_t sizeInBytes() const;
+			Device device() const noexcept;
+			DataType dtype() const noexcept;
+			size_t sizeInBytes() const noexcept;
 
 			bool isOwning() const noexcept;
 			bool isView() const noexcept;
@@ -85,15 +85,15 @@ namespace ml
 			void copyFrom(const Context &context, const Tensor &other);
 			void copyFrom(const Context &context, const Tensor &other, size_t elements);
 
-			bool isPageLocked() const;
+			bool isPageLocked() const noexcept;
 			void pageLock();
 			void pageUnlock();
 
 			Tensor view() const;
 			Tensor view(const Shape &shape, size_t offsetInElements = 0) const;
 
-			const void* data() const;
-			void* data();
+			const void* data() const noexcept;
+			void* data() noexcept;
 
 			float get(std::initializer_list<int> idx) const;
 			void set(float value, std::initializer_list<int> idx);
@@ -101,6 +101,7 @@ namespace ml
 			Json serialize(SerializedObject &binary_data) const;
 			void unserialize(const Json &json, const SerializedObject &binary_data);
 
+			size_t getIndexOf(std::initializer_list<int> idx) const;
 		private:
 			size_t get_index(const int *ptr, size_t size) const;
 			void create_stride() noexcept;

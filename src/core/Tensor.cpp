@@ -212,15 +212,15 @@ namespace ml
 		}
 	}
 
-	Device Tensor::device() const
+	Device Tensor::device() const noexcept
 	{
 		return m_device;
 	}
-	DataType Tensor::dtype() const
+	DataType Tensor::dtype() const noexcept
 	{
 		return m_dtype;
 	}
-	size_t Tensor::sizeInBytes() const
+	size_t Tensor::sizeInBytes() const noexcept
 	{
 		return sizeOf(dtype()) * volume();
 	}
@@ -403,7 +403,7 @@ namespace ml
 		}
 	}
 
-	bool Tensor::isPageLocked() const
+	bool Tensor::isPageLocked() const noexcept
 	{
 		return m_is_page_locked;
 	}
@@ -456,11 +456,11 @@ namespace ml
 		return result;
 	}
 
-	const void* Tensor::data() const
+	const void* Tensor::data() const noexcept
 	{
 		return m_data;
 	}
-	void* Tensor::data()
+	void* Tensor::data() noexcept
 	{
 		return m_data;
 	}
@@ -525,7 +525,14 @@ namespace ml
 			ml::memcpy(device(), data(), 0, Device::cpu(), buffer_on_cpu.get(), 0, sizeInBytes());
 		}
 	}
+	size_t Tensor::getIndexOf(std::initializer_list<int> idx) const
+	{
+		return get_index(idx.begin(), idx.size());
+	}
 
+	/*
+	 * private
+	 */
 	size_t Tensor::get_index(const int *ptr, size_t size) const
 	{
 		if (static_cast<int>(size) != rank())
