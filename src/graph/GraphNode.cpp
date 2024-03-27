@@ -160,8 +160,8 @@ namespace ml
 
 		std::vector<Tensor> input(numberOfInputs());
 		for (int i = 0; i < numberOfInputs(); i++)
-			input[i] = changeBatch(batchSize, getInputNode(i)->getOutputTensor());
-		Tensor output = changeBatch(batchSize, this->getOutputTensor());
+			input[i] = change_batch(batchSize, getInputNode(i)->getOutputTensor());
+		Tensor output = change_batch(batchSize, this->getOutputTensor());
 
 //		m_timer.start();
 		getLayer().forward(input, output);
@@ -184,7 +184,7 @@ namespace ml
 		size_t offset = 0;
 		for (int i = 0; i < numberOfInputs(); i++)
 		{
-			input[i] = changeBatch(batchSize, getInputNode(i)->getOutputTensor());
+			input[i] = change_batch(batchSize, getInputNode(i)->getOutputTensor());
 			if (getInputNode(i)->m_done_backward == true)
 			{
 				Shape tmp_shape(getInputNode(i)->getOutputShape());
@@ -193,10 +193,10 @@ namespace ml
 				offset += gradient_prev[i].volume();
 			}
 			else
-				gradient_prev[i] = changeBatch(batchSize, getInputNode(i)->getGradientTensor());
+				gradient_prev[i] = change_batch(batchSize, getInputNode(i)->getGradientTensor());
 		}
-		Tensor output = changeBatch(batchSize, this->getOutputTensor());
-		Tensor gradient_next = changeBatch(batchSize, this->getGradientTensor());
+		Tensor output = change_batch(batchSize, this->getOutputTensor());
+		Tensor gradient_next = change_batch(batchSize, this->getGradientTensor());
 
 		m_layer->backward(input, output, gradient_prev, gradient_next);
 
@@ -312,8 +312,10 @@ namespace ml
 		while (m_output_nodes.size() > 0)
 			removeLink(this, m_output_nodes[0]);
 	}
-
-	Tensor GraphNode::changeBatch(int batch_size, const Tensor &other)
+	/*
+	 * private
+	 */
+	Tensor GraphNode::change_batch(int batch_size, const Tensor &other)
 	{
 		Shape tmp(other.shape());
 		tmp[0] = batch_size;

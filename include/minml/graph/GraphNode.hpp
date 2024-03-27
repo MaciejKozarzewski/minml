@@ -112,8 +112,8 @@ namespace ml
 
 			static void removeLink(GraphNode *prev, GraphNode *next);
 			void removeAllLinks();
-
-			Tensor changeBatch(int batch_size, const Tensor &other);
+		private:
+			Tensor change_batch(int batch_size, const Tensor &other);
 	};
 
 } /* namespace ml */
