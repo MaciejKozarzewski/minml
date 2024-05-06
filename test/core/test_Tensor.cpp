@@ -182,10 +182,9 @@ namespace ml
 	{
 		if (Device::numberOfCudaDevices() == 0)
 			GTEST_SKIP();
-		Context context(Device::cuda(0));
 		Shape ts( { 10 });
 		Tensor tensor(ts, DataType::FLOAT32, Device::cuda(0));
-		tensor.setall(context, 11);
+		tensor.setall(11);
 		for (int i = 0; i < tensor.volume(); i++)
 		{
 			EXPECT_EQ(tensor.get( { i }), 11);

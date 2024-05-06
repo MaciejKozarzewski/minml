@@ -1,6 +1,6 @@
 if (WIN32)
 	add_custom_command(OUTPUT "${CMAKE_BINARY_DIR}/bin/cudaml.dll" COMMAND "scripts/windows_cuda_build.bat")
-	target_link_libraries(${LibName} PUBLIC "${CMAKE_BINARY_DIR}/bin/cudaml.dll")
+	target_link_libraries(${LibName} PUBLIC "${CMAKE_SOURCE_DIR}/build/cudaml.dll")
 else()
 	find_package(CUDAToolkit)
 	enable_language(CUDA)
