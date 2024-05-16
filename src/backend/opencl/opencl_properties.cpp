@@ -20,6 +20,12 @@
 
 namespace
 {
+	std::string to_hex(uint8_t x)
+	{
+		static const std::array<char, 16> text( { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f' });
+		return std::string(1, text[x / 16]) + std::string(1, text[x % 16]);
+	}
+
 	struct openclDeviceProp
 	{
 			cl_device_type type;
@@ -227,11 +233,157 @@ namespace
 				const cl_int status = device.getInfo(name, param);
 				CHECK_OPENCL_STATUS(status);
 			}
+			const std::string& get_features()
+			{
+				if (m_features.empty())
+				{
+					print_field("type", type);
+					print_field("vendor_id", vendor_id);
+					print_field("max_compute_units", max_compute_units);
+					print_field("max_work_item_dimensions", max_work_item_dimensions);
+					print_array("max_work_item_sizes", max_work_item_sizes);
+					print_field("max_work_group_size", max_work_group_size);
+
+					print_field("preferred_vector_width_char", preferred_vector_width_char);
+					print_field("preferred_vector_width_short", preferred_vector_width_short);
+					print_field("preferred_vector_width_int", preferred_vector_width_int);
+					print_field("preferred_vector_width_long", preferred_vector_width_long);
+					print_field("preferred_vector_width_half", preferred_vector_width_half);
+					print_field("preferred_vector_width_float", preferred_vector_width_float);
+					print_field("preferred_vector_width_double", preferred_vector_width_double);
+
+					print_field("native_vector_width_char", native_vector_width_char);
+					print_field("native_vector_width_short", native_vector_width_short);
+					print_field("native_vector_width_int", native_vector_width_int);
+					print_field("native_vector_width_long", native_vector_width_long);
+					print_field("native_vector_width_half", native_vector_width_half);
+					print_field("native_vector_width_float", native_vector_width_float);
+					print_field("native_vector_width_double", native_vector_width_double);
+
+					print_field("max_clock_frequency", max_clock_frequency);
+					print_field("address_bits", address_bits);
+					print_field("max_mem_alloc_size", max_mem_alloc_size);
+
+					print_field("image_support", image_support);
+					print_field("max_read_image_args", max_read_image_args);
+					print_field("max_write_image_args", max_write_image_args);
+					print_field("max_read_write_image_args", max_read_write_image_args);
+					print_field("image2D_max_width", image2D_max_width);
+					print_field("image2D_max_height", image2D_max_height);
+					print_field("image3D_max_width", image3D_max_width);
+					print_field("image3D_max_height", image3D_max_height);
+					print_field("image3D_max_depth", image3D_max_depth);
+					print_field("image_max_buffer_size", image_max_buffer_size);
+					print_field("image_max_array_size", image_max_array_size);
+					print_field("max_samplers", max_samplers);
+					print_field("image_pitch_alignment", image_pitch_alignment);
+					print_field("image_base_address_alignment", image_base_address_alignment);
+
+					print_field("max_pipe_args", max_pipe_args);
+					print_field("pipe_max_active_reservations", pipe_max_active_reservations);
+					print_field("pipe_max_packet_size", pipe_max_packet_size);
+
+					print_field("max_parameter_size", max_parameter_size);
+					print_field("mem_base_add_align", mem_base_add_align);
+
+					print_field("single_fp_config", single_fp_config);
+					print_field("double_fp_config", double_fp_config);
+
+					print_field("global_mem_cache_type", global_mem_cache_type);
+					print_field("global_mem_cacheline_size", global_mem_cacheline_size);
+					print_field("global_mem_cache_size", global_mem_cache_size);
+					print_field("global_mem_size", global_mem_size);
+
+					print_field("max_constant_buffer_size", max_constant_buffer_size);
+					print_field("max_constant_args", max_constant_args);
+
+					print_field("max_global_variable_size", max_global_variable_size);
+					print_field("global_variable_preferred_total_size", global_variable_preferred_total_size);
+
+					print_field("local_mem_type", local_mem_type);
+					print_field("local_mem_size", local_mem_size);
+
+					print_field("error_correction_support", error_correction_support);
+
+					print_field("profiling_timer_resolution", profiling_timer_resolution);
+					print_field("endian_little", endian_little);
+					print_field("available", available);
+
+					print_field("compiler_available", compiler_available);
+					print_field("linker_available", linker_available);
+
+					print_field("execution_capabilities", execution_capabilities);
+					print_field("queue_on_host_properties", queue_on_host_properties);
+					print_field("queue_on_device_properties", queue_on_device_properties);
+					print_field("queue_on_device_max_size", queue_on_device_max_size);
+					print_field("max_on_device_queues", max_on_device_queues);
+					print_field("max_on_device_events", max_on_device_events);
+
+					print_field("built_in_kernels", built_in_kernels);
+					print_hex("platform", platform);
+					print_field("name", name);
+					print_field("vendor", vendor);
+					print_field("driver_version", driver_version);
+					print_field("profile", profile);
+					print_field("version", version);
+					print_field("opencl_c_version", opencl_c_version);
+					print_field("extensions", extensions);
+
+					print_field("printf_buffer_size", printf_buffer_size);
+					print_field("preferred_interop_user_sync", preferred_interop_user_sync);
+					print_hex("parent_device", parent_device);
+					print_field("partition_max_sub_devices", partition_max_sub_devices);
+					print_array("partition_properties", partition_properties);
+					print_field("partition_affinity_domain", partition_affinity_domain);
+					print_array("partition_type", partition_type);
+
+					print_field("reference_count", reference_count);
+					print_field("svm_capabilities", svm_capabilities);
+					print_field("preferred_platform_atomic_alignment", preferred_platform_atomic_alignment);
+					print_field("preferred_global_atomic_alignment", preferred_global_atomic_alignment);
+					print_field("preferred_local_atomic_alignment", preferred_local_atomic_alignment);
+				}
+				return m_features;
+			}
+		private:
+			std::string m_features;
+
+			template<typename T>
+			void print_field(const std::string &name, const T &x)
+			{
+				m_features += name + " : " + std::to_string(x) + '\n';
+			}
+			void print_field(const std::string &name, const std::string &x)
+			{
+				m_features += name + " : \"" + x + "\"\n";
+			}
+
+			template<typename T>
+			void print_hex(const std::string &name, T x)
+			{
+				m_features += name + " : 0x";
+				for (size_t i = 0; i < sizeof(T); i++)
+					m_features += to_hex(reinterpret_cast<const uint8_t*>(&x)[i]);
+				m_features += "\n";
+			}
+			template<typename T>
+			void print_array(const std::string &name, const std::vector<T> &x)
+			{
+				m_features += name + " : [";
+				for (size_t i = 0; i < x.size(); i++)
+					m_features += ((i == 0) ? "" : ", ") + std::to_string(x[i]);
+				m_features += "]\n";
+			}
+			template<typename T>
+			void print_bits(const std::string &name, T x)
+			{
+				m_features += name + " : " + std::bitset<8 * sizeof(T)>(x).to_string() + '\n';
+			}
 	};
 
-	const std::vector<openclDeviceProp>& get_device_properties()
+	std::vector<openclDeviceProp>& get_device_properties()
 	{
-		static const std::vector<openclDeviceProp> properties = []()
+		static std::vector<openclDeviceProp> properties = []()
 		{
 			std::vector<openclDeviceProp> result;
 			for (size_t i = 0; i < ml::opencl::get_list_of_devices().size(); i++)
@@ -254,43 +406,6 @@ namespace
 		return result;
 	}
 
-	template<typename T>
-	void print_field(const std::string &name, const T &x)
-	{
-		std::cout << name << " : " << std::to_string(x) << '\n';
-	}
-	template<>
-	void print_field<std::string>(const std::string &name, const std::string &x)
-	{
-		std::cout << name << " : \"" << x << "\"\n";
-	}
-
-	std::string to_hex(uint8_t x)
-	{
-		static const std::array<char, 16> text( { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f' });
-		return std::string(1, text[x / 16]) + std::string(1, text[x % 16]);
-	}
-	template<typename T>
-	void print_hex(const std::string &name, T x)
-	{
-		std::cout << name << " : 0x";
-		for (size_t i = 0; i < sizeof(T); i++)
-			std::cout << to_hex(reinterpret_cast<const uint8_t*>(&x)[i]);
-		std::cout << "\n";
-	}
-	template<typename T>
-	void print_array(const std::string &name, const std::vector<T> &x)
-	{
-		std::cout << name << " : [";
-		for (size_t i = 0; i < x.size(); i++)
-			std::cout << ((i == 0) ? "" : ", ") << std::to_string(x[i]);
-		std::cout << "]\n";
-	}
-	template<typename T>
-	void print_bits(const std::string &name, T x)
-	{
-		std::cout << name << " : " << std::bitset<8 * sizeof(T)>(x).to_string() << '\n';
-	}
 }
 
 namespace ml
@@ -332,117 +447,12 @@ namespace ml
 		else
 			return nullptr;
 	}
-	void opencl_print_device_features(int index)
+	const char* opencl_print_device_features(int index)
 	{
 		if (0 <= index and index < opencl_get_number_of_devices())
-		{
-			const openclDeviceProp &prop = get_device_properties().at(index);
-			print_field("type", prop.type);
-			print_field("vendor_id", prop.vendor_id);
-			print_field("max_compute_units", prop.max_compute_units);
-			print_field("max_work_item_dimensions", prop.max_work_item_dimensions);
-			print_array("max_work_item_sizes", prop.max_work_item_sizes);
-			print_field("max_work_group_size", prop.max_work_group_size);
-
-			print_field("preferred_vector_width_char", prop.preferred_vector_width_char);
-			print_field("preferred_vector_width_short", prop.preferred_vector_width_short);
-			print_field("preferred_vector_width_int", prop.preferred_vector_width_int);
-			print_field("preferred_vector_width_long", prop.preferred_vector_width_long);
-			print_field("preferred_vector_width_half", prop.preferred_vector_width_half);
-			print_field("preferred_vector_width_float", prop.preferred_vector_width_float);
-			print_field("preferred_vector_width_double", prop.preferred_vector_width_double);
-
-			print_field("native_vector_width_char", prop.native_vector_width_char);
-			print_field("native_vector_width_short", prop.native_vector_width_short);
-			print_field("native_vector_width_int", prop.native_vector_width_int);
-			print_field("native_vector_width_long", prop.native_vector_width_long);
-			print_field("native_vector_width_half", prop.native_vector_width_half);
-			print_field("native_vector_width_float", prop.native_vector_width_float);
-			print_field("native_vector_width_double", prop.native_vector_width_double);
-
-			print_field("max_clock_frequency", prop.max_clock_frequency);
-			print_field("address_bits", prop.address_bits);
-			print_field("max_mem_alloc_size", prop.max_mem_alloc_size);
-
-			print_field("image_support", prop.image_support);
-			print_field("max_read_image_args", prop.max_read_image_args);
-			print_field("max_write_image_args", prop.max_write_image_args);
-			print_field("max_read_write_image_args", prop.max_read_write_image_args);
-			print_field("image2D_max_width", prop.image2D_max_width);
-			print_field("image2D_max_height", prop.image2D_max_height);
-			print_field("image3D_max_width", prop.image3D_max_width);
-			print_field("image3D_max_height", prop.image3D_max_height);
-			print_field("image3D_max_depth", prop.image3D_max_depth);
-			print_field("image_max_buffer_size", prop.image_max_buffer_size);
-			print_field("image_max_array_size", prop.image_max_array_size);
-			print_field("max_samplers", prop.max_samplers);
-			print_field("image_pitch_alignment", prop.image_pitch_alignment);
-			print_field("image_base_address_alignment", prop.image_base_address_alignment);
-
-			print_field("max_pipe_args", prop.max_pipe_args);
-			print_field("pipe_max_active_reservations", prop.pipe_max_active_reservations);
-			print_field("pipe_max_packet_size", prop.pipe_max_packet_size);
-
-			print_field("max_parameter_size", prop.max_parameter_size);
-			print_field("mem_base_add_align", prop.mem_base_add_align);
-
-			print_field("single_fp_config", prop.single_fp_config);
-			print_field("double_fp_config", prop.double_fp_config);
-
-			print_field("global_mem_cache_type", prop.global_mem_cache_type);
-			print_field("global_mem_cacheline_size", prop.global_mem_cacheline_size);
-			print_field("global_mem_cache_size", prop.global_mem_cache_size);
-			print_field("global_mem_size", prop.global_mem_size);
-
-			print_field("max_constant_buffer_size", prop.max_constant_buffer_size);
-			print_field("max_constant_args", prop.max_constant_args);
-
-			print_field("max_global_variable_size", prop.max_global_variable_size);
-			print_field("global_variable_preferred_total_size", prop.global_variable_preferred_total_size);
-
-			print_field("local_mem_type", prop.local_mem_type);
-			print_field("local_mem_size", prop.local_mem_size);
-
-			print_field("error_correction_support", prop.error_correction_support);
-
-			print_field("profiling_timer_resolution", prop.profiling_timer_resolution);
-			print_field("endian_little", prop.endian_little);
-			print_field("available", prop.available);
-
-			print_field("compiler_available", prop.compiler_available);
-			print_field("linker_available", prop.linker_available);
-
-			print_field("execution_capabilities", prop.execution_capabilities);
-			print_field("queue_on_host_properties", prop.queue_on_host_properties);
-			print_field("queue_on_device_properties", prop.queue_on_device_properties);
-			print_field("queue_on_device_max_size", prop.queue_on_device_max_size);
-			print_field("max_on_device_queues", prop.max_on_device_queues);
-			print_field("max_on_device_events", prop.max_on_device_events);
-
-			print_field("built_in_kernels", prop.built_in_kernels);
-			print_hex("platform", prop.platform);
-			print_field("name", prop.name);
-			print_field("vendor", prop.vendor);
-			print_field("driver_version", prop.driver_version);
-			print_field("profile", prop.profile);
-			print_field("version", prop.version);
-			print_field("opencl_c_version", prop.opencl_c_version);
-			print_field("extensions", prop.extensions);
-
-			print_field("printf_buffer_size", prop.printf_buffer_size);
-			print_field("preferred_interop_user_sync", prop.preferred_interop_user_sync);
-			print_hex("parent_device", prop.parent_device);
-			print_field("partition_max_sub_devices", prop.partition_max_sub_devices);
-			print_array("partition_properties", prop.partition_properties);
-			print_field("partition_affinity_domain", prop.partition_affinity_domain);
-			print_array("partition_type", prop.partition_type);
-
-			print_field("reference_count", prop.reference_count);
-			print_field("svm_capabilities", prop.svm_capabilities);
-			print_field("preferred_platform_atomic_alignment", prop.preferred_platform_atomic_alignment);
-			print_field("preferred_global_atomic_alignment", prop.preferred_global_atomic_alignment);
-			print_field("preferred_local_atomic_alignment", prop.preferred_local_atomic_alignment);
-		}
+			return get_device_properties().at(index).get_features().data();
+		else
+			return nullptr;
 	}
 
 } /* namespace ml */

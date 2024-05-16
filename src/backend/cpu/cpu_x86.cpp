@@ -162,7 +162,7 @@ namespace
 		return (xcrFeatureMask & 0xe6) == 0xe6;
 	}
 
-	std::string to_string(uint32_t r0, uint32_t r1, uint32_t r2, uint32_t r3)
+	std::string bytes_to_string(uint32_t r0, uint32_t r1, uint32_t r2, uint32_t r3)
 	{
 		constexpr size_t size = sizeof(uint32_t) * 4;
 		char tmp[size + 1];
@@ -195,7 +195,7 @@ namespace ml
 
 			info = CpuID(0, 0); // EAX=0: Highest Function Parameter and Manufacturer ID
 			const uint32_t max_eax = info.eax();
-			m_vendor = to_string(info.ebx(), info.edx(), info.ecx(), 0);
+			m_vendor = bytes_to_string(info.ebx(), info.edx(), info.ecx(), 0);
 
 			if (max_eax >= 0x00000001) // EAX=1: Processor Info and Feature Bits
 			{
@@ -296,11 +296,11 @@ namespace ml
 			if (max_extended_eax >= 0x80000004) // EAX=0x80000002,0x80000003,0x80000004: Processor Brand String
 			{
 				info = CpuID(0x80000002, 0);
-				m_model = to_string(info.eax(), info.ebx(), info.ecx(), info.edx());
+				m_model = bytes_to_string(info.eax(), info.ebx(), info.ecx(), info.edx());
 				info = CpuID(0x80000003, 0);
-				m_model += to_string(info.eax(), info.ebx(), info.ecx(), info.edx());
+				m_model += bytes_to_string(info.eax(), info.ebx(), info.ecx(), info.edx());
 				info = CpuID(0x80000004, 0);
-				m_model += to_string(info.eax(), info.ebx(), info.ecx(), info.edx());
+				m_model += bytes_to_string(info.eax(), info.ebx(), info.ecx(), info.edx());
 			}
 		}
 		cpu_x86::cpu_x86()
@@ -328,25 +328,27 @@ namespace ml
 		{
 			return m_cores;
 		}
-		void cpu_x86::print() const
+		std::string cpu_x86::to_string() const
 		{
-			std::cout << "Vendor : " << vendor() << '\n';
-			std::cout << "Model  : " << model() << '\n';
-			std::cout << "Cores  : " << cores() << '\n';
-			std::cout << "Memory : " << (memory() >> 20) << "MB\n";
-			std::cout << "Features:\n";
+			std::string result;
+			result += "Vendor : " + vendor() + '\n';
+			result += "Model  : " + model() + '\n';
+			result += "Cores  : " + std::to_string(cores()) + '\n';
+			result += "Memory : " + std::to_string(memory() >> 20) + "MB\n";
+			result += "Features:\n";
 //			size_t max_name_length = 0;
 //			for (auto iter = m_features.begin(); iter != m_features.end(); iter++)
 //				max_name_length = std::max(max_name_length, iter->first.length());
 			for (auto iter = m_features.begin(); iter != m_features.end(); iter++)
 			{
-//				std::cout << std::string(max_name_length - iter->first.length(), ' ');
-				std::cout << iter->first << " : ";
-				std::cout << (iter->second.is_supported ? "YES" : "NO");
+//				result += std::string(max_name_length - iter->first.length(), ' ');
+				result += iter->first + " : ";
+				result += (iter->second.is_supported ? "YES" : "NO");
 				if (not iter->second.comment.empty())
-					std::cout << " - " + iter->second.comment;
-				std::cout << '\n';
+					result += " - " + iter->second.comment;
+				result += '\n';
 			}
+			return result;
 		}
 
 		const cpu_x86& cpu_x86::get()

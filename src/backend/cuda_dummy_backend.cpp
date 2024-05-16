@@ -34,7 +34,7 @@ namespace ml
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
-	void cuda_print_device_features(int index)
+	const char* cuda_get_device_features(int index)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
@@ -216,6 +216,7 @@ namespace ml
 		throw NotImplemented(METHOD_NAME);
 	}
 
+	// batchnorm
 	void cuda_batchnorm_inference(mlContext_t context, mlShape_t shape, const void *input, void *output, const void *weights, mlActivationType_t act)
 	{
 		throw NotImplemented(METHOD_NAME);
@@ -235,6 +236,17 @@ namespace ml
 		throw NotImplemented(METHOD_NAME);
 	}
 	void cuda_fold_batchnorm(mlContext_t context, mlShape_t shape, void *layer_weights, void *layer_bias, const void *batchnorm_weights)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+
+	// layernorm
+	void cuda_layernorm_forward(mlContext_t context, mlShape_t shape, const void *input, void *output, void *weights, mlActivationType_t act)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+	void cuda_layernorm_backward(mlContext_t context, mlShape_t shape, const void *input, const void *output, void *gradient_prev,
+			void *gradient_next, const void *weights, void *weights_update, mlActivationType_t act)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}

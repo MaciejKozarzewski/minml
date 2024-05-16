@@ -30,7 +30,7 @@ namespace ml
 		int opencl_get_memory(int index);
 		bool opencl_supports_type(int index, mlDataType_t dtype);
 		const char* opencl_get_device_info(int index);
-		void opencl_print_device_features(int index);
+		const char* opencl_get_device_features(int index);
 
 		// implemented in 'opencl_context.cpp'
 		mlContext_t opencl_create_context(int device_index);
@@ -57,78 +57,77 @@ namespace ml
 
 		// implemented in 'conversion.cpp'
 		void opencl_unpack_input(mlContext_t context, mlShape_t shape, mlDataType_t dst_dtype, void *dst, const void *src);
-		void opencl_convert_type(mlContext_t context, void *dst, mlDataType_t dst_dtype, const void *src, mlDataType_t src_dtype,
-				int elements);
+		void opencl_convert_type(mlContext_t context, void *dst, mlDataType_t dst_dtype, const void *src, mlDataType_t src_dtype, int elements);
 		void opencl_transpose_021(mlContext_t context, mlDataType_t dtype, mlShape_t shape, const void *input, void *output);
 
 		// implemented in 'winograd_non_fused.cpp'
-		void opencl_winograd_weight_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape,
-				const void *weights, void *matrices, bool invert);
-		void opencl_winograd_input_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape,
-				mlShape_t input_shape, const void *input, void *matrices);
-		void opencl_winograd_output_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape,
-				mlShape_t output_shape, const void *matrices, void *output, const void *bias, const void *add, mlActivationType_t act);
+		void opencl_winograd_weight_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape, const void *weights,
+				void *matrices, bool invert);
+		void opencl_winograd_input_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape, mlShape_t input_shape,
+				const void *input, void *matrices);
+		void opencl_winograd_output_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape, mlShape_t output_shape,
+				const void *matrices, void *output, const void *bias, const void *add, mlActivationType_t act);
 		void opencl_winograd_gradient_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape,
 				mlShape_t gradient_shape, const void *gradient, void *matrices);
-		void opencl_winograd_update_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape,
-				const void *matrices, void *update);
+		void opencl_winograd_update_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape, const void *matrices,
+				void *update);
 
 		// implemented in 'implicit_gemm_conv.cpp'
-		void opencl_convolution_implicit_gemm_forward(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape,
-				mlShape_t weights_shape, const void *input, const void *weights, void *output, const void *bias, const void *add,
-				mlActivationType_t act);
+		void opencl_convolution_implicit_gemm_forward(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, mlShape_t weights_shape,
+				const void *input, const void *weights, void *output, const void *bias, const void *add, mlActivationType_t act);
 
 		// implemented in 'global_pooling.cpp'
-		void opencl_global_avg_and_max_pooling_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output,
-				const void *input);
-		void opencl_global_avg_and_max_pooling_backward(mlContext_t context, mlShape_t shape, void *gradient_prev,
-				const void *gradient_next, const void *input, const void *output);
+		void opencl_global_avg_and_max_pooling_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input);
+		void opencl_global_avg_and_max_pooling_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next,
+				const void *input, const void *output);
 		void opencl_global_broadcasting_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input,
 				const void *bias, mlActivationType_t act);
-		void opencl_global_broadcasting_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, void *gradient_next,
-				const void *output, mlActivationType_t act);
+		void opencl_global_broadcasting_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, void *gradient_next, const void *output,
+				mlActivationType_t act);
 
 		// implemented in 'gemms.cpp'
-		void opencl_gemm(mlContext_t context, mlDataType_t dtype, mlShape_t shape_C, void *C, mlShape_t shape_A, const void *A,
-				mlShape_t shape_B, const void *B, char opA, char opB, float alpha, float beta);
+		void opencl_gemm(mlContext_t context, mlDataType_t dtype, mlShape_t shape_C, void *C, mlShape_t shape_A, const void *A, mlShape_t shape_B,
+				const void *B, char opA, char opB, float alpha, float beta);
 		void opencl_gemm_batched(mlContext_t context, mlDataType_t dtype, mlShape_t shape_C, void *C, mlShape_t shape_A, const void *A,
 				mlShape_t shape_B, const void *B, char opA, char opB, float alpha, float beta);
 
 		// implemented in 'add_bias_act.cpp'
-		void opencl_add_bias_act(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input,
-				const void *bias, mlActivationType_t act);
+		void opencl_add_bias_act(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input, const void *bias,
+				mlActivationType_t act);
 
+		// batchnorm
 		void opencl_batchnorm_inference(mlContext_t context, mlShape_t shape, const void *input, void *output, const void *weights,
 				mlActivationType_t act);
-		void opencl_batchnorm_forward(mlContext_t context, mlShape_t shape, const void *input, void *output, void *weights,
-				void *running_stats, int running_stat_idx, mlActivationType_t act);
+		void opencl_batchnorm_forward(mlContext_t context, mlShape_t shape, const void *input, void *output, void *weights, void *running_stats,
+				int running_stat_idx, mlActivationType_t act);
 		void opencl_batchnorm_backward(mlContext_t context, mlShape_t shape, const void *input, const void *output, void *gradient_prev,
 				void *gradient_next, const void *weights, void *weights_update, const void *running_stats, int running_stat_idx,
 				mlActivationType_t act);
-		void opencl_batchnorm_update(mlContext_t context, mlShape_t shape, const void *running_stat, void *weights, bool use_gamma,
-				bool use_beta);
-		void opencl_fold_batchnorm(mlContext_t context, mlShape_t shape, void *layer_weights, void *layer_bias,
-				const void *batchnorm_weights);
+		void opencl_batchnorm_update(mlContext_t context, mlShape_t shape, const void *running_stat, void *weights, bool use_gamma, bool use_beta);
+		void opencl_fold_batchnorm(mlContext_t context, mlShape_t shape, void *layer_weights, void *layer_bias, const void *batchnorm_weights);
+
+		// layernorm
+		void opencl_layernorm_forward(mlContext_t context, mlShape_t shape, const void *input, void *output, void *weights, mlActivationType_t act);
+		void opencl_layernorm_backward(mlContext_t context, mlShape_t shape, const void *input, const void *output, void *gradient_prev,
+				void *gradient_next, const void *weights, void *weights_update, mlActivationType_t act);
 
 		void opencl_activation_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input,
 				mlActivationType_t act);
-		void opencl_activation_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next,
-				const void *output, mlActivationType_t act);
+		void opencl_activation_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next, const void *output,
+				mlActivationType_t act);
 
 		// implemented in 'training.cpp'
 		void opencl_emulate_low_precision(mlContext_t context, mlShape_t shape, void *dst, const void *src);
 		void opencl_add_tensors(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *dst, const void *src1, const void *src2);
 		void opencl_sum_over_first_dim(mlContext_t context, mlShape_t shape, void *dst, const void *src, float beta);
 		float opencl_mean_squared_loss(mlContext_t context, mlShape_t shape, const void *output, const void *target);
-		void opencl_mean_squared_gradient(mlContext_t context, mlShape_t shape, void *gradient, const void *output, const void *target,
-				float weight);
+		void opencl_mean_squared_gradient(mlContext_t context, mlShape_t shape, void *gradient, const void *output, const void *target, float weight);
 		float opencl_cross_entropy_loss(mlContext_t context, mlShape_t shape, const void *output, const void *target);
 		void opencl_cross_entropy_gradient(mlContext_t context, mlShape_t shape, void *gradient, const void *output, const void *target,
 				float weight);
 		void opencl_adam_optimize(mlContext_t context, mlShape_t shape, void *weight, const void *update, void *momentum, void *variance,
 				float learning_rate, float beta1, float beta2);
-		void opencl_l2_regularization(mlContext_t context, mlShape_t shape, void *gradient, const void *param, float coefficient,
-				float offset);
+		void opencl_l2_regularization(mlContext_t context, mlShape_t shape, void *gradient, const void *param, float coefficient, float offset);
 
 #ifdef __cplusplus
 	}

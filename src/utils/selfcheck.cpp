@@ -130,21 +130,21 @@ namespace ml
 			{
 				case DeviceType::CPU:
 				{
-					cpu_print_device_features();
+					std::cout << cpu_get_device_features();
 					std::cout << "Supports fp32 : " << (cpu_supports_type(DTYPE_FLOAT32) ? "YES" : "NO") << '\n';
 					std::cout << "Supports fp16 : " << (cpu_supports_type(DTYPE_FLOAT16) ? "YES" : "NO") << '\n';
 					return 0;
 				}
 				case DeviceType::CUDA:
 				{
-					cuda_print_device_features(device.index());
+					std::cout << cuda_get_device_features(device.index());
 					std::cout << "Supports fp32 : " << (cuda_supports_type(device.index(), DTYPE_FLOAT32) ? "YES" : "NO") << '\n';
 					std::cout << "Supports fp16 : " << (cuda_supports_type(device.index(), DTYPE_FLOAT16) ? "YES" : "NO") << '\n';
 					return 0;
 				}
 				case DeviceType::OPENCL:
 				{
-					opencl_print_device_features(device.index());
+					std::cout << opencl_get_device_features(device.index());
 					std::cout << "Supports fp32 : " << (opencl_supports_type(device.index(), DTYPE_FLOAT32) ? "YES" : "NO") << '\n';
 					std::cout << "Supports fp16 : " << (opencl_supports_type(device.index(), DTYPE_FLOAT16) ? "YES" : "NO") << '\n';
 					return 0;

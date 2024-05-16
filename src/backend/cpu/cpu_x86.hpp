@@ -38,7 +38,7 @@ namespace ml
 				const std::string& model() const noexcept;
 				int64_t memory() const noexcept;
 				int64_t cores() const noexcept;
-				void print() const;
+				std::string to_string() const;
 				static const cpu_x86& get();
 		};
 	}

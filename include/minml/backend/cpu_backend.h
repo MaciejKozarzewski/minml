@@ -27,7 +27,7 @@ namespace ml
 		int cpu_get_simd_level();
 		bool cpu_supports_type(mlDataType_t dtype);
 		const char* cpu_get_device_info();
-		void cpu_print_device_features();
+		const char* cpu_get_device_features();
 
 		mlContext_t cpu_create_context();
 		void cpu_synchronize_with_context(mlContext_t context);
@@ -83,6 +83,9 @@ namespace ml
 		void cpu_add_bias_act(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input, const void *bias,
 				mlActivationType_t act);
 
+		/*
+		 * batchnorm
+		 */
 		void cpu_batchnorm_inference(mlContext_t context, mlShape_t shape, const void *input, void *output, const void *weights,
 				mlActivationType_t act);
 		void cpu_batchnorm_forward(mlContext_t context, mlShape_t shape, const void *input, void *output, void *weights, void *running_stats,
@@ -93,6 +96,16 @@ namespace ml
 		void cpu_batchnorm_update(mlContext_t context, mlShape_t shape, const void *running_stat, void *weights, bool use_gamma, bool use_beta);
 		void cpu_fold_batchnorm(mlContext_t context, mlShape_t shape, void *layer_weights, void *layer_bias, const void *batchnorm_weights);
 
+		/*
+		 * layernorm
+		 */
+		void cpu_layernorm_forward(mlContext_t context, mlShape_t shape, const void *input, void *output, void *weights, mlActivationType_t act);
+		void cpu_layernorm_backward(mlContext_t context, mlShape_t shape, const void *input, const void *output, void *gradient_prev,
+				void *gradient_next, const void *weights, void *weights_update, mlActivationType_t act);
+
+		/*
+		 * activation
+		 */
 		void cpu_activation_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input,
 				mlActivationType_t act);
 		void cpu_activation_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next, const void *output,

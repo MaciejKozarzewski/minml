@@ -26,7 +26,7 @@ namespace ml
 		DLL_PUBLIC int cuda_get_memory(int index);
 		DLL_PUBLIC bool cuda_supports_type(int index, mlDataType_t dtype);
 		DLL_PUBLIC const char* cuda_get_device_info(int index);
-		DLL_PUBLIC void cuda_print_device_features(int index);
+		DLL_PUBLIC const char* cuda_get_device_features(int index);
 
 		// implemented in 'cuda_context.cpp'
 		DLL_PUBLIC mlContext_t cuda_create_context(int device_index);
@@ -96,6 +96,7 @@ namespace ml
 		DLL_PUBLIC void cuda_add_bias_act(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input, const void *bias,
 				mlActivationType_t act);
 
+		// batchnorm
 		DLL_PUBLIC void cuda_batchnorm_inference(mlContext_t context, mlShape_t shape, const void *input, void *output, const void *weights,
 				mlActivationType_t act);
 		DLL_PUBLIC void cuda_batchnorm_forward(mlContext_t context, mlShape_t shape, const void *input, void *output, void *weights,
@@ -108,6 +109,13 @@ namespace ml
 		DLL_PUBLIC void cuda_fold_batchnorm(mlContext_t context, mlShape_t shape, void *layer_weights, void *layer_bias,
 				const void *batchnorm_weights);
 
+		// layernorm
+		DLL_PUBLIC void cuda_layernorm_forward(mlContext_t context, mlShape_t shape, const void *input, void *output, void *weights,
+				mlActivationType_t act);
+		DLL_PUBLIC void cuda_layernorm_backward(mlContext_t context, mlShape_t shape, const void *input, const void *output, void *gradient_prev,
+				void *gradient_next, const void *weights, void *weights_update, mlActivationType_t act);
+
+		// activations
 		DLL_PUBLIC void cuda_activation_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input,
 				mlActivationType_t act);
 		DLL_PUBLIC void cuda_activation_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next,
