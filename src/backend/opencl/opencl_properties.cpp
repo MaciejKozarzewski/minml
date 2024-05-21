@@ -447,7 +447,7 @@ namespace ml
 		else
 			return nullptr;
 	}
-	const char* opencl_print_device_features(int index)
+	const char* opencl_get_device_features(int index)
 	{
 		if (0 <= index and index < opencl_get_number_of_devices())
 			return get_device_properties().at(index).get_features().data();
