@@ -19,21 +19,21 @@ R"(
   }
   #if STORAGE_PRECISION == 16
 	typedef half storage_type;
-	float load(const half *ptr, int offset)
+	float load(const __global half *ptr, int offset)
 	{
 		return vload_half(offset, ptr);
 	}
-	void store(half value, half *ptr, int offset)
+	void store(half value, __global half *ptr, int offset)
 	{
 		vstore_half(value, offset, ptr);
 	}
   #elif STORAGE_PRECISION == 32
     typedef float storage_type;
-	float load(const float *ptr, int offset)
+	float load(const __global float *ptr, int offset)
 	{
 		return ptr[offset];
 	}
-	void store(float value, float *ptr, int offset)
+	void store(float value, __global float *ptr, int offset)
 	{
 		ptr[offset] = value;
 	}
@@ -50,11 +50,11 @@ R"(
   }
   #if STORAGE_PRECISION == 16
   	typedef half storage_type;
-	half load(const half *ptr, int offset)
+	half load(const __global half *ptr, int offset)
 	{
 		return half[offset];
 	}
-	void store(half value, half *ptr, int offset)
+	void store(half value, __global half *ptr, int offset)
 	{
 		ptr[offset] = value;
 	}
