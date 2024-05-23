@@ -110,8 +110,10 @@ namespace
 		switch (device.type())
 		{
 			case DeviceType::CPU:
-				return (filter_size == 3) ? std::vector<int>( { 2, 4, 5 }) : std::vector<int>( { 2 });
+				return (filter_size == 3) ? std::vector<int>( { 4, 5 }) : std::vector<int>();
 			case DeviceType::CUDA:
+				return (filter_size == 3) ? std::vector<int>( { 2, 4 }) : std::vector<int>( { 2 });
+			case DeviceType::OPENCL:
 				return (filter_size == 3) ? std::vector<int>( { 2, 4 }) : std::vector<int>( { 2 });
 			default:
 				return std::vector<int>();
