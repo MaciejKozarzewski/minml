@@ -171,7 +171,7 @@ namespace ml
 		const int tiles_w = get_number_of_tiles(width, tile_size);
 		const int max_threads = opencl::has_fp16_math(context) ? 64 : 128;
 
-		cl::Kernel kernel = get_kernel(context, "transform_gradientweights", kernel_size, tile_size);
+		cl::Kernel kernel = get_kernel(context, "transform_gradient", kernel_size, tile_size);
 		cl::NDRange local(max_threads);
 		cl::NDRange global(max_threads * tiles_h, tiles_w, gradient_shape.dim[0]);
 
