@@ -70,16 +70,21 @@ namespace ml
 			}();
 			return devices;
 		}
-		cl::Context& get_cl_context()
+		std::vector<cl::Context>& get_list_of_contexts()
 		{
-			static cl::Context context = []()
+			static std::vector<cl::Context> contexts = []()
 			{
 				cl_int status;
-				cl::Context result(get_list_of_devices(), nullptr, nullptr, nullptr, &status);
-				CHECK_OPENCL_STATUS(status);
+				std::vector<cl::Context> result;
+				for (size_t i = 0; i < get_list_of_devices().size(); i++)
+				{
+					cl::Context tmp(get_list_of_devices().at(i), nullptr, nullptr, nullptr, &status);
+					CHECK_OPENCL_STATUS(status);
+					result.push_back(tmp);
+				}
 				return result;
 			}();
-			return context;
+			return contexts;
 		}
 
 		void waitForEvent(const cl::Event *event)
@@ -88,36 +93,9 @@ namespace ml
 			const cl_int status = event->wait();
 			CHECK_OPENCL_STATUS(status);
 		}
-		cl::Program compileProgram(const std::string &name, const std::string &source, const std::string &options)
-		{
-			cl_int status;
-			cl::Program result(opencl::get_cl_context(), source, false, &status);
-			CHECK_OPENCL_STATUS(status);
-
-			const std::string all_options = options + " -cl-mad-enable";
-			status = result.build(get_list_of_devices(), all_options.c_str());
-			if (status != CL_SUCCESS)
-			{
-				std::cout << "Compilation status = " << status << '\n';
-				const auto info = result.getBuildInfo<CL_PROGRAM_BUILD_LOG>();
-				for (size_t i = 0; i < info.size(); i++)
-				{
-					std::cout << "Build log for program " << name << " on device OPENCL:" << i << " - " << opencl_get_device_info(i) << ":\n";
-					std::cout << info[i].second << '\n';
-				}
-				CHECK_OPENCL_STATUS(status);
-			}
-			return result;
-		}
-		cl::Kernel getKernel(const cl::Program &program, const char *name)
-		{
-			cl_int status;
-			cl::Kernel result(program, name, &status);
-			CHECK_OPENCL_STATUS(status);
-			return result;
-		}
 		void runKernel(mlContext_t context, const cl::Kernel &kernel, const cl::NDRange &global, const cl::NDRange &local)
 		{
+			assert(context != nullptr);
 			cl::CommandQueue &queue = opencl::Context::getCommandQueue(context);
 			cl::Event *event = opencl::Context::getLastEvent(context);
 			const cl_int status = queue.enqueueNDRangeKernel(kernel, cl::NullRange, global, local, nullptr, event);
@@ -131,7 +109,8 @@ namespace ml
 				m_device_index(device_index)
 		{
 			cl_int status;
-			m_command_queue = cl::CommandQueue(get_cl_context(), get_list_of_devices().at(device_index), CL_QUEUE_PROFILING_ENABLE, &status);
+			m_command_queue = cl::CommandQueue(get_list_of_contexts().at(device_index), get_list_of_devices().at(device_index),
+			CL_QUEUE_PROFILING_ENABLE, &status);
 			CHECK_OPENCL_STATUS(status);
 
 			status = m_command_queue.enqueueMarkerWithWaitList(nullptr, &m_last_event);
@@ -168,21 +147,28 @@ namespace ml
 			else
 				return get(context)->m_is_synchronized;
 		}
+		cl::CommandQueue& Context::getDefaultCommandQueue(int device_index)
+		{
+			static std::vector<cl::CommandQueue> command_queues = []()
+			{
+				cl_int status;
+				std::vector<cl::CommandQueue> result;
+				for (size_t i = 0; i < get_list_of_devices().size(); i++)
+				{
+					cl::CommandQueue tmp(get_list_of_contexts().at(i), get_list_of_devices().at(i), CL_QUEUE_PROFILING_ENABLE, &status);
+					CHECK_OPENCL_STATUS(status);
+					result.push_back(tmp);
+				}
+				return result;
+			}();
+			return command_queues.at(device_index);
+		}
 		cl::CommandQueue& Context::getCommandQueue(mlContext_t context)
 		{
 			if (context == nullptr)
-			{
-				static cl::CommandQueue default_queue = []()
-				{
-					cl_int status;
-					cl::CommandQueue result(get_cl_context(), get_list_of_devices().at(0), 0, &status);
-					CHECK_OPENCL_STATUS(status);
-					return result;
-				}();
-				return default_queue;
-			}
-			else
-				return get(context)->m_command_queue;
+				throw std::logic_error("Context::getCommandQueue() got null context");
+
+			return get(context)->m_command_queue;
 		}
 		cl::Event* Context::getLastEvent(mlContext_t context)
 		{
@@ -194,22 +180,11 @@ namespace ml
 		cl::Buffer& Context::getWorkspace(mlContext_t context)
 		{
 			if (context == nullptr)
-			{
-				static cl::Buffer buffer = []()
-				{
-					cl_int status;
-					cl::Buffer result(get_cl_context(), CL_MEM_READ_WRITE, 1024, nullptr, &status); // @suppress("Ambiguous problem")
-					CHECK_OPENCL_STATUS(status);
-					return result;
-				}();
-				return buffer;
-			}
-			else
-			{
-				if (getWorkspaceSize(context) == 0)
-					setWorkspaceSize(context, default_workspace_size);
-				return get(context)->m_workspace;
-			}
+				throw std::logic_error("Context::getWorkspace() got null context");
+
+			if (getWorkspaceSize(context) == 0)
+				setWorkspaceSize(context, default_workspace_size);
+			return get(context)->m_workspace;
 		}
 		size_t Context::getWorkspaceSize(mlContext_t context)
 		{
@@ -223,7 +198,94 @@ namespace ml
 			if (context != nullptr and bytes > getWorkspaceSize(context))
 			{
 				get(context)->m_workspace_size = bytes;
-				get(context)->m_workspace = cl::Buffer(get_cl_context(), CL_MEM_READ_WRITE, bytes);
+				get(context)->m_workspace = cl::Buffer(get_list_of_contexts().at(getDeviceIndex(context)), CL_MEM_READ_WRITE, bytes);
+			}
+		}
+
+		/*
+		 * ProgramCache
+		 */
+		ProgramCache::ProgramCache(const std::string &name, const std::string &source, const std::string &options)
+		{
+			cl_int status;
+			for (size_t i = 0; i < get_list_of_contexts().size(); i++)
+			{
+				cl::Program program(get_list_of_contexts().at(i), source, false, &status);
+				CHECK_OPENCL_STATUS(status);
+
+				const std::string all_options = options + " -cl-mad-enable";
+				status = program.build(get_list_of_devices().at(i), all_options.c_str());
+				if (status != CL_SUCCESS)
+				{
+					std::cout << "Compilation status = " << status << '\n';
+					const auto info = program.getBuildInfo<CL_PROGRAM_BUILD_LOG>();
+					for (size_t i = 0; i < info.size(); i++)
+					{
+						std::cout << "Build log for program " << name << " on device OPENCL:" << i << " - " << opencl_get_device_info(i) << ":\n";
+						std::cout << info[i].second << '\n';
+					}
+					CHECK_OPENCL_STATUS(status);
+				}
+				m_programs.push_back(program);
+			}
+		}
+		cl::Kernel ProgramCache::getKernel(mlContext_t context, const char *name) const
+		{
+			cl_int status;
+			cl::Kernel result(m_programs.at(Context::getDeviceIndex(context)), name, &status);
+			CHECK_OPENCL_STATUS(status);
+			return result;
+		}
+
+		/*
+		 * MemoryObject
+		 */
+		MemoryObject::MemoryObject(int device_index, size_t count) :
+				m_size(count),
+				m_device_index(device_index)
+		{
+			cl_int status;
+			m_buffer = cl::Buffer(ml::opencl::get_list_of_contexts().at(device_index), CL_MEM_READ_WRITE, count, nullptr, &status); // @suppress("Ambiguous problem")
+			CHECK_OPENCL_STATUS(status);
+		}
+		MemoryObject::MemoryObject(MemoryObject &other, size_t offset, size_t size) :
+				m_buffer(other.m_buffer),
+				m_offset(other.m_offset + offset),
+				m_size(size),
+				m_device_index(other.m_device_index)
+		{
+			assert(m_offset + m_size <= other.m_size);
+		}
+		const cl::Buffer& MemoryObject::buffer() const
+		{
+			if (m_offset == 0)
+				return m_buffer;
+			else
+			{
+				_cl_buffer_region tmp;
+				tmp.origin = m_offset;
+				tmp.size = m_size;
+
+				cl_int status;
+				m_view = m_buffer.createSubBuffer(CL_MEM_READ_WRITE, CL_BUFFER_CREATE_TYPE_REGION, &tmp, &status);
+				CHECK_OPENCL_STATUS(status);
+				return m_view;
+			}
+		}
+		cl::Buffer& MemoryObject::buffer()
+		{
+			if (m_offset == 0)
+				return m_buffer;
+			else
+			{
+				_cl_buffer_region tmp;
+				tmp.origin = m_offset;
+				tmp.size = m_size;
+
+				cl_int status;
+				m_view = m_buffer.createSubBuffer(CL_MEM_READ_WRITE, CL_BUFFER_CREATE_TYPE_REGION, &tmp, &status);
+				CHECK_OPENCL_STATUS(status);
+				return m_view;
 			}
 		}
 

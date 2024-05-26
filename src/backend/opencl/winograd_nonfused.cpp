@@ -37,31 +37,31 @@ namespace
 		return "#define KERNEL_SIZE " + std::to_string(kernel_size) + "\n" + "#define TRANSFORM_SIZE " + std::to_string(tile_size) + "\n";
 	}
 
-	const cl::Program& get_program(int kernel_size, int tile_size)
+	cl::Kernel get_kernel(ml::mlContext_t context, const char *name, int kernel_size, int tile_size)
 	{
 		if (kernel_size == 3)
 		{
 			if (tile_size == 2)
 			{
-				const static cl::Program program_3x3_2x2 = ml::opencl::compileProgram("winograd_transforms_3x3_2x2",
+				static const ml::opencl::ProgramCache result("winograd_transforms_3x3_2x2",
 						ml::opencl::kernels::common + ml::opencl::kernels::indexers + ml::opencl::kernels::lines_and_tiles
 								+ get_defines(kernel_size, tile_size) + ml::opencl::kernels::winograd_nonfused, "");
-				return program_3x3_2x2;
+				return result.getKernel(context, name);
 			}
 			if (tile_size == 4)
 			{
-				const static cl::Program program_3x3_4x4 = ml::opencl::compileProgram("winograd_transforms_3x3_4x4",
+				static const ml::opencl::ProgramCache result("winograd_transforms_3x3_4x4",
 						ml::opencl::kernels::common + ml::opencl::kernels::indexers + ml::opencl::kernels::lines_and_tiles
 								+ get_defines(kernel_size, tile_size) + ml::opencl::kernels::winograd_nonfused, "");
-				return program_3x3_4x4;
+				return result.getKernel(context, name);
 			}
 		}
 		if (kernel_size == 5 and tile_size == 2)
 		{
-			const static cl::Program program_5x5_2x2 = ml::opencl::compileProgram("winograd_transforms_5x5_2x2",
+			static const ml::opencl::ProgramCache result("winograd_transforms_5x5_2x2",
 					ml::opencl::kernels::common + ml::opencl::kernels::indexers + ml::opencl::kernels::lines_and_tiles
 							+ get_defines(kernel_size, tile_size) + ml::opencl::kernels::winograd_nonfused, "");
-			return program_5x5_2x2;
+			return result.getKernel(context, name);
 		}
 		throw std::logic_error(
 				"Unsupported configuration of kernel size = " + std::to_string(kernel_size) + " and tile size = " + std::to_string(tile_size));
@@ -81,12 +81,12 @@ namespace ml
 
 		const int max_threads = opencl::has_fp16_math(context) ? 64 : 128;
 
-		cl::Kernel kernel(get_program(kernel_size, tile_size), "transform_weights");
+		cl::Kernel kernel = get_kernel(context, "transform_weights", kernel_size, tile_size);
 		cl::NDRange local(max_threads);
 		cl::NDRange global(max_threads, filters_out);
 
-		kernel.setArg(0, opencl::getBuffer(matrices));
-		kernel.setArg(1, opencl::getBuffer(weights));
+		kernel.setArg(0, opencl::getMemoryObject(matrices).buffer());
+		kernel.setArg(1, opencl::getMemoryObject(weights).buffer());
 		kernel.setArg(2, filters_out);
 		kernel.setArg(3, filters_in);
 		kernel.setArg(4, static_cast<int>(invert));
@@ -107,12 +107,12 @@ namespace ml
 		const int tiles_w = get_number_of_tiles(width, tile_size);
 		const int max_threads = opencl::has_fp16_math(context) ? 64 : 128;
 
-		cl::Kernel kernel(get_program(kernel_size, tile_size), "transform_input");
+		cl::Kernel kernel = get_kernel(context, "transform_input", kernel_size, tile_size);
 		cl::NDRange local(max_threads);
 		cl::NDRange global(max_threads * tiles_h, tiles_w, input_shape.dim[0]);
 
-		kernel.setArg(0, opencl::getBuffer(matrices));
-		kernel.setArg(1, opencl::getBuffer(input));
+		kernel.setArg(0, opencl::getMemoryObject(matrices).buffer());
+		kernel.setArg(1, opencl::getMemoryObject(input).buffer());
 		kernel.setArg(2, batch_size);
 		kernel.setArg(3, height);
 		kernel.setArg(4, width);
@@ -134,7 +134,7 @@ namespace ml
 		const int tiles_w = get_number_of_tiles(width, tile_size);
 		const int max_threads = opencl::has_fp16_math(context) ? 64 : 128;
 
-		cl::Kernel kernel(get_program(kernel_size, tile_size), "transform_output");
+		cl::Kernel kernel = get_kernel(context, "transform_output", kernel_size, tile_size);
 		cl::NDRange local(max_threads);
 		cl::NDRange global(max_threads * tiles_h, tiles_w, batch_size);
 
@@ -143,11 +143,11 @@ namespace ml
 		const bool use_add = (add != nullptr);
 		const bool use_bias = (bias != nullptr);
 
-		kernel.setArg(0, opencl::getBuffer(matrices));
-		kernel.setArg(1, opencl::getBuffer(output));
-		kernel.setArg(2, use_add ? opencl::getBuffer(add) : workspace);
+		kernel.setArg(0, opencl::getMemoryObject(matrices).buffer());
+		kernel.setArg(1, opencl::getMemoryObject(output).buffer());
+		kernel.setArg(2, use_add ? opencl::getMemoryObject(add).buffer() : workspace);
 		kernel.setArg(3, static_cast<int>(use_add));
-		kernel.setArg(4, use_bias ? opencl::getBuffer(bias) : workspace);
+		kernel.setArg(4, use_bias ? opencl::getMemoryObject(bias).buffer() : workspace);
 		kernel.setArg(5, static_cast<int>(use_bias));
 		kernel.setArg(6, static_cast<int>(act));
 		kernel.setArg(7, batch_size);
@@ -171,12 +171,12 @@ namespace ml
 		const int tiles_w = get_number_of_tiles(width, tile_size);
 		const int max_threads = opencl::has_fp16_math(context) ? 64 : 128;
 
-		cl::Kernel kernel(get_program(kernel_size, tile_size), "transform_gradient");
+		cl::Kernel kernel = get_kernel(context, "transform_gradientweights", kernel_size, tile_size);
 		cl::NDRange local(max_threads);
 		cl::NDRange global(max_threads * tiles_h, tiles_w, gradient_shape.dim[0]);
 
-		kernel.setArg(0, opencl::getBuffer(matrices));
-		kernel.setArg(1, opencl::getBuffer(gradient));
+		kernel.setArg(0, opencl::getMemoryObject(matrices).buffer());
+		kernel.setArg(1, opencl::getMemoryObject(gradient).buffer());
 		kernel.setArg(2, batch_size);
 		kernel.setArg(3, height);
 		kernel.setArg(4, width);
@@ -193,12 +193,12 @@ namespace ml
 		const int kernel_size = get_kernel_size(weight_shape);
 		const int max_threads = opencl::has_fp16_math(context) ? 64 : 128;
 
-		cl::Kernel kernel(get_program(kernel_size, tile_size), "transform_update");
+		cl::Kernel kernel = get_kernel(context, "transform_update", kernel_size, tile_size);
 		cl::NDRange local(max_threads);
 		cl::NDRange global(max_threads, filters_out);
 
-		kernel.setArg(0, opencl::getBuffer(matrices));
-		kernel.setArg(1, opencl::getBuffer(update));
+		kernel.setArg(0, opencl::getMemoryObject(matrices).buffer());
+		kernel.setArg(1, opencl::getMemoryObject(update).buffer());
 		kernel.setArg(2, filters_out);
 		kernel.setArg(3, filters_in);
 

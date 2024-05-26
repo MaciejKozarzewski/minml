@@ -17,10 +17,10 @@
 
 namespace
 {
-	const cl::Program& get_program()
+	cl::Kernel get_kernel(ml::mlContext_t context, const char *name)
 	{
-		static const cl::Program program = ml::opencl::compileProgram("conversions", ml::opencl::kernels::conversion, "");
-		return program;
+		static const ml::opencl::ProgramCache result("conversions", ml::opencl::kernels::conversion, "");
+		return result.getKernel(context, name);
 	}
 }
 
@@ -36,18 +36,18 @@ namespace ml
 		switch (dst_dtype)
 		{
 			case DTYPE_FLOAT16:
-				kernel = opencl::getKernel(get_program(), "unpack_input_fp16");
+				kernel = get_kernel(context, "unpack_input_fp16");
 				break;
 			case DTYPE_FLOAT32:
-				kernel = opencl::getKernel(get_program(), "unpack_input_fp32");
+				kernel = get_kernel(context, "unpack_input_fp32");
 				break;
 			case DTYPE_INT32:
 			case DTYPE_UNKNOWN:
 				break;
 		}
 
-		kernel.setArg(0, opencl::getBuffer(dst));
-		kernel.setArg(1, opencl::getBuffer(src));
+		kernel.setArg(0, opencl::getMemoryObject(dst).buffer());
+		kernel.setArg(1, opencl::getMemoryObject(src).buffer());
 		kernel.setArg(2, first_dim);
 		kernel.setArg(3, last_dim);
 
@@ -68,16 +68,16 @@ namespace ml
 		if (dst_dtype == DTYPE_FLOAT16 and src_dtype == DTYPE_FLOAT32)
 		{
 			assert(dst != src);
-			kernel = opencl::getKernel(get_program(), "convert_fp32_to_fp16");
+			kernel = get_kernel(context, "convert_fp32_to_fp16");
 		}
 		if (dst_dtype == DTYPE_FLOAT32 and src_dtype == DTYPE_FLOAT16)
 		{
 			assert(dst != src);
-			kernel = opencl::getKernel(get_program(), "convert_fp16_to_fp32");
+			kernel = get_kernel(context, "convert_fp16_to_fp32");
 		}
 
-		kernel.setArg(0, opencl::getBuffer(dst));
-		kernel.setArg(1, opencl::getBuffer(src));
+		kernel.setArg(0, opencl::getMemoryObject(dst).buffer());
+		kernel.setArg(1, opencl::getMemoryObject(src).buffer());
 		kernel.setArg(2, elements);
 
 		const cl::NDRange global = opencl::get_nd_range<65536>(elements);

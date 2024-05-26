@@ -37,9 +37,9 @@ namespace ml
 		const int LDC = get_last_dim(shape_C);
 
 		cl::CommandQueue &queue = opencl::Context::getCommandQueue(context);
-		const cl::Buffer &a_buffer = opencl::getBuffer(A);
-		const cl::Buffer &b_buffer = opencl::getBuffer(B);
-		cl::Buffer &c_buffer = opencl::getBuffer(C);
+		const cl::Buffer &a_buffer = opencl::getMemoryObject(A).buffer();
+		const cl::Buffer &b_buffer = opencl::getMemoryObject(B).buffer();
+		cl::Buffer &c_buffer = opencl::getMemoryObject(C).buffer();
 		cl::Event &event = *opencl::Context::getLastEvent(context);
 
 		switch (dtype)
@@ -90,9 +90,9 @@ namespace ml
 		const int strideC = volume_without_first_dim(shape_C);
 
 		cl::CommandQueue &queue = opencl::Context::getCommandQueue(context);
-		const cl::Buffer &a_buffer = opencl::getBuffer(A);
-		const cl::Buffer &b_buffer = opencl::getBuffer(B);
-		cl::Buffer &c_buffer = opencl::getBuffer(C);
+		const cl::Buffer &a_buffer = opencl::getMemoryObject(A).buffer();
+		const cl::Buffer &b_buffer = opencl::getMemoryObject(B).buffer();
+		cl::Buffer &c_buffer = opencl::getMemoryObject(C).buffer();
 		cl::Event &event = *opencl::Context::getLastEvent(context);
 
 		switch (dtype)

@@ -8,10 +8,6 @@
 #include <minml/backend/opencl_backend.h>
 #include "utils.hpp"
 
-#include <CL/opencl.hpp>
-
-#include <cassert>
-
 namespace ml
 {
 	mlContext_t opencl_create_context(int device_index)

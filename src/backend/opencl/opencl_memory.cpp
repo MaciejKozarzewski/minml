@@ -23,36 +23,26 @@ namespace ml
 		if (count <= 0)
 			return nullptr;
 
-		cl_int status;
-		cl::Buffer *result = new cl::Buffer(opencl::get_cl_context(), CL_MEM_READ_WRITE, count, nullptr, &status); // @suppress("Ambiguous problem")
-		if (status != CL_BUILD_SUCCESS)
+		opencl::MemoryObject *result = nullptr;
+		try
+		{
+			result = new opencl::MemoryObject(device_index, count);
+		} catch (std::exception &e)
 		{
 			delete result;
-			CHECK_OPENCL_STATUS(status);
+			throw e;
 		}
 		return result;
 	}
 	void opencl_free(void *ptr)
 	{
 		if (ptr != nullptr)
-			delete reinterpret_cast<cl::Buffer*>(ptr);
+			delete reinterpret_cast<opencl::MemoryObject*>(ptr);
 	}
 	void* opencl_create_view(void *src, int offset, int count)
 	{
 		assert(src != nullptr);
-		_cl_buffer_region tmp;
-		tmp.origin = offset;
-		tmp.size = count;
-
-		cl_int status;
-		cl::Buffer *result = new cl::Buffer();
-		*result = opencl::getBuffer(src).createSubBuffer(CL_MEM_READ_WRITE, CL_BUFFER_CREATE_TYPE_REGION, &tmp, &status);
-		if (status != CL_SUCCESS)
-		{
-			delete result;
-			CHECK_OPENCL_STATUS(status);
-		}
-		return result;
+		return new opencl::MemoryObject(*reinterpret_cast<opencl::MemoryObject*>(src), offset, count);
 	}
 	void opencl_destroy_view(void *ptr)
 	{
@@ -62,13 +52,24 @@ namespace ml
 	void opencl_memset(mlContext_t context, void *dst, int dst_offset, int dst_count, const void *src, int src_count)
 	{
 		assert(dst != nullptr);
-		cl::CommandQueue &queue = opencl::Context::getCommandQueue(context);
+		cl::CommandQueue *queue;
+		cl::Event *event;
+
 		cl::Event local_event;
-		cl::Event *event = (context == nullptr) ? &local_event : opencl::Context::getLastEvent(context);
+		if (context == nullptr)
+		{
+			queue = &opencl::Context::getDefaultCommandQueue(opencl::getMemoryObject(dst).getDeviceIndex());
+			event = &local_event;
+		}
+		else
+		{
+			queue = &opencl::Context::getCommandQueue(context);
+			event = opencl::Context::getLastEvent(context);
+		}
 
 		if (src == nullptr)
 		{
-			cl_int status = queue.enqueueFillBuffer<cl_char>(opencl::getBuffer(dst), 0u, dst_offset, dst_count, nullptr, event);
+			cl_int status = queue->enqueueFillBuffer<cl_char>(opencl::getMemoryObject(dst).buffer(), 0u, dst_offset, dst_count, nullptr, event);
 			CHECK_OPENCL_STATUS(status);
 		}
 		else
@@ -80,7 +81,7 @@ namespace ml
 				{
 					cl_short pattern;
 					std::memcpy(&pattern, src, sizeof(cl_short));
-					cl_int status = queue.enqueueFillBuffer(opencl::getBuffer(dst), pattern, dst_offset, dst_count, nullptr, event);
+					cl_int status = queue->enqueueFillBuffer(opencl::getMemoryObject(dst).buffer(), pattern, dst_offset, dst_count, nullptr, event);
 					CHECK_OPENCL_STATUS(status);
 					break;
 				}
@@ -88,7 +89,7 @@ namespace ml
 				{
 					cl_int pattern;
 					std::memcpy(&pattern, src, sizeof(cl_int));
-					cl_int status = queue.enqueueFillBuffer(opencl::getBuffer(dst), pattern, dst_offset, dst_count, nullptr, event);
+					cl_int status = queue->enqueueFillBuffer(opencl::getMemoryObject(dst).buffer(), pattern, dst_offset, dst_count, nullptr, event);
 					CHECK_OPENCL_STATUS(status);
 					break;
 				}
@@ -99,35 +100,69 @@ namespace ml
 	}
 	void opencl_memcpy_within_device(mlContext_t context, void *dst, int dst_offset, const void *src, int src_offset, int count)
 	{
-		cl::CommandQueue &queue = opencl::Context::getCommandQueue(context);
-		cl::Event local_event;
-		cl::Event *event = (context == nullptr) ? &local_event : opencl::Context::getLastEvent(context);
+		cl::CommandQueue *queue;
+		cl::Event *event;
 
-		cl_int status = queue.enqueueCopyBuffer(opencl::getBuffer(src), opencl::getBuffer(dst), src_offset, dst_offset, count, nullptr, event);
+		cl::Event local_event;
+		if (context == nullptr)
+		{
+			queue = &opencl::Context::getDefaultCommandQueue(opencl::getMemoryObject(src).getDeviceIndex());
+			event = &local_event;
+		}
+		else
+		{
+			queue = &opencl::Context::getCommandQueue(context);
+			event = opencl::Context::getLastEvent(context);
+		}
+
+		cl_int status = queue->enqueueCopyBuffer(opencl::getMemoryObject(src).buffer(), opencl::getMemoryObject(dst).buffer(), src_offset, dst_offset,
+				count, nullptr, event);
 		CHECK_OPENCL_STATUS(status);
 		if (opencl::Context::isSynchronized(context))
 			opencl::waitForEvent(event);
 	}
 	void opencl_memcpy_from_host(mlContext_t context, void *dst, int dst_offset, const void *src, int count)
 	{
-		cl::CommandQueue &queue = opencl::Context::getCommandQueue(context);
+		cl::CommandQueue *queue;
+		cl::Event *event;
+
 		cl::Event local_event;
-		cl::Event *event = (context == nullptr) ? &local_event : opencl::Context::getLastEvent(context);
+		if (context == nullptr)
+		{
+			queue = &opencl::Context::getDefaultCommandQueue(opencl::getMemoryObject(dst).getDeviceIndex());
+			event = &local_event;
+		}
+		else
+		{
+			queue = &opencl::Context::getCommandQueue(context);
+			event = opencl::Context::getLastEvent(context);
+		}
 
 		const bool is_blocking = (context == nullptr);
-		cl_int status = queue.enqueueWriteBuffer(opencl::getBuffer(dst), is_blocking, dst_offset, count, src, nullptr, event);
+		cl_int status = queue->enqueueWriteBuffer(opencl::getMemoryObject(dst).buffer(), is_blocking, dst_offset, count, src, nullptr, event);
 		CHECK_OPENCL_STATUS(status);
 		if (opencl::Context::isSynchronized(context))
 			opencl::waitForEvent(event);
 	}
 	void opencl_memcpy_to_host(mlContext_t context, void *dst, const void *src, int src_offset, int count)
 	{
-		cl::CommandQueue &queue = opencl::Context::getCommandQueue(context);
+		cl::CommandQueue *queue;
+		cl::Event *event;
+
 		cl::Event local_event;
-		cl::Event *event = (context == nullptr) ? &local_event : opencl::Context::getLastEvent(context);
+		if (context == nullptr)
+		{
+			queue = &opencl::Context::getDefaultCommandQueue(opencl::getMemoryObject(src).getDeviceIndex());
+			event = &local_event;
+		}
+		else
+		{
+			queue = &opencl::Context::getCommandQueue(context);
+			event = opencl::Context::getLastEvent(context);
+		}
 
 		const bool is_blocking = (context == nullptr);
-		cl_int status = queue.enqueueReadBuffer(opencl::getBuffer(src), is_blocking, src_offset, count, dst, nullptr, event);
+		cl_int status = queue->enqueueReadBuffer(opencl::getMemoryObject(src).buffer(), is_blocking, src_offset, count, dst, nullptr, event);
 		CHECK_OPENCL_STATUS(status);
 		if (opencl::Context::isSynchronized(context))
 			opencl::waitForEvent(event);

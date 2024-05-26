@@ -24,11 +24,9 @@ namespace ml
 		std::vector<cl::Platform> get_list_of_platforms();
 		std::vector<cl::Device> get_devices_for_platform(const cl::Platform &p);
 		const std::vector<cl::Device>& get_list_of_devices();
-		cl::Context& get_cl_context();
+		std::vector<cl::Context>& get_list_of_contexts();
 
 		void waitForEvent(const cl::Event *event);
-		cl::Program compileProgram(const std::string &name, const std::string &source, const std::string &options);
-		cl::Kernel getKernel(const cl::Program &program, const char *name);
 		void runKernel(mlContext_t context, const cl::Kernel &kernel, const cl::NDRange &global, const cl::NDRange &local = cl::NullRange);
 
 		class Context
@@ -47,11 +45,46 @@ namespace ml
 				static bool isReady(mlContext_t context);
 				static int getDeviceIndex(mlContext_t context);
 				static int isSynchronized(mlContext_t context);
+				static cl::CommandQueue& getDefaultCommandQueue(int device_index);
 				static cl::CommandQueue& getCommandQueue(mlContext_t context);
 				static cl::Event* getLastEvent(mlContext_t context);
 				static cl::Buffer& getWorkspace(mlContext_t context);
 				static size_t getWorkspaceSize(mlContext_t context);
 				static void setWorkspaceSize(mlContext_t context, size_t bytes);
+		};
+
+		class ProgramCache
+		{
+				std::vector<cl::Program> m_programs;
+			public:
+				ProgramCache(const std::string &name, const std::string &source, const std::string &options);
+				cl::Kernel getKernel(mlContext_t context, const char *name) const;
+		};
+
+		class MemoryObject
+		{
+				mutable cl::Buffer m_buffer;
+				mutable cl::Buffer m_view;
+				size_t m_offset = 0;
+				size_t m_size = 0;
+				int m_device_index = -1;
+			public:
+				MemoryObject(int device_index, size_t count);
+				MemoryObject(MemoryObject &other, size_t offset, size_t size);
+				int getDeviceIndex() const noexcept
+				{
+					return m_device_index;
+				}
+				const cl::Buffer& buffer() const;
+				cl::Buffer& buffer();
+				size_t offset() const noexcept
+				{
+					return m_offset;
+				}
+				size_t size() const noexcept
+				{
+					return m_size;
+				}
 		};
 
 		template<unsigned int maxBlocks>
@@ -84,15 +117,15 @@ namespace ml
 			return cl::NDRange(std::min(dim0, MaxDim0), std::min(dim1, MaxDim1), std::min(dim2, MaxDim2));
 		}
 
-		[[maybe_unused]] static cl::Buffer& getBuffer(void *buf) noexcept
+		[[maybe_unused]] static MemoryObject& getMemoryObject(void *mo) noexcept
 		{
-			assert(buf != nullptr);
-			return *reinterpret_cast<cl::Buffer*>(buf);
+			assert(mo != nullptr);
+			return *reinterpret_cast<MemoryObject*>(mo);
 		}
-		[[maybe_unused]] static const cl::Buffer& getBuffer(const void *buf) noexcept
+		[[maybe_unused]] static const MemoryObject& getMemoryObject(const void *mo) noexcept
 		{
-			assert(buf != nullptr);
-			return *reinterpret_cast<const cl::Buffer*>(buf);
+			assert(mo != nullptr);
+			return *reinterpret_cast<const MemoryObject*>(mo);
 		}
 
 		class OpenCLRuntimeError: public std::runtime_error
@@ -100,7 +133,8 @@ namespace ml
 			public:
 				OpenCLRuntimeError(const std::string &function, int line, int error_code) :
 						std::runtime_error(
-								"OpenCLRuntimeError occurred in function '" + function + "' at line " + std::to_string(line) + " got error code " + std::to_string(error_code))
+								"OpenCLRuntimeError occurred in function '" + function + "' at line " + std::to_string(line) + " got error code "
+										+ std::to_string(error_code))
 				{
 				}
 		};

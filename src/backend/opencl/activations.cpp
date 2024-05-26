@@ -19,7 +19,7 @@ namespace ml
 {
 	void opencl_activation_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input, mlActivationType_t act)
 	{
-		static const cl::Program program = ml::opencl::compileProgram("activations_forward",
+		static const ml::opencl::ProgramCache program_cache("activations_forward",
 				ml::opencl::kernels::common + ml::opencl::kernels::reductions + ml::opencl::kernels::activations_forward, "");
 
 		const int first_dim = volume_without_last_dim(shape);
@@ -42,10 +42,10 @@ namespace ml
 				switch (dtype)
 				{
 //					case DTYPE_FLOAT16:
-//						kernel = opencl::get_kernel(program, "sigmoid_forward_fp16");
+//						kernel = program_cache.getKernel(context, "sigmoid_forward_fp16");
 //						break;
 					case DTYPE_FLOAT32:
-						kernel = opencl::getKernel(program, "sigmoid_forward_fp32");
+						kernel = program_cache.getKernel(context, "sigmoid_forward_fp32");
 						break;
 					default:
 						break;
@@ -57,10 +57,10 @@ namespace ml
 				switch (dtype)
 				{
 //					case DTYPE_FLOAT16:
-//						kernel = opencl::get_kernel(program, "tanh_forward_fp16");
+//						kernel = program_cache.getKernel(context, "tanh_forward_fp16");
 //						break;
 					case DTYPE_FLOAT32:
-						kernel = opencl::getKernel(program, "tanh_forward_fp32");
+						kernel = program_cache.getKernel(context, "tanh_forward_fp32");
 						break;
 					default:
 						break;
@@ -72,10 +72,10 @@ namespace ml
 				switch (dtype)
 				{
 //					case DTYPE_FLOAT16:
-//						kernel = opencl::get_kernel(program, "relu_forward_fp16");
+//						kernel = program_cache.getKernel(context, "relu_forward_fp16");
 //						break;
 					case DTYPE_FLOAT32:
-						kernel = opencl::getKernel(program, "relu_forward_fp16");
+						kernel = program_cache.getKernel(context, "relu_forward_fp16");
 						break;
 					default:
 						break;
@@ -91,10 +91,10 @@ namespace ml
 					switch (dtype)
 					{
 //						case DTYPE_FLOAT16:
-//							kernel = opencl::get_kernel(program, "softmax_3_channels_fp16");
+//							kernel = program_cache.getKernel(context, "softmax_3_channels_fp16");
 //							break;
 						case DTYPE_FLOAT32:
-							kernel = opencl::getKernel(program, "softmax_3_channels_fp32");
+							kernel = program_cache.getKernel(context, "softmax_3_channels_fp32");
 							break;
 						default:
 							break;
@@ -107,10 +107,10 @@ namespace ml
 					switch (dtype)
 					{
 //						case DTYPE_FLOAT16:
-//							kernel = opencl::get_kernel(program, "softmax_generic_fp16");
+//							kernel = program_cache.getKernel(context, "softmax_generic_fp16");
 //							break;
 						case DTYPE_FLOAT32:
-							kernel = opencl::getKernel(program, "softmax_generic_fp32");
+							kernel = program_cache.getKernel(context, "softmax_generic_fp32");
 							break;
 						default:
 							break;
@@ -120,8 +120,8 @@ namespace ml
 			}
 		}
 
-		kernel.setArg(0, opencl::getBuffer(output));
-		kernel.setArg(1, opencl::getBuffer(input));
+		kernel.setArg(0, opencl::getMemoryObject(output).buffer());
+		kernel.setArg(1, opencl::getMemoryObject(input).buffer());
 		kernel.setArg(2, first_dim);
 		kernel.setArg(3, last_dim);
 
@@ -130,8 +130,9 @@ namespace ml
 	void opencl_activation_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next, const void *output,
 			mlActivationType_t act)
 	{
-		static const cl::Program program = ml::opencl::compileProgram("activations_backward",
+		static const ml::opencl::ProgramCache program_cache("activations_backward",
 				ml::opencl::kernels::common + ml::opencl::kernels::activations_backward, "");
+
 		cl::Kernel kernel;
 		cl::NDRange global = opencl::get_nd_range<65536>(volume(shape));
 		cl::NDRange local = cl::NullRange;
@@ -145,29 +146,29 @@ namespace ml
 				break;
 			}
 			case ACTIVATION_SIGMOID:
-				kernel = opencl::getKernel(program, "sigmoid_backward_fp32");
+				kernel = program_cache.getKernel(context, "sigmoid_backward_fp32");
 				break;
 			case ACTIVATION_TANH:
-				kernel = opencl::getKernel(program, "tanh_backward_fp32");
+				kernel = program_cache.getKernel(context, "tanh_backward_fp32");
 				break;
 			case ACTIVATION_RELU:
-				kernel = opencl::getKernel(program, "relu_backward_fp32");
+				kernel = program_cache.getKernel(context, "relu_backward_fp32");
 				break;
 			case ACTIVATION_SOFTMAX:
 				break;
 		}
-		kernel.setArg(0, opencl::getBuffer(gradient_prev));
-		kernel.setArg(1, opencl::getBuffer(gradient_next));
-		kernel.setArg(2, opencl::getBuffer(output));
+		kernel.setArg(0, opencl::getMemoryObject(gradient_prev).buffer());
+		kernel.setArg(1, opencl::getMemoryObject(gradient_next).buffer());
+		kernel.setArg(2, opencl::getMemoryObject(output).buffer());
 		kernel.setArg(3, volume(shape));
 
 		opencl::runKernel(context, kernel, global, local);
 	}
 
-	void opencl_add_bias_act(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input, const void *bias, mlActivationType_t act)
+	void opencl_add_bias_act(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input, const void *bias,
+			mlActivationType_t act)
 	{
-		static const cl::Program program = ml::opencl::compileProgram("add_bias_act",
-				ml::opencl::kernels::common + ml::opencl::kernels::add_bias_act, "");
+		static const ml::opencl::ProgramCache program_cache("add_bias_act", ml::opencl::kernels::common + ml::opencl::kernels::add_bias_act, "");
 
 		const int first_dim = volume_without_last_dim(shape);
 		const int last_dim = get_last_dim(shape);
@@ -179,18 +180,18 @@ namespace ml
 		switch (dtype)
 		{
 //			case DTYPE_FLOAT16:
-//				kernel = opencl::get_kernel(program, "sigmoid_forward_fp16");
+//				kernel = program_cache.getKernel(context, "sigmoid_forward_fp16");
 //				break;
 			case DTYPE_FLOAT32:
-				kernel = opencl::getKernel(program, "add_bias_act_fp32");
+				kernel = program_cache.getKernel(context, "add_bias_act_fp32");
 				break;
 			default:
 				break;
 		}
 
-		kernel.setArg(0, opencl::getBuffer(output));
-		kernel.setArg(1, opencl::getBuffer(input));
-		kernel.setArg(2, opencl::getBuffer(bias));
+		kernel.setArg(0, opencl::getMemoryObject(output).buffer());
+		kernel.setArg(1, opencl::getMemoryObject(input).buffer());
+		kernel.setArg(2, opencl::getMemoryObject(bias).buffer());
 		kernel.setArg(3, first_dim);
 		kernel.setArg(4, last_dim);
 		kernel.setArg(5, static_cast<int>(act));
