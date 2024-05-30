@@ -9,12 +9,14 @@
 #include <minml/core/Tensor.hpp>
 #include <minml/core/ml_memory.hpp>
 #include <minml/core/math.hpp>
+#include <minml/core/Event.hpp>
 #include <minml/graph/Graph.hpp>
 #include <minml/graph/graph_optimizers.hpp>
 #include <minml/layers/Dense.hpp>
 #include <minml/layers/Conv2D.hpp>
 #include <minml/layers/BatchNormalization.hpp>
 #include <minml/layers/GlobalBroadcastHW.hpp>
+#include <minml/layers/GlobalPooling.hpp>
 #include <minml/layers/Add.hpp>
 #include <minml/layers/Softmax.hpp>
 #include <minml/training/Optimizer.hpp>
@@ -28,6 +30,8 @@
 #include <minml/backend/opencl_backend.h>
 
 #include <iostream>
+#include <chrono>
+#include <thread>
 #include <functional>
 #include <fstream>
 #include <memory>
@@ -3010,10 +3014,114 @@ int main()
 	std::cout << "BEGIN" << std::endl;
 	std::cout << ml::Device::hardwareInfo();
 
-	std::cout << "Detailed properties" << std::endl;
-	opencl_print_device_features(0);
-	std::cout << "END" << std::endl;
-	return 0;
+//	std::cout << "Detailed properties" << std::endl;
+//	opencl_print_device_features(0);
+
+//	{
+//		Graph graph;
+//
+//		auto x = graph.addInput(Shape( { 32, 15, 15, 8 }));
+//		x = graph.add(Conv2D(128, 5, "relu"), x);
+//		x = graph.add(Conv2D(64, 1, "relu"), x);
+//		x = graph.add(Conv2D(64, 3, "relu"), x);
+//		x = graph.add(Conv2D(128, 3, "relu"), x);
+//		x = graph.add(GlobalPooling("linear"), x);
+//		graph.addOutput(x);
+//		graph.init();
+//		graph.makeNonTrainable();
+////		graph.convertTo(DataType::FLOAT16);
+//		graph.moveTo(Device::opencl(0));
+//		graph.forward(32);
+//		graph.context().synchronize();
+//
+//		std::cout << "starting benchmark\n";
+//		const double start = getTime();
+//		ml::Event t0 = graph.context().createEvent();
+//		int repeats = 0;
+//		for (; repeats < 1000000; repeats++)
+//		{
+//			graph.forward(32);
+//			if ((getTime() - start) > 30.0)
+//				break;
+//		}
+//		ml::Event t1 = graph.context().createEvent();
+//		graph.context().synchronize();
+//		const double stop = getTime();
+//		std::cout << "event time = " << ml::Event::getElapsedTime(t0, t1) << '\n';
+//
+//		const double time = stop - start;
+//		std::cout << "time = " << time << "s, repeats = " << repeats << ", n/s = " << 12 * repeats / time << "\n";
+//
+////		graph.forward(12);
+////		graph.backward(12);
+////		graph.context().synchronize();
+//		std::cout << "END" << '\n';
+//	}
+//	return 0;
+
+	if (false)
+	{
+		Context context(Device::opencl(1));
+		Tensor input( { 10000, 256 }, "float32", Device::opencl(1));
+		Tensor output( { 10000, 256 }, "float32", Device::opencl(1));
+
+//		std::vector<int> tmp(input.volume(), -1);
+//		input.copyFromHost(context, tmp.data(), input.sizeInBytes());
+
+		mlShape_t shape = ml::make_shape( { 1000, 256 });
+
+//		opencl_unpack_input(context.backend(), shape, DTYPE_FLOAT32, output.data(), input.data());
+//		context.synchronize();
+
+		const double start = getTime();
+		for (;;)
+		{
+//			std::cout << "in the loop " << i << '\n';
+			const double t0 = getTime();
+			for (int j = 0; j < 1000; j++)
+			{
+				activationForward(context, output, input, ActivationType::SOFTMAX);
+				context.synchronize();
+			}
+			const double t1 = getTime();
+			std::cout << "time = " << 1000 * (t1 - t0) << " ms\n";
+//			opencl_unpack_input(context.backend(), shape, DTYPE_FLOAT32, output.data(), input.data());
+//			context.synchronize();
+		}
+		std::cout << "out of the loop" << '\n';
+//		context.synchronize();
+		const double stop = getTime();
+		std::cout << "time = " << 1000 * (stop - start) << "ms\n";
+		context.synchronize();
+
+//		for (int i = 0; i < 1000; i++)
+//			for (int j = 0; j < 1000; j++)
+//				for (int l = 0; l < 32; l++)
+//					if (output.get( { i, j, l }) != 1.0f)
+//					{
+//						std::cout << i << "," << j << "," << l << " = " << output.get( { i, j, l }) << '\n';
+//						return 0;
+//					}
+
+//		output.convertTo(context, DataType::FLOAT32);
+		context.synchronize();
+		for (int i = 0; i < 10; i++)
+			std::cout << output.get( { 0, 0, i }) << '\n';
+
+//		Context context(Device::opencl(1));
+//		context.synchronize();
+//
+//		Tensor t( { 10, 10 }, "float32", Device::opencl(1));
+//		std::cout << t.info() << '\n';
+//		t.setall(context, 1.234f);
+//		std::cout << "value = " << t.get( { 5, 5 }) << '\n';
+//
+//		Tensor other( { 10, 10 }, "float32", Device::opencl(0));
+//		other.copyFrom(context, t);
+//		std::cout << "other = " << other.get( { 5, 5 }) << '\n';
+		std::cout << "END" << std::endl;
+		return 0;
+	}
 
 //	for (int i = 1; i <= 1024; i++)
 //		test_packing(i, 16, ml::MatrixOp::TRANSPOSE);
@@ -3224,32 +3332,32 @@ int main()
 //		test_packing(i, 10, ml::MatrixOp::NORMAL);
 //		test_packing(i, 10, ml::MatrixOp::TRANSPOSE);
 //	}
-	std::cout << "FP32 kernels\n";
-	std::cout << "SSE2\n";
-	for (int i = 1; i <= 1024; i *= 2)
-		test_microkernel(4, 8, i, DTYPE_FLOAT32, gemm_sse2_4x8_fp32);
-	std::cout << "AVX\n";
-	for (int i = 1; i <= 1024; i *= 2)
-		test_microkernel(10, 8, i, DTYPE_FLOAT32, gemm_avx_10x8_fp32);
-	std::cout << "AVX2\n";
-	for (int i = 1; i <= 1024; i *= 2)
-		test_microkernel(12, 8, i, DTYPE_FLOAT32, gemm_avx2_fma_12x8_fp32);
-	std::cout << "AVX512\n";
-	for (int i = 1; i <= 1024; i *= 2)
-		test_microkernel(24, 16, i, DTYPE_FLOAT32, gemm_avx512f_24x16_fp32);
-
-	std::cout << "FP16 kernels\n";
-	std::cout << "AVX\n";
-	for (int i = 1; i <= 1024; i *= 2)
-		test_microkernel(10, 8, i, DTYPE_FLOAT16, gemm_avx_10x8_fp32_fp16);
-	std::cout << "AVX2\n";
-	for (int i = 1; i <= 1024; i *= 2)
-		test_microkernel(12, 8, i, DTYPE_FLOAT16, gemm_avx2_fma_12x8_fp32_fp16);
-	std::cout << "AVX512\n";
-	for (int i = 1; i <= 1024; i *= 2)
-		test_microkernel(24, 16, i, DTYPE_FLOAT16, gemm_avx512f_24x16_fp32_fp16);
-
-	return 0;
+//	std::cout << "FP32 kernels\n";
+//	std::cout << "SSE2\n";
+//	for (int i = 1; i <= 1024; i *= 2)
+//		test_microkernel(4, 8, i, DTYPE_FLOAT32, gemm_sse2_4x8_fp32);
+//	std::cout << "AVX\n";
+//	for (int i = 1; i <= 1024; i *= 2)
+//		test_microkernel(10, 8, i, DTYPE_FLOAT32, gemm_avx_10x8_fp32);
+//	std::cout << "AVX2\n";
+//	for (int i = 1; i <= 1024; i *= 2)
+//		test_microkernel(12, 8, i, DTYPE_FLOAT32, gemm_avx2_fma_12x8_fp32);
+//	std::cout << "AVX512\n";
+//	for (int i = 1; i <= 1024; i *= 2)
+//		test_microkernel(24, 16, i, DTYPE_FLOAT32, gemm_avx512f_24x16_fp32);
+//
+//	std::cout << "FP16 kernels\n";
+//	std::cout << "AVX\n";
+//	for (int i = 1; i <= 1024; i *= 2)
+//		test_microkernel(10, 8, i, DTYPE_FLOAT16, gemm_avx_10x8_fp32_fp16);
+//	std::cout << "AVX2\n";
+//	for (int i = 1; i <= 1024; i *= 2)
+//		test_microkernel(12, 8, i, DTYPE_FLOAT16, gemm_avx2_fma_12x8_fp32_fp16);
+//	std::cout << "AVX512\n";
+//	for (int i = 1; i <= 1024; i *= 2)
+//		test_microkernel(24, 16, i, DTYPE_FLOAT16, gemm_avx512f_24x16_fp32_fp16);
+//
+//	return 0;
 
 //	test_microkernel(24, 4, 64);
 //	test_microkernel(24, 4, 128);
@@ -3473,15 +3581,15 @@ int main()
 
 	{
 		Device::setNumberOfThreads(1);
-		const int batch_size = 12;
+		const int batch_size = 32;
 
 		FileLoader fl("/home/maciek/Desktop/AlphaGomoku561/networks/standard_conv_8x128.bin");
 
 		Graph graph;
 		graph.load(fl.getJson()["model"], fl.getBinaryData());
 		graph.setInputShape(Shape( { batch_size, 15, 15, 8 }));
-		graph.moveTo(Device::cpu());
-		graph.convertTo(DataType::FLOAT16);
+		graph.moveTo(Device::opencl(0));
+//		graph.convertTo(DataType::FLOAT16);
 
 		Tensor input(graph.getInputShape(), graph.dtype(), Device::cpu());
 		for (int i = 0; i < batch_size * 15 * 15; i++)
@@ -3503,6 +3611,7 @@ int main()
 		}
 		graph.getInput().copyFrom(graph.context(), input);
 		graph.forward(batch_size);
+		graph.context().synchronize();
 
 		std::cout << "starting benchmark\n";
 		const double start = getTime();
@@ -3510,12 +3619,13 @@ int main()
 		for (; repeats < 10000; repeats++)
 		{
 			graph.forward(batch_size);
-//			if ((getTime() - start) > 30.0)
-			break;
+			graph.context().synchronize();
+			if ((getTime() - start) > 30.0)
+				break;
 		}
 		const double stop = getTime();
 		const double time = stop - start;
-		std::cout << "time = " << time << "s, repeats = " << repeats << '\n';
+		std::cout << "time = " << time << "s, repeats = " << repeats << ", n/s = " << batch_size * repeats / time << "\n";
 
 		for (int i = 0; i < graph.getOutputShape(1).dim(1); i++)
 			std::cout << "output " << i << " = " << graph.getOutput(1).get( { 0, i }) << '\n';
