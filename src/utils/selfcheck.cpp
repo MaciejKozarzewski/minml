@@ -68,23 +68,21 @@ namespace
 				case CpuSimd::SSSE3:
 				case CpuSimd::SSE41:
 				case CpuSimd::SSE42:
-					result.emplace_back(8, 4, 77);
-					result.emplace_back(4, 4, 77);
+					result.emplace_back(4, 8, 77);
 					break;
 				case CpuSimd::AVX:
 					result.emplace_back(10, 8, 77);
-					result.emplace_back(8, 8, 77);
 					break;
 				case CpuSimd::AVX2:
-					result.emplace_back(6, 16, 77);
-					result.emplace_back(24, 4, 77);
+					result.emplace_back(12, 8, 77);
 					break;
 				case CpuSimd::AVX512F:
 				case CpuSimd::AVX512VL_BW_DQ:
+					result.emplace_back(24, 16, 77);
 					break;
 			}
 		}
-		if (device.isCUDA())
+		if (device.isCUDA() or device.isOPENCL())
 			result.emplace_back(123, 46, 78);
 		return result;
 	}
