@@ -1,5 +1,4 @@
-target_sources(${LibName} PRIVATE batchnorm.cpp
-				conv_im2row.cpp
+target_sources(${LibName} PRIVATE conv_im2row.cpp
 				cpu_context.cpp
 				cpu_event.cpp
 				cpu_memory.cpp
@@ -8,6 +7,7 @@ target_sources(${LibName} PRIVATE batchnorm.cpp
 				def_misc_kernels.cpp
 				dispatcher.cpp
 				fp16.cpp
+				normalization.cpp
 				training.cpp
 				utils.cpp)
 				

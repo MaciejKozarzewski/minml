@@ -241,12 +241,13 @@ namespace ml
 	}
 
 	// layernorm
-	void cuda_layernorm_forward(mlContext_t context, mlShape_t shape, const void *input, void *output, void *weights, mlActivationType_t act)
+	void cuda_layernorm_forward(mlContext_t context, mlShape_t shape, mlDataType_t dtype, const void *input, void *output, const void *weights,
+			const void *bias, const void *ext)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
 	void cuda_layernorm_backward(mlContext_t context, mlShape_t shape, const void *input, const void *output, void *gradient_prev,
-			void *gradient_next, const void *weights, void *weights_update, mlActivationType_t act)
+			void *gradient_next, const void *weights, void *weights_update, void *bias_update)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}

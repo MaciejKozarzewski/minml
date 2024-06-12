@@ -320,5 +320,115 @@ namespace ml
 		}
 	}
 
+	void cpu_layernorm_forward(mlContext_t context, mlShape_t shape, mlDataType_t dtype, const void *input, void *output, const void *weights,
+			const void *bias, const void *ext)
+	{
+		assert(input != nullptr);
+		assert(output != nullptr);
+		assert(weights != nullptr);
+		assert(shape.rank == 2);
+
+		const int first_dim = get_first_dim(shape);
+		const int last_dim = get_last_dim(shape);
+
+		const float *input_ptr = getPointer<float>(input);
+		const float *weights_ptr = getPointer<float>(weights);
+		const float *bias_ptr = getPointer<float>(bias);
+		float *output_ptr = getPointer<float>(output);
+		const float *ext_ptr = getPointer<float>(ext);
+
+		assert(cpu::Context::getWorkspaceSize(context) > size_of(dtype) * last_dim);
+		float *workspace = getPointer<float>(cpu::Context::getWorkspace(context));
+
+		for (int i = 0; i < first_dim; i++)
+		{
+			AvgVarStats<float> stats;
+			if (ext == nullptr)
+			{
+				for (int j = 0; j < last_dim; j++)
+				{
+					const float x = input_ptr[i * last_dim + j];
+					workspace[j] = x;
+					stats.add(x);
+				}
+			}
+			else
+			{
+				for (int j = 0; j < last_dim; j++)
+				{
+					const float x = input_ptr[i * last_dim + j] + ext_ptr[i * last_dim + j];
+					workspace[j] = x;
+					stats.add(x);
+				}
+			}
+
+			const float avg = stats.get_average();
+			const float stddev = stats.get_stddev();
+
+			for (int j = 0; j < last_dim; j++)
+			{
+				const float gamma = weights_ptr[j];
+				const float beta = bias_ptr[j];
+				output_ptr[i * last_dim + j] = gamma * (workspace[j] - avg) / stddev + beta;
+			}
+		}
+	}
+	void cpu_layernorm_backward(mlContext_t context, mlShape_t shape, const void *input, const void *output, void *gradient_prev, void *gradient_next,
+			const void *weights, void *weights_update, void *bias_update)
+	{
+		assert(input != nullptr);
+		assert(output != nullptr);
+		assert(gradient_prev != nullptr);
+		assert(gradient_next != nullptr);
+		assert(weights_update != nullptr);
+		assert(shape.rank == 2);
+
+		const int first_dim = get_first_dim(shape);
+		const int last_dim = get_last_dim(shape);
+
+		const float *input_ptr = getPointer<float>(input);
+		const float *output_ptr = getPointer<float>(output);
+		float *gradient_prev_ptr = getPointer<float>(gradient_prev);
+		float *gradient_next_ptr = getPointer<float>(gradient_next);
+		const float *weights_ptr = getPointer<float>(weights);
+		float *weights_update_ptr = getPointer<float>(weights_update);
+		float *bias_update_ptr = getPointer<float>(bias_update);
+
+		for (int i = 0; i < first_dim; i++)
+		{
+			AvgVarStats<float> stats;
+			for (int j = 0; j < last_dim; j++)
+				stats.add(input_ptr[i * last_dim + j]);
+			const float avg = stats.get_average();
+			const float stddev = stats.get_stddev();
+
+			float d_sigma = 0.0f;
+			float d_mu = 0.0f;
+
+			for (int j = 0; j < last_dim; j++)
+			{
+				const int idx = i * last_dim + j;
+				const float gamma = weights_ptr[j];
+				const float x = (input_ptr[idx] - avg) / stddev;
+
+				d_sigma -= gradient_next_ptr[idx] * x * gamma / stddev;
+				d_mu -= gradient_next_ptr[idx] * gamma / stddev;
+
+				weights_update_ptr[j] += gradient_next_ptr[idx] * x;
+				bias_update_ptr[j] += gradient_next_ptr[idx];
+			}
+			d_sigma /= last_dim;
+			d_mu /= last_dim;
+
+			for (int j = 0; j < last_dim; j++)
+			{
+				const int idx = i * last_dim + j;
+				const float gamma = weights_ptr[j];
+
+				gradient_prev_ptr[idx] = gamma / stddev * gradient_next_ptr[idx] + d_sigma * (input_ptr[idx] - avg) / stddev + d_mu;
+			}
+		}
+	}
+
 } /* namespace ml */
 

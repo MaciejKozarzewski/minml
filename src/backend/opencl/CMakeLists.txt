@@ -1,9 +1,9 @@
 set(codesrc 	activations.cpp
-				batchnorm.cpp
 				conversion.cpp
 				gemms.cpp
 				global_pooling.cpp
 				kernel_table.cpp
+				normalization.cpp
 				opencl_context.cpp
 				opencl_event.cpp
 				opencl_memory.cpp

@@ -601,6 +601,44 @@ namespace ml
 		context.synchronize();
 	}
 
+	void layernormForward(const Context &context, const Tensor &input, Tensor &output, const Tensor &weights, const Tensor &bias, const Tensor &ext)
+	{
+		switch (context.device().type())
+		{
+			case DeviceType::CPU:
+				cpu_layernorm_forward(get(context), get_shape(input), get(input.dtype()), input.data(), output.data(), weights.data(), bias.data(),
+						ext.data());
+				break;
+			case DeviceType::CUDA:
+				cuda_layernorm_forward(get(context), get_shape(input), get(input.dtype()), input.data(), output.data(), weights.data(), bias.data(),
+						ext.data());
+				break;
+			case DeviceType::OPENCL:
+				opencl_layernorm_forward(get(context), get_shape(input), get(input.dtype()), input.data(), output.data(), weights.data(), bias.data(),
+						ext.data());
+				break;
+		}
+	}
+	void layernormBackward(const Context &context, const Tensor &input, const Tensor &output, Tensor &gradient_prev, Tensor &gradient_next,
+			const Tensor &weights, Tensor &weights_update, Tensor &bias_update)
+	{
+		switch (context.device().type())
+		{
+			case DeviceType::CPU:
+				cpu_layernorm_backward(get(context), get_shape(input), input.data(), output.data(), gradient_prev.data(), gradient_next.data(),
+						weights.data(), weights_update.data(), bias_update.data());
+				break;
+			case DeviceType::CUDA:
+				cuda_layernorm_backward(get(context), get_shape(input), input.data(), output.data(), gradient_prev.data(), gradient_next.data(),
+						weights.data(), weights_update.data(), bias_update.data());
+				break;
+			case DeviceType::OPENCL:
+				opencl_layernorm_backward(get(context), get_shape(input), input.data(), output.data(), gradient_prev.data(), gradient_next.data(),
+						weights.data(), weights_update.data(), bias_update.data());
+				break;
+		}
+	}
+
 	void activationForward(const Context &context, Tensor &output, const Tensor &input, ActivationType act)
 	{
 		static Timer timer("activationForward");

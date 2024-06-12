@@ -10,6 +10,7 @@
 
 #include <minml/backend/backend_types.h>
 
+#include <cstddef>
 #include <initializer_list>
 #include <cassert>
 
@@ -36,7 +37,7 @@ namespace ml
 		return result;
 	}
 
-	[[maybe_unused]] static int size_of(mlDataType_t dtype) noexcept
+	[[maybe_unused]] static size_t size_of(mlDataType_t dtype) noexcept
 	{
 		switch (dtype)
 		{

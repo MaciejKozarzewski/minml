@@ -110,10 +110,10 @@ namespace ml
 				const void *batchnorm_weights);
 
 		// layernorm
-		DLL_PUBLIC void cuda_layernorm_forward(mlContext_t context, mlShape_t shape, const void *input, void *output, void *weights,
-				mlActivationType_t act);
+		DLL_PUBLIC void cuda_layernorm_forward(mlContext_t context, mlShape_t shape, mlDataType_t dtype, const void *input, void *output,
+				const void *weights, const void *bias, const void *ext);
 		DLL_PUBLIC void cuda_layernorm_backward(mlContext_t context, mlShape_t shape, const void *input, const void *output, void *gradient_prev,
-				void *gradient_next, const void *weights, void *weights_update, mlActivationType_t act);
+				void *gradient_next, const void *weights, void *weights_update, void *bias_update);
 
 		// activations
 		DLL_PUBLIC void cuda_activation_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input,

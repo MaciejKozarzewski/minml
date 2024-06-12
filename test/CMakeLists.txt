@@ -1,9 +1,9 @@
 add_executable(${TestName}	test_launcher.cpp
-				backend/test_batchnorm.cpp
 				backend/test_conv2D.cpp
 				backend/test_gemm_conv.cpp
 				backend/test_gemms.cpp
 				backend/test_nonlinearity.cpp
+				backend/test_normalization.cpp
 				backend/test_tensor_op.cpp
 				backend/test_winograd.cpp
 				core/test_Shape.cpp

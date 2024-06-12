@@ -15,8 +15,10 @@ namespace ml
 	class Context;
 	class Shape;
 	class Tensor;
-	enum class DataType;
-	enum class ActivationType;
+	enum class DataType
+	;
+	enum class ActivationType
+	;
 }
 
 namespace ml
@@ -38,7 +40,8 @@ namespace ml
 			const Tensor &add, ActivationType act);
 
 	void globalAvgAndMaxPoolingForward(const Context &context, const Tensor &input, Tensor &output);
-	void globalAvgAndMaxPoolingBackward(const Context &context, Tensor &gradient_prev, const Tensor &gradient_next, const Tensor &input, const Tensor &output);
+	void globalAvgAndMaxPoolingBackward(const Context &context, Tensor &gradient_prev, const Tensor &gradient_next, const Tensor &input,
+			const Tensor &output);
 	void globalBroadcastingForward(const Context &context, const Tensor &input, Tensor &output, const Tensor &bias, ActivationType act);
 	void globalBroadcastingBackward(const Context &context, Tensor &gradient_prev, Tensor &gradient_next, const Tensor &output, ActivationType act);
 
@@ -60,6 +63,13 @@ namespace ml
 			const Tensor &weights, Tensor &weights_update, const Tensor &running_stats, int running_stat_idx, ActivationType act);
 	void batchnormUpdate(const Context &context, const Tensor &running_stat, int stats_to_average, Tensor &weights, bool use_gamma, bool use_beta);
 	void foldBatchnorm(const Context &context, Tensor &layer_weights, Tensor &layer_bias, const Tensor &batchnorm_weights);
+
+	/*
+	 * Layer normalization
+	 */
+	void layernormForward(const Context &context, const Tensor &input, Tensor &output, const Tensor &weights, const Tensor &bias, const Tensor &ext);
+	void layernormBackward(const Context &context, const Tensor &input, const Tensor &output, Tensor &gradient_prev, Tensor &gradient_next,
+			const Tensor &weights, Tensor &weights_update, Tensor &bias_update);
 
 	void activationForward(const Context &context, Tensor &output, const Tensor &input, ActivationType act);
 	void activationBackward(const Context &context, Tensor &gradient_prev, const Tensor &gradient_next, const Tensor &output, ActivationType act);
