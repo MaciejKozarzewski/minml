@@ -543,7 +543,7 @@ namespace ml
 		for (int i = 0; i < rank(); i++)
 		{
 #ifndef NDEBUG
-			if (ptr[i] < 0 || ptr[i] > m_shape[i])
+			if (ptr[i] < 0 or ptr[i] >= m_shape[i])
 				throw IndexOutOfBounds(METHOD_NAME, std::string("index:") + std::to_string(i), ptr[i], m_shape[i]);
 #endif
 			result += m_stride[i] * static_cast<uint32_t>(ptr[i]);
