@@ -29,6 +29,27 @@ namespace
 				}
 	}
 
+	void unpack_input_fp32(float *dst, const uint32_t *src, int first_dim, int last_dim)
+	{
+		assert(last_dim <= 32);
+		for (int i = 0; i < first_dim; i++, dst += last_dim)
+		{
+			uint32_t mask = src[i];
+			for (int j = 0; j < last_dim; j++, mask >>= 1)
+				dst[j] = (mask & 1u) ? 1.0f : 0.0f;
+		}
+	}
+	void unpack_input_fp16(uint16_t *dst, const uint32_t *src, int first_dim, int last_dim)
+	{
+		assert(last_dim <= 32);
+		for (int i = 0; i < first_dim; i++, dst += last_dim)
+		{
+			uint32_t mask = src[i];
+			for (int j = 0; j < last_dim; j++, mask >>= 1)
+				dst[j] = (mask & 1u) ? 0x3c00 : 0x000;
+		}
+	}
+
 //	ml::Shape transpose(const ml::Shape &shape)
 //	{
 //		return ml::Shape( { shape[0], shape[2], shape[1] });
@@ -37,6 +58,22 @@ namespace
 }
 namespace ml
 {
+
+	TEST(TestUnpackInput, cpu_fp32)
+	{
+		Context context;
+		Tensor input(Shape( { 11, 12, 13, 1 }), DataType::INT32, Device::cpu());
+		for (int i = 0; i < input.volume(); i++)
+			reinterpret_cast<int32_t*>(input.data())[i] = i;
+
+//		Tensor output(Shape( { 11, 12, 13, 32 }), input.dtype(), input.device());
+//		Tensor correct_output(output.shape(), input.dtype(), input.device());
+//
+//		transpose<uint32_t>(correct_output.data(), input.data(), input.dim(0), input.dim(1), input.dim(2));
+//
+//		transpose_021(context, input, output);
+//		EXPECT_LE(testing::diffForTest(output, correct_output), 1.0e-6f);
+	}
 
 //	TEST(TestTranspose021, cpu_fp32)
 //	{
