@@ -15,10 +15,8 @@ namespace ml
 	class Context;
 	class Shape;
 	class Tensor;
-	enum class DataType
-	;
-	enum class ActivationType
-	;
+	enum class DataType;
+	enum class ActivationType;
 }
 
 namespace ml
@@ -70,6 +68,14 @@ namespace ml
 	void layernormForward(const Context &context, const Tensor &input, Tensor &output, const Tensor &weights, const Tensor &bias, const Tensor &ext);
 	void layernormBackward(const Context &context, const Tensor &input, const Tensor &output, Tensor &gradient_prev, Tensor &gradient_next,
 			const Tensor &weights, Tensor &weights_update, Tensor &bias_update);
+
+	/*
+	 * attention
+	 */
+	int multiHeadAttentionGetWorkspaceSize(const Context &context, const Shape &inputShape, int numHeads, bool training);
+	void multiHeadAttentionForward(const Context &context, const Tensor &input, Tensor &output, int numHeads, Tensor &workspace);
+	void multiHeadAttentionBackward(const Context &context, const Tensor &input, Tensor &gradient_prev, Tensor &gradient_next, int numHeads,
+			Tensor &workspace);
 
 	void activationForward(const Context &context, Tensor &output, const Tensor &input, ActivationType act);
 	void activationBackward(const Context &context, Tensor &gradient_prev, const Tensor &gradient_next, const Tensor &output, ActivationType act);

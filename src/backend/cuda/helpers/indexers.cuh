@@ -37,7 +37,7 @@ class Indexer
 template<>
 class Indexer<1>
 {
-	public:
+	private:
 		int length;
 	public:
 		__host__ __device__ Indexer() // @suppress("Class members should be properly initialized")
@@ -65,7 +65,7 @@ class Indexer<1>
 template<>
 class Indexer<2>
 {
-	public:
+	private:
 		int stride0;
 #ifndef NDEBUG
 		int d0, d1;
@@ -101,7 +101,7 @@ class Indexer<2>
 template<>
 class Indexer<3>
 {
-	public:
+	private:
 		int stride0, stride1;
 #ifndef NDEBUG
 		int d0, d1, d2;
@@ -140,7 +140,7 @@ class Indexer<3>
 template<>
 class Indexer<4>
 {
-	public:
+	private:
 		int stride0, stride1, stride2;
 #ifndef NDEBUG
 		int d0, d1, d2, d3;
@@ -176,6 +176,51 @@ class Indexer<4>
 		__host__ __device__ constexpr int rank() const
 		{
 			return 4;
+		}
+};
+
+template<>
+class Indexer<5>
+{
+	private:
+		int stride0, stride1, stride2, stride3;
+#ifndef NDEBUG
+		int d0, d1, d2, d3, d4;
+#endif
+	public:
+		__host__ __device__ Indexer() // @suppress("Class members should be properly initialized")
+		{
+		}
+		__host__ __device__ Indexer(int dim0, int dim1, int dim2, int dim3, int dim4) :
+				stride0(dim1 * dim2 * dim3 * dim4),
+				stride1(dim2 * dim3 * dim4),
+				stride2(dim3 * dim4),
+				stride3(dim4)
+		{
+#ifndef NDEBUG
+			d0 = dim0;
+			d1 = dim1;
+			d2 = dim2;
+			d3 = dim3;
+			d4 = dim4;
+#endif
+		}
+		__host__ __device__ int last_dim() const
+		{
+			return stride3;
+		}
+		__host__ __device__ int at(int x0, int x1, int x2, int x3, int x4) const
+		{
+			assert(0 <= x0 && x0 < d0);
+			assert(0 <= x1 && x1 < d1);
+			assert(0 <= x2 && x2 < d2);
+			assert(0 <= x3 && x3 < d3);
+			assert(0 <= x4 && x4 < d4);
+			return x0 * stride0 + x1 * stride1 + x2 * stride2 + x3 * stride3 + x4;
+		}
+		__host__ __device__ constexpr int rank() const
+		{
+			return 5;
 		}
 };
 

@@ -197,23 +197,39 @@ namespace ml
 			{
 				return perf_estimator( { M, N, K }, inner_tile);
 			}
+			void setMatrixA(const Matrix &mat, char op)
+			{
+				matrix_A = mat;
+				op_A = invert_op(convert_op(op));
+			}
+			void setMatrixB(const Matrix &mat, char op)
+			{
+				matrix_B = mat;
+				op_B = convert_op(op);
+			}
+			void setMatrixC(const Matrix &mat)
+			{
+				matrix_C = mat;
+			}
+			void setMatrixD(const Matrix &mat)
+			{
+				matrix_D = mat;
+			}
 			void setMatrixA(const void *ptr, mlShape_t shape, mlDataType_t dtype, char op)
 			{
-				matrix_A = create_matrix(ptr, dtype, shape);
-				op_A = invert_op(convert_op(op));
+				setMatrixA(create_matrix(ptr, dtype, shape), op);
 			}
 			void setMatrixB(const void *ptr, mlShape_t shape, mlDataType_t dtype, char op)
 			{
-				matrix_B = create_matrix(ptr, dtype, shape);
-				op_B = convert_op(op);
+				setMatrixB(create_matrix(ptr, dtype, shape), op);
 			}
 			void setMatrixC(const void *ptr, mlShape_t shape, mlDataType_t dtype)
 			{
-				matrix_C = create_matrix(ptr, dtype, shape);
+				setMatrixC(create_matrix(ptr, dtype, shape));
 			}
 			void setMatrixD(void *ptr, mlShape_t shape, mlDataType_t dtype)
 			{
-				matrix_D = create_matrix(ptr, dtype, shape);
+				setMatrixD(create_matrix(ptr, dtype, shape));
 			}
 			void setScalingFactors(float alpha, float beta) noexcept
 			{
@@ -235,6 +251,8 @@ namespace ml
 			void pack_fragment_D(Fragment &fragment, int m, int n);
 			void unpack_fragment_D(Fragment &fragment, int m, int n);
 	};
+
+	GemmRuntime get_runtime(mlContext_t context, mlDataType_t dtype, char opA, mlShape_t shape_A, char opB, mlShape_t shape_B);
 }
 
 #endif /* BACKEND_CPU_KERNELS_GEMM_GEMM_RUNTIME_HPP_ */

@@ -16,4 +16,14 @@ __kernel void relu_backward_fp32(__global float *gradient_prev, const __global f
 		gradient_prev[i] = (output[i] == 0.0f) ? 0.0f : gradient_next[i];
 }
 
+__kernel void attention_softmax_backward_fp32(__global float *data, int elements)
+{
+	for (int i = get_global_id(0); i < elements; i += get_global_size(0))
+	{
+		const float grad = data[i];
+		const float output = data[i + elements];
+		data[i] = grad * output * (1.0f - output);
+	}
+}
+
 )"

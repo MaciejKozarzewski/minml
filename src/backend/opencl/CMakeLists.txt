@@ -1,4 +1,5 @@
 set(codesrc 	activations.cpp
+				attention.cpp
 				conversion.cpp
 				gemms.cpp
 				global_pooling.cpp

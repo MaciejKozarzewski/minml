@@ -11,6 +11,7 @@ else()
 		kernels/normalization.cu
 		kernels/training.cu
 		kernels/winograd_nonfused.cu
+		attention.cu
 		cuda_context.cpp
 		cuda_event.cpp
 		cuda_memory.cu

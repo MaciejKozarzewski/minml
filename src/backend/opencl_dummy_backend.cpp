@@ -245,6 +245,22 @@ namespace ml
 		throw NotImplemented(METHOD_NAME);
 	}
 
+	// attention
+	int opencl_multi_head_attention_get_workspace_size(mlShape_t shape, int num_heads, bool training)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+	void opencl_multi_head_attention_forward(mlContext_t context, mlShape_t shape, mlDataType_t dtype, const void *input, void *output,
+			int num_heads, void *workspace)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+	void opencl_multi_head_attention_backward(mlContext_t context, mlShape_t shape, const void *input, void *gradient_prev,
+			void *gradient_next, int num_heads, void *workspace)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+
 	void opencl_activation_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input, mlActivationType_t act)
 	{
 		throw NotImplemented(METHOD_NAME);

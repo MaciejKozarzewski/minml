@@ -1,4 +1,5 @@
-target_sources(${LibName} PRIVATE conv_im2row.cpp
+target_sources(${LibName} PRIVATE attention.cpp
+				conv_im2row.cpp
 				cpu_context.cpp
 				cpu_event.cpp
 				cpu_memory.cpp

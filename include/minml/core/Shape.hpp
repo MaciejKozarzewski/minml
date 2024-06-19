@@ -22,7 +22,7 @@ namespace ml
 	class Shape
 	{
 		public:
-			static const int max_dimension = 4;
+			static const int max_dimension = 6;
 		private:
 			int m_dim[max_dimension];
 			int m_rank = 0;
@@ -54,9 +54,8 @@ namespace ml
 			// serialization
 			Json serialize() const;
 
-			//common to all classes
+			// common to all classes
 			size_t getMemory() const noexcept;
-
 	};
 
 	std::ostream& operator<<(std::ostream &stream, const Shape &s);

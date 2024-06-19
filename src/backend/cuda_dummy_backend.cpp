@@ -177,8 +177,7 @@ namespace ml
 	}
 
 	// implemented in 'global_pooling.cu'
-	void cuda_global_avg_and_max_pooling_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output,
-					const void *input)
+	void cuda_global_avg_and_max_pooling_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
@@ -187,13 +186,13 @@ namespace ml
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
-	void cuda_global_broadcasting_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input,
-			const void *bias, mlActivationType_t act)
+	void cuda_global_broadcasting_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input, const void *bias,
+			mlActivationType_t act)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
-	void cuda_global_broadcasting_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, void *gradient_next,
-			const void *output, mlActivationType_t act)
+	void cuda_global_broadcasting_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, void *gradient_next, const void *output,
+			mlActivationType_t act)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
@@ -211,7 +210,8 @@ namespace ml
 	}
 
 	// implemented in 'add_bias_act.cu'
-	void cuda_add_bias_act(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input, const void *bias, mlActivationType_t act)
+	void cuda_add_bias_act(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input, const void *bias,
+			mlActivationType_t act)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
@@ -248,6 +248,22 @@ namespace ml
 	}
 	void cuda_layernorm_backward(mlContext_t context, mlShape_t shape, const void *input, const void *output, void *gradient_prev,
 			void *gradient_next, const void *weights, void *weights_update, void *bias_update)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+
+	// attention
+	int cuda_multi_head_attention_get_workspace_size(mlShape_t shape, int num_heads, bool training)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+	void cuda_multi_head_attention_forward(mlContext_t context, mlShape_t shape, mlDataType_t dtype, const void *input, void *output,
+			int num_heads, void *workspace)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+	void cuda_multi_head_attention_backward(mlContext_t context, mlShape_t shape, const void *input, void *gradient_prev,
+			void *gradient_next, int num_heads, void *workspace)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}

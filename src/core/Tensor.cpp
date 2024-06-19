@@ -286,7 +286,7 @@ namespace ml
 	void Tensor::reshape(const Shape &newShape)
 	{
 		if (this->m_shape.volume() != newShape.volume())
-			throw ShapeMismatch(METHOD_NAME, "");
+			throw ShapeMismatch(METHOD_NAME, "trying to reshape " + shape().toString() + " into " + newShape.toString());
 
 		this->m_shape = newShape;
 		create_stride();

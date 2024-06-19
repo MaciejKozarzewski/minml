@@ -107,10 +107,19 @@ namespace ml
 		void opencl_fold_batchnorm(mlContext_t context, mlShape_t shape, void *layer_weights, void *layer_bias, const void *batchnorm_weights);
 
 		// layernorm
-		void opencl_layernorm_forward(mlContext_t context, mlShape_t shape, mlDataType_t dtype, const void *input, void *output,
-				const void *weights, const void *bias, const void *ext);
+		void opencl_layernorm_forward(mlContext_t context, mlShape_t shape, mlDataType_t dtype, const void *input, void *output, const void *weights,
+				const void *bias, const void *ext);
 		void opencl_layernorm_backward(mlContext_t context, mlShape_t shape, const void *input, const void *output, void *gradient_prev,
 				void *gradient_next, const void *weights, void *weights_update, void *bias_update);
+
+		/*
+		 * attention
+		 */
+		int opencl_multi_head_attention_get_workspace_size(mlShape_t shape, int num_heads, bool training);
+		void opencl_multi_head_attention_forward(mlContext_t context, mlShape_t shape, mlDataType_t dtype, const void *input, void *output,
+				int num_heads, void *workspace);
+		void opencl_multi_head_attention_backward(mlContext_t context, mlShape_t shape, const void *input, void *gradient_prev, void *gradient_next,
+				int num_heads, void *workspace);
 
 		void opencl_activation_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input,
 				mlActivationType_t act);

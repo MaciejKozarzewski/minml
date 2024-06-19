@@ -103,7 +103,7 @@ namespace ml
 				else
 				{
 					global = opencl::get_nd_range<1024 * 128>(first_dim * 128);
-					local = opencl::get_nd_range<128>(last_dim);
+					local = 128;
 					switch (dtype)
 					{
 //						case DTYPE_FLOAT16:
