@@ -16,8 +16,11 @@ namespace ml
 	class MultiHeadAttention: public Layer
 	{
 			int m_number_of_heads = 0;
+			int m_positional_encoding_range = 0;
 		public:
-			MultiHeadAttention(int numberOfHeads);
+			MultiHeadAttention(int numberOfHeads, int positional_encoding_range);
+
+			Shape getWeightShape() const;
 
 			void setInputShape(const std::vector<Shape> &shapes);
 			Shape getOutputShape() const;

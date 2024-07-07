@@ -115,11 +115,11 @@ namespace ml
 		/*
 		 * attention
 		 */
-		int opencl_multi_head_attention_get_workspace_size(mlShape_t shape, int num_heads, bool training);
-		void opencl_multi_head_attention_forward(mlContext_t context, mlShape_t shape, mlDataType_t dtype, const void *input, void *output,
-				int num_heads, void *workspace);
-		void opencl_multi_head_attention_backward(mlContext_t context, mlShape_t shape, const void *input, void *gradient_prev, void *gradient_next,
-				int num_heads, void *workspace);
+		int opencl_multi_head_attention_get_workspace_size(mlShape_t input_shape, mlShape_t weights_shape, bool training);
+		void opencl_multi_head_attention_forward(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, mlDataType_t dtype,
+				const void *input, void *output, const void *weights, void *workspace);
+		void opencl_multi_head_attention_backward(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, const void *input,
+				const void *weights, void *gradient_prev, void *gradient_next, void *weights_update, void *workspace);
 
 		void opencl_activation_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input,
 				mlActivationType_t act);

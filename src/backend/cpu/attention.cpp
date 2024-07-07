@@ -83,31 +83,32 @@ namespace
 
 namespace ml
 {
-	int cpu_multi_head_attention_get_workspace_size(mlShape_t shape, int num_heads, bool training)
+	int cpu_multi_head_attention_get_workspace_size(mlShape_t input_shape, mlShape_t weights_shape, bool training)
 	{
 		return 0;
 	}
-	void cpu_multi_head_attention_forward(mlContext_t context, mlShape_t shape, mlDataType_t dtype, const void *input, void *output, int num_heads,
-			void *workspace)
+
+	void cpu_multi_head_attention_forward(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, mlDataType_t dtype,
+			const void *input, void *output, const void *weights, void *workspace)
 	{
-		assert(shape.rank == 3);
-		const int batch_size = shape.dim[0];
-		const int tokens = shape.dim[1];
-		assert(shape.dim[2] % 3 == 0);
-		const int embedding_dim = shape.dim[2] / 3;
-
-		assert(num_heads > 0);
-		assert(embedding_dim % num_heads == 0);
-		const int head_dim = embedding_dim / num_heads;
-
-		const mlShape_t head_shape = make_shape( { tokens, head_dim });
-		GemmRuntime rt = get_runtime(context, dtype, 'n', head_shape, 't', head_shape);
-
-		const int batch_stride = shape.dim[1] * shape.dim[2];
-		for (int b = 0; b < batch_size; b++)
-		{
-			const void *q_ptr = reinterpret_cast<const uint8_t*>(input) + 0;
-		}
+//		assert(shape.rank == 3);
+//		const int batch_size = shape.dim[0];
+//		const int tokens = shape.dim[1];
+//		assert(shape.dim[2] % 3 == 0);
+//		const int embedding_dim = shape.dim[2] / 3;
+//
+//		assert(num_heads > 0);
+//		assert(embedding_dim % num_heads == 0);
+//		const int head_dim = embedding_dim / num_heads;
+//
+//		const mlShape_t head_shape = make_shape( { tokens, head_dim });
+//		GemmRuntime rt = get_runtime(context, dtype, 'n', head_shape, 't', head_shape);
+//
+//		const int batch_stride = shape.dim[1] * shape.dim[2];
+//		for (int b = 0; b < batch_size; b++)
+//		{
+//			const void *q_ptr = reinterpret_cast<const uint8_t*>(input) + 0;
+//		}
 //		for (int i = 0; i < shape_A.dim[0]; i++)
 //		{
 //			rt.setMatrixA(getPointer<uint8_t>(A) + i * stride_A, shape_A, dtype, opA);
@@ -123,8 +124,8 @@ namespace ml
 //		}
 
 	}
-	void cpu_multi_head_attention_backward(mlContext_t context, mlShape_t shape, const void *input, void *gradient_prev, void *gradient_next,
-			int num_heads, void *workspace)
+	void cpu_multi_head_attention_backward(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, const void *input,
+			const void *weights, void *gradient_prev, void *gradient_next, void *weights_update, void *workspace)
 	{
 	}
 } /* namespace ml */

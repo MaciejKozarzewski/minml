@@ -72,10 +72,10 @@ namespace ml
 	/*
 	 * attention
 	 */
-	int multiHeadAttentionGetWorkspaceSize(const Context &context, const Shape &inputShape, int numHeads, bool training);
-	void multiHeadAttentionForward(const Context &context, const Tensor &input, Tensor &output, int numHeads, Tensor &workspace);
-	void multiHeadAttentionBackward(const Context &context, const Tensor &input, Tensor &gradient_prev, Tensor &gradient_next, int numHeads,
-			Tensor &workspace);
+	int multiHeadAttentionGetWorkspaceSize(const Context &context, const Shape &inputShape, const Shape &weightsShape, bool training);
+	void multiHeadAttentionForward(const Context &context, const Tensor &input, Tensor &output, const Tensor &weights, Tensor &workspace);
+	void multiHeadAttentionBackward(const Context &context, const Tensor &input, const Tensor &weights, Tensor &gradient_prev, Tensor &gradient_next,
+			Tensor &weights_update, Tensor &workspace);
 
 	void activationForward(const Context &context, Tensor &output, const Tensor &input, ActivationType act);
 	void activationBackward(const Context &context, Tensor &gradient_prev, const Tensor &gradient_next, const Tensor &output, ActivationType act);
