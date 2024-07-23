@@ -52,13 +52,14 @@ namespace
 	template<typename T>
 	void kernel_unpack_input(T *dst, const uint32_t *src, int first_dim, int last_dim)
 	{
-		assert(last_dim <= 32);
+		const int stride = (last_dim + 31) / 32;
 		for (int i = 0; i < first_dim; i++, dst += last_dim)
-		{
-			uint32_t mask = src[i];
-			for (int j = 0; j < last_dim; j++, mask >>= 1)
-				dst[j] = one_or_zero<T>(mask & 1u);
-		}
+			for (int j = 0; j < last_dim; j++)
+			{
+				const int int_idx = j / 32;
+				const int bit_idx = j % 32;
+				dst[j] = one_or_zero<T>((src[i * stride + int_idx] >> bit_idx) & 1u);
+			}
 	}
 }
 

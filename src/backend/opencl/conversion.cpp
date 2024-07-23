@@ -51,8 +51,8 @@ namespace ml
 		kernel.setArg(2, first_dim);
 		kernel.setArg(3, last_dim);
 
-		const cl::NDRange global = opencl::get_nd_range<1024>(first_dim, last_dim);
-		const cl::NDRange local = opencl::get_nd_range(1, last_dim);
+		const cl::NDRange global = opencl::get_nd_range<1024, 256>(first_dim, last_dim);
+		const cl::NDRange local = opencl::get_nd_range<256>(1, last_dim);
 
 		opencl::runKernel(context, kernel, global, local);
 	}
