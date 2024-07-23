@@ -43,7 +43,12 @@ namespace ml
 	{
 		if (m_input_shapes.size() != 1)
 			throw UninitializedObject(METHOD_NAME, "input shape has not been set");
-		return m_input_shapes[0];
+		const int last_dim = getInputShape().volume(m_axis);
+		if (last_dim == 0)
+			throw LogicError(METHOD_NAME, "softmax cannot be calculated over zero volume dimensions");
+		const int first_dim = getInputShape().volume() / last_dim;
+
+		return Shape( { first_dim, last_dim });
 	}
 
 	std::string Softmax::name() const
@@ -71,22 +76,14 @@ namespace ml
 	{
 		assert(input.size() == 1);
 
-		const int last_dim = input[0].shape().volume(m_axis);
-		if (last_dim == 0)
-			throw LogicError(METHOD_NAME, "softmax cannot be calculated over zero volume dimensions");
-		const int first_dim = input[0].shape().volume() / last_dim;
-		const Shape shape( { first_dim, last_dim });
-
-		const Tensor in = input[0].view(shape);
-		Tensor out = output.view(shape);
-
-		activationForward(context(), out, in, ActivationType::SOFTMAX);
+		const Tensor in = input[0].view(output.shape());
+		activationForward(context(), output, in, ActivationType::SOFTMAX);
 	}
 	void Softmax::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next)
 	{
 		assert(input.size() == 1);
 
-		gradient_prev[0].copyFrom(context(), gradient_next);
+		gradient_prev[0].copyFrom(context(), gradient_next.view(input[0].shape()));
 	}
 }
 

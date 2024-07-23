@@ -86,7 +86,6 @@ namespace ml
 		assert(input.size() <= 2);
 
 		Tensor ext;
-
 		if (input.size() == 2)
 			ext = input.at(1).view();
 
@@ -96,7 +95,7 @@ namespace ml
 			Tensor &gradient_next)
 	{
 		assert(input.size() == 1);
-		assert(gradient_prev.size() == 1);
+		assert(gradient_prev.size() == input.size());
 
 		layernormBackward(context(), input[0], output, gradient_prev[0], gradient_next, getWeights().getParam(), getWeights().getGradient(),
 				getBias().getGradient());

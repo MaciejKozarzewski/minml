@@ -59,18 +59,15 @@ namespace ml
 	{
 		if (shapes.size() != 1)
 			throw IllegalArgument(METHOD_NAME, "MLP layer expects single input shape");
-		const int first_dim = shapes[0].volumeWithoutLastDim();
-		const int last_dim = shapes[0].lastDim();
-		if (not isUsingWeights() and m_neurons != last_dim)
-			throw IllegalArgument(METHOD_NAME, "MLP layer without weights must have input and output of the same shape");
-
-		m_input_shapes = { Shape( { first_dim, last_dim }) };
+		m_input_shapes = shapes;
 	}
 	Shape MLP::getOutputShape() const
 	{
 		if (m_input_shapes.size() != 1)
 			throw UninitializedObject(METHOD_NAME, "input shape has not been set");
-		return Shape( { getInputShape().firstDim(), m_neurons });
+		Shape result = getInputShape();
+		result[result.rank() - 1] = m_neurons;
+		return result;
 	}
 	Shape MLP::getWeightShape() const
 	{
@@ -152,6 +149,7 @@ namespace ml
 			else
 				activationForward(context(), output, output, m_activation);
 		}
+		output.reshape(output.shape());
 	}
 	void MLP::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next)
 	{
@@ -162,17 +160,17 @@ namespace ml
 		if (isUsingWeights())
 		{
 			Tensor tmp_grad = flatten_input_tensor(gradient_prev[0]);
-			gemm(context(), 'n', 'n', tmp_grad, gradient_next, getWeights().getParam(), 1, 0);
-			gemm(context(), 't', 'n', getWeights().getGradient(), gradient_next, flatten_input_tensor(input[0]), 1, 0);
+			gemm(context(), 'n', 'n', tmp_grad, flatten_input_tensor(gradient_next), getWeights().getParam(), 1, 0);
+			gemm(context(), 't', 'n', getWeights().getGradient(), flatten_input_tensor(gradient_next), flatten_input_tensor(input[0]), 1, 0);
 		}
 		else
 		{
 			Tensor tmp = flatten_input_tensor(gradient_prev[0]);
-			tmp.copyFrom(context(), gradient_next);
+			tmp.copyFrom(context(), flatten_input_tensor(gradient_next));
 		}
 
 		if (isUsingBias())
-			sumOverFirstDim(context(), getBias().getGradient(), gradient_next, 0);
+			sumOverFirstDim(context(), getBias().getGradient(), flatten_input_tensor(gradient_next), 0);
 	}
 
 } /* namespace ml */

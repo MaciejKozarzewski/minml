@@ -27,6 +27,7 @@
 #include <minml/layers/GlobalBroadcastHW.hpp>
 #include <minml/layers/GlobalPooling.hpp>
 #include <minml/layers/Softmax.hpp>
+#include <minml/layers/SqueezeAndExcitation.hpp>
 #include <unordered_map>
 #include <cmath>
 #include <mutex>

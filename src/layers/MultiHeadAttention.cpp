@@ -41,9 +41,10 @@ namespace ml
 	Shape MultiHeadAttention::getOutputShape() const
 	{
 		const int batch_size = getInputShape().dim(0);
-		const int tokens = getInputShape().dim(1) * getInputShape().dim(2);
+		const int height = getInputShape().dim(1);
+		const int width = getInputShape().dim(2);
 		const int embedding = getInputShape().dim(3) / 3;
-		return Shape( { batch_size, tokens, embedding });
+		return Shape( { batch_size, height, width, embedding });
 	}
 
 	std::string MultiHeadAttention::name() const
@@ -53,7 +54,7 @@ namespace ml
 	Json MultiHeadAttention::getConfig() const
 	{
 		Json result = Layer::getConfig();
-		result["numberf_of_heads"] = m_number_of_heads;
+		result["number_of_heads"] = m_number_of_heads;
 		result["positional_encoding_range"] = m_positional_encoding_range;
 		return result;
 	}

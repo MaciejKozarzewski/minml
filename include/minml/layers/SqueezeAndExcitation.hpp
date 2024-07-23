@@ -1,28 +1,30 @@
 /*
- * GlobalPooling.hpp
+ * SqueezeAndExcitation.hpp
  *
- *  Created on: Jul 10, 2024
+ *  Created on: Nov 22, 2023
  *      Author: Maciej Kozarzewski
  */
 
-#ifndef MINML_LAYERS_GLOBALPOOLING_HPP_
-#define MINML_LAYERS_GLOBALPOOLING_HPP_
+#ifndef MINML_LAYERS_SQUEEZEANDEXCITATION_HPP_
+#define MINML_LAYERS_SQUEEZEANDEXCITATION_HPP_
 
 #include <minml/layers/Layer.hpp>
 
 namespace ml
 {
 
-	class GlobalPooling: public Layer
+	class SqueezeAndExcitation: public Layer
 	{
 		public:
-			GlobalPooling();
+			SqueezeAndExcitation(std::string activation = "linear");
 
 			void setInputShape(const std::vector<Shape> &shapes);
 			Shape getOutputShape() const;
+			Shape getWeightShape() const;
 
 			std::string name() const;
 
+			int getWorkspaceSize() const noexcept;
 			std::unique_ptr<Layer> clone(const Json &config) const;
 
 			void forward(const std::vector<Tensor> &input, Tensor &output);
@@ -31,4 +33,4 @@ namespace ml
 
 } /* namespace ml */
 
-#endif /* MINML_LAYERS_GLOBALPOOLING_HPP_ */
+#endif /* MINML_LAYERS_SQUEEZEANDEXCITATION_HPP_ */

@@ -6,5 +6,9 @@ target_sources(${LibName} PRIVATE 	Add.cpp
 								GlobalPooling.cpp
 								Input.cpp
 								Layer.cpp
+								LayerNormalization.cpp
+								MLP.cpp
+								MultiHeadAttention.cpp
 								Parameter.cpp
-								Softmax.cpp)
+								Softmax.cpp
+								SqueezeAndExcitation.cpp)
