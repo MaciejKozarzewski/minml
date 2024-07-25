@@ -31,7 +31,6 @@ namespace
 
 	void unpack_input_fp32(float *dst, const uint32_t *src, int first_dim, int last_dim)
 	{
-		assert(last_dim <= 32);
 		for (int i = 0; i < first_dim; i++, dst += last_dim)
 		{
 			uint32_t mask = src[i];
@@ -41,7 +40,6 @@ namespace
 	}
 	void unpack_input_fp16(uint16_t *dst, const uint32_t *src, int first_dim, int last_dim)
 	{
-		assert(last_dim <= 32);
 		for (int i = 0; i < first_dim; i++, dst += last_dim)
 		{
 			uint32_t mask = src[i];

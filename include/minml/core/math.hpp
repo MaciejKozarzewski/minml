@@ -50,7 +50,7 @@ namespace ml
 	 * Computes D = act(alpha * op_A(A) * op_B(B) + beta * C)
 	 */
 	void gemm_ex(const Context &context, Tensor &D, float alpha, char opA, const Tensor &A, char opB, const Tensor &B, float beta, const Tensor &C,
-			ActivationType act);
+			const Tensor &bias, ActivationType act);
 
 	void addBiasAct(const Context &context, Tensor &output, const Tensor &input, const Tensor &bias, ActivationType act);
 
@@ -66,8 +66,8 @@ namespace ml
 	 * Layer normalization
 	 */
 	void layernormForward(const Context &context, const Tensor &input, Tensor &output, const Tensor &weights, const Tensor &bias, const Tensor &ext);
-	void layernormBackward(const Context &context, const Tensor &input, const Tensor &output, Tensor &gradient_prev, Tensor &gradient_next,
-			const Tensor &weights, Tensor &weights_update, Tensor &bias_update);
+	void layernormBackward(const Context &context, const Tensor &input, Tensor &gradient_prev, Tensor &gradient_next, const Tensor &weights,
+			Tensor &weights_update, Tensor &bias_update);
 
 	/*
 	 * attention

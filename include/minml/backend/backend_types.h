@@ -28,7 +28,7 @@ namespace ml
 		typedef struct
 		{
 				int rank;
-				int dim[4];
+				int dim[6];
 		} mlShape_t;
 
 		typedef enum

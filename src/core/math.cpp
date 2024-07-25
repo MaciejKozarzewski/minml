@@ -464,36 +464,27 @@ namespace ml
 	}
 
 	void gemm_ex(const Context &context, Tensor &D, float alpha, char opA, const Tensor &A, char opB, const Tensor &B, float beta, const Tensor &C,
-			ActivationType act)
+			const Tensor &bias, ActivationType act)
 	{
-		static Timer timer("gemm");
+		static Timer timer("gemm_ex");
 		TimerGuard tg(timer);
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
-			{
-				if (act != ActivationType::RELU and act != ActivationType::LINEAR)
-					throw std::logic_error("Only ReLU or linear activations are supported for CPU gemm_ex");
 				cpu_gemm_ex(get(context), get(C.dtype()), get_shape(D), D.data(), alpha, opA, get_shape(A), A.data(), opB, get_shape(B), B.data(),
-						beta, get_shape(C), C.data(), get(act));
+						beta, get_shape(C), C.data(), bias.data(), get(act));
 				break;
-			}
 			case DeviceType::CUDA:
-			{
-				if (C.data() != D.data())
-					throw std::logic_error("C and D must point to the same memory for CUDA gemm_ex");
-				if (act != ActivationType::RELU and act != ActivationType::LINEAR)
-					throw std::logic_error("Only ReLU or linear activations are supported for CUDA gemm_ex");
-				cuda_gemm(get(context), get(D.dtype()), get_shape(D), D.data(), get_shape(A), A.data(), get_shape(B), B.data(), opA, opB, alpha,
-						beta);
+				cuda_gemm_ex(get(context), get(C.dtype()), get_shape(D), D.data(), alpha, opA, get_shape(A), A.data(), opB, get_shape(B), B.data(),
+						beta, get_shape(C), C.data(), bias.data(), get(act));
 				break;
-			}
 			case DeviceType::OPENCL:
-			{
-				// FIXME
+				opencl_gemm_ex(get(context), get(C.dtype()), get_shape(D), D.data(), alpha, opA, get_shape(A), A.data(), opB, get_shape(B), B.data(),
+						beta, get_shape(C), C.data(), bias.data(), get(act));
 				break;
-			}
-		}SYNC();
+		}
+
+		SYNC();
 	}
 
 	void addBiasAct(const Context &context, Tensor &output, const Tensor &input, const Tensor &bias, ActivationType act)
@@ -619,22 +610,22 @@ namespace ml
 				break;
 		}
 	}
-	void layernormBackward(const Context &context, const Tensor &input, const Tensor &output, Tensor &gradient_prev, Tensor &gradient_next,
-			const Tensor &weights, Tensor &weights_update, Tensor &bias_update)
+	void layernormBackward(const Context &context, const Tensor &input, Tensor &gradient_prev, Tensor &gradient_next, const Tensor &weights,
+			Tensor &weights_update, Tensor &bias_update)
 	{
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
-				cpu_layernorm_backward(get(context), get_shape(input), input.data(), output.data(), gradient_prev.data(), gradient_next.data(),
-						weights.data(), weights_update.data(), bias_update.data());
+				cpu_layernorm_backward(get(context), get_shape(input), input.data(), gradient_prev.data(), gradient_next.data(), weights.data(),
+						weights_update.data(), bias_update.data());
 				break;
 			case DeviceType::CUDA:
-				cuda_layernorm_backward(get(context), get_shape(input), input.data(), output.data(), gradient_prev.data(), gradient_next.data(),
-						weights.data(), weights_update.data(), bias_update.data());
+				cuda_layernorm_backward(get(context), get_shape(input), input.data(), gradient_prev.data(), gradient_next.data(), weights.data(),
+						weights_update.data(), bias_update.data());
 				break;
 			case DeviceType::OPENCL:
-				opencl_layernorm_backward(get(context), get_shape(input), input.data(), output.data(), gradient_prev.data(), gradient_next.data(),
-						weights.data(), weights_update.data(), bias_update.data());
+				opencl_layernorm_backward(get(context), get_shape(input), input.data(), gradient_prev.data(), gradient_next.data(), weights.data(),
+						weights_update.data(), bias_update.data());
 				break;
 		}
 	}

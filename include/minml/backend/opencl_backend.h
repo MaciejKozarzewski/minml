@@ -91,6 +91,13 @@ namespace ml
 		void opencl_gemm_batched(mlContext_t context, mlDataType_t dtype, mlShape_t shape_C, void *C, mlShape_t shape_A, const void *A,
 				mlShape_t shape_B, const void *B, char opA, char opB, float alpha, float beta);
 
+		/*
+		 * Computes D = act(alpha * op_A(A) * op_B(B) + beta * C + bias)
+		 */
+		void opencl_gemm_ex(mlContext_t context, mlDataType_t dtype, mlShape_t shape_D, void *D, float alpha, char opA, mlShape_t shape_A,
+				const void *A, char opB, mlShape_t shape_B, const void *B, float beta, mlShape_t shape_C, const void *C, const void *bias,
+				mlActivationType_t act);
+
 		// implemented in 'add_bias_act.cpp'
 		void opencl_add_bias_act(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input, const void *bias,
 				mlActivationType_t act);
@@ -109,8 +116,8 @@ namespace ml
 		// layernorm
 		void opencl_layernorm_forward(mlContext_t context, mlShape_t shape, mlDataType_t dtype, const void *input, void *output, const void *weights,
 				const void *bias, const void *ext);
-		void opencl_layernorm_backward(mlContext_t context, mlShape_t shape, const void *input, const void *output, void *gradient_prev,
-				void *gradient_next, const void *weights, void *weights_update, void *bias_update);
+		void opencl_layernorm_backward(mlContext_t context, mlShape_t shape, const void *input, void *gradient_prev, void *gradient_next,
+				const void *weights, void *weights_update, void *bias_update);
 
 		/*
 		 * attention

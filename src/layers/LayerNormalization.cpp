@@ -97,7 +97,7 @@ namespace ml
 		assert(input.size() == 1);
 		assert(gradient_prev.size() == input.size());
 
-		layernormBackward(context(), input[0], output, gradient_prev[0], gradient_next, getWeights().getParam(), getWeights().getGradient(),
+		layernormBackward(context(), input[0], gradient_prev[0], gradient_next, getWeights().getParam(), getWeights().getGradient(),
 				getBias().getGradient());
 	}
 

@@ -201,6 +201,12 @@ namespace ml
 		throw NotImplemented(METHOD_NAME);
 	}
 
+	void opencl_gemm_ex(mlContext_t context, mlDataType_t dtype, mlShape_t shape_D, void *D, float alpha, char opA, mlShape_t shape_A, const void *A,
+			char opB, mlShape_t shape_B, const void *B, float beta, mlShape_t shape_C, const void *C, const void *bias, mlActivationType_t act)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+
 	// implemented in 'add_bias_act.cpp'
 	void opencl_add_bias_act(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input, const void *bias,
 			mlActivationType_t act)
@@ -239,8 +245,8 @@ namespace ml
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
-	void opencl_layernorm_backward(mlContext_t context, mlShape_t shape, const void *input, const void *output, void *gradient_prev,
-			void *gradient_next, const void *weights, void *weights_update, void *bias_update)
+	void opencl_layernorm_backward(mlContext_t context, mlShape_t shape, const void *input, void *gradient_prev, void *gradient_next,
+			const void *weights, void *weights_update, void *bias_update)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}

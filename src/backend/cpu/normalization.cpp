@@ -373,11 +373,10 @@ namespace ml
 			}
 		}
 	}
-	void cpu_layernorm_backward(mlContext_t context, mlShape_t shape, const void *input, const void *output, void *gradient_prev, void *gradient_next,
+	void cpu_layernorm_backward(mlContext_t context, mlShape_t shape, const void *input, void *gradient_prev, void *gradient_next,
 			const void *weights, void *weights_update, void *bias_update)
 	{
 		assert(input != nullptr);
-		assert(output != nullptr);
 		assert(gradient_prev != nullptr);
 		assert(gradient_next != nullptr);
 		assert(weights_update != nullptr);
@@ -387,7 +386,6 @@ namespace ml
 		const int last_dim = get_last_dim(shape);
 
 		const float *input_ptr = getPointer<float>(input);
-		const float *output_ptr = getPointer<float>(output);
 		float *gradient_prev_ptr = getPointer<float>(gradient_prev);
 		float *gradient_next_ptr = getPointer<float>(gradient_next);
 		const float *weights_ptr = getPointer<float>(weights);

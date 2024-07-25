@@ -192,7 +192,7 @@ namespace ml
 			const void *bias, const void *ext)
 	{
 	}
-	void opencl_layernorm_backward(mlContext_t context, mlShape_t shape, const void *input, const void *output, void *gradient_prev,
+	void opencl_layernorm_backward(mlContext_t context, mlShape_t shape, const void *input, void *gradient_prev,
 			void *gradient_next, const void *weights, void *weights_update, void *bias_update)
 	{
 	}
