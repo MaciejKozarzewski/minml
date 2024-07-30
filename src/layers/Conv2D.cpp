@@ -207,10 +207,11 @@ namespace ml
 					{
 						const float beta = isUsingBias() ? 1.0f : 0.0f;
 						if (m_activation == ActivationType::RELU or m_activation == ActivationType::LINEAR)
-							gemm_ex(context(), output_matrix, 1.0f, 'n', input_matrix, 't', weight_matrix, beta, getBias().getParam(), m_activation);
+							gemm_ex(context(), output_matrix, 1.0f, 'n', input_matrix, 't', weight_matrix, beta, getBias().getParam(), Tensor(),
+									m_activation);
 						else
 						{
-							gemm_ex(context(), output_matrix, 1.0f, 'n', input_matrix, 't', weight_matrix, beta, getBias().getParam(),
+							gemm_ex(context(), output_matrix, 1.0f, 'n', input_matrix, 't', weight_matrix, beta, getBias().getParam(), Tensor(),
 									ActivationType::LINEAR);
 							activationForward(context(), output, output, m_activation);
 						}

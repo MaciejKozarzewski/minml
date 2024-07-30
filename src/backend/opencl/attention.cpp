@@ -98,7 +98,7 @@ namespace ml
 		return result;
 	}
 	void opencl_multi_head_attention_forward(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, mlDataType_t dtype,
-			const void *input, void *output, const void *weights, void *workspace)
+			const void *input, void *output, const void *weights, void *workspace, void *backward_data)
 	{
 		assert(input_shape.rank == 3);
 		assert(weights_shape.rank == 3);
@@ -128,7 +128,7 @@ namespace ml
 				output, out_offsets, embedding, num_pointers);
 	}
 	void opencl_multi_head_attention_backward(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, const void *input,
-			const void *weights, void *gradient_prev, void *gradient_next, void *weights_update, void *workspace)
+			const void *weights, void *gradient_prev, void *gradient_next, void *weights_update, void *workspace, void *backward_data)
 	{
 		assert(input_shape.rank == 3);
 		assert(weights_shape.rank == 3);

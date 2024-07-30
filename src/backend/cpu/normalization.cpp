@@ -30,6 +30,11 @@ namespace
 	{
 		return x * x;
 	}
+	template<typename T>
+	T cube(T x) noexcept
+	{
+		return x * x * x;
+	}
 	float get_mean(const float *ptr, int idx, int last_dim) noexcept
 	{
 		assert(idx >= 0 && idx < last_dim);
@@ -424,6 +429,74 @@ namespace ml
 				const float gamma = weights_ptr[j];
 
 				gradient_prev_ptr[idx] = gamma / stddev * gradient_next_ptr[idx] + d_sigma * (input_ptr[idx] - avg) / stddev + d_mu;
+			}
+		}
+	}
+
+	void cpu_rmsnorm_forward(mlContext_t context, mlShape_t shape, mlDataType_t dtype, const void *input, void *output, const void *weights)
+	{
+		assert(input != nullptr);
+		assert(output != nullptr);
+		assert(weights != nullptr);
+		assert(shape.rank == 2);
+
+		const int first_dim = get_first_dim(shape);
+		const int last_dim = get_last_dim(shape);
+
+		const float *input_ptr = getPointer<float>(input);
+		const float *weights_ptr = getPointer<float>(weights);
+		float *output_ptr = getPointer<float>(output);
+
+		for (int i = 0; i < first_dim; i++)
+		{
+			float sum_square = 0.0f;
+			for (int j = 0; j < last_dim; j++)
+				sum_square += square(input_ptr[i * last_dim + j]);
+			const float rms = std::sqrt(sum_square / last_dim);
+
+			const float inv_rms = 1.0f / (epsilon + rms);
+			for (int j = 0; j < last_dim; j++)
+			{
+				const float gamma = weights_ptr[j];
+				output_ptr[i * last_dim + j] = gamma * input_ptr[i * last_dim + j] * inv_rms;
+			}
+		}
+	}
+	void cpu_rmsnorm_backward(mlContext_t context, mlShape_t shape, const void *input, void *gradient_prev, void *gradient_next, const void *weights,
+			void *weights_update)
+	{
+		assert(input != nullptr);
+		assert(gradient_prev != nullptr);
+		assert(gradient_next != nullptr);
+		assert(weights_update != nullptr);
+		assert(shape.rank == 2);
+
+		const int first_dim = get_first_dim(shape);
+		const int last_dim = get_last_dim(shape);
+
+		const float *input_ptr = getPointer<float>(input);
+		float *gradient_prev_ptr = getPointer<float>(gradient_prev);
+		float *gradient_next_ptr = getPointer<float>(gradient_next);
+		const float *weights_ptr = getPointer<float>(weights);
+		float *weights_update_ptr = getPointer<float>(weights_update);
+
+		for (int i = 0; i < first_dim; i++)
+		{
+			float sum_square = 0.0f;
+			for (int j = 0; j < last_dim; j++)
+				sum_square += square(input_ptr[i * last_dim + j]);
+			const float rms = std::sqrt(sum_square / last_dim);
+
+			const float inv_rms = 1.0f / (epsilon + rms);
+			for (int j = 0; j < last_dim; j++)
+			{
+				const int idx = i * last_dim + j;
+				const float gamma = weights_ptr[j];
+				const float in = input_ptr[idx];
+				const float out = in * inv_rms;
+
+				weights_update_ptr[j] += gradient_next_ptr[idx] * out;
+				gradient_prev_ptr[idx] = gradient_next_ptr[idx] * gamma * (sum_square - square(in)) / (last_dim * cube(rms));
 			}
 		}
 	}

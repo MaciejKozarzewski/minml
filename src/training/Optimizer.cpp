@@ -86,11 +86,7 @@ namespace ml
 			m_variance = std::make_unique<Tensor>(param.shape(), param.dtype(), param.device());
 
 		m_steps++;
-		float learning_rate = m_learning_rate;
-		if (m_steps < 10000)
-			learning_rate *= sqrt(1.0f - pow(m_beta2, m_steps)) / (1.0f - pow(m_beta1, m_steps));
-
-		adamOptimize(context, param.getParam(), param.getGradient(), *m_momentum, *m_variance, learning_rate, m_beta1, m_beta2);
+		radamOptimize(context, param.getParam(), param.getGradient(), *m_momentum, *m_variance, m_learning_rate, m_beta1, m_beta2, m_steps);
 		param.getGradient().zeroall(context);
 	}
 

@@ -123,13 +123,21 @@ namespace ml
 				const void *weights, void *weights_update, void *bias_update);
 
 		/*
+		 * RMSnorm
+		 */
+		DLL_PUBLIC void cuda_rmsnorm_forward(mlContext_t context, mlShape_t shape, mlDataType_t dtype, const void *input, void *output,
+				const void *weights);
+		DLL_PUBLIC void cuda_rmsnorm_backward(mlContext_t context, mlShape_t shape, const void *input, void *gradient_prev, void *gradient_next,
+				const void *weights, void *weights_update);
+
+		/*
 		 * attention
 		 */
 		DLL_PUBLIC int cuda_multi_head_attention_get_workspace_size(mlShape_t input_shape, mlShape_t weights_shape, bool training);
 		DLL_PUBLIC void cuda_multi_head_attention_forward(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, mlDataType_t dtype,
-				const void *input, void *output, const void *weights, void *workspace);
+				const void *input, void *output, const void *weights, void *workspace, void *backward_data);
 		DLL_PUBLIC void cuda_multi_head_attention_backward(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, const void *input,
-				const void *weights, void *gradient_prev, void *gradient_next, void *weights_update, void *workspace);
+				const void *weights, void *gradient_prev, void *gradient_next, void *weights_update, void *workspace, void *backward_data);
 
 		// activations
 		DLL_PUBLIC void cuda_activation_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input,
@@ -147,8 +155,8 @@ namespace ml
 		DLL_PUBLIC float cuda_cross_entropy_loss(mlContext_t context, mlShape_t shape, const void *output, const void *target);
 		DLL_PUBLIC void cuda_cross_entropy_gradient(mlContext_t context, mlShape_t shape, void *gradient, const void *output, const void *target,
 				float weight);
-		DLL_PUBLIC void cuda_adam_optimize(mlContext_t context, mlShape_t shape, void *weight, const void *update, void *momentum, void *variance,
-				float learning_rate, float beta1, float beta2);
+		DLL_PUBLIC void cuda_radam_optimize(mlContext_t context, mlShape_t shape, void *weight, const void *update, void *momentum, void *variance,
+				float learning_rate, float beta1, float beta2, int step);
 		DLL_PUBLIC void cuda_l2_regularization(mlContext_t context, mlShape_t shape, void *gradient, const void *param, float coefficient,
 				float offset);
 

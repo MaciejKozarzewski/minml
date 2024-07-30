@@ -81,10 +81,10 @@ namespace ml
 		testing::initForTest(cpu_weights, 0.0f);
 		Tensor cpu_momentum(shape, "float32", Device::cpu());
 		Tensor cpu_variance(shape, "float32", Device::cpu());
-		for (int i = 0; i < 1000; i++)
+		for (int i = 1; i < 1000; i++)
 		{
 			testing::initForTest(gradient, 1.0f + 0.01f * i);
-			adamOptimize(Context(), cpu_weights, gradient, cpu_momentum, cpu_variance, 1.0e-3f, 0.9f, 0.999f);
+			radamOptimize(Context(), cpu_weights, gradient, cpu_momentum, cpu_variance, 1.0e-3f, 0.9f, 0.999f, i);
 		}
 
 		if (testing::has_device_supporting(DataType::FLOAT32))
@@ -97,10 +97,10 @@ namespace ml
 			testing::initForTest(device_weights, 0.0f);
 			Tensor device_momentum(shape, "float32", device);
 			Tensor device_variance(shape, "float32", device);
-			for (int i = 0; i < 1000; i++)
+			for (int i = 1; i < 1000; i++)
 			{
 				testing::initForTest(gradient, 1.0f + 0.01f * i);
-				adamOptimize(context, device_weights, gradient, device_momentum, device_variance, 1.0e-3f, 0.9f, 0.999f);
+				radamOptimize(context, device_weights, gradient, device_momentum, device_variance, 1.0e-3f, 0.9f, 0.999f, i);
 				context.synchronize();
 			}
 

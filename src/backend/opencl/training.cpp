@@ -192,8 +192,8 @@ namespace ml
 
 		opencl::runKernel(context, kernel, global, local);
 	}
-	void opencl_adam_optimize(mlContext_t context, mlShape_t shape, void *weight, const void *update, void *momentum, void *variance,
-			float learning_rate, float beta1, float beta2)
+	void opencl_radam_optimize(mlContext_t context, mlShape_t shape, void *weight, const void *update, void *momentum, void *variance,
+			float learning_rate, float beta1, float beta2, int step)
 	{
 		const int elements = volume(shape);
 		cl::Kernel kernel = get_kernel(context, "learn_adam");
@@ -208,6 +208,7 @@ namespace ml
 		kernel.setArg(5, learning_rate);
 		kernel.setArg(6, beta1);
 		kernel.setArg(7, beta2);
+		kernel.setArg(8, step);
 
 		opencl::runKernel(context, kernel, global, local);
 	}

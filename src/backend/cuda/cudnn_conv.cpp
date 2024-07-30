@@ -228,6 +228,11 @@ namespace
 				cublasStatus_t status = cublasLtMatrixLayoutCreate(&m_layout, cuda_convert(dtype), cols, rows, cols);
 				assert(status == CUBLAS_STATUS_SUCCESS);
 			}
+			MatrixLayout(const mlShape_t &shape, mlDataType_t dtype) :
+					MatrixLayout(shape.dim[0], shape.dim[1], dtype)
+			{
+				assert(shape.rank == 2);
+			}
 			MatrixLayout(const MatrixLayout &other) = delete;
 			MatrixLayout(MatrixLayout &&other) noexcept = delete;
 			MatrixLayout& operator=(const MatrixLayout &other) = delete;
@@ -263,10 +268,18 @@ namespace
 				{
 					status = cublasLtMatmulDescSetAttribute(m_desc, CUBLASLT_MATMUL_DESC_BIAS_POINTER, &bias, sizeof(bias));
 					assert(status == CUBLAS_STATUS_SUCCESS);
-					epilogue = (act == ACTIVATION_RELU) ? CUBLASLT_EPILOGUE_RELU_BIAS : CUBLASLT_EPILOGUE_BIAS;
+					if (act == ACTIVATION_RELU)
+						epilogue = CUBLASLT_EPILOGUE_RELU_BIAS;
+					else
+						epilogue = CUBLASLT_EPILOGUE_BIAS;
 				}
 				else
-					epilogue = (act == ACTIVATION_RELU) ? CUBLASLT_EPILOGUE_RELU : CUBLASLT_EPILOGUE_DEFAULT;
+				{
+					if (act == ACTIVATION_RELU)
+						epilogue = CUBLASLT_EPILOGUE_RELU;
+					else
+						epilogue = CUBLASLT_EPILOGUE_DEFAULT;
+				}
 
 				status = cublasLtMatmulDescSetAttribute(m_desc, CUBLASLT_MATMUL_DESC_EPILOGUE, &epilogue, sizeof(epilogue));
 				assert(status == CUBLAS_STATUS_SUCCESS);
@@ -281,6 +294,30 @@ namespace
 				assert(status == CUBLAS_STATUS_SUCCESS);
 			}
 			operator cublasLtMatmulDesc_t() const noexcept
+			{
+				return m_desc;
+			}
+	};
+
+	class TransformDescriptor
+	{
+			cublasLtMatrixTransformDesc_t m_desc = 0;
+		public:
+			TransformDescriptor()
+			{
+				cublasStatus_t status = cublasLtMatrixTransformDescCreate(&m_desc, cuda_convert(DTYPE_FLOAT32));
+				assert(status == CUBLAS_STATUS_SUCCESS);
+			}
+			TransformDescriptor(const TransformDescriptor &other) = delete;
+			TransformDescriptor(TransformDescriptor &&other) noexcept = delete;
+			TransformDescriptor& operator=(const TransformDescriptor &other) = delete;
+			TransformDescriptor& operator=(TransformDescriptor &&other) noexcept = delete;
+			~TransformDescriptor() noexcept
+			{
+				cublasStatus_t status = cublasLtMatrixTransformDescDestroy(m_desc);
+				assert(status == CUBLAS_STATUS_SUCCESS);
+			}
+			operator cublasLtMatrixTransformDesc_t() const noexcept
 			{
 				return m_desc;
 			}
@@ -371,6 +408,41 @@ namespace ml
 			}
 		}
 	}
+
+	void cuda_gemm_ex(mlContext_t context, mlDataType_t dtype, mlShape_t shape_D, void *D, float alpha, char opA, mlShape_t shape_A, const void *A,
+			char opB, mlShape_t shape_B, const void *B, float beta, mlShape_t shape_C, const void *C, const void *bias, mlActivationType_t act)
+	{
+		const size_t workspace_size = cuda::Context::getWorkspaceSize(context);
+		void *workspace = cuda::Context::getWorkspace(context);
+		const MatrixLayout Adesc(shape_A, dtype);
+		const MatrixLayout Bdesc(shape_B, dtype);
+		const MatrixLayout Cdesc(shape_C, dtype);
+		const MatrixLayout Ddesc(shape_D, dtype);
+		const MatMulDescriptor computeDesc(dtype, bias, act);
+
+		uint32_t _alpha, _beta;
+		if (dtype == DTYPE_FLOAT32)
+		{
+			std::memcpy(&_alpha, &alpha, sizeof(float));
+			std::memcpy(&_beta, &beta, sizeof(float));
+		}
+		else
+		{
+			const half a = static_cast<half>(alpha);
+			const half b = static_cast<half>(beta);
+			std::memcpy(&_alpha, &a, sizeof(half));
+			std::memcpy(&_beta, &b, sizeof(half));
+		}
+
+		cublasLtHandle_t handle = cuda::Context::getCublasLtHandle(context);
+		cudaStream_t stream = cuda::Context::getStream(context);
+		cublasStatus_t status = cublasLtMatmul(handle, computeDesc, &_alpha, A, Bdesc, B, Adesc, &_beta, C, Cdesc, D, Ddesc, nullptr, workspace,
+				workspace_size, stream);
+		assert(status == CUBLAS_STATUS_SUCCESS);
+
+		if (act != ACTIVATION_LINEAR and act != ACTIVATION_RELU)
+			cuda_activation_forward(context, dtype, shape_D, D, D, act);
+	}
 }
 
 #else
@@ -379,6 +451,20 @@ namespace ml
 	void cuda_convolution_implicit_gemm_forward(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, mlShape_t weights_shape,
 			const void *input, const void *weights, void *output, const void *bias, const void *add, mlActivationType_t act)
 	{
+	}
+
+	void cuda_gemm_ex(mlContext_t context, mlDataType_t dtype, mlShape_t shape_D, void *D, float alpha, char opA, mlShape_t shape_A, const void *A,
+			char opB, mlShape_t shape_B, const void *B, float beta, mlShape_t shape_C, const void *C, const void *bias, mlActivationType_t act)
+	{
+		if (C != D)
+			cuda_memcpy_within_device(context, D, 0, C, 0, volume(shape_D) * size_of(dtype));
+
+		cuda_gemm(context, dtype, shape_D, D, shape_A, A, shape_B, B, opA, opB, alpha, beta);
+
+		if (bias == nullptr)
+			cuda_activation_forward(context, dtype, shape_D, D, D, act);
+		else
+			cuda_add_bias_act(context, dtype, shape_D, D, D, bias, act);
 	}
 }
 #endif

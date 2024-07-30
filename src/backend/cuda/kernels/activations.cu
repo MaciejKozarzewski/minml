@@ -13,6 +13,8 @@
 #include "../vectors/vectors.cuh"
 #include "../helpers/tensor_wrappers.cuh"
 
+#include "../vec/vec4f.cuh"
+
 #include <cuda_runtime_api.h>
 #include <cuda_runtime.h>
 #include <cooperative_groups.h>
@@ -25,6 +27,7 @@ namespace cg = cooperative_groups;
 namespace
 {
 	using namespace vectors;
+	using namespace vectors2;
 
 	template<typename T>
 	__device__ bool is_power_of_2(T x)
@@ -63,7 +66,7 @@ namespace
 		__shared__ float workspace[1024];
 		__shared__ cg::block_tile_memory<128> btm;
 		cg::thread_block thb = cg::this_thread_block(btm);
-		cg::thread_block_tile < 128 > tile = cg::tiled_partition<128>(thb);
+		cg::thread_block_tile<128> tile = cg::tiled_partition<128>(thb);
 
 		for (int i = blockIdx.x; i < first_dim; i += gridDim.x)
 		{
@@ -138,9 +141,6 @@ namespace
 	template<typename T>
 	__global__ void kernel_add_to_last_dim(T *output, const T *input, const T *bias, int first_dim, int last_dim, ml::mlActivationType_t act)
 	{
-		assert(last_dim <= 1024);
-		assert(blockDim.x == 128);
-
 		ConstTensorWrapper<1, T> bias_wrapper(bias, last_dim);
 
 		ConstTensorWrapper<2, T> input_wrapper(input, first_dim, last_dim);
@@ -159,6 +159,39 @@ namespace
 				if (act == ml::ACTIVATION_SIGMOID)
 					tmp = vector_one<T>() / (vector_one<T>() + vectors::exp(-tmp));
 				output_wrapper.store(tmp, i, j);
+			}
+		}
+	}
+
+	__global__ void kernel_add_to_last_dim_4xfp32(float *output, const float *input, const float *bias, int first_dim, int last_dim,
+			ml::mlActivationType_t act)
+	{
+		assert(last_dim % 4 ==0);
+		assert(blockDim.x == 128);
+
+		const int tid = blockIdx.x * blockDim.x + threadIdx.x;
+
+//		__shared__ float workspace[128];
+//		if(tid < last_dim)
+//			workspace[threadIdx.x] = bias[]
+//		{
+//
+//		}
+
+		for (int j = tid * 4; j < last_dim; j += gridDim.x * blockDim.x * 4)
+		{
+			const vec4f _bias(bias + j);
+			for (int i = blockIdx.y; i < first_dim; i += gridDim.y)
+			{
+				vec4f tmp(input + i * last_dim + j);
+				tmp = tmp + _bias;
+//				if (act == ml::ACTIVATION_RELU)
+//					tmp = vectors::max(vector_zero<T>(), tmp);
+//				if (act == ml::ACTIVATION_TANH)
+//					tmp = vectors::tanh(tmp);
+//				if (act == ml::ACTIVATION_SIGMOID)
+//					tmp = vector_one<T>() / (vector_one<T>() + vectors::exp(-tmp));
+				tmp.store(output + i * last_dim + j);
 			}
 		}
 	}
@@ -329,16 +362,25 @@ namespace ml
 		dim3 blockDim(128);
 		dim3 gridDim(cuda::gridSize<128>(last_dim, blockDim.x), std::min(1024, first_dim));
 
-		switch (dtype)
+//		if (last_dim % 4 == 0 and dtype == DTYPE_FLOAT32)
+//		{
+//			dim3 gridDim(1, std::min(1024, first_dim));
+//			kernel_add_to_last_dim_4xfp32<<<gridDim, blockDim, 0, stream>>>(getPointer<float>(output), getPointer<float>(input),
+//					getPointer<float>(bias), first_dim, last_dim, act);
+//		}
+//		else
 		{
-			case DTYPE_FLOAT16:
-				kernel_add_to_last_dim<<<gridDim, blockDim, 0, stream>>>(getPointer<half>(output), getPointer<half>(input), getPointer<half>(bias),
-						first_dim, last_dim, act);
-				break;
-			case DTYPE_FLOAT32:
-				kernel_add_to_last_dim<<<gridDim, blockDim, 0, stream>>>(getPointer<float>(output), getPointer<float>(input), getPointer<float>(bias),
-						first_dim, last_dim, act);
-				break;
+			switch (dtype)
+			{
+				case DTYPE_FLOAT16:
+					kernel_add_to_last_dim<<<gridDim, blockDim, 0, stream>>>(getPointer<half>(output), getPointer<half>(input),
+							getPointer<half>(bias), first_dim, last_dim, act);
+					break;
+				case DTYPE_FLOAT32:
+					kernel_add_to_last_dim<<<gridDim, blockDim, 0, stream>>>(getPointer<float>(output), getPointer<float>(input),
+							getPointer<float>(bias), first_dim, last_dim, act);
+					break;
+			}
 		}
 		assert(cudaGetLastError() == cudaSuccess);
 	}

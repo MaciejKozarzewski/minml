@@ -251,18 +251,29 @@ namespace ml
 		throw NotImplemented(METHOD_NAME);
 	}
 
+	// rmsnorm
+	void opencl_rmsnorm_forward(mlContext_t context, mlShape_t shape, mlDataType_t dtype, const void *input, void *output, const void *weights)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+	void opencl_rmsnorm_backward(mlContext_t context, mlShape_t shape, const void *input, void *gradient_prev, void *gradient_next,
+			const void *weights, void *weights_update)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+
 	// attention
 	int opencl_multi_head_attention_get_workspace_size(mlShape_t input_shape, mlShape_t weights_shape, bool training)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
 	void opencl_multi_head_attention_forward(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, mlDataType_t dtype,
-			const void *input, void *output, const void *weights, void *workspace)
+			const void *input, void *output, const void *weights, void *workspace, void *backward_data)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
 	void opencl_multi_head_attention_backward(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, const void *input,
-			const void *weights, void *gradient_prev, void *gradient_next, void *weights_update, void *workspace)
+			const void *weights, void *gradient_prev, void *gradient_next, void *weights_update, void *workspace, void *backward_data)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
@@ -306,8 +317,8 @@ namespace ml
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
-	void opencl_adam_optimize(mlContext_t context, mlShape_t shape, void *weight, const void *update, void *momentum, void *variance,
-			float learning_rate, float beta1, float beta2)
+	void opencl_radam_optimize(mlContext_t context, mlShape_t shape, void *weight, const void *update, void *momentum, void *variance,
+			float learning_rate, float beta1, float beta2, int step)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}

@@ -12,6 +12,16 @@
 #include <minml/core/ml_exceptions.hpp>
 #include <minml/utils/json.hpp>
 
+namespace
+{
+	int get_backward_data_workspace_size(const ml::Shape &input_shape, int num_heads)
+	{
+		const int batch_size = input_shape[0];
+		const int tokens = input_shape[1] * input_shape[2];
+		return batch_size * num_heads * tokens * tokens;
+	}
+}
+
 namespace ml
 {
 	MultiHeadAttention::MultiHeadAttention(int numberOfHeads, int positional_encoding_range) :
@@ -24,7 +34,7 @@ namespace ml
 	Shape MultiHeadAttention::getWeightShape() const
 	{
 		const int tmp = 2 * m_positional_encoding_range + 1;
-		return Shape( { m_number_of_heads, tmp, tmp });
+		return Shape( { m_number_of_heads, tmp, 4 * ((tmp + 3) / 4) });
 	}
 	void MultiHeadAttention::setInputShape(const std::vector<Shape> &shapes)
 	{
@@ -74,7 +84,11 @@ namespace ml
 	void MultiHeadAttention::forward(const std::vector<Tensor> &input, Tensor &output)
 	{
 		assert(input.size() == 1);
-		multiHeadAttentionForward(context(), input.at(0), output, getWeights().getParam(), *m_workspace.lock());
+		const int tmp = get_backward_data_workspace_size(input[0].shape(), m_number_of_heads);
+		if (isTrainable() and m_backward_data.volume() < tmp)
+			m_backward_data = Tensor( { tmp }, dtype(), device());
+
+		multiHeadAttentionForward(context(), input.at(0), output, getWeights().getParam(), *m_workspace.lock(), m_backward_data);
 	}
 	void MultiHeadAttention::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev,
 			Tensor &gradient_next)
@@ -82,7 +96,7 @@ namespace ml
 		assert(input.size() == 1);
 		assert(gradient_prev.size() == 1);
 		multiHeadAttentionBackward(context(), input.at(0), getWeights().getParam(), gradient_prev.at(0), gradient_next, getWeights().getGradient(),
-				*m_workspace.lock());
+				*m_workspace.lock(), m_backward_data);
 	}
 
 } /* namespace ml */

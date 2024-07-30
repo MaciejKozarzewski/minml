@@ -24,6 +24,11 @@ namespace
 		assert(lower <= upper);
 		return std::max(lower, std::min(upper, x));
 	}
+	int round_up(int x, int y) noexcept
+	{
+		const int tmp = x % y;
+		return (tmp == 0) ? x : (x + y - tmp);
+	}
 
 	Tensor baseline_extract_qkv(char c, const Tensor &qkv)
 	{
@@ -142,7 +147,6 @@ namespace
 		assert(qk.dim(2) == height * width);
 		assert(qk.dim(3) == height * width);
 
-		assert(weights.dim(1) == weights.dim(2));
 		const int range = (weights.dim(1) - 1) / 2;
 
 		Tensor t = qk.view( { batch_size, num_heads, height, width, height, width });
@@ -252,8 +256,8 @@ namespace
 
 		const Tensor d_int2 = baseline_softmax_backward(QK_intermediate, d_int, weights_update, input.shape());
 
-		Tensor dQ = baseline_batched_gemm(d_int2, K, 1.0f / scale, 'n', 'n');
-		Tensor dK = baseline_batched_gemm(d_int2, Q, 1.0f / scale, 't', 'n');
+		Tensor dQ = baseline_batched_gemm(d_int2, K, scale, 'n', 'n');
+		Tensor dK = baseline_batched_gemm(d_int2, Q, scale, 't', 'n');
 
 		dQ = combine_heads(dQ, input.shape());
 		dK = combine_heads(dK, input.shape());
@@ -262,6 +266,35 @@ namespace
 		baseline_insert_qkv('Q', dQ, gradient_prev);
 		baseline_insert_qkv('K', dK, gradient_prev);
 		baseline_insert_qkv('V', dV, gradient_prev);
+	}
+
+	float l2_loss(const Tensor &lhs, const Tensor &rhs)
+	{
+		std::vector<float> _lhs(lhs.volume());
+		std::vector<float> _rhs(rhs.volume());
+
+		lhs.copyToHost(_lhs.data(), lhs.sizeInBytes());
+		rhs.copyToHost(_rhs.data(), rhs.sizeInBytes());
+
+		float result = 0.0f;
+		for (size_t i = 0; i < _lhs.size(); i++)
+			result += (_lhs[i] - _rhs[i]) * (_lhs[i] - _rhs[i]);
+		return 0.5f * result / lhs.volume();
+	}
+	Tensor l2_grad(const Tensor &lhs, const Tensor &rhs)
+	{
+		std::vector<float> _lhs(lhs.volume());
+		std::vector<float> _rhs(rhs.volume());
+
+		lhs.copyToHost(_lhs.data(), lhs.sizeInBytes());
+		rhs.copyToHost(_rhs.data(), rhs.sizeInBytes());
+
+		for (size_t i = 0; i < _lhs.size(); i++)
+			_lhs[i] = (_lhs[i] - _rhs[i]) / lhs.volume();
+
+		Tensor result(lhs.shape(), lhs.dtype(), lhs.device());
+		result.copyFromHost(_lhs.data(), lhs.sizeInBytes());
+		return result;
 	}
 }
 
@@ -274,14 +307,15 @@ namespace ml
 		const int width = 14;
 		const int embedding = 56;
 		const int num_heads = 4;
-		const int range = 5;
+		const int range = std::max(height, width);
 		assert(embedding % num_heads == 0);
 
 		Context context(Device::cpu());
 
 		Tensor input( { batch_size, height, width, 3 * embedding }, "float32", context.device());
 		Tensor output( { batch_size, height, width, embedding }, "float32", context.device());
-		Tensor weights( { num_heads, range * 2 + 1, range * 2 + 1 }, "float32", context.device());
+		Tensor weights( { num_heads, range * 2 + 1, round_up(range * 2 + 1, 4) }, "float32", context.device());
+		Tensor backward_data;
 		testing::initForTest(input, 0.0f);
 		testing::initForTest(weights, 1.0);
 
@@ -289,7 +323,7 @@ namespace ml
 
 		const int workspace_size = multiHeadAttentionGetWorkspaceSize(context, input.shape(), weights.shape(), false);
 		Tensor workspace( { workspace_size }, "float32", context.device());
-		multiHeadAttentionForward(context, input, output, weights, workspace);
+		multiHeadAttentionForward(context, input, output, weights, workspace, backward_data);
 
 //		EXPECT_LE(testing::diffForTest(correct_output, output), 1.0e-4f);
 
@@ -305,7 +339,7 @@ namespace ml
 			const int workspace_size = multiHeadAttentionGetWorkspaceSize(context, input.shape(), weights.shape(), false);
 			Tensor workspace( { workspace_size }, "float32", context.device());
 
-			multiHeadAttentionForward(context, input, output, weights, workspace);
+			multiHeadAttentionForward(context, input, output, weights, workspace, backward_data);
 			context.synchronize();
 
 			EXPECT_LE(testing::diffForTest(correct_output, output), 1.0e-4f);
@@ -313,19 +347,20 @@ namespace ml
 	}
 	TEST(TestMultiHeadAttention, backward)
 	{
-		const int batch_size = 11;
-		const int height = 12;
-		const int width = 13;
-		const int embedding = 56;
-		const int num_heads = 4;
-		const int range = 10;
+		const int batch_size = 32;
+		const int height = 7;
+		const int width = 6;
+		const int embedding = 64;
+		const int num_heads = 16;
+		const int range = std::max(height, width);
 		assert(embedding % num_heads == 0);
 
 		Context context(Device::cpu());
 
 		Tensor input( { batch_size, height, width, 3 * embedding }, "float32", context.device());
 		Tensor output( { batch_size, height, width, embedding }, "float32", context.device());
-		Tensor weights( { num_heads, range * 2 + 1, range * 2 + 1 }, "float32", context.device());
+		Tensor weights( { num_heads, range * 2 + 1, round_up(range * 2 + 1, 4) }, "float32", context.device());
+		Tensor backward_data( { batch_size, num_heads, height* width, height* width }, "float32", context.device());
 		testing::initForTest(input, 0.0f);
 		testing::initForTest(weights, 1.0);
 
@@ -342,7 +377,34 @@ namespace ml
 
 		const int workspace_size = multiHeadAttentionGetWorkspaceSize(context, input.shape(), weights.shape(), true);
 		Tensor workspace( { workspace_size }, "float32", context.device());
-		multiHeadAttentionBackward(context, input, weights, gradient_prev, gradient_next, weights_update, workspace);
+
+		Tensor target(output.shape(), output.dtype(), output.device());
+		testing::initForTest(target, 0.0f);
+
+//		const float eps = 1.0e-3f;
+//		std::initializer_list<int> index = { 0, 0, 0, 0 };
+//
+//		Tensor output_0 = baseline_mha_forward(input, weights);
+//		Tensor grad_0 = l2_grad(output_0, target);
+//		gradient_prev.zeroall();
+//		multiHeadAttentionBackward(context, input, weights, gradient_prev, grad_0, weights_update, workspace);
+//		context.synchronize();
+//		baseline_mha_backward(input, weights, gradient_prev, grad_0, weights_update);
+//
+//		input.set(input.get(index) + eps, index);
+//		const Tensor output_p = baseline_mha_forward(input, weights);
+//		const float loss_p = l2_loss(output_p, target);
+//
+//		input.set(input.get(index) - 2 * eps, index);
+//		const Tensor output_m = baseline_mha_forward(input, weights);
+//		const float loss_m = l2_loss(output_m, target);
+//
+//		std::cout << loss_p << " " << loss_m << '\n';
+//		std::cout << testing::diffForTest(output_p, output_m) << '\n';
+//		std::cout << "backprop grad = " << gradient_prev.get(index) << " vs numerical = " << (loss_p - loss_m) / (2 * eps) << '\n';
+//		exit(0);
+
+//		multiHeadAttentionBackward(context, input, weights, gradient_prev, gradient_next, weights_update, workspace, backward_data);
 
 //		EXPECT_LE(testing::diffForTest(correct_gradient_prev, gradient_prev), 1.0e-4f);
 
@@ -356,23 +418,26 @@ namespace ml
 			gradient_prev.moveTo(device);
 			gradient_next.moveTo(device);
 			weights_update.moveTo(device);
+			backward_data.moveTo(device);
 			output.zeroall();
+			backward_data.zeroall();
 			testing::initForTest(weights_update, 1.0f);
 
 			const int workspace_size = multiHeadAttentionGetWorkspaceSize(context, input.shape(), weights.shape(), true);
 			Tensor workspace( { workspace_size }, "float32", context.device());
-			multiHeadAttentionBackward(context, input, weights, gradient_prev, gradient_next, weights_update, workspace);
+			multiHeadAttentionForward(context, input, output, weights, workspace, backward_data);
+			multiHeadAttentionBackward(context, input, weights, gradient_prev, gradient_next, weights_update, workspace, backward_data);
 
 			context.synchronize();
-			for (int i = 0; i < weights_update.dim(0); i++)
-				for (int j = 0; j < weights_update.dim(1); j++)
-					for (int k = 0; k < weights_update.dim(2); k++)
-						if (std::abs(weights_update.get( { i, j, k }) - correct_weights_update.get( { i, j, k })) > 1.0e-3f)
-						{
-							std::cout << i << "," << j << "," << k << " : " << weights_update.get( { i, j, k }) << " vs "
-									<< correct_weights_update.get( { i, j, k }) << '\n';
-							exit(0);
-						}
+//			for (int i = 0; i < weights_update.dim(0); i++)
+//				for (int j = 0; j < weights_update.dim(1); j++)
+//					for (int k = 0; k < weights_update.dim(2); k++)
+//						if (std::abs(weights_update.get( { i, j, k }) - correct_weights_update.get( { i, j, k })) > 1.0e-3f)
+//						{
+//							std::cout << i << "," << j << "," << k << " : " << weights_update.get( { i, j, k }) << " vs "
+//									<< correct_weights_update.get( { i, j, k }) << '\n';
+//							exit(0);
+//						}
 
 			EXPECT_LE(testing::diffForTest(correct_gradient_prev, gradient_prev), 1.0e-4f);
 			EXPECT_LE(testing::diffForTest(correct_weights_update, weights_update), 1.0e-4f);

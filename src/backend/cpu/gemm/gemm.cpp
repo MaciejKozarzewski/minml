@@ -17,7 +17,7 @@ namespace ml
 	void cpu_gemm(mlContext_t context, mlDataType_t dtype, mlShape_t shape_C, void *C, mlShape_t shape_A, const void *A, mlShape_t shape_B,
 			const void *B, char opA, char opB, float alpha, float beta)
 	{
-		cpu_gemm_ex(context, dtype, shape_C, C, alpha, opA, shape_A, A, opB, shape_B, B, beta, shape_C, C, ACTIVATION_LINEAR);
+		cpu_gemm_ex(context, dtype, shape_C, C, alpha, opA, shape_A, A, opB, shape_B, B, beta, shape_C, C, nullptr, ACTIVATION_LINEAR);
 	}
 	void cpu_gemm_batched(mlContext_t context, mlDataType_t dtype, mlShape_t shape_C, void *C, mlShape_t shape_A, const void *A, mlShape_t shape_B,
 			const void *B, char opA, char opB, float alpha, float beta)
@@ -45,7 +45,7 @@ namespace ml
 	}
 
 	void cpu_gemm_ex(mlContext_t context, mlDataType_t dtype, mlShape_t shape_D, void *D, float alpha, char opA, mlShape_t shape_A, const void *A,
-			char opB, mlShape_t shape_B, const void *B, float beta, mlShape_t shape_C, const void *C, mlActivationType_t act)
+			char opB, mlShape_t shape_B, const void *B, float beta, mlShape_t shape_C, const void *C, const void *bias, mlActivationType_t act)
 	{
 		GemmRuntime rt = get_runtime(context, dtype, opA, shape_A, opB, shape_B);
 

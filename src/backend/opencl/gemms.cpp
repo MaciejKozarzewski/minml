@@ -119,5 +119,10 @@ namespace ml
 				break;
 		}
 	}
+
+	void opencl_gemm_ex(mlContext_t context, mlDataType_t dtype, mlShape_t shape_D, void *D, float alpha, char opA, mlShape_t shape_A, const void *A,
+			char opB, mlShape_t shape_B, const void *B, float beta, mlShape_t shape_C, const void *C, const void *bias, mlActivationType_t act)
+	{
+	}
 } /* namespace ml */
 

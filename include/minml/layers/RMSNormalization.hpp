@@ -1,41 +1,41 @@
 /*
- * MultiHeadAttention.hpp
+ * RMSNormalization.hpp
  *
- *  Created on: Jun 12, 2024
+ *  Created on: Jul 26, 2024
  *      Author: Maciej Kozarzewski
  */
 
-#ifndef MINML_LAYERS_MULTIHEADATTENTION_HPP_
-#define MINML_LAYERS_MULTIHEADATTENTION_HPP_
+#ifndef MINML_LAYERS_RMSNORMALIZATION_HPP_
+#define MINML_LAYERS_RMSNORMALIZATION_HPP_
 
 #include <minml/layers/Layer.hpp>
 
 namespace ml
 {
 
-	class MultiHeadAttention: public Layer
+	class RMSNormalization: public Layer
 	{
-			int m_number_of_heads = 0;
-			int m_positional_encoding_range = 0;
-			Tensor m_backward_data;
+			bool m_use_gamma = true;
 		public:
-			MultiHeadAttention(int numberOfHeads, int positional_encoding_range);
+			RMSNormalization(bool useGamma = true);
 
-			Shape getWeightShape() const;
+			RMSNormalization& useGamma(bool b) noexcept;
 
 			void setInputShape(const std::vector<Shape> &shapes);
 			Shape getOutputShape() const;
+			Shape getWeightShape() const;
 
 			std::string name() const;
 			Json getConfig() const;
 
-			int getWorkspaceSize() const noexcept;
 			std::unique_ptr<Layer> clone(const Json &config) const;
 
+			void init();
+			void setRegularizer(const Regularizer &regularizer);
 			void forward(const std::vector<Tensor> &input, Tensor &output);
 			void backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next);
 	};
 
 } /* namespace ml */
 
-#endif /* MINML_LAYERS_MULTIHEADATTENTION_HPP_ */
+#endif /* MINML_LAYERS_RMSNORMALIZATION_HPP_ */

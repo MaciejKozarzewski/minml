@@ -18,7 +18,7 @@ namespace
 {
 	float round_small_to_zero(float x) noexcept
 	{
-		return (fabsf(x) < 1.0e-6f) ? 0.0f : x;
+		return (fabsf(x) < 1.0e-7f) ? 0.0f : x;
 	}
 	float safe_log(float x) noexcept
 	{
@@ -31,6 +31,13 @@ namespace
 	float square(float x) noexcept
 	{
 		return x * x;
+	}
+	float bounded_pow(float x, float y, float min) noexcept
+	{
+		assert(0 < x && x < 1);
+		assert(min > 0);
+		const float max_y = std::log(min) / std::log(x);
+		return (y >= max_y) ? 0.0f : std::pow(x, y);
 	}
 }
 
@@ -151,13 +158,14 @@ namespace ml
 		for (int i = 0; i < elements; i++)
 			gradient_ptr[i] = inv_batch_size * (output_ptr[i] - target_ptr[i]);
 	}
-	void cpu_adam_optimize(mlContext_t context, mlShape_t shape, void *weight, const void *update, void *momentum, void *variance,
-			float learning_rate, float beta1, float beta2)
+	void cpu_radam_optimize(mlContext_t context, mlShape_t shape, void *weight, const void *update, void *momentum, void *variance,
+			float learning_rate, float beta1, float beta2, int step)
 	{
 		assert(weight != nullptr);
 		assert(update != nullptr);
 		assert(momentum != nullptr);
 		assert(variance != nullptr);
+		assert(step > 0);
 
 		const int elements = volume(shape);
 
@@ -166,11 +174,27 @@ namespace ml
 		float *momentum_ptr = getPointer<float>(momentum);
 		float *variance_ptr = getPointer<float>(variance);
 
+		const float pow_beta1 = bounded_pow(beta1, step, 1.0e-8f);
+		const float pow_beta2 = bounded_pow(beta2, step, 1.0e-8f);
+		const float p_inf = 2.0f / (1.0f - beta2) - 1.0f;
+		const float p = p_inf - 2.0f * step * pow_beta2 / (1.0f - pow_beta2);
+
+		float correction = 1.0f;
+
 		for (int i = 0; i < elements; i++)
 		{
-			momentum_ptr[i] = momentum_ptr[i] * beta1 + update_ptr[i] * (1.0f - beta1);
-			variance_ptr[i] = variance_ptr[i] * beta2 + square(update_ptr[i]) * (1.0f - beta2);
-			weight_ptr[i] -= momentum_ptr[i] * learning_rate / std::sqrt(variance_ptr[i] + 1.0e-8f);
+			momentum_ptr[i] = beta1 * momentum_ptr[i] + (1.0f - beta1) * update_ptr[i];
+			variance_ptr[i] = beta2 * variance_ptr[i] + (1.0f - beta2) * square(update_ptr[i]);
+
+			if (p > 4.0f)
+			{
+				const float l = std::sqrt((1.0f - pow_beta2) / (variance_ptr[i] + 1.0e-8f));
+				const float r = std::sqrt((p - 4.0f) * (p - 2.0f) * p_inf / ((p_inf - 4.0f) * (p_inf - 2.0f) * p));
+				correction = l * r;
+			}
+
+			const float m_dash = momentum_ptr[i] / (1.0f - pow_beta1);
+			weight_ptr[i] -= learning_rate * m_dash * correction;
 			weight_ptr[i] = round_small_to_zero(weight_ptr[i]);
 		}
 	}

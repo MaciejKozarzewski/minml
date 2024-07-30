@@ -54,14 +54,29 @@ __kernel void reduce_loss_step2(__global float *workspace, int elements)
 		workspace[get_group_id(0)] = sum;
 }
 
-__kernel void learn_adam(__global float *weight, const __global float *gradient, __global float *momentum, __global float *variance, int elements,
-		float learning_rate, float beta1, float beta2)
+__kernel void learn_radam(__global float *weight, const __global float *gradient, __global float *momentum, __global float *variance, int elements,
+		float learning_rate, float beta1, float beta2, int step)
 {
+	const float pow_beta1 = bounded_pow(beta1, step, 1.0e-8f);
+	const float pow_beta2 = bounded_pow(beta2, step, 1.0e-8f);
+	const float p_inf = 2.0f / (1.0f - beta2) - 1.0f;
+	const float p = p_inf - 2.0f * step * pow_beta2 / (1.0f - pow_beta2);
+
 	for (int i = get_global_id(0); i < elements; i += get_global_size(0))
 	{
-		momentum[i] = momentum[i] * beta1 + gradient[i] * (1.0f - beta1);
-		variance[i] = variance[i] * beta2 + square(gradient[i]) * (1.0f - beta2);
-		const float tmp = -momentum[i] * learning_rate / sqrt(variance[i] + 1.0e-8f);
+		momentum[i] = beta1 * momentum[i] + (1.0f - beta1) * gradient[i];
+		variance[i] = beta2 * variance[i] + (1.0f - beta2) * square(gradient[i]);
+
+		float correction = 1.0f;
+		if (p > 4.0f)
+		{
+			const float l = std::sqrt((1.0f - pow_beta2) / (variance[i] + 1.0e-8f));
+			const float r = std::sqrt((p - 4.0f) * (p - 2.0f) * p_inf / ((p_inf - 4.0f) * (p_inf - 2.0f) * p));
+			correction = l * r;
+		}
+
+		const float m_dash = momentum[i] / (1.0f - pow_beta1);
+		const float tmp = -learning_rate * m_dash * correction;
 		weight[i] = round_small_to_zero(weight[i] + tmp);
 	}
 }

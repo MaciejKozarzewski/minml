@@ -124,16 +124,22 @@ namespace ml
 				const Tensor flattened_input = flatten_input_tensor(input[0]);
 				const float beta = isUsingBias() ? 1.0f : 0.0f;
 				if (m_activation == ActivationType::RELU or m_activation == ActivationType::LINEAR)
-					gemm_ex(context(), output, 1.0f, 'n', flattened_input, 't', getWeights().getParam(), beta, getBias().getParam(), m_activation);
+					gemm_ex(context(), output, 1.0f, 'n', flattened_input, 't', getWeights().getParam(), beta, getBias().getParam(),
+							getBias().getParam(), m_activation);
 				else
 				{
 					gemm_ex(context(), output, 1.0f, 'n', flattened_input, 't', getWeights().getParam(), beta, getBias().getParam(),
-							ActivationType::LINEAR);
+							getBias().getParam(), ActivationType::LINEAR);
 					activationForward(context(), output, output, m_activation);
 				}
 			}
 			else
 			{
+//				const Tensor flattened_input = flatten_input_tensor(input[0]);
+//
+//				gemm_ex(context(), output, 1.0f, 'n', flattened_input, 't', getWeights().getParam(), 0.0f, getBias().getParam(), getBias().getParam(),
+//						m_activation);
+
 				gemm(context(), 'n', 't', output, flatten_input_tensor(input[0]), getWeights().getParam(), 1, 0);
 				if (isUsingBias())
 					addBiasAct(context(), output, output, getBias().getParam(), m_activation);

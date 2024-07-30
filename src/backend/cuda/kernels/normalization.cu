@@ -9,6 +9,7 @@
 #include <minml/backend/backend_utils.hpp>
 
 #include "../utils.hpp"
+#include "../vec/vec4f.cuh"
 
 #include <cuda_runtime_api.h>
 #include <cuda_runtime.h>
@@ -23,6 +24,8 @@ namespace cg = cooperative_groups;
 
 namespace
 {
+	using namespace vectors2;
+
 	__device__ float get_mean(const float *ptr, int idx, int last_dim)
 	{
 		assert(idx >= 0 && idx < last_dim);
@@ -48,6 +51,11 @@ namespace
 	__device__ T square(T x)
 	{
 		return x * x;
+	}
+	template<typename T>
+	__device__ T cube(T x)
+	{
+		return x * x * x;
 	}
 
 	/*
@@ -373,93 +381,6 @@ namespace
 		}
 	}
 
-	struct __builtin_align__(16) vec4f
-	{
-			float x0, x1, x2, x3;
-
-	};
-	__device__ vec4f operator+(const vec4f &lhs, const vec4f &rhs)
-	{
-		vec4f result;
-		result.x0 = lhs.x0 + rhs.x0;
-		result.x1 = lhs.x1 + rhs.x1;
-		result.x2 = lhs.x2 + rhs.x2;
-		result.x3 = lhs.x3 + rhs.x3;
-		return result;
-	}
-	__device__ vec4f operator-(const vec4f &lhs, const vec4f &rhs)
-	{
-		vec4f result;
-		result.x0 = lhs.x0 - rhs.x0;
-		result.x1 = lhs.x1 - rhs.x1;
-		result.x2 = lhs.x2 - rhs.x2;
-		result.x3 = lhs.x3 - rhs.x3;
-		return result;
-	}
-	__device__ vec4f operator-(const vec4f &lhs, float rhs)
-	{
-		vec4f result;
-		result.x0 = lhs.x0 - rhs;
-		result.x1 = lhs.x1 - rhs;
-		result.x2 = lhs.x2 - rhs;
-		result.x3 = lhs.x3 - rhs;
-		return result;
-	}
-	__device__ vec4f operator*(const vec4f &lhs, const vec4f &rhs)
-	{
-		vec4f result;
-		result.x0 = lhs.x0 * rhs.x0;
-		result.x1 = lhs.x1 * rhs.x1;
-		result.x2 = lhs.x2 * rhs.x2;
-		result.x3 = lhs.x3 * rhs.x3;
-		return result;
-	}
-	__device__ vec4f operator*(const vec4f &lhs, float rhs)
-	{
-		vec4f result;
-		result.x0 = lhs.x0 * rhs;
-		result.x1 = lhs.x1 * rhs;
-		result.x2 = lhs.x2 * rhs;
-		result.x3 = lhs.x3 * rhs;
-		return result;
-	}
-	struct __builtin_align__(8) vec4h
-	{
-			half x0, x1, x2, x3;
-	};
-
-	__device__ vec4f load_vec(const float *ptr)
-	{
-		return reinterpret_cast<const vec4f*>(ptr)[0];
-	}
-	__device__ vec4f load_vec(const half *ptr)
-	{
-		const vec4h tmp = reinterpret_cast<const vec4h*>(ptr)[0];
-		vec4f result;
-		result.x0 = tmp.x0;
-		result.x1 = tmp.x1;
-		result.x2 = tmp.x2;
-		result.x3 = tmp.x3;
-		return result;
-	}
-	__device__ void store_vec(float *ptr, const vec4f &x)
-	{
-		reinterpret_cast<vec4f*>(ptr)[0] = x;
-	}
-	__device__ void store_vec(half *ptr, const vec4f &x)
-	{
-		vec4h tmp;
-		tmp.x0 = x.x0;
-		tmp.x1 = x.x1;
-		tmp.x2 = x.x2;
-		tmp.x3 = x.x3;
-		reinterpret_cast<vec4h*>(ptr)[0] = tmp;
-	}
-	__device__ float reduce_sum(const vec4f &v)
-	{
-		return v.x0 + v.x1 + v.x2 + v.x3;
-	}
-
 	__device__ AvgVarStats<float> get_stats(const vec4f &v)
 	{
 		const float mean = (v.x0 + v.x1 + v.x2 + v.x3) / 4.0f;
@@ -471,146 +392,6 @@ namespace
 	__global__ void kernel_layernorm_forward(const float *input, float *output, const float *weights, const float *bias, const float *ext,
 			int first_dim, int last_dim)
 	{
-//		assert(last_dim <= 1024);
-//		assert(blockDim.x == 256);
-//		float workspace[8];
-//		__shared__ cg::block_tile_memory<256> btm;
-//		cg::thread_block thb = cg::this_thread_block(btm);
-//		cg::thread_block_tile<256> tile = cg::tiled_partition<256>(thb);
-//
-//		for (int i = blockIdx.x; i < first_dim; i += gridDim.x)
-//		{
-//			int counter = 0;
-//			float local_avg = 0.0f;
-//			for (int j = tile.thread_rank(); j < last_dim; j += tile.size())
-//			{
-//				float tmp = input[i * last_dim + j];
-//				if (ext != nullptr)
-//					tmp += ext[i * last_dim + j];
-//				local_avg += tmp;
-//				workspace[counter] = tmp;
-//				counter++;
-//			}
-//			const float mean = cg::reduce(tile, local_avg, cg::plus<float>()) / last_dim;
-//
-//			counter = 0;
-//			float local_var = 0.0f;
-//			for (int j = tile.thread_rank(); j < last_dim; j += tile.size())
-//			{
-//				float tmp = workspace[counter] - mean;
-//				local_var += tmp * tmp;
-//				counter++;
-//			}
-//			const float var = cg::reduce(tile, local_var, cg::plus<float>()) / (last_dim - 1);
-//			const float inv_stddev = 1.0f / std::sqrt(1.0e-6f + var);
-//
-//			counter = 0;
-//			for (int j = tile.thread_rank(); j < last_dim; j += tile.size())
-//			{
-//				const float gamma = weights[j];
-//				const float beta = bias[j];
-//				output[i * last_dim + j] = gamma * (workspace[counter] - mean) * inv_stddev + beta;
-//				counter++;
-//			}
-//		}
-
-//		assert(last_dim <= 1024);
-//		assert(blockDim.x == 64);
-//		__shared__ float workspace[512];
-//		__shared__ cg::block_tile_memory<64> btm;
-//		cg::thread_block thb = cg::this_thread_block(btm);
-//		cg::thread_block_tile<64> tile = cg::tiled_partition<64>(thb);
-//
-//		for (int i = blockIdx.x; i < first_dim; i += gridDim.x)
-//		{
-//			float local_avg = 0.0f;
-//			for (int j = tile.thread_rank(); j < last_dim; j += tile.size())
-//			{
-//				float tmp = input[i * last_dim + j];
-//				if (ext != nullptr)
-//					tmp += ext[i * last_dim + j];
-//				local_avg += tmp;
-//				workspace[j] = tmp;
-//			}
-//			const float mean = cg::reduce(tile, local_avg, cg::plus<float>()) / last_dim;
-//
-//			float local_var = 0.0f;
-//			for (int j = tile.thread_rank(); j < last_dim; j += tile.size())
-//			{
-//				float tmp = workspace[j] - mean;
-//				local_var += tmp * tmp;
-//			}
-//			const float var = cg::reduce(tile, local_var, cg::plus<float>()) / (last_dim - 1);
-//			const float inv_stddev = 1.0f / std::sqrt(1.0e-6f + var);
-//
-//			for (int j = tile.thread_rank(); j < last_dim; j += tile.size())
-//			{
-//				const float gamma = 1.0f; // weights[j];
-//				const float beta = 0.0f; //bias[j];
-//				output[i * last_dim + j] = gamma * (workspace[j] - mean) * inv_stddev + beta;
-//			}
-//		}
-
-//		assert(last_dim <= 1024);
-//		assert(last_dim % 4 == 0);
-//		assert(blockDim.x <= 256);
-//		__shared__ cg::block_tile_memory<256> btm;
-//		cg::thread_block thb = cg::this_thread_block(btm);
-//		cg::thread_block_tile<256> tile = cg::tiled_partition<256>(thb);
-//
-//		const vec4f gamma = load_vec(weights + 4 * tile.thread_rank());
-//		const vec4f beta = load_vec(bias + 4 * tile.thread_rank());
-//
-//		for (int i = blockIdx.x; i < first_dim; i += gridDim.x)
-//		{
-//			const int idx = i * last_dim + 4 * tile.thread_rank();
-//			vec4f workspace = load_vec(input + idx);
-//			if (ext != nullptr)
-//				workspace = workspace + load_vec(ext + idx);
-//
-//			const float local_mean = reduce_sum(workspace);
-//			const float mean = cg::reduce(tile, local_mean, cg::plus<float>()) / last_dim;
-//
-//			workspace = workspace - mean;
-//			float local_var = reduce_sum(workspace * workspace);
-//
-//			const float var = cg::reduce(tile, local_var, cg::plus<float>()) / (last_dim - 1);
-//			const float inv_stddev = 1.0f / std::sqrt(1.0e-6f + var);
-//
-//			const vec4f out = gamma * workspace * inv_stddev + beta;
-//			store_vec(output + idx, out);
-//		}
-
-//		assert(last_dim <= 1024);
-//		assert(blockDim.x <= 128);
-//		__shared__ float workspace[1024];
-//		__shared__ AvgVarStats<float> stats[128];
-//
-//		for (int i = blockIdx.x; i < first_dim; i += gridDim.x)
-//		{
-//			AvgVarStats<float> local_stats;
-//			for (int j = threadIdx.x; j < last_dim; j += blockDim.x)
-//			{
-//				workspace[j] = input[i * last_dim + j];
-//				if (ext != nullptr)
-//					workspace[j] += ext[i * last_dim + j];
-//				local_stats.add(workspace[j]);
-//			}
-//			stats[threadIdx.x] = local_stats;
-//			__syncthreads();
-//			combine_stats_1D(stats);
-//			const float avg = stats[0].get_average();
-//			const float stddev = stats[0].get_stddev();
-//			__syncthreads();
-//
-//			for (int j = threadIdx.x; j < last_dim; j += blockDim.x)
-//			{
-//				const float gamma = weights[j];
-//				const float beta = bias[j];
-//				output[i * last_dim + j] = gamma * (workspace[j] - avg) / stddev + beta;
-//			}
-//		}
-
 		assert(last_dim <= 1024);
 		assert(last_dim % 4 == 0);
 		assert(blockDim.x == 128);
@@ -625,9 +406,9 @@ namespace
 			AvgVarStats<float> local_stats;
 			for (int j = 4 * threadIdx.x; j < last_dim; j += 4 * blockDim.x)
 			{
-				const vec4f tmp = load_vec(input + i * last_dim + j);
+				const vec4f tmp(input + i * last_dim + j);
 				local_stats.merge_with(get_stats(tmp));
-				store_vec(workspace + j, tmp);
+				tmp.store(workspace + j);
 			}
 			__syncthreads();
 			for (int k = 16; k >= 1; k /= 2)
@@ -655,11 +436,11 @@ namespace
 
 			for (int j = 4 * threadIdx.x; j < last_dim; j += 4 * blockDim.x)
 			{
-				const vec4f gamma = load_vec(weights + j);
-				const vec4f beta = load_vec(bias + j);
-				const vec4f tmp = load_vec(workspace + j);
+				const vec4f gamma(weights + j);
+				const vec4f beta(bias + j);
+				const vec4f tmp(workspace + j);
 				const vec4f out = gamma * (tmp - avg) * inv_stddev + beta;
-				store_vec(output + i * last_dim + j, out);
+				out.store(output + i * last_dim + j);
 			}
 		}
 	}
@@ -745,6 +526,122 @@ namespace
 			bias_update[tid] += storage_b[threadIdx.x];
 		}
 	}
+
+	__global__ void kernel_rmsnorm_forward(const float *input, float *output, const float *weights, int first_dim, int last_dim)
+	{
+		assert(last_dim <= 1024);
+		assert(last_dim % 4 == 0);
+		assert(blockDim.x == 128);
+		__shared__ float workspace[1024];
+		__shared__ float stats[4];
+		if (threadIdx.x < 4)
+			stats[threadIdx.x] = 0.0f;
+		__syncthreads();
+
+		for (int i = blockIdx.x; i < first_dim; i += gridDim.x)
+		{
+			float local_sum_squares = 0.0f;
+			for (int j = 4 * threadIdx.x; j < last_dim; j += 4 * blockDim.x)
+			{
+				const vec4f tmp(input + i * last_dim + j);
+				local_sum_squares += horizontal_add(tmp * tmp);
+				tmp.store(workspace + j);
+			}
+			__syncthreads();
+			for (int k = 16; k >= 1; k /= 2)
+				local_sum_squares += __shfl_xor_sync(0xffffffff, local_sum_squares, k);
+			if (threadIdx.x % 32 == 0)
+				stats[threadIdx.x / 32] = local_sum_squares;
+			__syncthreads();
+			if (threadIdx.x == 0)
+			{
+				local_sum_squares = 0.0f;
+				for (int k = 0; k < blockDim.x / 32; k++)
+					local_sum_squares += stats[k];
+				stats[0] = local_sum_squares;
+			}
+			__syncthreads();
+
+			const float rms = std::sqrt(local_sum_squares / last_dim);
+			const float inv_rms = 1.0f / (1.0e-6f + rms);
+
+			for (int j = 4 * threadIdx.x; j < last_dim; j += 4 * blockDim.x)
+			{
+				const vec4f gamma(weights + j);
+				const vec4f tmp(workspace + j);
+				const vec4f out = gamma * tmp * inv_rms;
+				out.store(output + i * last_dim + j);
+			}
+		}
+	}
+	__global__ void kernel_rmsnorm_backward(const float *input, float *gradient_prev, float *gradient_next, const float *weights,
+			float *weights_update, int first_dim, int last_dim)
+	{
+		assert(blockDim.x == 128);
+		__shared__ float workspace[4];
+
+		for (int j = threadIdx.x; j < last_dim; j += blockDim.x)
+			weights_update[blockIdx.x * last_dim + j] = 0.0f;
+		__syncthreads();
+
+		for (int i = blockIdx.x; i < first_dim; i += gridDim.x)
+		{
+			float local_sum_squares = 0.0f;
+			for (int j = threadIdx.x; j < last_dim; j += blockDim.x)
+			{
+				const float tmp = input[i * last_dim + j];
+				local_sum_squares += tmp * tmp;
+			}
+			__syncthreads();
+			for (int k = 16; k >= 1; k /= 2)
+				local_sum_squares += __shfl_xor_sync(0xffffffff, local_sum_squares, k);
+			if (threadIdx.x % 32 == 0)
+				workspace[threadIdx.x / 32] = local_sum_squares;
+			__syncthreads();
+			if (threadIdx.x == 0)
+			{
+				local_sum_squares = 0.0f;
+				for (int k = 0; k < blockDim.x / 32; k++)
+					local_sum_squares += workspace[k];
+				workspace[0] = local_sum_squares;
+			}
+			__syncthreads();
+
+			const float rms = std::sqrt(local_sum_squares / last_dim);
+			const float inv_rms = 1.0f / (1.0e-6f + rms);
+			for (int j = threadIdx.x; j < last_dim; j += blockDim.x)
+			{
+				const int idx = i * last_dim + j;
+				const float gamma = weights[j];
+				const float in = input[idx];
+				const float out = in * inv_rms;
+
+				weights_update[blockIdx.x * last_dim + j] += gradient_next[idx] * out;
+				gradient_prev[idx] = gradient_next[idx] * gamma * (local_sum_squares - square(in)) / (last_dim * cube(rms));
+			}
+		}
+	}
+	__global__ void kernel_rmsnorm_update(const float *partial_weights_upadte, float *weights_update, int first_dim, int last_dim)
+	{
+		__shared__ float storage_w[32 * 32];
+		const int tid = blockIdx.x * 32 + threadIdx.x;
+		float thread_w = 0.0f;
+		if (tid < last_dim)
+			for (int i = 32 * blockIdx.y + threadIdx.y; i < first_dim; i += 32 * gridDim.y)
+				thread_w += partial_weights_upadte[i * last_dim + tid];
+		storage_w[threadIdx.y * 32 + threadIdx.x] = thread_w;
+
+		__syncthreads();
+		for (int i = 16; i >= 1; i /= 2) // sum results stored in temporary array
+		{
+			if (threadIdx.y < i)
+				storage_w[threadIdx.y * 32 + threadIdx.x] += storage_w[(i + threadIdx.y) * 32 + threadIdx.x];
+			__syncthreads();
+		}
+		if (threadIdx.y == 0 && tid < last_dim)
+			weights_update[tid] += storage_w[threadIdx.x];
+	}
+
 }
 
 namespace ml
@@ -877,8 +774,6 @@ namespace ml
 		dim3 blockDim(128);
 		dim3 gridDim(workspace_first_dim);
 
-		std::cout << first_dim << " " << last_dim << " : " << workspace_first_dim << '\n';
-
 		cudaStream_t stream = cuda::Context::getStream(context);
 
 		float *partial_weights_update = workspace;
@@ -892,6 +787,49 @@ namespace ml
 		dim3 gridDim2((last_dim + 31) / 32);
 		kernel_layernorm_update<<<gridDim2, blockDim2, 0, stream >>>(partial_weights_update, partial_bias_update, getPointer<float>(weights_update),
 				getPointer<float>(bias_update), workspace_first_dim, last_dim);
+
+		assert(cudaGetLastError() == cudaSuccess);
+	}
+
+	void cuda_rmsnorm_forward(mlContext_t context, mlShape_t shape, mlDataType_t dtype, const void *input, void *output, const void *weights)
+	{
+		const int first_dim = volume_without_last_dim(shape);
+		const int last_dim = get_last_dim(shape);
+
+		dim3 blockDim(128);
+		dim3 gridDim(std::min(2048, first_dim));
+
+		cudaStream_t stream = cuda::Context::getStream(context);
+
+		kernel_rmsnorm_forward<<<gridDim, blockDim, 0, stream >>>(getPointer<float>(input), getPointer<float>(output), getPointer<float>(weights),
+				first_dim, last_dim);
+		assert(cudaGetLastError() == cudaSuccess);
+	}
+	void cuda_rmsnorm_backward(mlContext_t context, mlShape_t shape, const void *input, void *gradient_prev, void *gradient_next, const void *weights,
+			void *weights_update)
+	{
+		const int first_dim = volume_without_last_dim(shape);
+		const int last_dim = get_last_dim(shape);
+
+		float *workspace = cuda::Context::getWorkspace<float>(context);
+		const int workspace_first_dim = std::min((size_t) std::min(first_dim, 512),
+				cuda::Context::getWorkspaceSize(context) / (sizeof(float) * last_dim));
+
+		dim3 blockDim(128);
+		dim3 gridDim(workspace_first_dim);
+
+		cudaStream_t stream = cuda::Context::getStream(context);
+
+		float *partial_weights_update = workspace;
+
+		kernel_rmsnorm_backward<<<gridDim, blockDim, 0, stream >>>(getPointer<float>(input), getPointer<float>(gradient_prev),
+				getPointer<float>(gradient_next), getPointer<float>(weights), partial_weights_update, first_dim, last_dim);
+		assert(cudaGetLastError() == cudaSuccess);
+
+		dim3 blockDim2(32, 32);
+		dim3 gridDim2((last_dim + 31) / 32);
+		kernel_rmsnorm_update<<<gridDim2, blockDim2, 0, stream >>>(partial_weights_update, getPointer<float>(weights_update), workspace_first_dim,
+				last_dim);
 
 		assert(cudaGetLastError() == cudaSuccess);
 	}

@@ -24,8 +24,12 @@
 #include <minml/layers/Input.hpp>
 #include <minml/layers/Add.hpp>
 #include <minml/layers/BatchNormalization.hpp>
+#include <minml/layers/LayerNormalization.hpp>
 #include <minml/layers/GlobalBroadcastHW.hpp>
 #include <minml/layers/GlobalPooling.hpp>
+#include <minml/layers/MLP.hpp>
+#include <minml/layers/MultiHeadAttention.hpp>
+#include <minml/layers/RMSNormalization.hpp>
 #include <minml/layers/Softmax.hpp>
 #include <minml/layers/SqueezeAndExcitation.hpp>
 #include <unordered_map>
@@ -234,12 +238,17 @@ namespace ml
 	{
 		static const Add add;
 		static const BatchNormalization batchnorm;
-		static const GlobalBroadcastHW global_broadcast;
-		static const GlobalPooling global_pooling;
 		static const Conv2D conv2d(0, 0);
 		static const Dense dense(0);
+		static const GlobalBroadcastHW global_broadcast;
+		static const GlobalPooling global_pooling;
+		static const LayerNormalization layernorm;
+		static const MLP mlp(0);
+		static const MultiHeadAttention mha(0, 0);
 		static const Input input;
+		static const RMSNormalization rmsnorm;
 		static const Softmax softmax( { 0 });
+		static const SqueezeAndExcitation se;
 
 		const std::string name = json["name"];
 		std::unique_ptr<Layer> result;
@@ -248,18 +257,28 @@ namespace ml
 			result = add.clone(json);
 		if (name == batchnorm.name())
 			result = batchnorm.clone(json);
-		if (name == global_broadcast.name())
-			result = global_broadcast.clone(json);
-		if (name == global_pooling.name())
-			result = global_pooling.clone(json);
 		if (name == conv2d.name())
 			result = conv2d.clone(json);
 		if (name == dense.name())
 			result = dense.clone(json);
+		if (name == global_broadcast.name())
+			result = global_broadcast.clone(json);
+		if (name == global_pooling.name())
+			result = global_pooling.clone(json);
+		if (name == layernorm.name())
+			result = layernorm.clone(json);
+		if (name == mlp.name())
+			result = mlp.clone(json);
+		if (name == mha.name())
+			result = mha.clone(json);
 		if (name == input.name())
 			result = input.clone(json);
+		if (name == rmsnorm.name())
+			result = rmsnorm.clone(json);
 		if (name == softmax.name())
 			result = softmax.clone(json);
+		if (name == se.name())
+			result = se.clone(json);
 
 		if (result == nullptr)
 			throw LogicError(METHOD_NAME, "unknown layer '" + static_cast<std::string>(json["name"]) + "'");

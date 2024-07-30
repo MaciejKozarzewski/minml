@@ -10,5 +10,6 @@ target_sources(${LibName} PRIVATE 	Add.cpp
 								MLP.cpp
 								MultiHeadAttention.cpp
 								Parameter.cpp
+								RMSNormalization.cpp
 								Softmax.cpp
 								SqueezeAndExcitation.cpp)

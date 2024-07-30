@@ -89,7 +89,7 @@ namespace ml
 	}
 
 	void cpu_multi_head_attention_forward(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, mlDataType_t dtype,
-			const void *input, void *output, const void *weights, void *workspace)
+			const void *input, void *output, const void *weights, void *workspace, void *backward_data)
 	{
 //		assert(shape.rank == 3);
 //		const int batch_size = shape.dim[0];
@@ -125,7 +125,7 @@ namespace ml
 
 	}
 	void cpu_multi_head_attention_backward(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, const void *input,
-			const void *weights, void *gradient_prev, void *gradient_next, void *weights_update, void *workspace)
+			const void *weights, void *gradient_prev, void *gradient_next, void *weights_update, void *workspace, void *backward_data)
 	{
 	}
 } /* namespace ml */

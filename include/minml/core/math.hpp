@@ -70,12 +70,19 @@ namespace ml
 			Tensor &weights_update, Tensor &bias_update);
 
 	/*
+	 * RMS normalization
+	 */
+	void rmsnormForward(const Context &context, const Tensor &input, Tensor &output, const Tensor &weights);
+	void rmsnormBackward(const Context &context, const Tensor &input, Tensor &gradient_prev, Tensor &gradient_next, const Tensor &weights,
+			Tensor &weights_update);
+
+	/*
 	 * attention
 	 */
 	int multiHeadAttentionGetWorkspaceSize(const Context &context, const Shape &inputShape, const Shape &weightsShape, bool training);
-	void multiHeadAttentionForward(const Context &context, const Tensor &input, Tensor &output, const Tensor &weights, Tensor &workspace);
+	void multiHeadAttentionForward(const Context &context, const Tensor &input, Tensor &output, const Tensor &weights, Tensor &workspace, Tensor& backwardData);
 	void multiHeadAttentionBackward(const Context &context, const Tensor &input, const Tensor &weights, Tensor &gradient_prev, Tensor &gradient_next,
-			Tensor &weights_update, Tensor &workspace);
+			Tensor &weights_update, Tensor &workspace, Tensor& backwardData);
 
 	void activationForward(const Context &context, Tensor &output, const Tensor &input, ActivationType act);
 	void activationBackward(const Context &context, Tensor &gradient_prev, const Tensor &gradient_next, const Tensor &output, ActivationType act);
@@ -87,8 +94,8 @@ namespace ml
 	void meanSquaredGradient(const Context &context, Tensor &gradient, const Tensor &output, const Tensor &target, float weight = 1.0f);
 	float crossEntropyLoss(const Context &context, const Tensor &output, const Tensor &target);
 	void crossEntropyGradient(const Context &context, Tensor &gradient, const Tensor &output, const Tensor &target, float weight = 1.0f);
-	void adamOptimize(const Context &context, Tensor &weight, const Tensor &update, Tensor &momentum, Tensor &variance, float learning_rate,
-			float beta1, float beta2);
+	void radamOptimize(const Context &context, Tensor &weight, const Tensor &update, Tensor &momentum, Tensor &variance, float learning_rate,
+			float beta1, float beta2, int step);
 	void l2Regularization(const Context &context, Tensor &gradient, const Tensor &param, float coefficient, float offset);
 
 } /* namespace ml */
