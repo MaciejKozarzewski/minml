@@ -37,8 +37,34 @@ namespace ml
 			bool m_is_page_locked = false;
 
 			uint32_t m_stride[Shape::max_dimension];
-
 		public:
+			class reference
+			{
+					friend class Tensor;
+					void *m_ptr = nullptr;
+					Device m_device = Device::cpu();
+					DataType m_dtype = DataType::UNKNOWN;
+					reference(void *ptr, size_t offset, Device d, DataType dtype);
+				public:
+					reference& operator=(float x);
+					reference& operator=(double x);
+					reference& operator=(int x);
+					operator float() const;
+					operator double() const;
+					operator int() const;
+			};
+			class const_reference
+			{
+					friend class Tensor;
+					uint64_t m_data;
+					DataType m_dtype = DataType::UNKNOWN;
+					const_reference(void *ptr, size_t offset, Device d, DataType dtype);
+				public:
+					operator float() const;
+					operator double() const;
+					operator int() const;
+			};
+
 			Tensor() noexcept = default;
 			Tensor(const Shape &shape, DataType dtype, Device device);
 			Tensor(const Shape &shape, const std::string &dtype, Device device);
@@ -98,6 +124,9 @@ namespace ml
 			float get(std::initializer_list<int> idx) const;
 			void set(float value, std::initializer_list<int> idx);
 
+			const_reference at(std::initializer_list<int> idx) const;
+			reference at(std::initializer_list<int> idx);
+
 			Json serialize(SerializedObject &binary_data) const;
 			void unserialize(const Json &json, const SerializedObject &binary_data);
 
@@ -108,6 +137,9 @@ namespace ml
 			void deallocate_if_owning();
 
 	};
+
+	Tensor zeros_like(const Tensor &t);
+	Tensor ones_like(const Tensor &t);
 
 	Tensor toTensor(std::initializer_list<float> data);
 	Tensor toTensor(std::initializer_list<std::initializer_list<float>> data);

@@ -23,7 +23,7 @@ namespace
 {
 	class Data
 	{
-			uint16_t m_data[2] = { 0u, 0u };
+			uint64_t m_data = 0u;
 			ml::DataType m_dtype = ml::DataType::UNKNOWN;
 		public:
 			Data(ml::DataType dtype) noexcept :
@@ -36,15 +36,21 @@ namespace
 				switch (m_dtype)
 				{
 					case ml::DataType::FLOAT16:
-						m_data[0] = ml::convert_fp32_to_fp16(value);
+						reinterpret_cast<uint16_t*>(&m_data)[0] = ml::convert_fp32_to_fp16(value);
 						break;
 					case ml::DataType::FLOAT32:
-						std::memcpy(m_data, &value, sizeof(float));
+						std::memcpy(&m_data, &value, sizeof(float));
 						break;
+					case ml::DataType::FLOAT64:
+					{
+						const double x = value;
+						std::memcpy(&m_data, &x, sizeof(double));
+						break;
+					}
 					case ml::DataType::INT32:
 					{
 						const int tmp = static_cast<int>(value);
-						std::memcpy(m_data, &tmp, sizeof(int));
+						std::memcpy(&m_data, &tmp, sizeof(int));
 						break;
 					}
 					default:
@@ -56,17 +62,23 @@ namespace
 				switch (m_dtype)
 				{
 					case ml::DataType::FLOAT16:
-						return ml::convert_fp16_to_fp32(m_data[0]);
+						return ml::convert_fp16_to_fp32(reinterpret_cast<const uint16_t*>(&m_data)[0]);
 					case ml::DataType::FLOAT32:
 					{
 						float x;
-						std::memcpy(&x, m_data, sizeof(float));
+						std::memcpy(&x, &m_data, sizeof(float));
+						return x;
+					}
+					case ml::DataType::FLOAT64:
+					{
+						double x;
+						std::memcpy(&x, &m_data, sizeof(double));
 						return x;
 					}
 					case ml::DataType::INT32:
 					{
 						int x;
-						std::memcpy(&x, m_data, sizeof(int));
+						std::memcpy(&x, &m_data, sizeof(int));
 						return static_cast<float>(x);
 					}
 					default:
@@ -75,21 +87,147 @@ namespace
 			}
 			void* data() noexcept
 			{
-				return m_data;
+				return &m_data;
 			}
 			const void* data() const noexcept
 			{
-				return m_data;
+				return &m_data;
 			}
 			size_t size() const noexcept
 			{
 				return ml::sizeOf(m_dtype);
 			}
 	};
+
+	template<typename T>
+	T load(const void *ptr, ml::DataType dtype)
+	{
+		switch (dtype)
+		{
+			case ml::DataType::FLOAT16:
+				return static_cast<T>(ml::convert_fp16_to_fp32(reinterpret_cast<const uint16_t*>(ptr)[0]));
+			case ml::DataType::FLOAT32:
+			{
+				float x;
+				std::memcpy(&x, ptr, sizeof(float));
+				return static_cast<T>(x);
+			}
+			case ml::DataType::FLOAT64:
+			{
+				double x;
+				std::memcpy(&x, ptr, sizeof(double));
+				return static_cast<T>(x);
+			}
+			case ml::DataType::INT32:
+			{
+				int32_t x;
+				std::memcpy(&x, ptr, sizeof(int32_t));
+				return static_cast<T>(x);
+			}
+			default:
+				throw ml::DataTypeMismatch(METHOD_NAME, "unknown data type");
+		}
+	}
+	template<typename T>
+	void store(T x, void *ptr, ml::DataType dtype)
+	{
+		switch (dtype)
+		{
+			case ml::DataType::FLOAT16:
+			{
+				const float value = static_cast<float>(x);
+				reinterpret_cast<uint16_t*>(ptr)[0] = ml::convert_fp32_to_fp16(value);
+				break;
+			}
+			case ml::DataType::FLOAT32:
+			{
+				const float value = static_cast<float>(x);
+				std::memcpy(ptr, &value, sizeof(float));
+				break;
+			}
+			case ml::DataType::FLOAT64:
+			{
+				const double value = static_cast<double>(x);
+				std::memcpy(ptr, &value, sizeof(double));
+				break;
+			}
+			case ml::DataType::INT32:
+			{
+				const int value = static_cast<int>(x);
+				std::memcpy(ptr, &value, sizeof(int));
+				break;
+			}
+			default:
+				throw ml::DataTypeMismatch(METHOD_NAME, "unknown data type");
+		}
+	}
 }
 
 namespace ml
 {
+	Tensor::reference::reference(void *ptr, size_t offset, Device d, DataType dtype) :
+			m_ptr(reinterpret_cast<uint8_t*>(ptr) + offset * sizeOf(dtype)),
+			m_device(d),
+			m_dtype(dtype)
+	{
+	}
+	Tensor::reference& Tensor::reference::operator=(float x)
+	{
+		uint64_t tmp;
+		store(x, &tmp, m_dtype);
+		ml::memcpy(m_device, m_ptr, 0, Device::cpu(), &tmp, 0, sizeOf(m_dtype));
+		return *this;
+	}
+	Tensor::reference& Tensor::reference::operator=(double x)
+	{
+		uint64_t tmp;
+		store(x, &tmp, m_dtype);
+		ml::memcpy(m_device, m_ptr, 0, Device::cpu(), &tmp, 0, sizeOf(m_dtype));
+		return *this;
+	}
+	Tensor::reference& Tensor::reference::operator=(int x)
+	{
+		uint64_t tmp;
+		store(x, &tmp, m_dtype);
+		ml::memcpy(m_device, m_ptr, 0, Device::cpu(), &tmp, 0, sizeOf(m_dtype));
+		return *this;
+	}
+	Tensor::reference::operator float() const
+	{
+		uint64_t tmp;
+		ml::memcpy(Device::cpu(), &tmp, 0, m_device, m_ptr, 0, sizeOf(m_dtype));
+		return load<float>(&tmp, m_dtype);
+	}
+	Tensor::reference::operator double() const
+	{
+		uint64_t tmp;
+		ml::memcpy(Device::cpu(), &tmp, 0, m_device, m_ptr, 0, sizeOf(m_dtype));
+		return load<float>(&tmp, m_dtype);
+	}
+	Tensor::reference::operator int() const
+	{
+		uint64_t tmp;
+		ml::memcpy(Device::cpu(), &tmp, 0, m_device, m_ptr, 0, sizeOf(m_dtype));
+		return load<float>(&tmp, m_dtype);
+	}
+
+	Tensor::const_reference::const_reference(void *ptr, size_t offset, Device d, DataType dtype) :
+			m_dtype(dtype)
+	{
+		ml::memcpy(Device::cpu(), &m_data, 0, d, ptr, sizeOf(dtype) * offset, sizeOf(dtype));
+	}
+	Tensor::const_reference::operator float() const
+	{
+		return load<float>(&m_data, m_dtype);
+	}
+	Tensor::const_reference::operator double() const
+	{
+		return load<double>(&m_data, m_dtype);
+	}
+	Tensor::const_reference::operator int() const
+	{
+		return load<int>(&m_data, m_dtype);
+	}
 
 	Tensor::Tensor(const Shape &shape, DataType dtype, Device device) :
 			m_device(device),
@@ -307,7 +445,7 @@ namespace ml
 				convertType(context, data(), newType, data(), dtype(), volume());
 			else
 			{
-				void *tmp = ml::malloc(device(), volume() * sizeof(newType));
+				void *tmp = ml::malloc(device(), volume() * sizeOf(newType));
 				convertType(context, tmp, newType, data(), dtype(), volume());
 				deallocate_if_owning();
 				m_data = tmp;
@@ -476,6 +614,15 @@ namespace ml
 		ml::memcpy(device(), data(), sizeOf(dtype()) * get_index(idx.begin(), idx.size()), Device::cpu(), tmp.data(), 0, tmp.size());
 	}
 
+	Tensor::const_reference Tensor::at(std::initializer_list<int> idx) const
+	{
+		return const_reference(m_data, get_index(idx.begin(), idx.size()), device(), dtype());
+	}
+	Tensor::reference Tensor::at(std::initializer_list<int> idx)
+	{
+		return reference(m_data, get_index(idx.begin(), idx.size()), device(), dtype());
+	}
+
 	Json Tensor::serialize(SerializedObject &binary_data) const
 	{
 		Json result;
@@ -529,7 +676,6 @@ namespace ml
 	{
 		return get_index(idx.begin(), idx.size());
 	}
-
 	/*
 	 * private
 	 */
@@ -571,6 +717,17 @@ namespace ml
 		}
 		else
 			ml::destroy_view(device(), data());
+	}
+
+	Tensor zeros_like(const Tensor &t)
+	{
+		return Tensor(t.shape(), t.dtype(), t.device());
+	}
+	Tensor ones_like(const Tensor &t)
+	{
+		Tensor result(t.shape(), t.dtype(), t.device());
+		result.setall(1.0f);
+		return result;
 	}
 
 	Tensor toTensor(std::initializer_list<float> data)

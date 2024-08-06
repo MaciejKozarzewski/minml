@@ -43,6 +43,7 @@ namespace ml
 			DTYPE_UNKNOWN,
 			DTYPE_FLOAT16,
 			DTYPE_FLOAT32,
+			DTYPE_FLOAT64,
 			DTYPE_INT32
 		} mlDataType_t;
 
@@ -52,7 +53,8 @@ namespace ml
 			ACTIVATION_SIGMOID,
 			ACTIVATION_TANH,
 			ACTIVATION_RELU,
-			ACTIVATION_SOFTMAX
+			ACTIVATION_SOFTMAX,
+			ACTIVATION_GELU
 		} mlActivationType_t;
 
 		typedef void *mlContext_t;

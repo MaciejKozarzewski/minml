@@ -18,6 +18,7 @@ namespace ml
 		UNKNOWN,
 		FLOAT16,
 		FLOAT32,
+		FLOAT64,
 		INT32
 	};
 
