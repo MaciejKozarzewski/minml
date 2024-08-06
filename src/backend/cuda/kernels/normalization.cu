@@ -562,6 +562,7 @@ namespace
 			}
 			__syncthreads();
 
+			local_sum_squares = stats[0];
 			const float rms = std::sqrt(local_sum_squares / last_dim);
 			const float inv_rms = 1.0f / (1.0e-6f + rms);
 

@@ -269,7 +269,7 @@ __kernel void batchnorm_backward(const __global float *workspace, const __global
 			weight_update[3 * last_dim + tid] += d_mu; // beta
 		}
 
-		d_sigma = -gamma / stddev * d_sigma / (float)first_dim;
+		d_sigma = -gamma / stddev * d_sigma / (float)(first_dim - 1);
 		d_mu = -gamma / stddev * d_mu / (float)first_dim;
 		for (int i = get_global_id(1); i < first_dim; i += get_global_size(1))
 			gradient_prev[i * last_dim + tid] = gamma / stddev * gradient_next[i * last_dim + tid]
