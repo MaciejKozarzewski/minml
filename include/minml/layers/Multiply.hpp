@@ -1,22 +1,22 @@
 /*
- * Add.hpp
+ * Multiply.hpp
  *
- *  Created on: Jan 3, 2023
+ *  Created on: Jul 30, 2024
  *      Author: Maciej Kozarzewski
  */
 
-#ifndef MINML_LAYERS_ADD_HPP_
-#define MINML_LAYERS_ADD_HPP_
+#ifndef MINML_LAYERS_MULTIPLY_HPP_
+#define MINML_LAYERS_MULTIPLY_HPP_
 
 #include <minml/layers/Layer.hpp>
 
 namespace ml
 {
 
-	class Add: public Layer
+	class Multiply: public Layer
 	{
 		public:
-			Add(std::string activation = "linear");
+			Multiply();
 
 			void setInputShape(const std::vector<Shape> &shapes);
 			Shape getOutputShape() const;
@@ -31,4 +31,6 @@ namespace ml
 
 } /* namespace ml */
 
-#endif /* MINML_LAYERS_ADD_HPP_ */
+
+
+#endif /* MINML_LAYERS_MULTIPLY_HPP_ */

@@ -153,7 +153,6 @@ namespace ml
 		TimerGuard tg(timer);
 
 		assert(src.dtype() == DataType::INT32);
-		assert(src.lastDim() == 1);
 		assert(dst.dim(0) == src.dim(0));
 		assert(dst.dim(1) == src.dim(1));
 		assert(dst.dim(2) == src.dim(2));
@@ -781,6 +780,21 @@ namespace ml
 				break;
 			case DeviceType::OPENCL:
 				opencl_sum_over_first_dim(get(context), get_shape(src), dst.data(), src.data(), beta);
+				break;
+		}
+	}
+	void multiplyTensors(const Context &context, Tensor &dst, const Tensor &lhs, const Tensor &rhs)
+	{
+		switch (context.device().type())
+		{
+			case DeviceType::CPU:
+				cpu_multiply_tensors(get(context), get(dst.dtype()), get_shape(dst), dst.data(), lhs.data(), rhs.data());
+				break;
+			case DeviceType::CUDA:
+				cuda_multiply_tensors(get(context), get(dst.dtype()), get_shape(dst), dst.data(), lhs.data(), rhs.data());
+				break;
+			case DeviceType::OPENCL:
+				opencl_multiply_tensors(get(context), get(dst.dtype()), get_shape(dst), dst.data(), lhs.data(), rhs.data());
 				break;
 		}
 	}

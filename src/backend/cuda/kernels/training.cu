@@ -220,8 +220,9 @@ namespace
 	}
 
 	template<int Step>
-	__global__ void kernel_sum_over_first_dim(float *dst, const float *src, int first_dim, int last_dim, float beta)
+	__global__ void kernel_sum_over_first_dim_vect(float *dst, const float *src, int first_dim, int last_dim, float beta)
 	{
+		assert(last_dim % 4 == 0);
 		__shared__ float workspace[32][128 + 1];
 
 		const int first_dim_idx = 32 * blockIdx.y + threadIdx.y;
@@ -231,12 +232,8 @@ namespace
 		{
 			for (int i = 32 * blockIdx.y + threadIdx.y; i < first_dim; i += 32 * gridDim.y)
 			{
-				vec4f tmp;
-				if ((last_dim - last_dim_idx) >= 4)
-					tmp.load(src + i * last_dim + last_dim_idx);
-				else
-					tmp.partial_load(src + i * last_dim + last_dim_idx, last_dim - last_dim_idx);
-				local_sum = local_sum + tmp;
+				const vec4f tmp(src + i * last_dim + last_dim_idx);
+				local_sum += tmp;
 			}
 			workspace[threadIdx.y][4 * threadIdx.x + 0] = local_sum.x0;
 			workspace[threadIdx.y][4 * threadIdx.x + 1] = local_sum.x1;
@@ -272,27 +269,87 @@ namespace
 			if (Step == 1) // write to temporary storage array
 			{
 				const int idx = blockIdx.y * last_dim + last_dim_idx;
-				if ((last_dim - last_dim_idx) >= 4)
-					tmp.store(dst + idx);
-				else
-					tmp.partial_store(dst + idx, last_dim - last_dim_idx);
+				tmp.store(dst + idx);
 			}
 			if (Step == 2) // write to final destination
 			{
 				if (beta != 0.0f)
 				{
-					vec4f y;
-					if ((last_dim - last_dim_idx) >= 4)
-						y.load(dst + last_dim_idx);
-					else
-						y.partial_load(dst + last_dim_idx, last_dim - last_dim_idx);
-					tmp = tmp + beta * y;
+					const vec4f y(dst + last_dim_idx);
+					tmp += beta * y;
 				}
-				if ((last_dim - last_dim_idx) >= 4)
-					tmp.store(dst + last_dim_idx);
-				else
-					tmp.partial_store(dst + last_dim_idx, last_dim - last_dim_idx);
+				tmp.store(dst + last_dim_idx);
 			}
+		}
+	}
+	template<int Step>
+	__global__ void kernel_sum_over_first_dim(float *dst, const float *src, int first_dim, int last_dim, float beta)
+	{
+		__shared__ float workspace[32][32 + 1];
+
+		const int first_dim_idx = 32 * blockIdx.y + threadIdx.y;
+		const int last_dim_idx = 32 * blockIdx.x + threadIdx.x;
+		vec1f local_sum(0.0f);
+		if (last_dim_idx < last_dim)
+		{
+			for (int i = 32 * blockIdx.y + threadIdx.y; i < first_dim; i += 32 * gridDim.y)
+			{
+				const vec1f tmp(src + i * last_dim + last_dim_idx);
+				local_sum += tmp;
+			}
+			workspace[threadIdx.y][threadIdx.x + 0] = local_sum.x0;
+		}
+		__syncthreads();
+		local_sum.x0 = workspace[threadIdx.x][threadIdx.y + 0];
+
+		for (int k = 16; k >= 1; k /= 2)
+			local_sum.x0 += __shfl_xor_sync(0xffffffff, local_sum.x0, k);
+		__syncthreads();
+		if (threadIdx.x == 0)
+			workspace[0][threadIdx.y + 0] = local_sum.x0;
+		__syncthreads();
+
+		if (threadIdx.y == 0 && last_dim_idx < last_dim)
+		{
+			vec1f tmp(workspace[0] + threadIdx.x);
+			if (Step == 1) // write to temporary storage array
+			{
+				const int idx = blockIdx.y * last_dim + last_dim_idx;
+				tmp.store(dst + idx);
+			}
+			if (Step == 2) // write to final destination
+			{
+				if (beta != 0.0f)
+				{
+					const vec1f y(dst + last_dim_idx);
+					tmp += beta * y;
+				}
+				tmp.store(dst + last_dim_idx);
+			}
+		}
+	}
+
+	template<typename T>
+	__global__ void kernel_multiply_tensors(T *dst, const T *src0, const T *src1, int elements)
+	{
+		for (int i = (blockIdx.x * blockDim.x + threadIdx.x) * vector_length<T>(); i < elements; i += gridDim.x * blockDim.x * vector_length<T>())
+		{
+			const int tmp = elements - i;
+			const Vector<T> x0(src0 + i, tmp);
+			const Vector<T> x1(src1 + i, tmp);
+			const Vector<T> y = x0 * x1;
+			y.store(dst + i, tmp);
+		}
+	}
+	template<typename T>
+	__global__ void kernel_multiply_tensors(T *dst, const T *src, int elements)
+	{
+		for (int i = (blockIdx.x * blockDim.x + threadIdx.x) * vector_length<T>(); i < elements; i += gridDim.x * blockDim.x * vector_length<T>())
+		{
+			const int tmp = elements - i;
+			const Vector<T> x(src + i, tmp);
+			const Vector<T> y = Vector<T>(dst + i, tmp) * x;
+			y.store(dst + i, tmp);
 		}
 	}
 
@@ -337,6 +394,45 @@ namespace ml
 
 		kernel_emulate_low_precision<<<gridDim, blockDim, 0, cuda::Context::getStream(context)>>>(getPointer<uint32_t>(dst),
 				getPointer<uint32_t>(src), length);
+		assert(cudaGetLastError() == cudaSuccess);
+	}
+	void cuda_multiply_tensors(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *dst, const void *src1, const void *src2)
+	{
+		assert(dst != nullptr);
+		assert(src1 != nullptr);
+		assert(src2 != nullptr);
+
+		const int length = volume(shape);
+		dim3 blockDim(256);
+		dim3 gridDim = cuda::gridSize<1024>(length, blockDim.x);
+		cudaStream_t stream = cuda::Context::getStream(context);
+
+		if (dst == src1)
+		{ // in place addition
+			switch (dtype)
+			{
+				case DTYPE_FLOAT16:
+					kernel_multiply_tensors<<<gridDim, blockDim, 0, stream>>>(getPointer<half>(dst), getPointer<half>(src2), length);
+					break;
+				case DTYPE_FLOAT32:
+					kernel_multiply_tensors<<<gridDim, blockDim, 0, stream>>>(getPointer<float>(dst), getPointer<float>(src2), length);
+					break;
+			}
+		}
+		else
+		{
+			switch (dtype)
+			{
+				case DTYPE_FLOAT16:
+					kernel_multiply_tensors<<<gridDim, blockDim, 0, stream>>>(getPointer<half>(dst), getPointer<half>(src1), getPointer<half>(src2),
+							length);
+					break;
+				case DTYPE_FLOAT32:
+					kernel_multiply_tensors<<<gridDim, blockDim, 0, stream>>>(getPointer<float>(dst), getPointer<float>(src1),
+							getPointer<float>(src2), length);
+					break;
+			}
+		}
 		assert(cudaGetLastError() == cudaSuccess);
 	}
 	void cuda_add_tensors(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *dst, const void *src1, const void *src2)
@@ -392,14 +488,27 @@ namespace ml
 		const int workspace_first_dim = std::min((size_t) 256, cuda::Context::getWorkspaceSize(context) / (sizeof(float) * last_dim));
 
 		dim3 blockDim(32, 32);
-		dim3 gridDim1((last_dim + 127) / 128, workspace_first_dim);
-		dim3 gridDim2((last_dim + 127) / 128);
 		cudaStream_t stream = cuda::Context::getStream(context);
 
-		kernel_sum_over_first_dim<1> <<<gridDim1, blockDim, 0, stream>>>(workspace, getPointer<float>(src), first_dim, last_dim, beta);
-		assert(cudaGetLastError() == cudaSuccess);
-		kernel_sum_over_first_dim<2> <<<gridDim2, blockDim, 0, stream>>>(getPointer<float>(dst), workspace, workspace_first_dim, last_dim, beta);
-		assert(cudaGetLastError() == cudaSuccess);
+		if (last_dim % 4 == 0)
+		{
+			dim3 gridDim1((last_dim + 127) / 128, workspace_first_dim);
+			dim3 gridDim2((last_dim + 127) / 128);
+			kernel_sum_over_first_dim_vect<1> <<<gridDim1, blockDim, 0, stream>>>(workspace, getPointer<float>(src), first_dim, last_dim, beta);
+			assert(cudaGetLastError() == cudaSuccess);
+			kernel_sum_over_first_dim_vect<2> <<<gridDim2, blockDim, 0, stream>>>(getPointer<float>(dst), workspace, workspace_first_dim, last_dim,
+					beta);
+			assert(cudaGetLastError() == cudaSuccess);
+		}
+		else
+		{
+			dim3 gridDim1((last_dim + 31) / 32, workspace_first_dim);
+			dim3 gridDim2((last_dim + 31) / 32);
+			kernel_sum_over_first_dim<1> <<<gridDim1, blockDim, 0, stream>>>(workspace, getPointer<float>(src), first_dim, last_dim, beta);
+			assert(cudaGetLastError() == cudaSuccess);
+			kernel_sum_over_first_dim<2> <<<gridDim2, blockDim, 0, stream>>>(getPointer<float>(dst), workspace, workspace_first_dim, last_dim, beta);
+			assert(cudaGetLastError() == cudaSuccess);
+		}
 	}
 	float cuda_mean_squared_loss(mlContext_t context, mlShape_t shape, const void *output, const void *target)
 	{

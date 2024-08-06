@@ -39,6 +39,42 @@ namespace
 		const float max_y = std::log(min) / std::log(x);
 		return (y >= max_y) ? 0.0f : std::pow(x, y);
 	}
+	template<typename T>
+	void add_kernel(void *dst, const void *src1, const void *src2, int elements)
+	{
+		T *dst_ptr = ml::getPointer<T>(dst);
+		const T *src1_ptr = ml::getPointer<T>(src1);
+		const T *src2_ptr = ml::getPointer<T>(src2);
+
+		if (dst == src1)
+		{ // in place addition
+			for (int i = 0; i < elements; i++)
+				dst_ptr[i] += src2_ptr[i];
+		}
+		else
+		{
+			for (int i = 0; i < elements; i++)
+				dst_ptr[i] = src1_ptr[i] + src2_ptr[i];
+		}
+	}
+	template<typename T>
+	void multiply_kernel(void *dst, const void *src1, const void *src2, int elements)
+	{
+		T *dst_ptr = ml::getPointer<T>(dst);
+		const T *src1_ptr = ml::getPointer<T>(src1);
+		const T *src2_ptr = ml::getPointer<T>(src2);
+
+		if (dst == src1)
+		{ // in place multiplication
+			for (int i = 0; i < elements; i++)
+				dst_ptr[i] *= src2_ptr[i];
+		}
+		else
+		{
+			for (int i = 0; i < elements; i++)
+				dst_ptr[i] = src1_ptr[i] * src2_ptr[i];
+		}
+	}
 }
 
 namespace ml
@@ -52,6 +88,25 @@ namespace ml
 			reinterpret_cast<uint32_t*>(dst)[i] = tmp & 0xFFFFF000u;
 		}
 	}
+	void cpu_multiply_tensors(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *dst, const void *src1, const void *src2)
+	{
+		assert(dst != nullptr);
+		assert(src1 != nullptr);
+		assert(src2 != nullptr);
+
+		const int elements = volume(shape);
+
+		switch (dtype)
+		{
+			case DTYPE_FLOAT32:
+				multiply_kernel<float>(dst, src1, src2, elements);
+				break;
+			case DTYPE_FLOAT64:
+				multiply_kernel<double>(dst, src1, src2, elements);
+				break;
+		}
+
+	}
 	void cpu_add_tensors(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *dst, const void *src1, const void *src2)
 	{
 		assert(dst != nullptr);
@@ -60,19 +115,14 @@ namespace ml
 
 		const int elements = volume(shape);
 
-		float *dst_ptr = getPointer<float>(dst);
-		const float *src1_ptr = getPointer<float>(src1);
-		const float *src2_ptr = getPointer<float>(src2);
-
-		if (dst == src1)
-		{ // in place addition
-			for (int i = 0; i < elements; i++)
-				dst_ptr[i] += src2_ptr[i];
-		}
-		else
+		switch (dtype)
 		{
-			for (int i = 0; i < elements; i++)
-				dst_ptr[i] = src1_ptr[i] + src2_ptr[i];
+			case DTYPE_FLOAT32:
+				add_kernel<float>(dst, src1, src2, elements);
+				break;
+			case DTYPE_FLOAT64:
+				add_kernel<double>(dst, src1, src2, elements);
+				break;
 		}
 	}
 	void cpu_sum_over_first_dim(mlContext_t context, mlShape_t shape, void *dst, const void *src, float beta)
@@ -109,11 +159,10 @@ namespace ml
 		assert(target != nullptr);
 
 		const int elements = volume(shape);
+		const float inv_batch_size = 1.0f / get_first_dim(shape);
 
 		const float *output_ptr = getPointer<float>(output);
 		const float *target_ptr = getPointer<float>(target);
-
-		const float inv_batch_size = 1.0f / get_first_dim(shape);
 
 		float result = 0.0f;
 		for (int i = 0; i < elements; i++)

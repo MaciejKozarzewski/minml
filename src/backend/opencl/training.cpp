@@ -42,6 +42,31 @@ namespace ml
 
 		opencl::runKernel(context, kernel, global, local);
 	}
+	void opencl_multiply_tensors(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *dst, const void *src1, const void *src2)
+	{
+		const int elements = volume(shape);
+		cl::Kernel kernel;
+		cl::NDRange global = opencl::get_nd_range<65536>(elements);
+		cl::NDRange local;
+
+		switch (dtype)
+		{
+//			case DTYPE_FLOAT16:
+//				break;
+			case DTYPE_FLOAT32:
+				kernel = get_kernel(context, "multiply_tensors");
+				break;
+			default:
+				break;
+		}
+
+		kernel.setArg(0, opencl::getMemoryObject(dst).buffer());
+		kernel.setArg(1, opencl::getMemoryObject(src1).buffer());
+		kernel.setArg(2, opencl::getMemoryObject(src2).buffer());
+		kernel.setArg(3, elements);
+
+		opencl::runKernel(context, kernel, global, local);
+	}
 	void opencl_add_tensors(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *dst, const void *src1, const void *src2)
 	{
 		const int elements = volume(shape);

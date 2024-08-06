@@ -191,6 +191,8 @@ namespace ml
 			case DataType::FLOAT32:
 			case DataType::INT32:
 				return 4;
+			case DataType::FLOAT64:
+				return 8;
 			default:
 				return 0;
 		}
@@ -202,6 +204,8 @@ namespace ml
 			return DataType::FLOAT16;
 		if (str == "fp32" or str == "float32" or str == "FLOAT32")
 			return DataType::FLOAT32;
+		if (str == "fp64" or str == "float64" or str == "FLOAT64")
+			return DataType::FLOAT64;
 		if (str == "int32" or str == "INT32")
 			return DataType::INT32;
 		throw DataTypeNotSupported(METHOD_NAME, "unknown data type '" + str + "'");
@@ -214,6 +218,8 @@ namespace ml
 				return std::string("FLOAT16");
 			case DataType::FLOAT32:
 				return std::string("FLOAT32");
+			case DataType::FLOAT64:
+				return std::string("FLOAT64");
 			case DataType::INT32:
 				return std::string("INT32");
 			default:

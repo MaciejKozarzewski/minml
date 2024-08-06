@@ -293,6 +293,10 @@ namespace ml
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
+	void opencl_multiply_tensors(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *dst, const void *src1, const void *src2)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
 	void opencl_add_tensors(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *dst, const void *src1, const void *src2)
 	{
 		throw NotImplemented(METHOD_NAME);

@@ -89,7 +89,7 @@ namespace ml
 		if (not isTrainable())
 			throw LogicError(METHOD_NAME, "parameter is set as non-trainable");
 		if (m_gradient.isEmpty() and shape().rank() != 0)
-			m_gradient = Tensor(shape(), "float32", device());
+			m_gradient = zeros_like(m_param);
 
 		return m_gradient;
 	}
@@ -106,6 +106,7 @@ namespace ml
 	void Parameter::convertTo(const Context &context, DataType newType)
 	{
 		m_param.convertTo(context, newType);
+		m_gradient.convertTo(context, newType);
 	}
 	void Parameter::learn(const Context &context)
 	{
