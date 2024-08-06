@@ -268,17 +268,33 @@ namespace
 				{
 					status = cublasLtMatmulDescSetAttribute(m_desc, CUBLASLT_MATMUL_DESC_BIAS_POINTER, &bias, sizeof(bias));
 					assert(status == CUBLAS_STATUS_SUCCESS);
-					if (act == ACTIVATION_RELU)
-						epilogue = CUBLASLT_EPILOGUE_RELU_BIAS;
-					else
-						epilogue = CUBLASLT_EPILOGUE_BIAS;
+					switch (act)
+					{
+						case ACTIVATION_RELU:
+							epilogue = CUBLASLT_EPILOGUE_RELU_BIAS;
+							break;
+						case ACTIVATION_GELU:
+							epilogue = CUBLASLT_EPILOGUE_GELU_BIAS;
+							break;
+						default:
+							epilogue = CUBLASLT_EPILOGUE_BIAS;
+							break;
+					}
 				}
 				else
 				{
-					if (act == ACTIVATION_RELU)
-						epilogue = CUBLASLT_EPILOGUE_RELU;
-					else
-						epilogue = CUBLASLT_EPILOGUE_DEFAULT;
+					switch (act)
+					{
+						case ACTIVATION_RELU:
+							epilogue = CUBLASLT_EPILOGUE_RELU;
+							break;
+						case ACTIVATION_GELU:
+							epilogue = CUBLASLT_EPILOGUE_GELU;
+							break;
+						default:
+							epilogue = CUBLASLT_EPILOGUE_DEFAULT;
+							break;
+					}
 				}
 
 				status = cublasLtMatmulDescSetAttribute(m_desc, CUBLASLT_MATMUL_DESC_EPILOGUE, &epilogue, sizeof(epilogue));
@@ -440,7 +456,7 @@ namespace ml
 				workspace_size, stream);
 		assert(status == CUBLAS_STATUS_SUCCESS);
 
-		if (act != ACTIVATION_LINEAR and act != ACTIVATION_RELU)
+		if (act != ACTIVATION_LINEAR and act != ACTIVATION_RELU and act != ACTIVATION_GELU)
 			cuda_activation_forward(context, dtype, shape_D, D, D, act);
 	}
 }

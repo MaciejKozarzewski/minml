@@ -203,7 +203,7 @@ namespace ml
 				}
 				else
 				{
-					if (device().isCPU())
+					if (device().isCPU() and isUsingBias())
 					{
 						const float beta = isUsingBias() ? 1.0f : 0.0f;
 						if (m_activation == ActivationType::RELU or m_activation == ActivationType::LINEAR)

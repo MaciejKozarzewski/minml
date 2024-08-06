@@ -53,6 +53,8 @@ namespace ml
 				return "relu";
 			case ActivationType::SOFTMAX:
 				return "softmax";
+			case ActivationType::GELU:
+				return "gelu";
 		}
 	}
 	ActivationType activationFromString(const std::string &str)
@@ -67,6 +69,8 @@ namespace ml
 			return ActivationType::RELU;
 		if (str == "softmax")
 			return ActivationType::SOFTMAX;
+		if (str == "gelu")
+			return ActivationType::GELU;
 		throw LogicError(METHOD_NAME, "unknown nonlinearity '" + str + "'");
 	}
 
@@ -75,7 +79,7 @@ namespace ml
 			m_activation(activationFromString(activation))
 	{
 		if (m_activation == ActivationType::SOFTMAX)
-			throw LogicError(METHOD_NAME, "softmax cannot be uased as a layer activation function");
+			throw LogicError(METHOD_NAME, "softmax cannot be used as a layer activation function");
 	}
 
 	bool Layer::isTrainable() const noexcept

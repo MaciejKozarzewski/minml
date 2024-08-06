@@ -254,7 +254,7 @@ namespace ml
 		{
 			const float gamma = get_gamma(getPointer<float>(weights), j, last_dim);
 			const float stddev = running_stat_ptr[j].get_stddev();
-			d_sigma[j] = -gamma / stddev * d_sigma[j] / first_dim;
+			d_sigma[j] = -gamma / stddev * d_sigma[j] / (first_dim - 1);
 			d_mu[j] = -gamma / stddev * d_mu[j] / first_dim;
 		}
 		for (int i = 0; i < first_dim; i++)
@@ -331,9 +331,8 @@ namespace ml
 		assert(input != nullptr);
 		assert(output != nullptr);
 		assert(weights != nullptr);
-		assert(shape.rank == 2);
 
-		const int first_dim = get_first_dim(shape);
+		const int first_dim = volume_without_last_dim(shape);
 		const int last_dim = get_last_dim(shape);
 
 		const float *input_ptr = getPointer<float>(input);
@@ -385,9 +384,8 @@ namespace ml
 		assert(gradient_prev != nullptr);
 		assert(gradient_next != nullptr);
 		assert(weights_update != nullptr);
-		assert(shape.rank == 2);
 
-		const int first_dim = get_first_dim(shape);
+		const int first_dim = volume_without_last_dim(shape);
 		const int last_dim = get_last_dim(shape);
 
 		const float *input_ptr = getPointer<float>(input);
@@ -420,7 +418,7 @@ namespace ml
 				weights_update_ptr[j] += gradient_next_ptr[idx] * x;
 				bias_update_ptr[j] += gradient_next_ptr[idx];
 			}
-			d_sigma /= last_dim;
+			d_sigma /= (last_dim - 1);
 			d_mu /= last_dim;
 
 			for (int j = 0; j < last_dim; j++)
@@ -438,9 +436,8 @@ namespace ml
 		assert(input != nullptr);
 		assert(output != nullptr);
 		assert(weights != nullptr);
-		assert(shape.rank == 2);
 
-		const int first_dim = get_first_dim(shape);
+		const int first_dim = volume_without_last_dim(shape);
 		const int last_dim = get_last_dim(shape);
 
 		const float *input_ptr = getPointer<float>(input);
@@ -469,9 +466,8 @@ namespace ml
 		assert(gradient_prev != nullptr);
 		assert(gradient_next != nullptr);
 		assert(weights_update != nullptr);
-		assert(shape.rank == 2);
 
-		const int first_dim = get_first_dim(shape);
+		const int first_dim = volume_without_last_dim(shape);
 		const int last_dim = get_last_dim(shape);
 
 		const float *input_ptr = getPointer<float>(input);
@@ -483,8 +479,14 @@ namespace ml
 		for (int i = 0; i < first_dim; i++)
 		{
 			float sum_square = 0.0f;
+			float sum = 0.0f;
 			for (int j = 0; j < last_dim; j++)
-				sum_square += square(input_ptr[i * last_dim + j]);
+			{
+				const int idx = i * last_dim + j;
+				const float gamma = weights_ptr[j];
+				sum_square += square(input_ptr[idx]);
+				sum += input_ptr[idx] * gradient_next_ptr[idx] * gamma;
+			}
 			const float rms = std::sqrt(sum_square / last_dim);
 
 			const float inv_rms = 1.0f / (epsilon + rms);
@@ -496,7 +498,7 @@ namespace ml
 				const float out = in * inv_rms;
 
 				weights_update_ptr[j] += gradient_next_ptr[idx] * out;
-				gradient_prev_ptr[idx] = gradient_next_ptr[idx] * gamma * (sum_square - square(in)) / (last_dim * cube(rms));
+				gradient_prev_ptr[idx] = (gradient_next_ptr[idx] * gamma * sum_square - in * sum) / (last_dim * cube(rms));
 			}
 		}
 	}

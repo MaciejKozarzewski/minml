@@ -9,6 +9,7 @@ target_sources(${LibName} PRIVATE 	Add.cpp
 								LayerNormalization.cpp
 								MLP.cpp
 								MultiHeadAttention.cpp
+								Multiply.cpp
 								Parameter.cpp
 								RMSNormalization.cpp
 								Softmax.cpp

@@ -316,7 +316,7 @@ namespace
 				weight_update[3 * shape.y + tid] += d_mu; // beta
 			}
 
-			d_sigma = -gamma / stddev * d_sigma / static_cast<float>(shape.x);
+			d_sigma = -gamma / stddev * d_sigma / static_cast<float>(shape.x - 1);
 			d_mu = -gamma / stddev * d_mu / static_cast<float>(shape.x);
 			for (int i = blockIdx.y * blockDim.y + threadIdx.y; i < shape.x; i += gridDim.y * blockDim.y)
 				gradient_prev[i * shape.y + tid] = gamma / stddev * gradient_next[i * shape.y + tid]
@@ -485,7 +485,7 @@ namespace
 				weights_update[blockIdx.x * last_dim + j] += gradient_next[idx] * x;
 				bias_update[blockIdx.x * last_dim + j] += gradient_next[idx];
 			}
-			workspace[threadIdx.x] = thread_d_sigma / last_dim;
+			workspace[threadIdx.x] = thread_d_sigma / (last_dim - 1);
 			workspace[threadIdx.x + 128] = thread_d_mu / last_dim;
 			__syncthreads();
 			combine_stats_1D(workspace, workspace + 128);
@@ -578,7 +578,7 @@ namespace
 			float *weights_update, int first_dim, int last_dim)
 	{
 		assert(blockDim.x == 128);
-		__shared__ float workspace[4];
+		__shared__ float workspace[2][4];
 
 		for (int j = threadIdx.x; j < last_dim; j += blockDim.x)
 			weights_update[blockIdx.x * last_dim + j] = 0.0f;
@@ -587,37 +587,56 @@ namespace
 		for (int i = blockIdx.x; i < first_dim; i += gridDim.x)
 		{
 			float local_sum_squares = 0.0f;
+			float local_sum = 0.0f;
 			for (int j = threadIdx.x; j < last_dim; j += blockDim.x)
 			{
-				const float tmp = input[i * last_dim + j];
-				local_sum_squares += tmp * tmp;
+				const int idx = i * last_dim + j;
+				const float in = input[idx];
+				const float grad = gradient_next[idx];
+				const float gamma = weights[j];
+				local_sum_squares += square(in);
+				local_sum += in * grad * gamma;
 			}
 			__syncthreads();
 			for (int k = 16; k >= 1; k /= 2)
+			{
 				local_sum_squares += __shfl_xor_sync(0xffffffff, local_sum_squares, k);
+				local_sum += __shfl_xor_sync(0xffffffff, local_sum, k);
+			}
 			if (threadIdx.x % 32 == 0)
-				workspace[threadIdx.x / 32] = local_sum_squares;
+			{
+				workspace[0][threadIdx.x / 32] = local_sum_squares;
+				workspace[1][threadIdx.x / 32] = local_sum;
+			}
 			__syncthreads();
 			if (threadIdx.x == 0)
 			{
 				local_sum_squares = 0.0f;
+				local_sum = 0.0f;
 				for (int k = 0; k < blockDim.x / 32; k++)
-					local_sum_squares += workspace[k];
-				workspace[0] = local_sum_squares;
+				{
+					local_sum_squares += workspace[0][k];
+					local_sum += workspace[1][k];
+				}
+				workspace[0][0] = local_sum_squares;
+				workspace[1][0] = local_sum;
 			}
 			__syncthreads();
+			const float sum_squares = workspace[0][0];
+			const float sum = workspace[1][0];
 
-			const float rms = std::sqrt(local_sum_squares / last_dim);
+			const float rms = std::sqrt(sum_squares / last_dim);
 			const float inv_rms = 1.0f / (1.0e-6f + rms);
 			for (int j = threadIdx.x; j < last_dim; j += blockDim.x)
 			{
 				const int idx = i * last_dim + j;
 				const float gamma = weights[j];
 				const float in = input[idx];
+				const float grad = gradient_next[idx];
 				const float out = in * inv_rms;
 
 				weights_update[blockIdx.x * last_dim + j] += gradient_next[idx] * out;
-				gradient_prev[idx] = gradient_next[idx] * gamma * (local_sum_squares - square(in)) / (last_dim * cube(rms));
+				gradient_prev[idx] = (gamma * grad * sum_squares - in * sum) / (last_dim * cube(rms));
 			}
 		}
 	}

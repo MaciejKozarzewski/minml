@@ -21,6 +21,10 @@ namespace ml
 		 */
 		void def_kernel_convert_fp32_to_fp16(void *dst, const void *src, size_t elements);
 		void def_kernel_convert_fp16_to_fp32(void *dst, const void *src, size_t elements);
+		void def_kernel_convert_fp64_to_fp16(void *dst, const void *src, size_t elements);
+		void def_kernel_convert_fp16_to_fp64(void *dst, const void *src, size_t elements);
+		void def_kernel_convert_fp64_to_fp32(void *dst, const void *src, size_t elements);
+		void def_kernel_convert_fp32_to_fp64(void *dst, const void *src, size_t elements);
 
 		void def_kernel_softmax_3_channels_fp32(void *dst, const void *src, int first_dim);
 		void def_kernel_softmax_fp32(void *dst, const void *src, int first_dim, int last_dim, void *workspace);

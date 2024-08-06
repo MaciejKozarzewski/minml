@@ -34,10 +34,68 @@ namespace
 		else
 			return ml::cpu::def_kernel_convert_fp16_to_fp32;
 	}
+	conversion_function get_conversion_function_fp64_to_fp16(ml::mlContext_t context)
+	{
+		return ml::cpu::def_kernel_convert_fp64_to_fp16;
+	}
+	conversion_function get_conversion_function_fp16_to_fp64(ml::mlContext_t context)
+	{
+		return ml::cpu::def_kernel_convert_fp16_to_fp64;
+	}
+	conversion_function get_conversion_function_fp64_to_fp32(ml::mlContext_t context)
+	{
+		return ml::cpu::def_kernel_convert_fp64_to_fp32;
+	}
+	conversion_function get_conversion_function_fp32_to_fp64(ml::mlContext_t context)
+	{
+		return ml::cpu::def_kernel_convert_fp32_to_fp64;
+	}
+
+	conversion_function get_conversion_function(ml::mlContext_t context, ml::mlDataType_t src, ml::mlDataType_t dst)
+	{
+		switch (src)
+		{
+			case ml::DTYPE_FLOAT16:
+			{
+				switch (dst)
+				{
+					case ml::DTYPE_FLOAT32:
+						return get_conversion_function_fp16_to_fp32(context);
+					case ml::DTYPE_FLOAT64:
+						return get_conversion_function_fp16_to_fp64(context);
+				}
+			}
+			case ml::DTYPE_FLOAT32:
+			{
+				switch (dst)
+				{
+					case ml::DTYPE_FLOAT16:
+						return get_conversion_function_fp32_to_fp16(context);
+					case ml::DTYPE_FLOAT64:
+						return get_conversion_function_fp32_to_fp64(context);
+				}
+			}
+			case ml::DTYPE_FLOAT64:
+			{
+				switch (dst)
+				{
+					case ml::DTYPE_FLOAT16:
+						return get_conversion_function_fp64_to_fp16(context);
+					case ml::DTYPE_FLOAT64:
+						return get_conversion_function_fp64_to_fp32(context);
+				}
+			}
+		}
+	}
 
 	template<typename T>
 	T one_or_zero(bool b) noexcept;
 
+	template<>
+	double one_or_zero(bool b) noexcept
+	{
+		return b ? 1.0 : 0.0;
+	}
 	template<>
 	float one_or_zero(bool b) noexcept
 	{
@@ -92,16 +150,8 @@ namespace ml
 			return;
 		}
 
-		if (dst_dtype == DTYPE_FLOAT16 and src_dtype == DTYPE_FLOAT32)
-		{
-			static const conversion_function func = get_conversion_function_fp32_to_fp16(context);
-			func(dst, src, elements);
-		}
-		if (dst_dtype == DTYPE_FLOAT32 and src_dtype == DTYPE_FLOAT16)
-		{
-			static const conversion_function func = get_conversion_function_fp16_to_fp32(context);
-			func(dst, src, elements);
-		}
+		const conversion_function func = get_conversion_function(context, src_dtype, dst_dtype);
+		func(dst, src, elements);
 	}
 	void cpu_transpose_021(mlContext_t context, mlDataType_t dtype, mlShape_t shape, const void *input, void *output)
 	{

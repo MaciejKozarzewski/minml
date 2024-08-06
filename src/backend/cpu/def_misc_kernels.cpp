@@ -16,6 +16,7 @@
 #include <cstring>
 #include <cmath>
 #include <cassert>
+#include <iostream>
 
 namespace
 {
@@ -44,6 +45,16 @@ namespace
 	float convert(float16 x) noexcept
 	{
 		return convert_fp16_to_fp32(x);
+	}
+	template<>
+	float16 convert(double x) noexcept
+	{
+		return convert_fp32_to_fp16(static_cast<float>(x));
+	}
+	template<>
+	double convert(float16 x) noexcept
+	{
+		return static_cast<double>(convert_fp16_to_fp32(x));
 	}
 
 	template<typename T>
@@ -210,6 +221,13 @@ namespace
 			bias_ptr += channels;
 		}
 	}
+
+	template<typename SrcT, typename DstT>
+	void convert_kernel(void *dst, const void *src, size_t elements)
+	{
+		for (size_t i = 0; i < elements; i++)
+			reinterpret_cast<DstT*>(dst)[i] = convert<SrcT, DstT>(reinterpret_cast<const SrcT*>(src)[i]);
+	}
 }
 
 namespace ml
@@ -218,13 +236,27 @@ namespace ml
 	{
 		void def_kernel_convert_fp32_to_fp16(void *dst, const void *src, size_t elements)
 		{
-			for (size_t i = 0; i < elements; i++)
-				reinterpret_cast<float16*>(dst)[i] = convert_fp32_to_fp16(reinterpret_cast<const float*>(src)[i]);
+			convert_kernel<float, float16>(dst, src, elements);
 		}
 		void def_kernel_convert_fp16_to_fp32(void *dst, const void *src, size_t elements)
 		{
-			for (size_t i = 0; i < elements; i++)
-				reinterpret_cast<float*>(dst)[i] = convert_fp16_to_fp32(reinterpret_cast<const float16*>(src)[i]);
+			convert_kernel<float16, float>(dst, src, elements);
+		}
+		void def_kernel_convert_fp64_to_fp16(void *dst, const void *src, size_t elements)
+		{
+			convert_kernel<double, float16>(dst, src, elements);
+		}
+		void def_kernel_convert_fp16_to_fp64(void *dst, const void *src, size_t elements)
+		{
+			convert_kernel<float16, double>(dst, src, elements);
+		}
+		void def_kernel_convert_fp64_to_fp32(void *dst, const void *src, size_t elements)
+		{
+			convert_kernel<double, float>(dst, src, elements);
+		}
+		void def_kernel_convert_fp32_to_fp64(void *dst, const void *src, size_t elements)
+		{
+			convert_kernel<float, double>(dst, src, elements);
 		}
 
 		void def_kernel_softmax_3_channels_fp32(void *dst, const void *src, int first_dim)
