@@ -66,13 +66,14 @@ namespace
 	}
 
 	template<typename T>
-	__global__ void kernel_softmax_forward_in_place(T *input, const T *weights, int batch_size, int num_heads, int height, int width, int range)
+	__global__ void kernel_softmax_forward_in_place(T *input, const T *weights, int batch_size, int num_heads, int height, int width,
+			int weights_size)
 	{
 		extern __shared__ char shared_array[];
 
 		float *workspace = reinterpret_cast<float*>(shared_array);
 		float *biases = reinterpret_cast<float*>(workspace + height * width * blockDim.y);
-		Index2D *indices = reinterpret_cast<Index2D*>(biases + (2 * range + 1) * round_up(2 * range + 1, 4));
+		Index2D *indices = reinterpret_cast<Index2D*>(biases + weights_size * round_up(weights_size, 4));
 
 		const int block_size = blockDim.x * blockDim.y;
 		const int tid = threadIdx.y * blockDim.x + threadIdx.x;
@@ -88,7 +89,7 @@ namespace
 			indices[i].y = i - indices[i].x * width;
 		}
 		{
-			const int tmp = (2 * range + 1) * round_up(2 * range + 1, 4);
+			const int tmp = weights_size * round_up(weights_size, 4);
 			const Indexer<2> weight_indexer(num_heads, tmp);
 			for (int i = 4 * tid; i < tmp; i += 4 * block_size)
 			{
@@ -121,7 +122,9 @@ namespace
 		__syncthreads();
 
 		const Index2D origin = indices[token_idx + threadIdx.y];
-		const Indexer<2> weight_indexer(2 * range + 1, round_up(2 * range + 1, 4));
+		const Indexer<2> weight_indexer(weights_size, round_up(weights_size, 4));
+		const int range = (weights_size - 1) / 2;
+
 		float max_value = -1e+32f;
 		for (int j = threadIdx.x; j < tokens; j += blockDim.x)
 		{
@@ -172,52 +175,71 @@ namespace
 				input[idx + j] = workspace[j];
 		}
 	}
-
 	__global__ void kernel_softmax_backward_in_place(const float *output, float *gradient, float *weights_update, int batch_size, int num_heads,
-			int height, int width, int range)
+			int height, int width, int weights_size)
 	{
 		extern __shared__ char shared_array[];
 
 		const int batch_idx = blockIdx.x;
 		const int head_idx = blockIdx.y;
 		const int tokens = height * width;
-		const int size = 2 * range + 1;
 
 		float *workspace = reinterpret_cast<float*>(shared_array);
-		Index2D *indices = reinterpret_cast<Index2D*>(workspace + size * round_up(size, 4));
+		float *storage = workspace + weights_size * round_up(weights_size, 4);
+		Index2D *indices = reinterpret_cast<Index2D*>(storage + 4);
 
 		for (int i = threadIdx.x; i < tokens; i += blockDim.x)
 		{
 			indices[i].x = i / width;
 			indices[i].y = i - indices[i].x * width;
 		}
-		for (int i = threadIdx.x; i < size * round_up(size, 4); i += blockDim.x)
+		for (int i = threadIdx.x; i < weights_size * round_up(weights_size, 4); i += blockDim.x)
 			workspace[i] = 0.0f;
 		__syncthreads();
 
 		const Indexer<4> gradient_indexer(batch_size, num_heads, tokens, tokens);
-		const Indexer<2> weight_indexer(size, round_up(size, 4));
+		const Indexer<2> weight_indexer(weights_size, round_up(weights_size, 4));
 		for (int i = 0; i < tokens; i++)
 		{
-			const Index2D origin = indices[i];
-
 			const int idx = gradient_indexer.at(batch_idx, head_idx, i, 0);
+
+			float local_sum = 0.0f;
+			for (int j = threadIdx.x; j < tokens; j += blockDim.x)
+				local_sum += output[idx + j] * gradient[idx + j];
+
+			__syncthreads();
+			for (int k = 16; k >= 1; k /= 2)
+				local_sum += __shfl_xor_sync(0xffffffff, local_sum, k);
+			if (threadIdx.x % 32 == 0)
+				storage[threadIdx.x / 32] = local_sum;
+			__syncthreads();
+			if (threadIdx.x == 0)
+			{
+				local_sum = 0.0f;
+				for (int k = 0; k < blockDim.x / 32; k++)
+					local_sum += storage[k];
+				storage[0] = local_sum;
+			}
+			__syncthreads();
+			local_sum = storage[0];
+
+			const Index2D origin = indices[i];
+			const int range = (weights_size - 1) / 2;
 			for (int j = threadIdx.x; j < tokens; j += blockDim.x)
 			{
 				const Index2D current = indices[j];
 				const int offset_h = range + clamp(current.x - origin.x, -range, range);
 				const int offset_w = range + clamp(current.y - origin.y, -range, range);
-				const float out = output[idx + j];
-				const float grad = gradient[idx + j] * out * (1.0f - out);
+				const float dx = output[idx + j] * (gradient[idx + j] - local_sum);
 
-				atomicAdd(workspace + weight_indexer.at(offset_h, offset_w), grad);
-				gradient[idx + j] = grad;
+				atomicAdd(workspace + weight_indexer.at(offset_h, offset_w), dx);
+				gradient[idx + j] = dx;
 			}
 			__syncthreads();
 		}
 
-		const Indexer<3> update_indexer(batch_size, num_heads, size * round_up(size, 4));
-		for (int i = threadIdx.x; i < size * round_up(size, 4); i += blockDim.x)
+		const Indexer<3> update_indexer(batch_size, num_heads, weights_size * round_up(weights_size, 4));
+		for (int i = threadIdx.x; i < weights_size * round_up(weights_size, 4); i += blockDim.x)
 			weights_update[update_indexer.at(batch_idx, head_idx, i)] = workspace[i];
 	}
 	__global__ void kernel_weights_update_reduction(const float *workspace, float *update, int batch_size, int num_heads, int last_dim)
@@ -301,7 +323,6 @@ namespace
 		const int width = input_shape.dim[2];
 		const int tokens = height * width;
 		const int num_heads = weights_shape.dim[0];
-		const int range = (weights_shape.dim[1] - 1) / 2;
 		assert(weights_shape.dim[2] % 4 == 0);
 
 		dim3 blockDim(32, 8);
@@ -319,7 +340,7 @@ namespace
 			{
 				const int shared_mem = sizeof(float) * (tokens * blockDim.y + weights_shape.dim[1] * weights_shape.dim[2]) + sizeof(Index2D) * tokens;
 				kernel_softmax_forward_in_place<<<gridDim, blockDim, shared_mem, stream>>>(ml::getPointer<float>(input),
-						ml::getPointer<float>(weights), batch_size, num_heads, height, width, range);
+						ml::getPointer<float>(weights), batch_size, num_heads, height, width, weights_shape.dim[1]);
 				break;
 			}
 		}
@@ -394,7 +415,6 @@ namespace ml
 		const int embedding = input_shape.dim[3] / 3;
 		const int num_heads = weights_shape.dim[0];
 		const int head_dim = embedding / num_heads;
-		const int range = (weights_shape.dim[1] - 1) / 2;
 		assert(weights_shape.dim[2] % 4 == 0);
 
 		const int offset = batch_size * num_heads * tokens * tokens * size_of(DTYPE_FLOAT32);
@@ -441,9 +461,10 @@ namespace ml
 
 		dim3 blockDim(128);
 		dim3 gridDim(batch_size, num_heads);
-		const int shared_mem = sizeof(float) * (tokens + weights_shape.dim[1] * weights_shape.dim[2]) + sizeof(Index2D) * tokens;
+		const int shared_mem = sizeof(float) * (tokens + weights_shape.dim[1] * weights_shape.dim[2] + 4) + sizeof(Index2D) * tokens;
 		kernel_softmax_backward_in_place<<<gridDim, blockDim, shared_mem, stream>>>(getPointer<float>(qk_tensor_ptr),
-				getPointer<float>(backward_workspace), getPointer<float>(update_workspace), batch_size, num_heads, height, width, range);
+				getPointer<float>(backward_workspace), getPointer<float>(update_workspace), batch_size, num_heads, height, width,
+				weights_shape.dim[1]);
 		assert(cudaGetLastError() == cudaSuccess);
 
 		const int last_dim = weights_shape.dim[1] * weights_shape.dim[2];

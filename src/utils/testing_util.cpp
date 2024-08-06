@@ -324,30 +324,30 @@ namespace ml
 				{
 					for (int j = 0; j < std::min(n, input[i].volume()); j++)
 					{
-						const int r = (n <= input[i].volume()) ? j : randInt(input[i].volume());
+						const int r = (n >= input[i].volume()) ? j : randInt(input[i].volume());
 						const double grad = compute_gradient(input[i], r, epsilon);
 						max_diff = std::max(max_diff, std::abs(grad - reinterpret_cast<const double*>(gradient_prev[i].data())[r]));
-						std::cout << r << " : " << grad << " vs " << reinterpret_cast<const double*>(gradient_prev[i].data())[r] << '\n';
+//						std::cout << r << " : " << grad << " vs " << reinterpret_cast<const double*>(gradient_prev[i].data())[r] << '\n';
 					}
 				}
 
 			if (mode == "weights" or mode == "all")
 				for (int j = 0; j < std::min(n, m_layer->getWeights().getParam().volume()); j++)
 				{
-					const int r = (n <= m_layer->getWeights().getParam().volume()) ? j : randInt(m_layer->getWeights().getParam().volume());
+					const int r = (n >= m_layer->getWeights().getParam().volume()) ? j : randInt(m_layer->getWeights().getParam().volume());
 					const double grad = compute_gradient(m_layer->getWeights().getParam(), r, epsilon);
 					max_diff = std::max(max_diff, std::abs(grad - reinterpret_cast<const double*>(m_layer->getWeights().getGradient().data())[r]));
-//				std::cout << grad << " vs " << reinterpret_cast<const double*>(m_layer->getWeights().getGradient().data())[r] << '\n';
+//					std::cout << grad << " vs " << reinterpret_cast<const double*>(m_layer->getWeights().getGradient().data())[r] << '\n';
 				}
 
 			if (mode == "bias" or mode == "all")
 				for (int j = 0; j < std::min(n, m_layer->getBias().getParam().volume()); j++)
 				{
-					const int r = (n <= m_layer->getBias().getParam().volume()) ? j : randInt(m_layer->getBias().getParam().volume());
+					const int r = (n >= m_layer->getBias().getParam().volume()) ? j : randInt(m_layer->getBias().getParam().volume());
 
 					const double grad = compute_gradient(m_layer->getBias().getParam(), r, epsilon);
 					max_diff = std::max(max_diff, std::abs(grad - reinterpret_cast<const double*>(m_layer->getBias().getGradient().data())[r]));
-//				std::cout << grad << " vs " << reinterpret_cast<const double*>(m_layer->getBias().getGradient().data())[r] << '\n';
+//					std::cout << grad << " vs " << reinterpret_cast<const double*>(m_layer->getBias().getGradient().data())[r] << '\n';
 				}
 			std::cout << max_diff << '\n';
 			return max_diff;

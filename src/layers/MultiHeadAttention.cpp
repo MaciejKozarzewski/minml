@@ -33,7 +33,7 @@ namespace ml
 
 	Shape MultiHeadAttention::getWeightShape() const
 	{
-		const int tmp = 2 * m_positional_encoding_range + 1;
+		const int tmp = 2 * m_positional_encoding_range - 1;
 		return Shape( { m_number_of_heads, tmp, 4 * ((tmp + 3) / 4) });
 	}
 	void MultiHeadAttention::setInputShape(const std::vector<Shape> &shapes)
