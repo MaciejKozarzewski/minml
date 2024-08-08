@@ -168,6 +168,32 @@
 	vmovups(reg2, mem(rcx, r14, 2))\
 	add(r15, rcx)
 
+#define ADD_BIAS_24x16xFP32(reg)\
+	vaddps(reg, zmm8, zmm8)\
+	vaddps(reg, zmm9, zmm9)\
+	vaddps(reg, zmm10, zmm10)\
+	vaddps(reg, zmm11, zmm11)\
+	vaddps(reg, zmm12, zmm12)\
+	vaddps(reg, zmm13, zmm13)\
+	vaddps(reg, zmm14, zmm14)\
+	vaddps(reg, zmm15, zmm15)\
+	vaddps(reg, zmm16, zmm16)\
+	vaddps(reg, zmm17, zmm17)\
+	vaddps(reg, zmm18, zmm18)\
+	vaddps(reg, zmm19, zmm19)\
+	vaddps(reg, zmm20, zmm20)\
+	vaddps(reg, zmm21, zmm21)\
+	vaddps(reg, zmm22, zmm22)\
+	vaddps(reg, zmm23, zmm23)\
+	vaddps(reg, zmm24, zmm24)\
+	vaddps(reg, zmm25, zmm25)\
+	vaddps(reg, zmm26, zmm26)\
+	vaddps(reg, zmm27, zmm27)\
+	vaddps(reg, zmm28, zmm28)\
+	vaddps(reg, zmm29, zmm29)\
+	vaddps(reg, zmm30, zmm30)\
+	vaddps(reg, zmm31, zmm31)
+
 #define RELU_24x16xFP32()\
 	vxorps(zmm0, zmm0, zmm0)\
 	vmaxps(zmm0, zmm8, zmm8)\
@@ -522,7 +548,7 @@ namespace ml
 	using namespace ml::cpu;
 #ifdef __AVX512F__
 	void gemm_avx512f_24x16_fp32(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,
-			bool use_relu) noexcept
+			const Fragment &bias, bool use_relu) noexcept
 	{
 		assert(A.dtype() == DTYPE_FLOAT32);
 		assert(B.dtype() == DTYPE_FLOAT32);
@@ -535,13 +561,16 @@ namespace ml
 		assert(D.columns() == B.columns());
 
 		assert(alpha_ptr != nullptr);
-		assert(beta_ptr != nullptr);
+		assert(cpu::is_aligned(A.data(), 64));
 		assert(cpu::is_aligned(B.data(), 64));
+		assert(beta_ptr != nullptr);
+		assert(cpu::is_aligned(bias.data(), 64));
 
 		const float *A_ptr = A.data<float>();
 		const float *B_ptr = B.data<float>();
 		const float *C_ptr = C.data<float>();
 		float *D_ptr = D.data<float>();
+		const float *bias_ptr = bias.is_packed() ? bias.data<float>() : nullptr;
 
 		const int K = A.rows();
 		uint64_t k_iter = K / 4;
@@ -595,6 +624,13 @@ namespace ml
 		PERMUTE_AND_SCALE_6x16xFP32(zmm14, zmm15, zmm16, zmm17, zmm18, zmm19)
 		PERMUTE_AND_SCALE_6x16xFP32(zmm20, zmm21, zmm22, zmm23, zmm24, zmm25)
 		PERMUTE_AND_SCALE_6x16xFP32(zmm26, zmm27, zmm28, zmm29, zmm30, zmm31)
+
+		movq(var(bias_ptr), rax)// load address of bias pointer
+		test(rax, rax)
+		je(AFTER_BIAS)
+		vmovaps(mem(rax), zmm2)// load bias
+		ADD_BIAS_24x16xFP32(zmm2)
+		label(AFTER_BIAS)
 
 		vxorps(zmm1, zmm1, zmm1)
 		vucomiss(xmm0, xmm1)// set ZF if beta == 0.
@@ -652,7 +688,8 @@ namespace ml
 				[D_stride] "m"(D_stride),
 				[alpha_ptr] "m"(alpha_ptr),
 				[beta_ptr] "m"(beta_ptr),
-				[flag_relu] "m"(flag_relu)
+				[flag_relu] "m"(flag_relu),
+				[bias_ptr] "m"(bias_ptr)
 				:// clobbers
 				"cc", "memory", "%zmm0", "%zmm1", "%zmm2", "%zmm3", "%zmm4", "%zmm5", "%zmm6", "%zmm7",
 				"%zmm8", "%zmm9", "%zmm10", "%zmm11", "%zmm12", "%zmm13", "%zmm14", "%zmm15", "%zmm16",
@@ -660,7 +697,7 @@ namespace ml
 				"%zmm26", "%zmm27", "%zmm28", "%zmm29", "%zmm30", "%zmm31", "%rax", "%rbx", "%rcx", "%rdx", "%r14", "%r15")
 	}
 	void gemm_avx512f_24x16_fp32_fp16(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr,
-			const Fragment &C, bool use_relu) noexcept
+			const Fragment &C, const Fragment &bias, bool use_relu) noexcept
 	{
 		assert(A.dtype() == DTYPE_FLOAT32);
 		assert(B.dtype() == DTYPE_FLOAT32);
@@ -673,13 +710,16 @@ namespace ml
 		assert(D.columns() == B.columns());
 
 		assert(alpha_ptr != nullptr);
-		assert(beta_ptr != nullptr);
+		assert(cpu::is_aligned(A.data(), 64));
 		assert(cpu::is_aligned(B.data(), 64));
+		assert(beta_ptr != nullptr);
+		assert(cpu::is_aligned(bias.data(), 64));
 
 		const float *A_ptr = A.data<float>();
 		const float *B_ptr = B.data<float>();
 		const float16 *C_ptr = C.data<float16>();
 		float16 *D_ptr = D.data<float16>();
+		const float *bias_ptr = bias.is_packed() ? bias.data<float>() : nullptr;
 
 		const int K = A.rows();
 		uint64_t k_iter = K / 4;
@@ -733,6 +773,13 @@ namespace ml
 		PERMUTE_AND_SCALE_6x16xFP32(zmm14, zmm15, zmm16, zmm17, zmm18, zmm19)
 		PERMUTE_AND_SCALE_6x16xFP32(zmm20, zmm21, zmm22, zmm23, zmm24, zmm25)
 		PERMUTE_AND_SCALE_6x16xFP32(zmm26, zmm27, zmm28, zmm29, zmm30, zmm31)
+
+		movq(var(bias_ptr), rax)// load address of bias pointer
+		test(rax, rax)
+		je(AFTER_BIAS)
+		vmovaps(mem(rax), zmm2)// load bias
+		ADD_BIAS_24x16xFP32(zmm2)
+		label(AFTER_BIAS)
 
 		vxorps(zmm1, zmm1, zmm1)
 		vucomiss(xmm0, xmm1)// set ZF if beta == 0.
@@ -792,7 +839,8 @@ namespace ml
 				[D_stride] "m"(D_stride),
 				[alpha_ptr] "m"(alpha_ptr),
 				[beta_ptr] "m"(beta_ptr),
-				[flag_relu] "m"(flag_relu)
+				[flag_relu] "m"(flag_relu),
+				[bias_ptr] "m"(bias_ptr)
 				:// clobbers
 				"cc", "memory", "%zmm0", "%zmm1", "%zmm2", "%zmm3", "%zmm4", "%zmm5", "%zmm6", "%zmm7",
 				"%zmm8", "%zmm9", "%zmm10", "%zmm11", "%zmm12", "%zmm13", "%zmm14", "%zmm15", "%zmm16",
@@ -1326,11 +1374,11 @@ namespace ml
 	}
 #else
 	void gemm_avx512f_24x16_fp32(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,
-			bool use_relu) noexcept
+			const Fragment &bias, bool use_relu) noexcept
 	{
 	}
 	void gemm_avx512f_24x16_fp32_fp16(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr,
-			const Fragment &C, bool use_relu) noexcept
+			const Fragment &C, const Fragment &bias, bool use_relu) noexcept
 	{
 	}
 	void pack_avx512f_24xK_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept

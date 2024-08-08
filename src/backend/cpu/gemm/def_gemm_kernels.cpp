@@ -155,8 +155,10 @@ namespace
 
 	template<typename DT, typename AT, typename BT, typename CT>
 	void kernel_gemm_fp32(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,
-			bool use_relu) noexcept
+			const Fragment &bias, bool use_relu) noexcept
 	{
+		assert(A.is_packed() && A.data() != nullptr);
+		assert(B.is_packed() && B.data() != nullptr);
 		assert(A.rows() == B.rows());
 		const int M = A.columns();
 		const int N = B.columns();
@@ -180,6 +182,16 @@ namespace
 		{
 			for (int i = 0; i < M * N; i++)
 				acc[i] *= alpha;
+		}
+		if (bias.is_packed())
+		{
+			assert(bias.data() != nullptr);
+			assert(bias.rows() == 1);
+			assert(bias.columns() == N);
+			assert(bias.dtype() == B.dtype());
+			for (int m = 0; m < M; m++)
+				for (int n = 0; n < N; n++)
+					acc[m * N + n] += convert<BT, float>(bias.at<BT>(0, n));
 		}
 
 		assert(beta_ptr != nullptr);
@@ -266,12 +278,12 @@ namespace ml
 	 * C and D may point to the same object
 	 */
 	void gemm_def_MxN_fp32(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,
-			bool use_relu) noexcept
+			const Fragment &bias, bool use_relu) noexcept
 	{
-		kernel_gemm_fp32<float, float, float, float>(D, alpha_ptr, A, B, beta_ptr, C, use_relu);
+		kernel_gemm_fp32<float, float, float, float>(D, alpha_ptr, A, B, beta_ptr, C, bias, use_relu);
 	}
 	void gemm_def_MxN_fp32_fp16(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,
-			bool use_relu) noexcept
+			const Fragment &bias, bool use_relu) noexcept
 	{
 		assert(D.dtype() == DTYPE_FLOAT16);
 		assert(C.dtype() == DTYPE_FLOAT16);
@@ -280,16 +292,16 @@ namespace ml
 		if (A.dtype() == DTYPE_FLOAT16)
 		{
 			if (B.dtype() == DTYPE_FLOAT16)
-				kernel_gemm_fp32<float16, float16, float16, float16>(D, alpha_ptr, A, B, beta_ptr, C, use_relu);
+				kernel_gemm_fp32<float16, float16, float16, float16>(D, alpha_ptr, A, B, beta_ptr, C, bias, use_relu);
 			else
-				kernel_gemm_fp32<float16, float16, float, float16>(D, alpha_ptr, A, B, beta_ptr, C, use_relu);
+				kernel_gemm_fp32<float16, float16, float, float16>(D, alpha_ptr, A, B, beta_ptr, C, bias, use_relu);
 		}
 		else
 		{
 			if (B.dtype() == DTYPE_FLOAT16)
-				kernel_gemm_fp32<float16, float, float16, float16>(D, alpha_ptr, A, B, beta_ptr, C, use_relu);
+				kernel_gemm_fp32<float16, float, float16, float16>(D, alpha_ptr, A, B, beta_ptr, C, bias, use_relu);
 			else
-				kernel_gemm_fp32<float16, float, float, float16>(D, alpha_ptr, A, B, beta_ptr, C, use_relu);
+				kernel_gemm_fp32<float16, float, float, float16>(D, alpha_ptr, A, B, beta_ptr, C, bias, use_relu);
 		}
 	}
 

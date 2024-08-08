@@ -189,6 +189,7 @@ namespace ml
 	}
 	void GemmRuntime::run()
 	{
+		bool is_using_bias = (bias.data() != nullptr);
 		Fragment C_fragment, D_fragment;
 
 		for (int outer_m = 0; outer_m < total_size.M; outer_m += outer_tile.M)
@@ -202,12 +203,16 @@ namespace ml
 				for (int outer_n = 0; outer_n < total_size.N; outer_n += outer_tile.N)
 				{
 					B_fragments.reset();
+					bias_fragments.reset();
 
 					ArrayOfFragments::Iterator B_frag_iter = B_fragments.get_iterator();
+					ArrayOfFragments::Iterator bias_frag_iter = bias_fragments.get_iterator();
 					for (int inner_n = outer_n; inner_n < std::min(total_size.N, outer_n + outer_tile.N); inner_n += inner_tile.N)
 					{
 						if (not B_frag_iter->is_packed())
 							pack_fragment_B(*B_frag_iter, inner_n, outer_k);
+						if (is_using_bias and is_last_k_tile and not bias_frag_iter->is_packed())
+							pack_fragment_bias(*bias_frag_iter, inner_n);
 
 						ArrayOfFragments::Iterator A_frag_iter = A_fragments.get_iterator();
 						for (int inner_m = outer_m; inner_m < std::min(total_size.M, outer_m + outer_tile.M); inner_m += inner_tile.M)
@@ -221,11 +226,13 @@ namespace ml
 							else
 								C_fragment = D_fragment;
 
-							gemm_kernel(D_fragment, &tmp_alpha, *A_frag_iter, *B_frag_iter, &tmp_beta, C_fragment, use_relu and is_last_k_tile);
+							gemm_kernel(D_fragment, &tmp_alpha, *A_frag_iter, *B_frag_iter, &tmp_beta, C_fragment, *bias_frag_iter,
+									use_relu and is_last_k_tile);
 							unpack_fragment_D(D_fragment, inner_m, inner_n);
 							A_frag_iter.advance();
 						}
 						B_frag_iter.advance();
+						bias_frag_iter.advance();
 					}
 				}
 			}
@@ -255,9 +262,11 @@ namespace ml
 		cpu::WorkspaceAllocator workspace_allocator(context);
 		A_fragments = ArrayOfFragments(workspace_allocator, num_A_fragments);
 		B_fragments = ArrayOfFragments(workspace_allocator, num_B_fragments);
+		bias_fragments = ArrayOfFragments(workspace_allocator, num_B_fragments);
 
 		A_fragments.create(workspace_allocator, type_configuration.compute_dtype, Size2D(inner_tile.K, inner_tile.M));
 		B_fragments.create(workspace_allocator, type_configuration.compute_dtype, Size2D(inner_tile.K, inner_tile.N));
+		bias_fragments.create(workspace_allocator, type_configuration.compute_dtype, Size2D(1, inner_tile.N), 64);
 
 		const Size2D tmp(inner_tile.M, inner_tile.N);
 		const int fragment_size = size_of(matrix_D.dtype()) * tmp.rows * tmp.columns;
@@ -325,6 +334,17 @@ namespace ml
 			fragment.set_size(Size2D(rows_to_pack, cols_to_pack), inner_tile.N);
 			d_packing(fragment, matrix_D, Position2D(m, n), MatrixOp::NORMAL);
 		}
+	}
+	void GemmRuntime::pack_fragment_bias(Fragment &fragment, int n)
+	{
+		const int n_to_pack = std::min(inner_tile.N, total_size.N - n);
+		fragment.mark_as_packed_with_size(Size2D(1, n_to_pack));
+
+		const Position2D pos = get_position(1, n, MatrixOp::NORMAL);
+		if (fragment.columns() == fragment.stride())
+			b_packing(fragment, bias, pos, MatrixOp::NORMAL);
+		else
+			edge_b_packing(fragment, bias, pos, MatrixOp::NORMAL);
 	}
 	void GemmRuntime::unpack_fragment_D(Fragment &fragment, int m, int n)
 	{

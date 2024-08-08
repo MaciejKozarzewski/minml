@@ -428,36 +428,51 @@ namespace ml
 	void cuda_gemm_ex(mlContext_t context, mlDataType_t dtype, mlShape_t shape_D, void *D, float alpha, char opA, mlShape_t shape_A, const void *A,
 			char opB, mlShape_t shape_B, const void *B, float beta, mlShape_t shape_C, const void *C, const void *bias, mlActivationType_t act)
 	{
-		const size_t workspace_size = cuda::Context::getWorkspaceSize(context);
-		void *workspace = cuda::Context::getWorkspace(context);
-		const MatrixLayout Adesc(shape_A, dtype);
-		const MatrixLayout Bdesc(shape_B, dtype);
-		const MatrixLayout Cdesc(shape_C, dtype);
-		const MatrixLayout Ddesc(shape_D, dtype);
-		const MatMulDescriptor computeDesc(dtype, bias, act);
-
-		uint32_t _alpha, _beta;
-		if (dtype == DTYPE_FLOAT32)
+		if (is_transpose(opB) and not is_transpose(opA))
 		{
-			std::memcpy(&_alpha, &alpha, sizeof(float));
-			std::memcpy(&_beta, &beta, sizeof(float));
+			const size_t workspace_size = cuda::Context::getWorkspaceSize(context);
+			void *workspace = cuda::Context::getWorkspace(context);
+			const MatrixLayout Adesc(shape_A, dtype);
+			const MatrixLayout Bdesc(shape_B, dtype);
+			const MatrixLayout Cdesc(shape_C, dtype);
+			const MatrixLayout Ddesc(shape_D, dtype);
+			const MatMulDescriptor computeDesc(dtype, bias, act);
+
+			uint32_t _alpha, _beta;
+			if (dtype == DTYPE_FLOAT32)
+			{
+				std::memcpy(&_alpha, &alpha, sizeof(float));
+				std::memcpy(&_beta, &beta, sizeof(float));
+			}
+			else
+			{
+				const half a = static_cast<half>(alpha);
+				const half b = static_cast<half>(beta);
+				std::memcpy(&_alpha, &a, sizeof(half));
+				std::memcpy(&_beta, &b, sizeof(half));
+			}
+
+			cublasLtHandle_t handle = cuda::Context::getCublasLtHandle(context);
+			cudaStream_t stream = cuda::Context::getStream(context);
+			cublasStatus_t status = cublasLtMatmul(handle, computeDesc, &_alpha, B, Bdesc, A, Adesc, &_beta, C, Cdesc, D, Ddesc, nullptr, workspace,
+					workspace_size, stream);
+			assert(status == CUBLAS_STATUS_SUCCESS);
+
+			if (act != ACTIVATION_LINEAR and act != ACTIVATION_RELU and act != ACTIVATION_GELU)
+				cuda_activation_forward(context, dtype, shape_D, D, D, act);
 		}
 		else
 		{
-			const half a = static_cast<half>(alpha);
-			const half b = static_cast<half>(beta);
-			std::memcpy(&_alpha, &a, sizeof(half));
-			std::memcpy(&_beta, &b, sizeof(half));
+			if (C != D)
+				cuda_memcpy_within_device(context, D, 0, C, 0, volume(shape_D) * size_of(dtype));
+
+			cuda_gemm(context, dtype, shape_D, D, shape_A, A, shape_B, B, opA, opB, alpha, beta);
+
+			if (bias == nullptr)
+				cuda_activation_forward(context, dtype, shape_D, D, D, act);
+			else
+				cuda_add_bias_act(context, dtype, shape_D, D, D, bias, act);
 		}
-
-		cublasLtHandle_t handle = cuda::Context::getCublasLtHandle(context);
-		cudaStream_t stream = cuda::Context::getStream(context);
-		cublasStatus_t status = cublasLtMatmul(handle, computeDesc, &_alpha, A, Bdesc, B, Adesc, &_beta, C, Cdesc, D, Ddesc, nullptr, workspace,
-				workspace_size, stream);
-		assert(status == CUBLAS_STATUS_SUCCESS);
-
-		if (act != ACTIVATION_LINEAR and act != ACTIVATION_RELU and act != ACTIVATION_GELU)
-			cuda_activation_forward(context, dtype, shape_D, D, D, act);
 	}
 }
 

@@ -84,12 +84,12 @@ namespace ml
 			{
 				return Iterator(m_data);
 			}
-			void create(cpu::WorkspaceAllocator &allocator, mlDataType_t dtype, Size2D max_size) noexcept
+			void create(cpu::WorkspaceAllocator &allocator, mlDataType_t dtype, Size2D max_size, size_t alignment = 4096) noexcept
 			{
 				m_max_size = max_size;
 				const int fragment_size = size_of(dtype) * max_size.rows * max_size.columns;
 				for (int i = 0; i < size(); i++)
-					m_data[i] = Fragment(allocator.get(fragment_size, 4096), dtype, max_size.columns);
+					m_data[i] = Fragment(allocator.get(fragment_size, alignment), dtype, max_size.columns);
 			}
 			const Fragment& operator[](int index) const noexcept
 			{
@@ -162,21 +162,21 @@ namespace ml
 
 	class GemmRuntime
 	{
-			Matrix matrix_A, matrix_B, matrix_C, matrix_D;
+			Matrix matrix_A, matrix_B, matrix_C, matrix_D, bias;
 			float alpha = 1.0f, beta = 0.0f;
 			MatrixOp op_A = MatrixOp::NORMAL, op_B = MatrixOp::NORMAL;
 			bool use_relu = false;
 
 			TileDimensions outer_tile, total_size;
 
-			ArrayOfFragments A_fragments, B_fragments;
+			ArrayOfFragments A_fragments, B_fragments, bias_fragments;
 			Fragment edge_C_fragment, edge_D_fragment;
 
 		public:
 			using packing_function = std::function<void(Fragment&, const Matrix&, const Position2D&, MatrixOp)>;
 			using unpacking_function = std::function<void(Matrix&, const Position2D&,const Fragment&)>;
 			using gemm_function = std::function<void(Fragment &, const void *, const Fragment &, const Fragment &, const void *,
-					const Fragment &, bool)>;
+					const Fragment &, const Fragment &, bool)>;
 
 			TypeConfiguration type_configuration;
 			TileDimensions inner_tile;
@@ -215,6 +215,10 @@ namespace ml
 			{
 				matrix_D = mat;
 			}
+			void setBias(const Matrix &mat)
+			{
+				bias = mat;
+			}
 			void setMatrixA(const void *ptr, mlShape_t shape, mlDataType_t dtype, char op)
 			{
 				setMatrixA(create_matrix(ptr, dtype, shape), op);
@@ -240,6 +244,10 @@ namespace ml
 			{
 				use_relu = b;
 			}
+			void setBias(const void *ptr, mlShape_t shape, mlDataType_t dtype)
+			{
+				setBias(create_matrix(ptr, dtype, shape));
+			}
 			void setup(mlContext_t context);
 			void run();
 		private:
@@ -249,6 +257,7 @@ namespace ml
 			void pack_fragment_B(Fragment &fragment, int n, int k);
 			void pack_fragment_C(Fragment &fragment, int m, int n);
 			void pack_fragment_D(Fragment &fragment, int m, int n);
+			void pack_fragment_bias(Fragment &fragment, int n);
 			void unpack_fragment_D(Fragment &fragment, int m, int n);
 	};
 

@@ -55,6 +55,7 @@ namespace ml
 		rt.setMatrixD(D, shape_D, dtype);
 		rt.setScalingFactors(alpha, beta);
 		rt.useRelu(act == ACTIVATION_RELU);
+		rt.setBias(bias, make_shape( { shape_D.dim[1] }), dtype);
 		rt.setup(context);
 		rt.run();
 	}

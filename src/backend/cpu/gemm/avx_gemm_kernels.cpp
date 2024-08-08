@@ -75,6 +75,18 @@
 	vmulps(reg, ymm14, ymm14) \
 	vmulps(reg, ymm15, ymm15)
 
+#define ADD_BIAS_10x8xFP32(reg)\
+	vaddps(reg, ymm6, ymm6) \
+	vaddps(reg, ymm7, ymm7) \
+	vaddps(reg, ymm8, ymm8) \
+	vaddps(reg, ymm9, ymm9) \
+	vaddps(reg, ymm10, ymm10) \
+	vaddps(reg, ymm11, ymm11) \
+	vaddps(reg, ymm12, ymm12) \
+	vaddps(reg, ymm13, ymm13) \
+	vaddps(reg, ymm14, ymm14) \
+	vaddps(reg, ymm15, ymm15)
+
 #define LOAD_5x8xFP32()\
 	vmovups(mem(rcx), ymm1)\
 	add(r14, rcx)\
@@ -219,7 +231,7 @@ namespace ml
 	using namespace ml::cpu;
 
 	void gemm_avx_10x8_fp32(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,
-			bool use_relu) noexcept
+			const Fragment &bias, bool use_relu) noexcept
 	{
 		assert(A.dtype() == DTYPE_FLOAT32);
 		assert(B.dtype() == DTYPE_FLOAT32);
@@ -235,11 +247,13 @@ namespace ml
 		assert(cpu::is_aligned(A.data(), 32));
 		assert(cpu::is_aligned(B.data(), 32));
 		assert(beta_ptr != nullptr);
+		assert(cpu::is_aligned(bias.data(), 32));
 
 		const float *A_ptr = A.data<float>();
 		const float *B_ptr = B.data<float>();
 		const float *C_ptr = C.data<float>();
 		float *D_ptr = D.data<float>();
+		const float *bias_ptr = bias.is_packed() ? bias.data<float>() : nullptr;
 
 		const int K = A.rows();
 		uint64_t k_iter = K / 4;
@@ -290,6 +304,13 @@ namespace ml
 
 		SCALE_ACCUMULATORS_BY(ymm1)
 
+		movq(var(bias_ptr), rax)// load address of bias pointer
+		test(rax, rax)
+		je(AFTER_BIAS)
+		vmovaps(mem(rax), ymm2)// load bias
+		ADD_BIAS_10x8xFP32(ymm2)
+		label(AFTER_BIAS)
+
 		vxorps(ymm1, ymm1, ymm1)
 		vucomiss(xmm0, xmm1)// set ZF if beta == 0.
 		je(APPLY_RELU)// if not loading C, jump to ReLU
@@ -334,13 +355,14 @@ namespace ml
 				[D_stride] "m"(D_stride),
 				[alpha_ptr] "m"(alpha_ptr),
 				[beta_ptr] "m"(beta_ptr),
-				[flag_relu] "m"(flag_relu)
+				[flag_relu] "m"(flag_relu),
+				[bias_ptr] "m"(bias_ptr)
 				:// clobbers
 				"cc", "memory", "%ymm0", "%ymm1", "%ymm2", "%ymm3", "%ymm4", "%ymm5", "%ymm6", "%ymm7",
 				"%ymm8", "%ymm9", "%ymm10", "%ymm11", "%ymm12", "%ymm13", "%ymm14", "%ymm15", "%rax", "%rbx", "%rcx", "%r14")
 	}
 	void gemm_avx_10x8_fp32_fp16(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,
-			bool use_relu) noexcept
+			const Fragment &bias, bool use_relu) noexcept
 	{
 		assert(A.dtype() == DTYPE_FLOAT32);
 		assert(B.dtype() == DTYPE_FLOAT32);
@@ -356,11 +378,13 @@ namespace ml
 		assert(cpu::is_aligned(A.data(), 32));
 		assert(cpu::is_aligned(B.data(), 32));
 		assert(beta_ptr != nullptr);
+		assert(cpu::is_aligned(bias.data(), 32));
 
 		const float *A_ptr = A.data<float>();
 		const float *B_ptr = B.data<float>();
 		const float16 *C_ptr = C.data<float16>();
 		float16 *D_ptr = D.data<float16>();
+		const float *bias_ptr = bias.is_packed() ? bias.data<float>() : nullptr;
 
 		const int K = A.rows();
 		uint64_t k_iter = K / 4;
@@ -410,6 +434,13 @@ namespace ml
 
 		SCALE_ACCUMULATORS_BY(ymm1)
 
+		movq(var(bias_ptr), rax)// load address of bias pointer
+		test(rax, rax)
+		je(AFTER_BIAS)
+		vmovaps(mem(rax), ymm2)// load bias
+		ADD_BIAS_10x8xFP32(ymm2)
+		label(AFTER_BIAS)
+
 		vxorps(ymm1, ymm1, ymm1)
 		vucomiss(xmm0, xmm1)// set ZF if beta == 0.
 		je(APPLY_RELU)
@@ -456,7 +487,8 @@ namespace ml
 				[D_stride] "m"(D_stride),
 				[alpha_ptr] "m"(alpha_ptr),
 				[beta_ptr] "m"(beta_ptr),
-				[flag_relu] "m"(flag_relu)
+				[flag_relu] "m"(flag_relu),
+				[bias_ptr] "m"(bias_ptr)
 				:// clobbers
 				"cc", "memory", "%ymm0", "%ymm1", "%ymm2", "%ymm3", "%ymm4", "%ymm5", "%ymm6", "%ymm7",
 				"%ymm8", "%ymm9", "%ymm10", "%ymm11", "%ymm12", "%ymm13", "%ymm14", "%ymm15", "%rax", "%rbx", "%rcx", "%r14")

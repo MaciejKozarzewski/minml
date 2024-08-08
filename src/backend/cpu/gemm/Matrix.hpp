@@ -36,7 +36,6 @@ namespace ml
 					m_columns(columns),
 					m_stride(stride)
 			{
-				assert(ptr != nullptr);
 				assert(rows > 0);
 				assert(columns > 0);
 				assert(stride >= 0);
