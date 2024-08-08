@@ -27,7 +27,6 @@
 #include <minml/layers/LayerNormalization.hpp>
 #include <minml/layers/GlobalBroadcastHW.hpp>
 #include <minml/layers/GlobalPooling.hpp>
-#include <minml/layers/MLP.hpp>
 #include <minml/layers/MultiHeadAttention.hpp>
 #include <minml/layers/RMSNormalization.hpp>
 #include <minml/layers/Softmax.hpp>
@@ -247,7 +246,6 @@ namespace ml
 		static const GlobalBroadcastHW global_broadcast;
 		static const GlobalPooling global_pooling;
 		static const LayerNormalization layernorm;
-		static const MLP mlp(0);
 		static const MultiHeadAttention mha(0, 0);
 		static const Input input;
 		static const RMSNormalization rmsnorm;
@@ -271,8 +269,6 @@ namespace ml
 			result = global_pooling.clone(json);
 		if (name == layernorm.name())
 			result = layernorm.clone(json);
-		if (name == mlp.name())
-			result = mlp.clone(json);
 		if (name == mha.name())
 			result = mha.clone(json);
 		if (name == input.name())

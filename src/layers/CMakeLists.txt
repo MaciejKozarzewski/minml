@@ -7,7 +7,6 @@ target_sources(${LibName} PRIVATE 	Add.cpp
 								Input.cpp
 								Layer.cpp
 								LayerNormalization.cpp
-								MLP.cpp
 								MultiHeadAttention.cpp
 								Multiply.cpp
 								Parameter.cpp

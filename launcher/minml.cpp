@@ -19,6 +19,10 @@
 #include <minml/layers/GlobalPooling.hpp>
 #include <minml/layers/Add.hpp>
 #include <minml/layers/Softmax.hpp>
+#include <minml/layers/Multiply.hpp>
+#include <minml/layers/MultiHeadAttention.hpp>
+#include <minml/layers/RMSNormalization.hpp>
+#include <minml/layers/LayerNormalization.hpp>
 #include <minml/training/Optimizer.hpp>
 #include <minml/training/LossFunction.hpp>
 #include <minml/utils/random.hpp>
@@ -73,9 +77,21 @@ class MNIST
 		{
 			assert(input.firstDim() == target.firstDim());
 			const int sample_size = sizeof(float) * 28 * 28;
+			Tensor storage(input.shape(), input.dtype(), Device::cpu());
 			for (int i = 0; i < input.firstDim(); i++)
 			{
 				const int index = (sample_index == -1) ? randInt(train_images.firstDim()) : sample_index;
+
+//				for (int h = 0; h < 28; h++)
+//					for (int w = 0; w < 28; w++)
+//					{
+//						const int h0 = h / 4;
+//						const int h1 = h % 4;
+//						const int w0 = w / 4;
+//						const int w1 = w % 4;
+//						storage.set(train_images.get( { index, h * 28 + w }), { i, h0, w0, h1 * 4 + w1 });
+//					}
+
 				if (input.dtype() == DataType::FLOAT32)
 					ml::memcpy(input.device(), input.data(), i * sample_size, Device::cpu(), train_images.data(), index * sample_size, sample_size);
 				else
@@ -89,6 +105,7 @@ class MNIST
 				const int label = train_labels.get( { index });
 				target.set(1.0f, { i, label });
 			}
+//			input.copyFromHost(storage.data(), input.sizeInBytes());
 		}
 	private:
 		Tensor load_images(const std::string &path, int n)
@@ -508,17 +525,42 @@ void test_mnist()
 //	x = model.add(Add("relu"), { x, y });
 //	x = model.add(Conv2D(31, 1, "relu"), x);
 
-	x = model.add(Dense(32, "linear").useBias(true), x);
-	x = model.add(BatchNormalization("relu").useGamma(true), x);
+	x = model.add(Conv2D(8, 1, "relu"), x);
+//	x = model.add(LayerNormalization().useGamma(false), x);
 	x = model.add(Dense(10, "linear"), x);
 	x = model.add(Softmax( { 1 }), x);
 	model.addOutput(x);
 
+//	const int embedding = 512;
+//
+//	auto x = model.addInput( { batch_size, 7, 7, 16 });
+//	x = model.add(Conv2D(embedding, 1).useBias(false), x);
+//
+//	for (int i = 0; i < 1; i++)
+//	{
+//		auto y = model.add(LayerNormalization(), x);
+//		y = model.add(Conv2D(3 * embedding, 1).useBias(false), y);
+//		y = model.add(MultiHeadAttention(16, 7), y);
+//		y = model.add(Conv2D(embedding, 1).useBias(false), y);
+//		x = model.add(Add(), { x, y });
+//
+//		y = model.add(LayerNormalization(), x);
+//		y = model.add(Conv2D(embedding, 1, "relu"), y);
+//		y = model.add(Conv2D(embedding, 1), y);
+//		x = model.add(Add(), { x, y });
+//	}
+//
+//	x = model.add(GlobalPooling(), x);
+//	x = model.add(Dense(10), x);
+//	x = model.add(Softmax( { 1 }), x);
+//	model.addOutput(x);
+
+	const float learning_rate = 1.0e-3f;
 	model.init();
-	model.setOptimizer(Optimizer(1.0e-3f));
-	model.setRegularizer(Regularizer(1.0e-4f));
-//	model.moveTo(Device::cuda(1));
-	model.moveTo(Device::cpu());
+	model.setOptimizer(Optimizer(learning_rate));
+//	model.setRegularizer(Regularizer(1.0e-4f));
+//	model.moveTo(Device::cpu());
+	model.moveTo(Device::cuda(0));
 	model.print();
 
 //	model.forward(1);
@@ -545,11 +587,11 @@ void test_mnist()
 //	model.setRegularizer(RegularizerL2(0.0001f));
 //	model.moveTo(Device::cuda(1));
 
-	const int steps = 100;
-	for (int e = 0; e < 100; e++)
+	const int steps = 1000;
+	for (int e = 0; e < 150; e++)
 	{
-		if (e == 75)
-			model.setLearningRate(1.0e-4f);
+		if (e == 100)
+			model.setLearningRate(learning_rate / 10.0f);
 		double loss = 0.0;
 		double acc = 0.0;
 		for (int s = 0; s < steps; s++)
@@ -2597,7 +2639,7 @@ void test_packing(int rows, int columns, ml::MatrixOp op)
 }
 
 void test_microkernel(const int M, const int N, const int K, mlDataType_t dtype,
-		std::function<void(Fragment&, const void*, const Fragment&, const Fragment&, const void*, const Fragment&, bool)> kernel)
+		std::function<void(Fragment&, const void*, const Fragment&, const Fragment&, const void*, const Fragment&, const Fragment&, bool)> kernel)
 {
 	std::unique_ptr<float[]> matrix_c = std::make_unique<float[]>(1024 * 1024);
 	std::unique_ptr<float[]> matrix_d = std::make_unique<float[]>(1024 * 1024);
@@ -2607,19 +2649,23 @@ void test_microkernel(const int M, const int N, const int K, mlDataType_t dtype,
 	const size_t size_in_bytes_rhs = sizeof(float) * N * K;
 	void *lhs = gemm::aligned_new(size_in_bytes_lhs, 4096);
 	void *rhs = gemm::aligned_new(size_in_bytes_rhs, 4096);
+	void *b_ptr = gemm::aligned_new(sizeof(float) * 1024, 4096);
 	std::memset(lhs, 0, size_in_bytes_lhs);
 	std::memset(rhs, 0, size_in_bytes_rhs);
+	std::memset(b_ptr, 0, sizeof(float) * 1024);
 
 	Fragment fragment_a(lhs, DTYPE_FLOAT32, M);
 	Fragment fragment_b(rhs, fragment_a.dtype(), N);
 	Fragment fragment_c(matrix_c.get(), dtype, 1024);
 	Fragment fragment_d(matrix_d.get(), fragment_c.dtype(), 1024);
 	Fragment correct_fragment_d(correct_d.get(), fragment_d.dtype(), 1024);
+	Fragment fragment_bias(b_ptr, fragment_b.dtype(), N);
 	fragment_a.mark_as_packed_with_size( { K, M });
 	fragment_b.mark_as_packed_with_size( { K, N });
 	fragment_c.mark_as_packed_with_size( { M, N });
 	fragment_d.mark_as_packed_with_size( { M, N });
 	correct_fragment_d.mark_as_packed_with_size( { M, N });
+	fragment_bias.mark_as_packed_with_size( { 1, N });
 
 	if (fragment_c.dtype() == DTYPE_FLOAT16)
 		for (int m = 0; m < M; m++)
@@ -2647,14 +2693,21 @@ void test_microkernel(const int M, const int N, const int K, mlDataType_t dtype,
 				fragment_b.at<float>(k, n) = randFloat() - 0.5f;
 	}
 
+	if (fragment_bias.dtype() == DTYPE_FLOAT16)
+		for (int n = 0; n < N; n++)
+			fragment_bias.at<float>(0, n) = float_to_half(randFloat() - 0.5f);
+	else
+		for (int n = 0; n < N; n++)
+			fragment_bias.at<float>(0, n) = randFloat() - 0.5f;
+
 	const float alpha = 1.1f;
 	const float beta = 0.1f;
 	const bool use_relu = true;
 
 	if (fragment_c.dtype() == DTYPE_FLOAT32)
-		gemm_def_MxN_fp32(correct_fragment_d, &alpha, fragment_a, fragment_b, &beta, fragment_c, use_relu);
+		gemm_def_MxN_fp32(correct_fragment_d, &alpha, fragment_a, fragment_b, &beta, fragment_c, fragment_bias, use_relu);
 	if (fragment_c.dtype() == DTYPE_FLOAT16)
-		gemm_def_MxN_fp32_fp16(correct_fragment_d, &alpha, fragment_a, fragment_b, &beta, fragment_c, use_relu);
+		gemm_def_MxN_fp32_fp16(correct_fragment_d, &alpha, fragment_a, fragment_b, &beta, fragment_c, fragment_bias, use_relu);
 
 //	std::cout << "Correct\n";
 //	for (int m = 0; m < M; m++)
@@ -2667,9 +2720,9 @@ void test_microkernel(const int M, const int N, const int K, mlDataType_t dtype,
 //		std::cout << '\n';
 //	}
 //	std::cout << "-------------------------------------------\n";
-
-	kernel(fragment_d, &alpha, fragment_a, fragment_b, &beta, fragment_c, use_relu);
-
+//
+//	kernel(fragment_d, &alpha, fragment_a, fragment_b, &beta, fragment_c, fragment_bias, use_relu);
+//
 //	std::cout << "Actual\n";
 //	for (int m = 0; m < M; m++)
 //	{
@@ -2680,23 +2733,23 @@ void test_microkernel(const int M, const int N, const int K, mlDataType_t dtype,
 //				std::cout << fragment_d.at<float>(m, n) << ' ';
 //		std::cout << '\n';
 //	}
-
-	double diff = 0.0;
-	for (int m = 0; m < M; m++)
-		for (int n = 0; n < N; n++)
-			if (fragment_d.dtype() == DTYPE_FLOAT16)
-				diff += std::fabs(half_to_float(correct_fragment_d.at<uint16_t>(m, n)) - half_to_float(fragment_d.at<uint16_t>(m, n)));
-			else
-				diff += std::fabs(correct_fragment_d.at<float>(m, n) - fragment_d.at<float>(m, n));
-	if (diff > 1.0e-3)
-		std::cout << "\ndiff = " << diff / (M * K) << '\n';
+//
+//	double diff = 0.0;
+//	for (int m = 0; m < M; m++)
+//		for (int n = 0; n < N; n++)
+//			if (fragment_d.dtype() == DTYPE_FLOAT16)
+//				diff += std::fabs(half_to_float(correct_fragment_d.at<uint16_t>(m, n)) - half_to_float(fragment_d.at<uint16_t>(m, n)));
+//			else
+//				diff += std::fabs(correct_fragment_d.at<float>(m, n) - fragment_d.at<float>(m, n));
+//	if (diff > 1.0e-3)
+//		std::cout << "\ndiff = " << diff / (M * K) << '\n';
 
 	const double repeats = 1.0e8;
 	const double start = getTime();
 	int i = 0;
 	for (; i < repeats; i++)
 	{
-		kernel(fragment_d, &alpha, fragment_a, fragment_b, &beta, fragment_c, use_relu);
+		kernel(fragment_d, &alpha, fragment_a, fragment_b, &beta, fragment_c, fragment_bias, use_relu);
 		if ((getTime() - start) > 10.0)
 			break;
 	}
@@ -3013,6 +3066,105 @@ int main()
 {
 	std::cout << "BEGIN" << std::endl;
 	std::cout << ml::Device::hardwareInfo();
+
+	test_mnist();
+	return 0;
+
+	if (false)
+	{
+		Graph graph;
+		const int batch_size = 8;
+		const int embedding = 512;
+
+		auto x = graph.addInput( { batch_size, 15, 15, 32 });
+
+		x = graph.add(Conv2D(embedding, 5), x);
+
+		for (int i = 0; i < 8; i++)
+		{
+			if (i % 4 == 0)
+			{
+				auto y = graph.add(ml::LayerNormalization(), x);
+				y = graph.add(ml::Conv2D(3 * embedding, 1).useBias(false), y);
+				y = graph.add(ml::MultiHeadAttention(embedding / 16, 15), y);
+				y = graph.add(ml::Conv2D(embedding, 1).useBias(false), y);
+				x = graph.add(ml::Add(), { x, y });
+			}
+
+			auto y = graph.add(Conv2D(embedding / 2, 1, "relu"), x);
+			y = graph.add(Conv2D(embedding / 2, 3, "relu"), y);
+			x = graph.add(Conv2D(embedding, 3, "relu"), { y, x });
+		}
+
+		auto p = graph.add(ml::Conv2D(embedding, 3, "relu"), x);
+		p = graph.add(ml::Conv2D(1, 1, "linear"), p);
+		p = graph.add(ml::Softmax( { 1, 2, 3 }), p);
+		graph.addOutput(p);
+
+		auto v = graph.add(ml::Conv2D(4, 1, "relu"), x);
+		v = graph.add(ml::Dense(256, "relu"), v);
+		v = graph.add(ml::Dense(3, "linear"), v);
+		v = graph.add(ml::Softmax( { 1 }), v);
+		graph.addOutput(v);
+
+		graph.print();
+
+		graph.init();
+		graph.moveTo(Device::cpu());
+
+		Tensor input(graph.getInputShape(), graph.dtype(), Device::cpu());
+		for (int i = 0; i < input.shape().volumeWithoutLastDim(); i++)
+		{
+			if (input.dtype() == DataType::FLOAT32)
+			{
+				float *ptr = reinterpret_cast<float*>(input.data()) + i * 8;
+				ptr[0] = 1.0f;
+				ptr[3] = 1.0f;
+				ptr[4] = 1.0f;
+			}
+			if (input.dtype() == DataType::FLOAT16)
+			{
+				uint16_t *ptr = reinterpret_cast<uint16_t*>(input.data()) + i * 8;
+				ptr[0] = 0x3c00;
+				ptr[3] = 0x3c00;
+				ptr[4] = 0x3c00;
+			}
+		}
+		graph.getInput().copyFrom(graph.context(), input);
+		graph.forward(1);
+		graph.context().synchronize();
+//		graph.backward(1);
+//		graph.learn();
+//		graph.context().synchronize();
+
+		std::this_thread::sleep_for(std::chrono::milliseconds(200));
+
+		graph.forward(batch_size);
+		graph.context().synchronize();
+		std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+//		graph.backward(batch_size);
+//		graph.learn();
+//		graph.context().synchronize();
+
+		std::cout << "starting benchmark\n";
+		const double start = getTime();
+		int repeats = 0;
+		for (; repeats < 10000; repeats++)
+		{
+			graph.forward(batch_size);
+			graph.context().synchronize();
+			if ((getTime() - start) > 30.0)
+				break;
+		}
+		const double stop = getTime();
+		const double time = stop - start;
+		std::cout << "time = " << time << "s, repeats = " << repeats << ", n/s = " << batch_size * repeats / time << "\n";
+
+		for (int i = 0; i < graph.numberOfOutputs(); i++)
+			std::cout << testing::normForTest(graph.getOutput(i)) / graph.getOutputShape(i).volume() << '\n';
+		return 0;
+	}
 
 //	std::cout << "Detailed properties" << std::endl;
 //	opencl_print_device_features(0);
@@ -3332,20 +3484,20 @@ int main()
 //		test_packing(i, 10, ml::MatrixOp::NORMAL);
 //		test_packing(i, 10, ml::MatrixOp::TRANSPOSE);
 //	}
-//	std::cout << "FP32 kernels\n";
+	std::cout << "FP32 kernels\n";
 //	std::cout << "SSE2\n";
 //	for (int i = 1; i <= 1024; i *= 2)
 //		test_microkernel(4, 8, i, DTYPE_FLOAT32, gemm_sse2_4x8_fp32);
 //	std::cout << "AVX\n";
 //	for (int i = 1; i <= 1024; i *= 2)
 //		test_microkernel(10, 8, i, DTYPE_FLOAT32, gemm_avx_10x8_fp32);
-//	std::cout << "AVX2\n";
-//	for (int i = 1; i <= 1024; i *= 2)
-//		test_microkernel(12, 8, i, DTYPE_FLOAT32, gemm_avx2_fma_12x8_fp32);
+	std::cout << "AVX2\n";
+	for (int i = 1; i <= 1024; i *= 2)
+		test_microkernel(12, 8, i, DTYPE_FLOAT32, gemm_avx2_fma_12x8_fp32);
 //	std::cout << "AVX512\n";
 //	for (int i = 1; i <= 1024; i *= 2)
 //		test_microkernel(24, 16, i, DTYPE_FLOAT32, gemm_avx512f_24x16_fp32);
-//
+
 //	std::cout << "FP16 kernels\n";
 //	std::cout << "AVX\n";
 //	for (int i = 1; i <= 1024; i *= 2)
@@ -3356,8 +3508,8 @@ int main()
 //	std::cout << "AVX512\n";
 //	for (int i = 1; i <= 1024; i *= 2)
 //		test_microkernel(24, 16, i, DTYPE_FLOAT16, gemm_avx512f_24x16_fp32_fp16);
-//
-//	return 0;
+
+	return 0;
 
 //	test_microkernel(24, 4, 64);
 //	test_microkernel(24, 4, 128);
@@ -3579,6 +3731,7 @@ int main()
 //	ml::cpu::cpu_x86 prop;
 //	prop.print();
 
+	if (false)
 	{
 		Device::setNumberOfThreads(1);
 		const int batch_size = 32;
