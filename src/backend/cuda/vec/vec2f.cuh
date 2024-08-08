@@ -208,6 +208,12 @@ namespace vectors2
 		return fmin(a.x0, a.x1);
 	}
 
+	DEVICE_INLINE void atomic_add(float *address, const vec2f &value)
+	{
+		atomicAdd(address + 0, value.x0);
+		atomicAdd(address + 1, value.x1);
+	}
+
 } /* namespace vectors */
 
 #endif /* BACKEND_CUDA_VEC_VEC2F_CUH_ */

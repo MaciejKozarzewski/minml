@@ -709,7 +709,7 @@ namespace ml
 	TEST(TestLayerNorm, backward)
 	{
 		const int batch_size = 123;
-		const int filters = 44;
+		const int filters = 43;
 		Context context;
 
 		Tensor input( { batch_size, filters }, "float32", Device::cpu());
@@ -717,14 +717,13 @@ namespace ml
 		Tensor gradient_next(input.shape(), "float32", Device::cpu());
 
 		Tensor weight( { filters }, "float32", Device::cpu());
-		Tensor bias( { filters }, "float32", Device::cpu());
 
 		Tensor weight_update( { filters }, "float32", Device::cpu());
 		Tensor bias_update( { filters }, "float32", Device::cpu());
 
 		testing::initForTest(input, 0.0f);
 		testing::initForTest(gradient_next, 1.57f);
-		testing::initForTest(weight, 0.0f);
+		testing::initForTest(weight, 0.1f);
 		add_scalar_to_tensor(weight, 1.1f);
 
 		testing::initForTest(weight_update, 0.1f);
@@ -756,7 +755,6 @@ namespace ml
 			gradient_prev.moveTo(device);
 			gradient_next.moveTo(device);
 			weight.moveTo(device);
-			bias.moveTo(device);
 
 			weight_update.moveTo(device);
 			bias_update.moveTo(device);
@@ -775,7 +773,7 @@ namespace ml
 	TEST(TestRMSNorm, forward)
 	{
 		const int batch_size = 123;
-		const int filters = 44;
+		const int filters = 43;
 		Context context;
 
 		Tensor input( { batch_size, filters }, "float32", Device::cpu());
@@ -813,7 +811,7 @@ namespace ml
 	TEST(TestRMSNorm, backward)
 	{
 		const int batch_size = 123;
-		const int filters = 44;
+		const int filters = 43;
 		Context context;
 
 		Tensor input( { batch_size, filters }, "float32", Device::cpu());
