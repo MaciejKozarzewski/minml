@@ -194,37 +194,11 @@ namespace ml
 
 				if (input.size() == 2)
 				{
-					output.copyFrom(context(), input[1]);
-					gemm(context(), 'n', 't', output_matrix, input_matrix, weight_matrix, 1, 1);
-					if (isUsingBias())
-						addBiasAct(context(), output, output, getBias().getParam(), m_activation);
-					else
-						activationForward(context(), output, output, m_activation);
+					const Tensor add = input[1].view(output_matrix.shape());
+					gemm_ex(context(), output_matrix, 1, 'n', input_matrix, 't', weight_matrix, 1, add, getBias().getParam(), m_activation);
 				}
 				else
-				{
-					if (device().isCPU() and isUsingBias())
-					{
-						const float beta = isUsingBias() ? 1.0f : 0.0f;
-						if (m_activation == ActivationType::RELU or m_activation == ActivationType::LINEAR)
-							gemm_ex(context(), output_matrix, 1.0f, 'n', input_matrix, 't', weight_matrix, beta, getBias().getParam(), Tensor(),
-									m_activation);
-						else
-						{
-							gemm_ex(context(), output_matrix, 1.0f, 'n', input_matrix, 't', weight_matrix, beta, getBias().getParam(), Tensor(),
-									ActivationType::LINEAR);
-							activationForward(context(), output, output, m_activation);
-						}
-					}
-					else
-					{
-						gemm(context(), 'n', 't', output_matrix, input_matrix, weight_matrix, 1, 0);
-						if (isUsingBias())
-							addBiasAct(context(), output, output, getBias().getParam(), m_activation);
-						else
-							activationForward(context(), output, output, m_activation);
-					}
-				}
+					gemm_ex(context(), output_matrix, 1, 'n', input_matrix, 't', weight_matrix, 0, output_matrix, getBias().getParam(), m_activation);
 
 				break;
 			}

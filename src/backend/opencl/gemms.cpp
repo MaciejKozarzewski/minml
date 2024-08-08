@@ -123,6 +123,15 @@ namespace ml
 	void opencl_gemm_ex(mlContext_t context, mlDataType_t dtype, mlShape_t shape_D, void *D, float alpha, char opA, mlShape_t shape_A, const void *A,
 			char opB, mlShape_t shape_B, const void *B, float beta, mlShape_t shape_C, const void *C, const void *bias, mlActivationType_t act)
 	{
+		if (C != D and beta != 0.0f)
+			opencl_memcpy_within_device(context, D, 0, C, 0, volume(shape_D) * size_of(dtype));
+
+		opencl_gemm(context, dtype, shape_D, D, shape_A, A, shape_B, B, opA, opB, alpha, beta);
+
+		if (bias == nullptr)
+			opencl_activation_forward(context, dtype, shape_D, D, D, act);
+		else
+			opencl_add_bias_act(context, dtype, shape_D, D, D, bias, act);
 	}
 } /* namespace ml */
 
