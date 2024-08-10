@@ -9,25 +9,119 @@
 #define BACKEND_CUDA_VEC_CONVERT_CUH_
 
 #include "utils.cuh"
+#include "vec1f.cuh"
+#include "vec2f.cuh"
 #include "vec4f.cuh"
+#include "vec1h.cuh"
+#include "vec2h.cuh"
 #include "vec4h.cuh"
+#include "vec8h.cuh"
 
 #include <cuda_runtime_api.h>
 #include <cuda_fp16.h>
 
-#include <cassert>
-#include <cmath>
-
 namespace vectors2
 {
 
-	HOST_DEVICE_INLINE vec4f convert_to_fp32(vec4h a)
+	template<typename T, typename U, int N>
+	DEVICE_INLINE vec<T, N> convert(const vec<U, N> &a);
+
+	template<>
+	DEVICE_INLINE vec<float, 1> convert(const vec<float, 1> &a)
 	{
-		return vec4f(__half2float(a.x0.x), __half2float(a.x0.y), __half2float(a.x1.x), __half2float(a.x1.y));
+		return a;
 	}
-	HOST_DEVICE_INLINE vec4h convert_to_fp16(vec4f a)
+	template<>
+	DEVICE_INLINE vec<float, 2> convert(const vec<float, 2> &a)
 	{
-		return vec4h(__float2half(a.x0), __float2half(a.x1), __float2half(a.x2), __float2half(a.x3));
+		return a;
+	}
+	template<>
+	DEVICE_INLINE vec<float, 4> convert(const vec<float, 4> &a)
+	{
+		return a;
+	}
+	template<>
+	DEVICE_INLINE vec<half, 1> convert(const vec<half, 1> &a)
+	{
+		return a;
+	}
+	template<>
+	DEVICE_INLINE vec<half, 2> convert(const vec<half, 2> &a)
+	{
+		return a;
+	}
+	template<>
+	DEVICE_INLINE vec<half, 4> convert(const vec<half, 4> &a)
+	{
+		return a;
+	}
+	template<>
+	DEVICE_INLINE vec<half, 8> convert(const vec<half, 8> &a)
+	{
+		return a;
+	}
+
+	/*
+	 * fp16 -> fp32 vector conversion
+	 */
+	template<>
+	DEVICE_INLINE vec<float, 1> convert(const vec<half, 1> &a)
+	{
+#if __CUDA_ARCH__ >= FP16_STORAGE_MIN_ARCH
+		return vec<float, 1>(__half2float(a.x0));
+#else
+		return vec<float, 1> { };
+#endif
+	}
+	template<>
+	DEVICE_INLINE vec<float, 2> convert(const vec<half, 2> &a)
+	{
+#if __CUDA_ARCH__ >= FP16_STORAGE_MIN_ARCH
+		return vec<float, 2>(__half2float(a.x0.x), __half2float(a.x0.y));
+#else
+		return vec<float, 2> { };
+#endif
+	}
+	template<>
+	DEVICE_INLINE vec<float, 4> convert(const vec<half, 4> &a)
+	{
+#if __CUDA_ARCH__ >= FP16_STORAGE_MIN_ARCH
+		return vec<float, 4>(__half2float(a.x0.x), __half2float(a.x0.y), __half2float(a.x1.x), __half2float(a.x1.y));
+#else
+		return vec<float, 4> { };
+#endif
+	}
+
+	/*
+	 * fp32 -> fp16 vector conversion
+	 */
+	template<>
+	DEVICE_INLINE vec<half, 1> convert(const vec<float, 1> &a)
+	{
+#if __CUDA_ARCH__ >= FP16_STORAGE_MIN_ARCH
+		return vec<half, 1>(__float2half(a.x0));
+#else
+		return vec<half, 1> { };
+#endif
+	}
+	template<>
+	DEVICE_INLINE vec<half, 2> convert(const vec<float, 2> &a)
+	{
+#if __CUDA_ARCH__ >= FP16_STORAGE_MIN_ARCH
+		return vec<half, 2>(__float2half(a.x0), __float2half(a.x1));
+#else
+		return vec<half, 2> { };
+#endif
+	}
+	template<>
+	DEVICE_INLINE vec<half, 4> convert(const vec<float, 4> &a)
+	{
+#if __CUDA_ARCH__ >= FP16_STORAGE_MIN_ARCH
+		return vec<half, 4>(__float2half(a.x0), __float2half(a.x1), __float2half(a.x2), __float2half(a.x3));
+#else
+		return vec<half, 4> { };
+#endif
 	}
 
 } /* namespace vectors2 */

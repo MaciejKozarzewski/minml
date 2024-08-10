@@ -24,10 +24,10 @@
 
 namespace vectors2
 {
-	template<typename T>
+	template<int N>
 	HOST_DEVICE bool is_aligned(const void *ptr)
 	{
-		return (reinterpret_cast<std::uintptr_t>(ptr) % sizeof(T)) == 0;
+		return (reinterpret_cast<std::uintptr_t>(ptr) % N) == 0;
 	}
 
 	HOST_DEVICE_INLINE uint32_t as_uint(float x)
@@ -40,6 +40,11 @@ namespace vectors2
 		assert(sizeof(x) == sizeof(uint32_t));
 		return reinterpret_cast<uint32_t*>(&x)[0];
 	}
+	HOST_DEVICE_INLINE uint16_t as_uint(half x)
+	{
+		assert(sizeof(x) == sizeof(uint16_t));
+		return reinterpret_cast<uint16_t*>(&x)[0];
+	}
 	HOST_DEVICE_INLINE float as_float(uint32_t x)
 	{
 		assert(sizeof(x) == sizeof(float));
@@ -50,6 +55,11 @@ namespace vectors2
 		assert(sizeof(x) == sizeof(half2));
 		return reinterpret_cast<half2*>(&x)[0];
 	}
+	HOST_DEVICE_INLINE half as_half(uint16_t x)
+	{
+		assert(sizeof(x) == sizeof(half));
+		return reinterpret_cast<half*>(&x)[0];
+	}
 
 	HOST_DEVICE_INLINE float bit_invert(float x)
 	{
@@ -58,6 +68,10 @@ namespace vectors2
 	HOST_DEVICE_INLINE half2 bit_invert(half2 x)
 	{
 		return as_half2(~as_uint(x));
+	}
+	HOST_DEVICE_INLINE half bit_invert(half x)
+	{
+		return as_half(~as_uint(x));
 	}
 
 } /* namespace vectors2 */

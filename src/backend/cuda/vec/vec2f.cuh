@@ -50,13 +50,11 @@ namespace vectors2
 			HOST_DEVICE void load(const float *__restrict__ ptr)
 			{
 				assert(ptr != nullptr);
-				assert(is_aligned<vec2f>(ptr));
 				*this = reinterpret_cast<const vec2f*>(ptr)[0];
 			}
 			HOST_DEVICE void store(float *__restrict__ ptr) const
 			{
 				assert(ptr != nullptr);
-				assert(is_aligned<vec2f>(ptr));
 				reinterpret_cast<vec2f*>(ptr)[0] = *this;
 			}
 			HOST_DEVICE void partial_load(const float *__restrict__ ptr, int num)
@@ -113,97 +111,97 @@ namespace vectors2
 			}
 	};
 
-	HOST_DEVICE_INLINE vec2f operator+(const vec2f &lhs, const vec2f &rhs)
+	DEVICE_INLINE vec2f operator+(const vec2f &lhs, const vec2f &rhs)
 	{
 		return vec2f(lhs.x0 + rhs.x0, lhs.x1 + rhs.x1);
 	}
-	HOST_DEVICE_INLINE vec2f operator-(const vec2f &lhs, const vec2f &rhs)
+	DEVICE_INLINE vec2f operator-(const vec2f &lhs, const vec2f &rhs)
 	{
 		return vec2f(lhs.x0 - rhs.x0, lhs.x1 - rhs.x1);
 	}
-	HOST_DEVICE_INLINE vec2f operator*(const vec2f &lhs, const vec2f &rhs)
+	DEVICE_INLINE vec2f operator*(const vec2f &lhs, const vec2f &rhs)
 	{
 		return vec2f(lhs.x0 * rhs.x0, lhs.x1 * rhs.x1);
 	}
-	HOST_DEVICE_INLINE vec2f operator/(const vec2f &lhs, const vec2f &rhs)
+	DEVICE_INLINE vec2f operator/(const vec2f &lhs, const vec2f &rhs)
 	{
 		return vec2f(lhs.x0 / rhs.x0, lhs.x1 / rhs.x1);
 	}
 
-	HOST_DEVICE_INLINE vec2f abs(const vec2f &a)
+	DEVICE_INLINE vec2f abs(const vec2f &a)
 	{
 		return vec2f(fabsf(a.x0), fabsf(a.x1));
 	}
-	HOST_DEVICE_INLINE vec2f max(const vec2f &a, const vec2f &b)
+	DEVICE_INLINE vec2f max(const vec2f &a, const vec2f &b)
 	{
 		return vec2f(fmax(a.x0, b.x0), fmax(a.x1, b.x1));
 	}
-	HOST_DEVICE_INLINE vec2f min(const vec2f &a, const vec2f &b)
+	DEVICE_INLINE vec2f min(const vec2f &a, const vec2f &b)
 	{
 		return vec2f(fmin(a.x0, b.x0), fmin(a.x1, b.x1));
 	}
-	HOST_DEVICE_INLINE vec2f ceil(const vec2f &a)
+	DEVICE_INLINE vec2f ceil(const vec2f &a)
 	{
 		return vec2f(ceilf(a.x0), ceilf(a.x1));
 	}
-	HOST_DEVICE_INLINE vec2f floor(const vec2f &a)
+	DEVICE_INLINE vec2f floor(const vec2f &a)
 	{
 		return vec2f(floorf(a.x0), floorf(a.x1));
 	}
-	HOST_DEVICE_INLINE vec2f sqrt(const vec2f &a)
+	DEVICE_INLINE vec2f sqrt(const vec2f &a)
 	{
 		return vec2f(sqrtf(a.x0), sqrtf(a.x1));
 	}
-	HOST_DEVICE_INLINE vec2f pow(const vec2f &a, const vec2f &b)
+	DEVICE_INLINE vec2f pow(const vec2f &a, const vec2f &b)
 	{
 		return vec2f(powf(a.x0, b.x0), powf(a.x1, b.x1));
 	}
-	HOST_DEVICE_INLINE vec2f mod(const vec2f &a, const vec2f &b)
+	DEVICE_INLINE vec2f mod(const vec2f &a, const vec2f &b)
 	{
 		return vec2f(fmodf(a.x0, b.x0), fmodf(a.x1, b.x1));
 	}
-	HOST_DEVICE_INLINE vec2f exp(const vec2f &a)
+	DEVICE_INLINE vec2f exp(const vec2f &a)
 	{
 		return vec2f(expf(a.x0), expf(a.x1));
 	}
-	HOST_DEVICE_INLINE vec2f log(const vec2f &a)
+	DEVICE_INLINE vec2f log(const vec2f &a)
 	{
 		return vec2f(logf(a.x0), logf(a.x1));
 	}
-	HOST_DEVICE_INLINE vec2f tanh(const vec2f &a)
+	DEVICE_INLINE vec2f tanh(const vec2f &a)
 	{
 		return vec2f(tanhf(a.x0), tanhf(a.x1));
 	}
-	HOST_DEVICE_INLINE vec2f expm1(const vec2f &a)
+	DEVICE_INLINE vec2f expm1(const vec2f &a)
 	{
 		return vec2f(expm1f(a.x0), expm1f(a.x1));
 	}
-	HOST_DEVICE_INLINE vec2f log1p(const vec2f &a)
+	DEVICE_INLINE vec2f log1p(const vec2f &a)
 	{
 		return vec2f(log1pf(a.x0), log1pf(a.x1));
 	}
-	HOST_DEVICE_INLINE vec2f sin(const vec2f &a)
+	DEVICE_INLINE vec2f sin(const vec2f &a)
 	{
 		return vec2f(sinf(a.x0), sinf(a.x1));
 	}
-	HOST_DEVICE_INLINE vec2f cos(const vec2f &a)
+	DEVICE_INLINE vec2f cos(const vec2f &a)
 	{
 		return vec2f(cosf(a.x0), cosf(a.x1));
 	}
-	HOST_DEVICE_INLINE vec2f tan(const vec2f &a)
+	DEVICE_INLINE vec2f tan(const vec2f &a)
 	{
 		return vec2f(tanf(a.x0), tanf(a.x1));
 	}
 
-	HOST_DEVICE_INLINE float horizontal_add(const vec2f &a)
+	DEVICE_INLINE float horizontal_add(const vec2f &a)
 	{
 		return a.x0 + a.x1;
 	}
-	HOST_DEVICE_INLINE float horizontal_max(const vec2f &a)
+	DEVICE_INLINE float horizontal_max(const vec2f &a)
 	{
 		return fmax(a.x0, a.x1);
 	}
-	HOST_DEVICE_INLINE float horizontal_min(const vec2f &a)
+	DEVICE_INLINE float horizontal_min(const vec2f &a)
 	{
 		return fmin(a.x0, a.x1);
 	}

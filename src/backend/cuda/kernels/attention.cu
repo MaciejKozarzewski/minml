@@ -30,7 +30,7 @@ namespace
 	};
 
 	template<typename T>
-	__device__ T clamp(T x, T lower, T upper)
+	__host__ __device__ T clamp(T x, T lower, T upper)
 	{
 		assert(lower <= upper);
 		return max(lower, min(upper, x));
@@ -184,9 +184,14 @@ namespace
 		const int head_idx = blockIdx.y;
 		const int tokens = height * width;
 
-		float *workspace = reinterpret_cast<float*>(shared_array);
-		float *storage = workspace + weights_size * round_up(weights_size, 4);
-		Index2D *indices = reinterpret_cast<Index2D*>(storage + 4);
+		float *shared_weight_update = reinterpret_cast<float*>(shared_array);
+		float *shared_output = shared_weight_update + weights_size * round_up(weights_size, 4);
+		float *shared_gradient = shared_output + tokens;
+		Index2D *indices = reinterpret_cast<Index2D*>(shared_gradient + tokens);
+
+		__shared__ cg::block_tile_memory<128> btm;
+		cg::thread_block thb = cg::this_thread_block(btm);
+		cg::thread_block_tile<128> tile = cg::tiled_partition<128>(thb);
 
 		for (int i = threadIdx.x; i < tokens; i += blockDim.x)
 		{
@@ -194,7 +199,7 @@ namespace
 			indices[i].y = i - indices[i].x * width;
 		}
 		for (int i = threadIdx.x; i < weights_size * round_up(weights_size, 4); i += blockDim.x)
-			workspace[i] = 0.0f;
+			shared_weight_update[i] = 0.0f;
 		__syncthreads();
 
 		const Indexer<4> gradient_indexer(batch_size, num_heads, tokens, tokens);
@@ -205,23 +210,14 @@ namespace
 
 			float local_sum = 0.0f;
 			for (int j = threadIdx.x; j < tokens; j += blockDim.x)
-				local_sum += output[idx + j] * gradient[idx + j];
-
-			__syncthreads();
-			for (int k = 16; k >= 1; k /= 2)
-				local_sum += __shfl_xor_sync(0xffffffff, local_sum, k);
-			if (threadIdx.x % 32 == 0)
-				storage[threadIdx.x / 32] = local_sum;
-			__syncthreads();
-			if (threadIdx.x == 0)
 			{
-				local_sum = 0.0f;
-				for (int k = 0; k < blockDim.x / 32; k++)
-					local_sum += storage[k];
-				storage[0] = local_sum;
+				const float out = output[idx + j];
+				const float grad = gradient[idx + j];
+				local_sum += out * grad;
+				shared_output[j] = out;
+				shared_gradient[j] = grad;
 			}
-			__syncthreads();
-			local_sum = storage[0];
+			local_sum = cg::reduce(tile, local_sum, cg::plus<float>());
 
 			const Index2D origin = indices[i];
 			const int range = (weights_size - 1) / 2;
@@ -230,17 +226,17 @@ namespace
 				const Index2D current = indices[j];
 				const int offset_h = range + clamp(current.x - origin.x, -range, range);
 				const int offset_w = range + clamp(current.y - origin.y, -range, range);
-				const float dx = output[idx + j] * (gradient[idx + j] - local_sum);
+				const float dx = shared_output[j] * (shared_gradient[j] - local_sum);
 
-				atomicAdd(workspace + weight_indexer.at(offset_h, offset_w), dx);
+				atomicAdd(shared_weight_update + weight_indexer.at(offset_h, offset_w), dx);
 				gradient[idx + j] = dx;
 			}
-			__syncthreads();
 		}
 
+		__syncthreads();
 		const Indexer<3> update_indexer(batch_size, num_heads, weights_size * round_up(weights_size, 4));
 		for (int i = threadIdx.x; i < weights_size * round_up(weights_size, 4); i += blockDim.x)
-			weights_update[update_indexer.at(batch_idx, head_idx, i)] = workspace[i];
+			weights_update[update_indexer.at(batch_idx, head_idx, i)] = shared_weight_update[i];
 	}
 	__global__ void kernel_weights_update_reduction(const float *workspace, float *update, int batch_size, int num_heads, int last_dim)
 	{
@@ -461,7 +457,7 @@ namespace ml
 
 		dim3 blockDim(128);
 		dim3 gridDim(batch_size, num_heads);
-		const int shared_mem = sizeof(float) * (tokens + weights_shape.dim[1] * weights_shape.dim[2] + 4) + sizeof(Index2D) * tokens;
+		const int shared_mem = sizeof(float) * (2 * tokens + weights_shape.dim[1] * weights_shape.dim[2] + 4) + sizeof(Index2D) * tokens;
 		kernel_softmax_backward_in_place<<<gridDim, blockDim, shared_mem, stream>>>(getPointer<float>(qk_tensor_ptr),
 				getPointer<float>(backward_workspace), getPointer<float>(update_workspace), batch_size, num_heads, height, width,
 				weights_shape.dim[1]);

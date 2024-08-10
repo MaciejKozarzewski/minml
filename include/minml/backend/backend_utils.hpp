@@ -29,7 +29,7 @@ namespace ml
 
 	[[maybe_unused]] static mlShape_t make_shape(std::initializer_list<int> dims) noexcept
 	{
-		assert(dims.size() <= 4);
+		assert(dims.size() <= 6);
 		mlShape_t result;
 		result.rank = dims.size();
 		for (int i = 0; i < result.rank; i++)
@@ -49,6 +49,8 @@ namespace ml
 			case DTYPE_FLOAT32:
 			case DTYPE_INT32:
 				return 4;
+			case DTYPE_FLOAT64:
+				return 8;
 		}
 	}
 

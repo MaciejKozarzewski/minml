@@ -52,13 +52,11 @@ namespace vectors2
 			HOST_DEVICE void load(const float *__restrict__ ptr)
 			{
 				assert(ptr != nullptr);
-				assert(is_aligned<vec4f>(ptr));
 				*this = reinterpret_cast<const vec4f*>(ptr)[0];
 			}
 			HOST_DEVICE void store(float *__restrict__ ptr) const
 			{
 				assert(ptr != nullptr);
-				assert(is_aligned<vec4f>(ptr));
 				reinterpret_cast<vec4f*>(ptr)[0] = *this;
 			}
 			HOST_DEVICE void partial_load(const float *__restrict__ ptr, int num)
@@ -139,99 +137,107 @@ namespace vectors2
 			}
 	};
 
-	HOST_DEVICE_INLINE vec4f operator+(const vec4f &lhs, const vec4f &rhs)
+	DEVICE_INLINE vec4f operator+(const vec4f &lhs, const vec4f &rhs)
 	{
 		return vec4f(lhs.x0 + rhs.x0, lhs.x1 + rhs.x1, lhs.x2 + rhs.x2, lhs.x3 + rhs.x3);
 	}
-	HOST_DEVICE_INLINE vec4f operator-(const vec4f &lhs, const vec4f &rhs)
+	DEVICE_INLINE vec4f operator-(const vec4f &lhs, const vec4f &rhs)
 	{
 		return vec4f(lhs.x0 - rhs.x0, lhs.x1 - rhs.x1, lhs.x2 - rhs.x2, lhs.x3 - rhs.x3);
 	}
-	HOST_DEVICE_INLINE vec4f operator*(const vec4f &lhs, const vec4f &rhs)
+	DEVICE_INLINE vec4f operator*(const vec4f &lhs, const vec4f &rhs)
 	{
 		return vec4f(lhs.x0 * rhs.x0, lhs.x1 * rhs.x1, lhs.x2 * rhs.x2, lhs.x3 * rhs.x3);
 	}
-	HOST_DEVICE_INLINE vec4f operator/(const vec4f &lhs, const vec4f &rhs)
+	DEVICE_INLINE vec4f operator/(const vec4f &lhs, const vec4f &rhs)
 	{
 		return vec4f(lhs.x0 / rhs.x0, lhs.x1 / rhs.x1, lhs.x2 / rhs.x2, lhs.x3 / rhs.x3);
 	}
 
-	HOST_DEVICE_INLINE vec4f abs(const vec4f &a)
+	DEVICE_INLINE vec4f abs(const vec4f &a)
 	{
 		return vec4f(fabsf(a.x0), fabsf(a.x1), fabsf(a.x2), fabsf(a.x3));
 	}
-	HOST_DEVICE_INLINE vec4f max(const vec4f &a, const vec4f &b)
+	DEVICE_INLINE vec4f max(const vec4f &a, const vec4f &b)
 	{
 		return vec4f(fmax(a.x0, b.x0), fmax(a.x1, b.x1), fmax(a.x2, b.x2), fmax(a.x3, b.x3));
 	}
-	HOST_DEVICE_INLINE vec4f min(const vec4f &a, const vec4f &b)
+	DEVICE_INLINE vec4f min(const vec4f &a, const vec4f &b)
 	{
 		return vec4f(fmin(a.x0, b.x0), fmin(a.x1, b.x1), fmin(a.x2, b.x2), fmin(a.x3, b.x3));
 	}
-	HOST_DEVICE_INLINE vec4f ceil(const vec4f &a)
+	DEVICE_INLINE vec4f ceil(const vec4f &a)
 	{
 		return vec4f(ceilf(a.x0), ceilf(a.x1), ceilf(a.x2), ceilf(a.x3));
 	}
-	HOST_DEVICE_INLINE vec4f floor(const vec4f &a)
+	DEVICE_INLINE vec4f floor(const vec4f &a)
 	{
 		return vec4f(floorf(a.x0), floorf(a.x1), floorf(a.x2), floorf(a.x3));
 	}
-	HOST_DEVICE_INLINE vec4f sqrt(const vec4f &a)
+	DEVICE_INLINE vec4f sqrt(const vec4f &a)
 	{
 		return vec4f(sqrtf(a.x0), sqrtf(a.x1), sqrtf(a.x2), sqrtf(a.x3));
 	}
-	HOST_DEVICE_INLINE vec4f pow(const vec4f &a, const vec4f &b)
+	DEVICE_INLINE vec4f pow(const vec4f &a, const vec4f &b)
 	{
 		return vec4f(powf(a.x0, b.x0), powf(a.x1, b.x1), powf(a.x2, b.x2), powf(a.x3, b.x3));
 	}
-	HOST_DEVICE_INLINE vec4f mod(const vec4f &a, const vec4f &b)
+	DEVICE_INLINE vec4f mod(const vec4f &a, const vec4f &b)
 	{
 		return vec4f(fmodf(a.x0, b.x0), fmodf(a.x1, b.x1), fmodf(a.x2, b.x2), fmodf(a.x3, b.x3));
 	}
-	HOST_DEVICE_INLINE vec4f exp(const vec4f &a)
+	DEVICE_INLINE vec4f exp(const vec4f &a)
 	{
 		return vec4f(expf(a.x0), expf(a.x1), expf(a.x2), expf(a.x3));
 	}
-	HOST_DEVICE_INLINE vec4f log(const vec4f &a)
+	DEVICE_INLINE vec4f log(const vec4f &a)
 	{
 		return vec4f(logf(a.x0), logf(a.x1), logf(a.x2), logf(a.x3));
 	}
-	HOST_DEVICE_INLINE vec4f tanh(const vec4f &a)
+	DEVICE_INLINE vec4f tanh(const vec4f &a)
 	{
 		return vec4f(tanhf(a.x0), tanhf(a.x1), tanhf(a.x2), tanhf(a.x3));
 	}
-	HOST_DEVICE_INLINE vec4f expm1(const vec4f &a)
+	DEVICE_INLINE vec4f expm1(const vec4f &a)
 	{
 		return vec4f(expm1f(a.x0), expm1f(a.x1), expm1f(a.x2), expm1f(a.x3));
 	}
-	HOST_DEVICE_INLINE vec4f log1p(const vec4f &a)
+	DEVICE_INLINE vec4f log1p(const vec4f &a)
 	{
 		return vec4f(log1pf(a.x0), log1pf(a.x1), log1pf(a.x2), log1pf(a.x3));
 	}
-	HOST_DEVICE_INLINE vec4f sin(const vec4f &a)
+	DEVICE_INLINE vec4f sin(const vec4f &a)
 	{
 		return vec4f(sinf(a.x0), sinf(a.x1), sinf(a.x2), sinf(a.x3));
 	}
-	HOST_DEVICE_INLINE vec4f cos(const vec4f &a)
+	DEVICE_INLINE vec4f cos(const vec4f &a)
 	{
 		return vec4f(cosf(a.x0), cosf(a.x1), cosf(a.x2), cosf(a.x3));
 	}
-	HOST_DEVICE_INLINE vec4f tan(const vec4f &a)
+	DEVICE_INLINE vec4f tan(const vec4f &a)
 	{
 		return vec4f(tanf(a.x0), tanf(a.x1), tanf(a.x2), tanf(a.x3));
 	}
 
-	HOST_DEVICE_INLINE float horizontal_add(const vec4f &a)
+	DEVICE_INLINE float horizontal_add(const vec4f &a)
 	{
 		return a.x0 + a.x1 + a.x2 + a.x3;
 	}
-	HOST_DEVICE_INLINE float horizontal_max(const vec4f &a)
+	DEVICE_INLINE float horizontal_max(const vec4f &a)
 	{
 		return fmax(fmax(a.x0, a.x1), fmax(a.x2, a.x3));
 	}
-	HOST_DEVICE_INLINE float horizontal_min(const vec4f &a)
+	DEVICE_INLINE float horizontal_min(const vec4f &a)
 	{
 		return fmin(fmin(a.x0, a.x1), fmin(a.x2, a.x3));
+	}
+
+	DEVICE_INLINE void atomic_add(float *address, const vec4f &value)
+	{
+		atomicAdd(address + 0, value.x0);
+		atomicAdd(address + 1, value.x1);
+		atomicAdd(address + 2, value.x2);
+		atomicAdd(address + 3, value.x3);
 	}
 
 } /* namespace vectors */

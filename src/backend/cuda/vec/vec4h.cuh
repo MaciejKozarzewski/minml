@@ -21,6 +21,7 @@ namespace vectors2
 {
 	using vec4h = vec<half, 4>;
 
+#if __CUDA_ARCH__ >= FP16_STORAGE_MIN_ARCH
 	template<>
 	class __builtin_align__(16) vec<half, 4>
 	{
@@ -48,6 +49,10 @@ namespace vectors2
 					vec4h(h, h, h, h)
 			{
 			}
+			HOST_DEVICE vec(float f) :
+					vec4h(static_cast<half>(f))
+			{
+			}
 			HOST_DEVICE vec(const half *__restrict__ ptr)
 			{
 				load(ptr);
@@ -55,14 +60,19 @@ namespace vectors2
 			HOST_DEVICE void load(const half *__restrict__ ptr)
 			{
 				assert(ptr != nullptr);
-				assert(is_aligned<vec4h>(ptr));
 				*this = reinterpret_cast<const vec4h*>(ptr)[0];
 			}
 			HOST_DEVICE void store(half *__restrict__ ptr) const
 			{
 				assert(ptr != nullptr);
-				assert(is_aligned<vec4h>(ptr));
 				reinterpret_cast<vec4h*>(ptr)[0] = *this;
+			}
+			HOST_DEVICE vec4h& operator=(float x)
+			{
+				const half tmp = static_cast<half>(x);
+				x0 = half2 { tmp, tmp };
+				x1 = half2 { tmp, tmp };
+				return *this;
 			}
 			HOST_DEVICE vec4h operator-() const
 			{
@@ -74,6 +84,86 @@ namespace vectors2
 			}
 	};
 
+	DEVICE_INLINE vec4h operator+(const vec4h &lhs, const vec4h &rhs)
+	{
+		return vec4h(lhs.x0 + rhs.x0, lhs.x1 + rhs.x1);
+	}
+	DEVICE_INLINE vec4h operator-(const vec4h &lhs, const vec4h &rhs)
+	{
+		return vec4h(lhs.x0 - rhs.x0, lhs.x1 - rhs.x1);
+	}
+	DEVICE_INLINE vec4h operator*(const vec4h &lhs, const vec4h &rhs)
+	{
+		return vec4h(lhs.x0 * rhs.x0, lhs.x1 * rhs.x1);
+	}
+	DEVICE_INLINE vec4h operator/(const vec4h &lhs, const vec4h &rhs)
+	{
+		return vec4h(lhs.x0 / rhs.x0, lhs.x1 / rhs.x1);
+	}
+
+	DEVICE_INLINE vec4h abs(vec4h a)
+	{
+		return vec4h(__habs2(a.x0), __habs2(a.x1));
+	}
+	DEVICE_INLINE vec4h max(vec4h a, vec4h b)
+	{
+		return vec4h(__hmax2(a.x0, b.x0), __hmax2(a.x1, b.x1));
+	}
+	DEVICE_INLINE vec4h min(vec4h a, vec4h b)
+	{
+		return vec4h(__hmin2(a.x0, b.x0), __hmin2(a.x1, b.x1));
+	}
+	DEVICE_INLINE vec4h ceil(vec4h a)
+	{
+		return vec4h(h2ceil(a.x0), h2ceil(a.x1));
+	}
+	DEVICE_INLINE vec4h floor(vec4h a)
+	{
+		return vec4h(h2floor(a.x0), h2floor(a.x1));
+	}
+	DEVICE_INLINE vec4h sqrt(vec4h a)
+	{
+		return vec4h(h2sqrt(a.x0), h2sqrt(a.x1));
+	}
+	DEVICE_INLINE vec4h exp(vec4h a)
+	{
+		return vec4h(h2exp(a.x0), h2exp(a.x1));
+	}
+	DEVICE_INLINE vec4h log(vec4h a)
+	{
+		return vec4h(h2log(a.x0), h2log(a.x1));
+	}
+	DEVICE_INLINE vec4h tanh(vec4h a)
+	{
+		const vec4h p = exp(a);
+		const vec4h m = exp(-a);
+		return (p - m) / (p + m);
+	}
+	DEVICE_INLINE vec4h sin(vec4h a)
+	{
+		return vec4h(h2sin(a.x0), h2sin(a.x1));
+	}
+	DEVICE_INLINE vec4h cos(vec4h a)
+	{
+		return vec4h(h2cos(a.x0), h2cos(a.x1));
+	}
+
+	DEVICE_INLINE half horizontal_add(vec4h a)
+	{
+		const half2 tmp = a.x0 + a.x1;
+		return tmp.x + tmp.y;
+	}
+	DEVICE_INLINE half horizontal_max(vec4h a)
+	{
+		const half2 tmp = __hmax2(a.x0, a.x1);
+		return __hmax(tmp.x, tmp.y);
+	}
+	DEVICE_INLINE half horizontal_min(vec4h a)
+	{
+		const half2 tmp = __hmin2(a.x0, a.x1);
+		return __hmin(tmp.x, tmp.y);
+	}
+#endif
 } /* namespace vectors */
 
 #endif /* BACKEND_CUDA_VEC_VEC4H_CUH_ */

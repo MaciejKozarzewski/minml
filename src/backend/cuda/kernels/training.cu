@@ -29,10 +29,10 @@ namespace
 	using namespace vectors;
 	using namespace vectors2;
 
-	__device__ float round_small_to_zero(float x)
-	{
-		return (fabsf(x) < 1.0e-6f) ? 0.0f : x;
-	}
+//	__device__ float round_small_to_zero(float x)
+//	{
+//		return (fabsf(x) < 1.0e-6f) ? 0.0f : x;
+//	}
 	__device__ vec4f round_small_to_zero(vec4f x)
 	{
 		vec4f result;
@@ -149,21 +149,6 @@ namespace
 			m.store(momentum + i);
 			v.store(variance + i);
 			w.store(weight + i);
-
-//			momentum[i] = beta1 * momentum[i] + (1.0f - beta1) * gradient[i];
-//			variance[i] = beta2 * variance[i] + (1.0f - beta2) * square(gradient[i]);
-//
-//			float correction = 1.0f;
-//			if (p > 4.0f)
-//			{
-//				const float l = std::sqrt((1.0f - pow_beta2) / (variance[i] + 1.0e-8f));
-//				const float r = std::sqrt((p - 4.0f) * (p - 2.0f) * p_inf / ((p_inf - 4.0f) * (p_inf - 2.0f) * p));
-//				correction = l * r;
-//			}
-//
-//			const float m_dash = momentum[i] / (1.0f - pow_beta1);
-//			const float tmp = -learning_rate * m_dash * correction;
-//			weight[i] = round_small_to_zero(weight[i] + tmp);
 		}
 	}
 
@@ -225,7 +210,6 @@ namespace
 		assert(last_dim % 4 == 0);
 		__shared__ float workspace[32][128 + 1];
 
-		const int first_dim_idx = 32 * blockIdx.y + threadIdx.y;
 		const int last_dim_idx = 4 * (32 * blockIdx.x + threadIdx.x);
 		vec4f local_sum(0.0f);
 		if (last_dim_idx < last_dim)
@@ -287,7 +271,6 @@ namespace
 	{
 		__shared__ float workspace[32][32 + 1];
 
-		const int first_dim_idx = 32 * blockIdx.y + threadIdx.y;
 		const int last_dim_idx = 32 * blockIdx.x + threadIdx.x;
 		vec1f local_sum(0.0f);
 		if (last_dim_idx < last_dim)

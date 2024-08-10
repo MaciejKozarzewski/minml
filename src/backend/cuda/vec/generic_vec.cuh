@@ -16,104 +16,235 @@
 namespace vectors2
 {
 	template<typename T, int N>
-	struct vec;
+	struct vec
+	{
+			__device__ vec()
+			{
+			}
+			__device__ vec(T x)
+			{
+			}
+	};
 
 	template<typename T, int N>
-	HOST_DEVICE vec<T, N> square(const vec<T, N> &x)
+	DEVICE_INLINE vec<T, N> square(const vec<T, N> &x)
 	{
 		return x * x;
 	}
 
 	template<typename T, int N>
-	HOST_DEVICE vec<T, N> operator+(const vec<T, N> &lhs, T rhs)
+	DEVICE_INLINE vec<T, N> operator+(const vec<T, N> &lhs, T rhs)
 	{
 		return lhs + vec<T, N>(rhs);
 	}
 	template<typename T, int N>
-	HOST_DEVICE vec<T, N> operator+(T lhs, const vec<T, N> &rhs)
+	DEVICE_INLINE vec<T, N> operator+(T lhs, const vec<T, N> &rhs)
 	{
 		return vec<T, N>(lhs) + rhs;
 	}
 	template<typename T, int N>
-	HOST_DEVICE vec<T, N>& operator+=(vec<T, N> &lhs, const vec<T, N> &rhs)
+	DEVICE_INLINE vec<T, N>& operator+=(vec<T, N> &lhs, const vec<T, N> &rhs)
 	{
 		lhs = lhs + rhs;
 		return lhs;
 	}
 	template<typename T, int N>
-	HOST_DEVICE vec<T, N>& operator+=(vec<T, N> &lhs, T rhs)
+	DEVICE_INLINE vec<T, N>& operator+=(vec<T, N> &lhs, T rhs)
 	{
 		lhs = lhs + rhs;
 		return lhs;
 	}
 
 	template<typename T, int N>
-	HOST_DEVICE vec<T, N> operator-(const vec<T, N> &lhs, T rhs)
+	DEVICE_INLINE vec<T, N> operator-(const vec<T, N> &lhs, T rhs)
 	{
 		return lhs - vec<T, N>(rhs);
 	}
 	template<typename T, int N>
-	HOST_DEVICE vec<T, N> operator-(T lhs, const vec<T, N> &rhs)
+	DEVICE_INLINE vec<T, N> operator-(T lhs, const vec<T, N> &rhs)
 	{
 		return vec<T, N>(lhs) - rhs;
 	}
 	template<typename T, int N>
-	HOST_DEVICE vec<T, N>& operator-=(vec<T, N> &lhs, const vec<T, N> &rhs)
+	DEVICE_INLINE vec<T, N>& operator-=(vec<T, N> &lhs, const vec<T, N> &rhs)
 	{
 		lhs = lhs - rhs;
 		return lhs;
 	}
 	template<typename T, int N>
-	HOST_DEVICE vec<T, N>& operator-=(vec<T, N> &lhs, T rhs)
+	DEVICE_INLINE vec<T, N>& operator-=(vec<T, N> &lhs, T rhs)
 	{
 		lhs = lhs - rhs;
 		return lhs;
 	}
 
 	template<typename T, int N>
-	HOST_DEVICE vec<T, N> operator*(const vec<T, N> &lhs, T rhs)
+	DEVICE_INLINE vec<T, N> operator*(const vec<T, N> &lhs, T rhs)
 	{
 		return lhs * vec<T, N>(rhs);
 	}
 	template<typename T, int N>
-	HOST_DEVICE vec<T, N> operator*(T lhs, const vec<T, N> &rhs)
+	DEVICE_INLINE vec<T, N> operator*(T lhs, const vec<T, N> &rhs)
 	{
 		return vec<T, N>(lhs) * rhs;
 	}
 	template<typename T, int N>
-	HOST_DEVICE vec<T, N>& operator*=(vec<T, N> &lhs, const vec<T, N> &rhs)
+	DEVICE_INLINE vec<T, N>& operator*=(vec<T, N> &lhs, const vec<T, N> &rhs)
 	{
 		lhs = lhs * rhs;
 		return lhs;
 	}
 	template<typename T, int N>
-	HOST_DEVICE vec<T, N>& operator*=(vec<T, N> &lhs, T rhs)
+	DEVICE_INLINE vec<T, N>& operator*=(vec<T, N> &lhs, T rhs)
 	{
 		lhs = lhs * rhs;
 		return lhs;
 	}
 
 	template<typename T, int N>
-	HOST_DEVICE vec<T, N> operator/(const vec<T, N> &lhs, T rhs)
+	DEVICE_INLINE vec<T, N> operator/(const vec<T, N> &lhs, T rhs)
 	{
 		return lhs / vec<T, N>(rhs);
 	}
 	template<typename T, int N>
-	HOST_DEVICE vec<T, N> operator/(T lhs, const vec<T, N> &rhs)
+	DEVICE_INLINE vec<T, N> operator/(T lhs, const vec<T, N> &rhs)
 	{
 		return vec<T, N>(lhs) / rhs;
 	}
 	template<typename T, int N>
-	HOST_DEVICE vec<T, N>& operator/=(vec<T, N> &lhs, const vec<T, N> &rhs)
+	DEVICE_INLINE vec<T, N>& operator/=(vec<T, N> &lhs, const vec<T, N> &rhs)
 	{
 		lhs = lhs / rhs;
 		return lhs;
 	}
 	template<typename T, int N>
-	HOST_DEVICE vec<T, N>& operator/=(vec<T, N> &lhs, T rhs)
+	DEVICE_INLINE vec<T, N>& operator/=(vec<T, N> &lhs, T rhs)
 	{
 		lhs = lhs / rhs;
 		return lhs;
+	}
+
+	template<typename T, int N>
+	DEVICE_INLINE vec<T, N> operator+(const vec<T, N> &lhs, const vec<T, N> &rhs)
+	{
+		return vec<T, N> { };
+	}
+	template<typename T, int N>
+	DEVICE_INLINE vec<T, N> operator-(const vec<T, N> &lhs, const vec<T, N> &rhs)
+	{
+		return vec<T, N> { };
+	}
+	template<typename T, int N>
+	DEVICE_INLINE vec<T, N> operator*(const vec<T, N> &lhs, const vec<T, N> &rhs)
+	{
+		return vec<T, N> { };
+	}
+	template<typename T, int N>
+	DEVICE_INLINE vec<T, N> operator/(const vec<T, N> &lhs, const vec<T, N> &rhs)
+	{
+		return vec<T, N> { };
+	}
+
+	template<typename T, int N>
+	DEVICE_INLINE vec<T, N> abs(const vec<T, N> &a)
+	{
+		return vec<T, N> { };
+	}
+	template<typename T, int N>
+	DEVICE_INLINE vec<T, N> max(const vec<T, N> &a, const vec<T, N> &b)
+	{
+		return vec<T, N> { };
+	}
+	template<typename T, int N>
+	DEVICE_INLINE vec<T, N> min(const vec<T, N> &a, const vec<T, N> &b)
+	{
+		return vec<T, N> { };
+	}
+	template<typename T, int N>
+	DEVICE_INLINE vec<T, N> ceil(const vec<T, N> &a)
+	{
+		return vec<T, N> { };
+	}
+	template<typename T, int N>
+	DEVICE_INLINE vec<T, N> floor(const vec<T, N> &a)
+	{
+		return vec<T, N> { };
+	}
+	template<typename T, int N>
+	DEVICE_INLINE vec<T, N> sqrt(const vec<T, N> &a)
+	{
+		return vec<T, N> { };
+	}
+	template<typename T, int N>
+	DEVICE_INLINE vec<T, N> pow(const vec<T, N> &a, const vec<T, N> &b)
+	{
+		return vec<T, N> { };
+	}
+	template<typename T, int N>
+	DEVICE_INLINE vec<T, N> mod(const vec<T, N> &a, const vec<T, N> &b)
+	{
+		return vec<T, N> { };
+	}
+	template<typename T, int N>
+	DEVICE_INLINE vec<T, N> exp(const vec<T, N> &a)
+	{
+		return vec<T, N> { };
+	}
+	template<typename T, int N>
+	DEVICE_INLINE vec<T, N> log(const vec<T, N> &a)
+	{
+		return vec<T, N> { };
+	}
+	template<typename T, int N>
+	DEVICE_INLINE vec<T, N> tanh(const vec<T, N> &a)
+	{
+		return vec<T, N> { };
+	}
+	template<typename T, int N>
+	DEVICE_INLINE vec<T, N> expm1(const vec<T, N> &a)
+	{
+		return vec<T, N> { };
+	}
+	template<typename T, int N>
+	DEVICE_INLINE vec<T, N> log1p(const vec<T, N> &a)
+	{
+		return vec<T, N> { };
+	}
+	template<typename T, int N>
+	DEVICE_INLINE vec<T, N> sin(const vec<T, N> &a)
+	{
+		return vec<T, N> { };
+	}
+	template<typename T, int N>
+	DEVICE_INLINE vec<T, N> cos(const vec<T, N> &a)
+	{
+		return vec<T, N> { };
+	}
+	template<typename T, int N>
+	DEVICE_INLINE vec<T, N> tan(const vec<T, N> &a)
+	{
+		return vec<T, N> { };
+	}
+
+	template<typename T, int N>
+	DEVICE_INLINE T horizontal_add(const vec<T, N> &a)
+	{
+		return T { };
+	}
+	template<typename T, int N>
+	DEVICE_INLINE T horizontal_max(const vec<T, N> &a)
+	{
+		return T { };
+	}
+	template<typename T, int N>
+	DEVICE_INLINE T horizontal_min(const vec<T, N> &a)
+	{
+		return T { };
+	}
+
+	template<typename T, int N>
+	DEVICE_INLINE void atomic_add(T *address, const vec<T, N> &value)
+	{
 	}
 
 }

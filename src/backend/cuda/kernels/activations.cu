@@ -163,7 +163,7 @@ namespace
 		}
 	}
 
-	__global__ void kernel_add_to_last_dim_4xfp32(float *output, const float *input, const float *bias, int first_dim, int last_dim,
+	__global__ void kernel_add_to_last_dim_vect(float *output, const float *input, const float *bias, int first_dim, int last_dim,
 			ml::mlActivationType_t act)
 	{
 		assert(last_dim % 4 ==0);
