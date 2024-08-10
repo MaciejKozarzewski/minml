@@ -10,7 +10,7 @@
 
 #include "../utils.hpp"
 #include "../helpers/indexers.cuh"
-#include "../vec/vec4f.cuh"
+#include "../vec/vec_headers.cuh"
 #include <cuda_runtime_api.h>
 #include <cooperative_groups.h>
 #include <cooperative_groups/reduce.h>
@@ -65,15 +65,21 @@ namespace
 		}
 	}
 
+	template<int N, typename T, typename U>
+	__device__ void vector_copy(T *dst, const U *src)
+	{
+		store_vec(dst, load_vec<U, N>(src));
+	}
+
 	template<typename T>
 	__global__ void kernel_softmax_forward_in_place(T *input, const T *weights, int batch_size, int num_heads, int height, int width,
 			int weights_size)
 	{
 		extern __shared__ char shared_array[];
 
-		float *workspace = reinterpret_cast<float*>(shared_array);
-		float *biases = reinterpret_cast<float*>(workspace + height * width * blockDim.y);
-		Index2D *indices = reinterpret_cast<Index2D*>(biases + weights_size * round_up(weights_size, 4));
+		float *shared_input = reinterpret_cast<float*>(shared_array);
+		float *shared_biases = reinterpret_cast<float*>(shared_input + height * width * blockDim.y);
+		Index2D *indices = reinterpret_cast<Index2D*>(shared_biases + weights_size * round_up(weights_size, 4));
 
 		const int block_size = blockDim.x * blockDim.y;
 		const int tid = threadIdx.y * blockDim.x + threadIdx.x;
@@ -92,10 +98,7 @@ namespace
 			const int tmp = weights_size * round_up(weights_size, 4);
 			const Indexer<2> weight_indexer(num_heads, tmp);
 			for (int i = 4 * tid; i < tmp; i += 4 * block_size)
-			{
-				const vec4f tmp(weights + weight_indexer.at(head_idx, i));
-				tmp.store(biases + i);
-			}
+				vector_copy<4>(shared_biases + i, weights + weight_indexer.at(head_idx, i));
 		}
 		__syncthreads();
 
@@ -106,18 +109,18 @@ namespace
 		{
 			for (int j = 4 * tid; j < tokens_left; j += 4 * block_size)
 			{
-				vec4f tmp;
+				vec<float, 4> tmp;
 				if (tokens_left - j >= 4)
-					tmp.load(input + idx + j);
+					tmp = load_vec<float, 4>(input + idx + j);
 				else
-					tmp.partial_load(input + idx + j, tokens_left - j);
-				tmp.store(workspace + j);
+					tmp = partial_load_vec<float, 4>(input + idx + j, tokens_left - j);
+				store_vec(shared_input + j, tmp);
 			}
 		}
 		else
 		{ // unaligned loads
 			for (int j = tid; j < tokens_left; j += block_size)
-				workspace[j] = input[idx + j];
+				shared_input[j] = input[idx + j];
 		}
 		__syncthreads();
 
@@ -132,9 +135,9 @@ namespace
 			const int offset_x = range + clamp(current.x - origin.x, -range, range);
 			const int offset_y = range + clamp(current.y - origin.y, -range, range);
 			const int idx = threadIdx.y * tokens + j;
-			const float tmp = workspace[idx] + biases[weight_indexer.at(offset_x, offset_y)];
+			const float tmp = shared_input[idx] + shared_biases[weight_indexer.at(offset_x, offset_y)];
 			max_value = max(max_value, tmp);
-			workspace[idx] = tmp;
+			shared_input[idx] = tmp;
 		}
 		for (int k = 16; k >= 1; k /= 2)
 			max_value = max(max_value, __shfl_xor_sync(0xffffffff, max_value, k));
@@ -143,9 +146,9 @@ namespace
 		for (int j = threadIdx.x; j < tokens; j += blockDim.x)
 		{
 			const int idx = threadIdx.y * tokens + j;
-			const float tmp = exp(workspace[idx] - max_value);
+			const float tmp = exp(shared_input[idx] - max_value);
 			partial_sum += tmp;
-			workspace[idx] = tmp;
+			shared_input[idx] = tmp;
 		}
 		for (int k = 16; k >= 1; k /= 2)
 			partial_sum += __shfl_xor_sync(0xffffffff, partial_sum, k);
@@ -154,7 +157,7 @@ namespace
 		for (int j = threadIdx.x; j < tokens; j += blockDim.x)
 		{
 			const int idx = threadIdx.y * tokens + j;
-			workspace[idx] *= inv_sum;
+			shared_input[idx] *= inv_sum;
 		}
 
 		__syncthreads();
@@ -162,17 +165,17 @@ namespace
 		{
 			for (int j = 4 * tid; j < tokens_left; j += 4 * block_size)
 			{
-				const vec4f tmp(workspace + j);
+				const vec<float, 4> tmp = load_vec<float, 4>(shared_input + j);
 				if (tokens_left - j >= 4)
-					tmp.store(input + idx + j);
+					store_vec(input + idx + j, tmp);
 				else
-					tmp.partial_store(input + idx + j, tokens_left - j);
+					partial_store_vec(input + idx + j, convert<T>(tmp), tokens_left - j);
 			}
 		}
 		else
 		{ // unaligned stores
 			for (int j = tid; j < tokens_left; j += block_size)
-				input[idx + j] = workspace[j];
+				input[idx + j] = shared_input[j];
 		}
 	}
 	__global__ void kernel_softmax_backward_in_place(const float *output, float *gradient, float *weights_update, int batch_size, int num_heads,
@@ -319,6 +322,7 @@ namespace
 		const int width = input_shape.dim[2];
 		const int tokens = height * width;
 		const int num_heads = weights_shape.dim[0];
+		const int range = weights_shape.dim[1];
 		assert(weights_shape.dim[2] % 4 == 0);
 
 		dim3 blockDim(32, 8);
@@ -328,15 +332,16 @@ namespace
 		{
 			case ml::DTYPE_FLOAT16:
 			{
-//				kernel_softmax_forward_in_place<<<gridDim, blockDim, 0, stream>>>(ml::getPointer<half>(input), ml::getPointer<half>(weights),
-//						batch_size, num_heads, height, width, range);
+				const int shared_mem = sizeof(float) * (tokens * blockDim.y + weights_shape.dim[1] * weights_shape.dim[2]) + sizeof(Index2D) * tokens;
+				kernel_softmax_forward_in_place<<<gridDim, blockDim, shared_mem, stream>>>(ml::getPointer<half>(input), ml::getPointer<half>(weights),
+						batch_size, num_heads, height, width, range);
 				break;
 			}
 			case ml::DTYPE_FLOAT32:
 			{
 				const int shared_mem = sizeof(float) * (tokens * blockDim.y + weights_shape.dim[1] * weights_shape.dim[2]) + sizeof(Index2D) * tokens;
 				kernel_softmax_forward_in_place<<<gridDim, blockDim, shared_mem, stream>>>(ml::getPointer<float>(input),
-						ml::getPointer<float>(weights), batch_size, num_heads, height, width, weights_shape.dim[1]);
+						ml::getPointer<float>(weights), batch_size, num_heads, height, width, range);
 				break;
 			}
 		}

@@ -29,7 +29,6 @@ namespace vectors2
 	DEVICE_INLINE void store_vec(T *ptr, const vec<U, N> &value)
 	{
 		assert(ptr != nullptr);
-		assert(is_aligned<sizeof(vec<U, N>)>(ptr));
 		reinterpret_cast<vec<T, N>*>(ptr)[0] = convert<T, U, N>(value);
 	}
 

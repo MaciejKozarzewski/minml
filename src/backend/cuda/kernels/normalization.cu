@@ -459,16 +459,14 @@ namespace
 
 		extern __shared__ char shared_array[];
 
-		T *shared_input = reinterpret_cast<T*>(shared_array);
-		T *shared_weights = shared_input + last_dim;
-		T *shared_bias = shared_weights + last_dim;
+		float *shared_input = reinterpret_cast<float*>(shared_array);
+		float *shared_weights = shared_input + last_dim;
+		float *shared_bias = shared_weights + last_dim;
 
 		for (int j = N * threadIdx.x; j < last_dim; j += N * blockDim.x)
 		{
-			const vec<T, N> w = load_vec<T, N>(weights + j);
-			const vec<T, N> b = load_vec<T, N>(bias + j);
-			store_vec(shared_weights + j, w);
-			store_vec(shared_bias + j, b);
+			vector_copy<N>(shared_weights + j, weights + j);
+			vector_copy<N>(shared_bias + j, bias + j);
 		}
 		__syncthreads();
 
@@ -478,29 +476,29 @@ namespace
 
 		for (int i = blockIdx.x; i < first_dim; i += gridDim.x)
 		{
-			T avg = 0.0f;
+			float avg = 0.0f;
 			for (int j = N * threadIdx.x; j < last_dim; j += N * blockDim.x)
 			{
-				const vec<T, N> in = load_vec<T, N>(input + i * last_dim + j);
+				const vec<float, N> in = load_vec<float, N>(input + i * last_dim + j);
 				avg += horizontal_add(in);
-				store_vec<T, N>(shared_input + j, in);
+				store_vec(shared_input + j, in);
 			}
-			avg = cg::reduce(tile, avg, cg::plus<T>()) / static_cast<T>(last_dim);
+			avg = cg::reduce(tile, avg, cg::plus<float>()) / static_cast<float>(last_dim);
 
-			T var = 0.0f;
+			float var = 0.0f;
 			for (int j = N * threadIdx.x; j < last_dim; j += N * blockDim.x)
 			{
-				const vec<T, N> in = load_vec<T, N>(shared_input + j);
+				const vec<float, N> in = load_vec<float, N>(shared_input + j);
 				var += horizontal_add(square(in - avg));
 			}
-			const T inv_stddev = get_inv_stddev(cg::reduce(tile, var, cg::plus<T>()), last_dim, 1.0e-6f);
+			const float inv_stddev = get_inv_stddev(cg::reduce(tile, var, cg::plus<float>()), last_dim, 1.0e-6f);
 
 			for (int j = N * threadIdx.x; j < last_dim; j += N * blockDim.x)
 			{
-				const vec<T, N> gamma = load_vec<T, N>(shared_weights + j);
-				const vec<T, N> beta = load_vec<T, N>(shared_bias + j);
-				const vec<T, N> in = load_vec<T, N>(shared_input + j);
-				const vec<T, N> out = gamma * (in - avg) * inv_stddev + beta;
+				const vec<float, N> gamma = load_vec<float, N>(shared_weights + j);
+				const vec<float, N> beta = load_vec<float, N>(shared_bias + j);
+				const vec<float, N> in = load_vec<float, N>(shared_input + j);
+				const vec<float, N> out = gamma * (in - avg) * inv_stddev + beta;
 				store_vec(output + i * last_dim + j, out);
 			}
 		}
@@ -1068,12 +1066,13 @@ namespace ml
 		{
 			case DTYPE_FLOAT16:
 			{
+				const int shared_mem = sizeof(float) * 3 * last_dim;
 				if (last_dim % 4 == 0)
-					kernel_layernorm_forward_v2<half, 4> <<<gridDim, blockDim, 0, stream >>>(getPointer<half>(input), getPointer<half>(output),
-							getPointer<half>(weights), getPointer<half>(bias), getPointer<half>(ext), first_dim, last_dim);
+					kernel_layernorm_forward_v2<half, 4> <<<gridDim, blockDim, shared_mem, stream >>>(getPointer<half>(input),
+							getPointer<half>(output), getPointer<half>(weights), getPointer<half>(bias), getPointer<half>(ext), first_dim, last_dim);
 				else
-					kernel_layernorm_forward_v2<half, 1> <<<gridDim, blockDim, 0, stream >>>(getPointer<half>(input), getPointer<half>(output),
-							getPointer<half>(weights), getPointer<half>(bias), getPointer<half>(ext), first_dim, last_dim);
+					kernel_layernorm_forward_v2<half, 1> <<<gridDim, blockDim, shared_mem, stream >>>(getPointer<half>(input),
+							getPointer<half>(output), getPointer<half>(weights), getPointer<half>(bias), getPointer<half>(ext), first_dim, last_dim);
 				break;
 			}
 			case DTYPE_FLOAT32:

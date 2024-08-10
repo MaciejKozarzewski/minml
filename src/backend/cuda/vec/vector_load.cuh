@@ -29,7 +29,6 @@ namespace vectors2
 	DEVICE_INLINE vec<T, N> load_vec(const U *ptr)
 	{
 		assert(ptr != nullptr);
-		assert(is_aligned<sizeof(vec<U, N>)>(ptr));
 		return convert<T, U, N>(reinterpret_cast<const vec<U, N>*>(ptr)[0]);
 	}
 

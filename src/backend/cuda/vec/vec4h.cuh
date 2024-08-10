@@ -23,7 +23,7 @@ namespace vectors2
 
 #if __CUDA_ARCH__ >= FP16_STORAGE_MIN_ARCH
 	template<>
-	class __builtin_align__(16) vec<half, 4>
+	class __builtin_align__(8) vec<half, 4>
 	{
 		public:
 			half2 x0, x1;
