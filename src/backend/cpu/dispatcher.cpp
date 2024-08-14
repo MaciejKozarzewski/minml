@@ -10,6 +10,7 @@
 
 #include "misc_kernels.hpp"
 #include "utils.hpp"
+#include "indexers.hpp"
 #include "fp16.hpp"
 
 #include <functional>
@@ -119,6 +120,20 @@ namespace
 				dst[j] = one_or_zero<T>((src[i * stride + int_idx] >> bit_idx) & 1u);
 			}
 	}
+
+	int get_patch_size(int smaller, int larger) noexcept
+	{
+		assert(smaller <= larger);
+		for (int i = 1;; i++)
+		{
+			const int tmp = (larger + i - 1) / i;
+			if (tmp == smaller)
+				return i;
+			if (tmp < smaller)
+				break;
+		}
+		return 0;
+	}
 }
 
 namespace ml
@@ -155,6 +170,64 @@ namespace ml
 	}
 	void cpu_transpose_021(mlContext_t context, mlDataType_t dtype, mlShape_t shape, const void *input, void *output)
 	{
+	}
+	void cpu_space_to_depth(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, const void *input, mlShape_t output_shape, void *output)
+	{
+		const int batch_size = get_first_dim(input_shape);
+		const int height = input_shape.dim[1];
+		const int width = input_shape.dim[2];
+		const int patch_size_h = get_patch_size(output_shape.dim[1], input_shape.dim[1]);
+		const int patch_size_w = get_patch_size(output_shape.dim[2], input_shape.dim[2]);
+		assert(patch_size_h != 0 && patch_size_w != 0);
+		const int channels_in = get_last_dim(input_shape);
+		const int channels_out = get_last_dim(output_shape);
+		assert(channels_in * patch_size_h * patch_size_w == channels_out);
+
+		const uint8_t *input_ptr = reinterpret_cast<const uint8_t*>(input);
+		uint8_t *output_ptr = reinterpret_cast<uint8_t*>(output);
+		Indexer<4> input_indexer(batch_size, height, width, channels_in);
+
+		const int block_size = size_of(dtype) * channels_in;
+		for (int b = 0; b < batch_size; b++)
+			for (int h = 0; h < height; h += patch_size_h)
+				for (int w = 0; w < width; w += patch_size_w)
+					for (int x = 0; x < patch_size_h; x++)
+						for (int y = 0; y < patch_size_w; y++)
+						{
+							if ((h + x) < height and (w + y) < width)
+								std::memcpy(output_ptr, input_ptr + size_of(dtype) * input_indexer.at(b, h + x, w + y, 0), block_size);
+							else
+								std::memset(output_ptr, 0, block_size);
+							output_ptr += block_size;
+						}
+	}
+	void cpu_depth_to_space(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, const void *input, mlShape_t output_shape, void *output)
+	{
+		const int batch_size = get_first_dim(input_shape);
+		const int height = output_shape.dim[1];
+		const int width = output_shape.dim[2];
+		const int patch_size_h = get_patch_size(input_shape.dim[1], output_shape.dim[1]);
+		const int patch_size_w = get_patch_size(input_shape.dim[2], output_shape.dim[2]);
+		assert(patch_size_h != 0 && patch_size_w != 0);
+		const int channels_in = get_last_dim(input_shape);
+		const int channels_out = get_last_dim(output_shape);
+		assert(channels_out * patch_size_h * patch_size_w == channels_in);
+
+		const uint8_t *input_ptr = reinterpret_cast<const uint8_t*>(input);
+		uint8_t *output_ptr = reinterpret_cast<uint8_t*>(output);
+		Indexer<4> output_indexer(batch_size, height, width, channels_out);
+
+		const int block_size = size_of(dtype) * channels_out;
+		for (int b = 0; b < batch_size; b++)
+			for (int h = 0; h < height; h += patch_size_h)
+				for (int w = 0; w < width; w += patch_size_w)
+					for (int x = 0; x < patch_size_h; x++)
+						for (int y = 0; y < patch_size_w; y++)
+						{
+							if ((h + x) < height and (w + y) < width)
+								std::memcpy(output_ptr + size_of(dtype) * output_indexer.at(b, h + x, w + y, 0), input_ptr, block_size);
+							input_ptr += block_size;
+						}
 	}
 
 	void cpu_convolution_implicit_gemm_forward(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, mlShape_t weights_shape,

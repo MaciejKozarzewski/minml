@@ -134,6 +134,16 @@ namespace ml
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
+	void cuda_space_to_depth(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, const void *input, mlShape_t output_shape,
+			void *output)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+	void cuda_depth_to_space(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, const void *input, mlShape_t output_shape,
+			void *output)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
 
 	// implemented in 'winograd_non_fused.cu'
 	void cuda_winograd_weight_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape, const void *weights,

@@ -33,6 +33,8 @@ namespace ml
 	void winogradUpdateTransform(const Context &context, const Tensor &matrices, Tensor &update);
 
 	void im2row(const Context &context, const Shape &weight_shape, const Tensor &input, Tensor &matrix);
+	void depthToSpace(const Context &context, const Tensor &input, Tensor &output);
+	void spaceToDepth(const Context &context, const Tensor &input, Tensor &output);
 
 	void convolutionImplicitGemmForward(const Context &context, const Tensor &input, const Tensor &weights, Tensor &output, const Tensor &bias,
 			const Tensor &add, ActivationType act);
@@ -80,9 +82,10 @@ namespace ml
 	 * attention
 	 */
 	int multiHeadAttentionGetWorkspaceSize(const Context &context, const Shape &inputShape, const Shape &weightsShape, bool training);
-	void multiHeadAttentionForward(const Context &context, const Tensor &input, Tensor &output, const Tensor &weights, Tensor &workspace, Tensor& backwardData);
+	void multiHeadAttentionForward(const Context &context, const Tensor &input, Tensor &output, const Tensor &weights, Tensor &workspace,
+			Tensor &backwardData);
 	void multiHeadAttentionBackward(const Context &context, const Tensor &input, const Tensor &weights, Tensor &gradient_prev, Tensor &gradient_next,
-			Tensor &weights_update, Tensor &workspace, Tensor& backwardData);
+			Tensor &weights_update, Tensor &workspace, Tensor &backwardData);
 
 	void activationForward(const Context &context, Tensor &output, const Tensor &input, ActivationType act);
 	void activationBackward(const Context &context, Tensor &gradient_prev, const Tensor &gradient_next, const Tensor &output, ActivationType act);

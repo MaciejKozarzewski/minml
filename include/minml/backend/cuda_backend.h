@@ -58,6 +58,10 @@ namespace ml
 		DLL_PUBLIC void cuda_convert_type(mlContext_t context, void *dst, mlDataType_t dst_dtype, const void *src, mlDataType_t src_dtype,
 				int elements);
 		DLL_PUBLIC void cuda_transpose_021(mlContext_t context, mlDataType_t dtype, mlShape_t shape, const void *input, void *output);
+		DLL_PUBLIC void cuda_space_to_depth(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, const void *input, mlShape_t output_shape,
+				void *output);
+		DLL_PUBLIC void cuda_depth_to_space(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, const void *input, mlShape_t output_shape,
+				void *output);
 
 		// implemented in 'winograd_non_fused.cu'
 		DLL_PUBLIC void cuda_winograd_weight_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape,
@@ -147,7 +151,8 @@ namespace ml
 
 		// implemented in 'training.cu'
 		DLL_PUBLIC void cuda_emulate_low_precision(mlContext_t context, mlShape_t shape, void *dst, const void *src);
-		DLL_PUBLIC void cuda_multiply_tensors(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *dst, const void *src1, const void *src2);
+		DLL_PUBLIC void cuda_multiply_tensors(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *dst, const void *src1,
+				const void *src2);
 		DLL_PUBLIC void cuda_add_tensors(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *dst, const void *src1, const void *src2);
 		DLL_PUBLIC void cuda_sum_over_first_dim(mlContext_t context, mlShape_t shape, void *dst, const void *src, float beta);
 		DLL_PUBLIC float cuda_mean_squared_loss(mlContext_t context, mlShape_t shape, const void *output, const void *target);

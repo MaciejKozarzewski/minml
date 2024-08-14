@@ -8,7 +8,6 @@ All notable ideas will be documented in this file.
 - Implement custom epilogue that fuses bias and activation.
 
 ### Dense layer
-- Implement fused gemm+bias+act for CPU.
 
 ### Pooling
 

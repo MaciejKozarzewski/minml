@@ -327,6 +327,36 @@ namespace ml
 				break;
 		}
 	}
+	void depthToSpace(const Context &context, const Tensor &input, Tensor &output)
+	{
+		switch (context.device().type())
+		{
+			case DeviceType::CPU:
+				cpu_depth_to_space(get(context), get(input.dtype()), get_shape(input), input.data(), get_shape(output), output.data());
+				break;
+			case DeviceType::CUDA:
+				cuda_depth_to_space(get(context), get(input.dtype()), get_shape(input), input.data(), get_shape(output), output.data());
+				break;
+			case DeviceType::OPENCL:
+//				opencl_depth_to_space(get(context), get(input.dtype()), get_shape(input), input.data(), get_shape(output), output.data());
+				break;
+		}
+	}
+	void spaceToDepth(const Context &context, const Tensor &input, Tensor &output)
+	{
+		switch (context.device().type())
+		{
+			case DeviceType::CPU:
+				cpu_space_to_depth(get(context), get(input.dtype()), get_shape(input), input.data(), get_shape(output), output.data());
+				break;
+			case DeviceType::CUDA:
+				cuda_space_to_depth(get(context), get(input.dtype()), get_shape(input), input.data(), get_shape(output), output.data());
+				break;
+			case DeviceType::OPENCL:
+//				opencl_space_to_depth(get(context), get(input.dtype()), get_shape(input), input.data(), get_shape(output), output.data());
+				break;
+		}
+	}
 
 	void convolutionImplicitGemmForward(const Context &context, const Tensor &input, const Tensor &weights, Tensor &output, const Tensor &bias,
 			const Tensor &add, ActivationType act)
