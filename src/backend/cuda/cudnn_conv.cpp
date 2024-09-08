@@ -33,6 +33,8 @@ namespace
 				return CUDNN_DATA_HALF;
 			case DTYPE_FLOAT32:
 				return CUDNN_DATA_FLOAT;
+			case DTYPE_FLOAT64:
+				return CUDNN_DATA_DOUBLE;
 			case DTYPE_INT32:
 				return CUDNN_DATA_INT32;
 		}
@@ -48,6 +50,8 @@ namespace
 				return CUDA_R_16F;
 			case DTYPE_FLOAT32:
 				return CUDA_R_32F;
+			case DTYPE_FLOAT64:
+				return CUDA_R_64F;
 			case DTYPE_INT32:
 				return CUDA_R_32I;
 		}
@@ -63,6 +67,8 @@ namespace
 				return CUBLAS_COMPUTE_16F;
 			case DTYPE_FLOAT32:
 				return CUBLAS_COMPUTE_32F;
+			case DTYPE_FLOAT64:
+				return CUBLAS_COMPUTE_64F;
 			case DTYPE_INT32:
 				return CUBLAS_COMPUTE_32F;
 		}
@@ -359,20 +365,33 @@ namespace ml
 			const MatrixLayout Ddesc(volume_without_last_dim(output_shape), get_last_dim(output_shape), dtype);
 			const MatMulDescriptor computeDesc(dtype, bias, act);
 
-			uint32_t alpha, beta;
-			if (dtype == DTYPE_FLOAT32)
+			uint64_t alpha, beta;
+			switch (dtype)
 			{
-				const float a = 1.0f;
-				const float b = (add == nullptr) ? 0.0f : 1.0f;
-				std::memcpy(&alpha, &a, sizeof(float));
-				std::memcpy(&beta, &b, sizeof(float));
-			}
-			else
-			{
-				const half a = 1.0f;
-				const half b = (add == nullptr) ? 0.0f : 1.0f;
-				std::memcpy(&alpha, &a, sizeof(half));
-				std::memcpy(&beta, &b, sizeof(half));
+				case DTYPE_FLOAT16:
+				{
+					const half a = 1.0f;
+					const half b = (add == nullptr) ? 0.0f : 1.0f;
+					std::memcpy(&alpha, &a, sizeof(half));
+					std::memcpy(&beta, &b, sizeof(half));
+					break;
+				}
+				case DTYPE_FLOAT32:
+				{
+					const float a = 1.0f;
+					const float b = (add == nullptr) ? 0.0f : 1.0f;
+					std::memcpy(&alpha, &a, sizeof(float));
+					std::memcpy(&beta, &b, sizeof(float));
+					break;
+				}
+				case DTYPE_FLOAT64:
+				{
+					const double a = 1.0;
+					const double b = (add == nullptr) ? 0.0 : 1.0;
+					std::memcpy(&alpha, &a, sizeof(double));
+					std::memcpy(&beta, &b, sizeof(double));
+					break;
+				}
 			}
 
 			const void *C = (add == nullptr) ? output : add;
@@ -438,18 +457,31 @@ namespace ml
 			const MatrixLayout Ddesc(shape_D, dtype);
 			const MatMulDescriptor computeDesc(dtype, bias, act);
 
-			uint32_t _alpha, _beta;
-			if (dtype == DTYPE_FLOAT32)
+			uint64_t _alpha, _beta;
+			switch (dtype)
 			{
-				std::memcpy(&_alpha, &alpha, sizeof(float));
-				std::memcpy(&_beta, &beta, sizeof(float));
-			}
-			else
-			{
-				const half a = static_cast<half>(alpha);
-				const half b = static_cast<half>(beta);
-				std::memcpy(&_alpha, &a, sizeof(half));
-				std::memcpy(&_beta, &b, sizeof(half));
+				case DTYPE_FLOAT16:
+				{
+					const half a = static_cast<half>(alpha);
+					const half b = static_cast<half>(beta);
+					std::memcpy(&_alpha, &a, sizeof(half));
+					std::memcpy(&_beta, &b, sizeof(half));
+					break;
+				}
+				case DTYPE_FLOAT32:
+				{
+					std::memcpy(&_alpha, &alpha, sizeof(float));
+					std::memcpy(&_beta, &beta, sizeof(float));
+					break;
+				}
+				case DTYPE_FLOAT64:
+				{
+					const double a = static_cast<double>(alpha);
+					const double b = static_cast<double>(beta);
+					std::memcpy(&_alpha, &a, sizeof(double));
+					std::memcpy(&_beta, &b, sizeof(double));
+					break;
+				}
 			}
 
 			cublasLtHandle_t handle = cuda::Context::getCublasLtHandle(context);

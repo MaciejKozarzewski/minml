@@ -57,8 +57,6 @@ namespace ml
 
 	void Dense::setInputShape(const std::vector<Shape> &shapes)
 	{
-		if (shapes.size() != 1)
-			throw IllegalArgument(METHOD_NAME, "Dense layer expects single input shape");
 		const int first_dim = shapes[0].firstDim();
 		const int last_dim = shapes[0].volumeWithoutFirstDim();
 		if (not isUsingWeights() and m_neurons != last_dim)
@@ -119,11 +117,19 @@ namespace ml
 
 	void Dense::forward(const std::vector<Tensor> &input, Tensor &output)
 	{
-		assert(input.size() == 1);
-
 		const Tensor flattened_input = flatten_input_tensor(input[0]);
 		if (isUsingWeights())
-			gemm_ex(context(), output, 1.0f, 'n', flattened_input, 't', getWeights().getParam(), 0.0f, output, getBias().getParam(), m_activation);
+		{
+			if (input.size() == 1)
+				gemm_ex(context(), output, 1.0f, 'n', flattened_input, 't', getWeights().getParam(), 0.0f, output, getBias().getParam(),
+						m_activation);
+			else
+			{
+				const Tensor flattened_ext = flatten_input_tensor(input[1]);
+				gemm_ex(context(), output, 1.0f, 'n', flattened_input, 't', getWeights().getParam(), 0.0f, flattened_ext, getBias().getParam(),
+						m_activation);
+			}
+		}
 		else
 		{
 			if (isUsingBias())

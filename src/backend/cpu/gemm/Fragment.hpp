@@ -9,8 +9,10 @@
 #define BACKEND_CPU_KERNELS_GEMM_FRAGMENT_HPP_
 
 #include <minml/backend/backend_types.h>
+#include <minml/backend/backend_utils.hpp>
 #include "utilities.hpp"
 
+#include <iostream>
 #include <cassert>
 
 namespace ml
@@ -109,6 +111,19 @@ namespace ml
 			{
 				m_size = size;
 				m_is_packed = true;
+			}
+			Fragment get_subfragment(Position2D pos, Size2D size) const noexcept
+			{
+				assert(is_packed());
+				void *shifted_ptr = reinterpret_cast<uint8_t*>(m_data) + size_of(dtype()) * offset_at(pos.row, pos.column);
+				Fragment result(shifted_ptr, dtype(), stride());
+				result.mark_as_packed_with_size(size);
+				return result;
+			}
+			void print_info() const
+			{
+				std::cout << "Fragment (" << m_data << ") of size (" << m_size.rows << " x " << m_size.columns << ") with stride " << m_stride
+						<< '\n';
 			}
 	};
 

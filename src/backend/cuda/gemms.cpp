@@ -71,6 +71,15 @@ namespace ml
 				assert(status == CUBLAS_STATUS_SUCCESS);
 				break;
 			}
+			case DTYPE_FLOAT64: // ABC [float64]
+			{
+				const double _alpha = alpha;
+				const double _beta = beta;
+				cublasStatus_t status = cublasDgemm(handle, op_B, op_A, M, N, K, &_alpha, getPointer<double>(B), LDB, getPointer<double>(A), LDA,
+						&_beta, getPointer<double>(C), LDC);
+				assert(status == CUBLAS_STATUS_SUCCESS);
+				break;
+			}
 		}
 	}
 
@@ -127,6 +136,15 @@ namespace ml
 				const float _beta = beta;
 				cublasStatus_t status = cublasSgemmStridedBatched(handle, op_B, op_A, M, N, K, &_alpha, getPointer<float>(B), LDB, strideB,
 						getPointer<float>(A), LDA, strideA, &_beta, getPointer<float>(C), LDC, strideC, batch);
+				assert(status == CUBLAS_STATUS_SUCCESS);
+				break;
+			}
+			case DTYPE_FLOAT64:
+			{
+				const double _alpha = alpha;
+				const double _beta = beta;
+				cublasStatus_t status = cublasDgemmStridedBatched(handle, op_B, op_A, M, N, K, &_alpha, getPointer<double>(B), LDB, strideB,
+						getPointer<double>(A), LDA, strideA, &_beta, getPointer<double>(C), LDC, strideC, batch);
 				assert(status == CUBLAS_STATUS_SUCCESS);
 				break;
 			}

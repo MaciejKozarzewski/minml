@@ -564,7 +564,10 @@ namespace ml
 		assert(cpu::is_aligned(A.data(), 64));
 		assert(cpu::is_aligned(B.data(), 64));
 		assert(beta_ptr != nullptr);
-		assert(cpu::is_aligned(bias.data(), 64));
+		if (bias.is_packed())
+		{
+			assert(cpu::is_aligned(bias.data(), 64));
+		}
 
 		const float *A_ptr = A.data<float>();
 		const float *B_ptr = B.data<float>();
@@ -713,7 +716,10 @@ namespace ml
 		assert(cpu::is_aligned(A.data(), 64));
 		assert(cpu::is_aligned(B.data(), 64));
 		assert(beta_ptr != nullptr);
-		assert(cpu::is_aligned(bias.data(), 64));
+		if (bias.is_packed())
+		{
+			assert(cpu::is_aligned(bias.data(), 64));
+		}
 
 		const float *A_ptr = A.data<float>();
 		const float *B_ptr = B.data<float>();

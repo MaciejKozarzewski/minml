@@ -261,7 +261,8 @@ namespace ml
 			void unpack_fragment_D(Fragment &fragment, int m, int n);
 	};
 
-	GemmRuntime get_runtime(mlContext_t context, mlDataType_t dtype, char opA, mlShape_t shape_A, char opB, mlShape_t shape_B);
+	GemmRuntime get_runtime(mlContext_t context, mlDataType_t dtype, char opA, char opB, mlShape_t shape_A, mlShape_t shape_B);
+	GemmRuntime get_runtime(mlContext_t context, mlDataType_t dtype, char opA, char opB, int M, int N, int K);
 }
 
 #endif /* BACKEND_CPU_KERNELS_GEMM_GEMM_RUNTIME_HPP_ */

@@ -21,6 +21,7 @@
 
 #include <minml/layers/Conv2D.hpp>
 #include <minml/layers/Dense.hpp>
+#include <minml/layers/DepthToSpace.hpp>
 #include <minml/layers/Input.hpp>
 #include <minml/layers/Add.hpp>
 #include <minml/layers/BatchNormalization.hpp>
@@ -30,6 +31,7 @@
 #include <minml/layers/MultiHeadAttention.hpp>
 #include <minml/layers/RMSNormalization.hpp>
 #include <minml/layers/Softmax.hpp>
+#include <minml/layers/SpaceToDepth.hpp>
 #include <minml/layers/SqueezeAndExcitation.hpp>
 #include <unordered_map>
 #include <cmath>
@@ -243,6 +245,7 @@ namespace ml
 		static const BatchNormalization batchnorm;
 		static const Conv2D conv2d(0, 0);
 		static const Dense dense(0);
+		static const DepthToSpace depth_to_space(0, { 0, 0 });
 		static const GlobalBroadcastHW global_broadcast;
 		static const GlobalPooling global_pooling;
 		static const LayerNormalization layernorm;
@@ -250,6 +253,7 @@ namespace ml
 		static const Input input;
 		static const RMSNormalization rmsnorm;
 		static const Softmax softmax( { 0 });
+		static const SpaceToDepth space_to_depth(0);
 		static const SqueezeAndExcitation se;
 
 		const std::string name = json["name"];
@@ -263,6 +267,8 @@ namespace ml
 			result = conv2d.clone(json);
 		if (name == dense.name())
 			result = dense.clone(json);
+		if (name == depth_to_space.name())
+			result = depth_to_space.clone(json);
 		if (name == global_broadcast.name())
 			result = global_broadcast.clone(json);
 		if (name == global_pooling.name())
@@ -277,6 +283,8 @@ namespace ml
 			result = rmsnorm.clone(json);
 		if (name == softmax.name())
 			result = softmax.clone(json);
+		if (name == space_to_depth.name())
+			result = space_to_depth.clone(json);
 		if (name == se.name())
 			result = se.clone(json);
 

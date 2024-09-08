@@ -194,7 +194,7 @@ namespace
 
 		__shared__ cg::block_tile_memory<128> btm;
 		cg::thread_block thb = cg::this_thread_block(btm);
-		cg::thread_block_tile<128> tile = cg::tiled_partition<128>(thb);
+		cg::thread_block_tile < 128 > tile = cg::tiled_partition<128>(thb);
 
 		for (int i = threadIdx.x; i < tokens; i += blockDim.x)
 		{
@@ -312,6 +312,15 @@ namespace
 				assert(status == CUBLAS_STATUS_SUCCESS);
 				break;
 			}
+			case ml::DTYPE_FLOAT64:
+			{
+				const double _alpha = alpha;
+				const double _beta = beta;
+				cublasStatus_t status = cublasDgemmBatched(handle, transb, transa, N, M, K, &_alpha, ml::getPointer<double*>(B), ldb,
+						ml::getPointer<double*>(A), lda, &_beta, ml::getPointer<double*>(C), ldc, batch_count);
+				assert(status == CUBLAS_STATUS_SUCCESS);
+				break;
+			}
 		}
 	}
 	void run_softmax_forward(cudaStream_t stream, void *input, ml::mlShape_t input_shape, const void *weights, ml::mlShape_t weights_shape,
@@ -342,6 +351,16 @@ namespace
 				const int shared_mem = sizeof(float) * (tokens * blockDim.y + weights_shape.dim[1] * weights_shape.dim[2]) + sizeof(Index2D) * tokens;
 				kernel_softmax_forward_in_place<<<gridDim, blockDim, shared_mem, stream>>>(ml::getPointer<float>(input),
 						ml::getPointer<float>(weights), batch_size, num_heads, height, width, range);
+				break;
+			}
+			case ml::DTYPE_FLOAT64:
+			{
+//				blockDim = dim3(32, 4);
+//				gridDim = dim3((height * width + blockDim.y - 1) / blockDim.y, batch_size, num_heads);
+//				const int shared_mem = sizeof(double) * (tokens * blockDim.y + weights_shape.dim[1] * weights_shape.dim[2])
+//						+ sizeof(Index2D) * tokens;
+//				kernel_softmax_forward_in_place<<<gridDim, blockDim, shared_mem, stream>>>(ml::getPointer<double>(input),
+//						ml::getPointer<double>(weights), batch_size, num_heads, height, width, range);
 				break;
 			}
 		}

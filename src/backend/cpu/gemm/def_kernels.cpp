@@ -12,11 +12,11 @@
 #include "../utils.hpp"
 #include "../fp16.hpp"
 
-#include <x86intrin.h>
 #include <cinttypes>
 #include <cstring>
 #include <cassert>
 #include <iostream>
+#include <cmath>
 
 namespace
 {
@@ -153,6 +153,56 @@ namespace
 		return (x > 0.0f) ? x : 0.0f;
 	}
 
+	float as_float(const int32_t x) noexcept
+	{
+		return *(float*) &x;
+	}
+	float fast_exp(float x) noexcept
+	{
+		// maximum relative error = 0.628981%
+		static constexpr float a = (1 << 22) / float(M_LN2);
+		static constexpr int32_t b = 127 * (1 << 23) - 139160;
+
+		const int32_t r = static_cast<int32_t>(a * x);
+		const float s = as_float(b + r);
+		const float t = as_float(b - r);
+		return s / t;
+	}
+	float fast_sigmoid(float x) noexcept
+	{
+		// maximum relative error = 0.628656%
+		static constexpr float a = (1 << 22) / float(M_LN2);
+		static constexpr int32_t b = 127 * (1 << 23) - 139002;
+		const int32_t r = static_cast<int32_t>(a * x);
+		const float s = as_float(b + r);
+		const float t = as_float(b - r);
+		return s / (s + t);
+	}
+	float fast_tanh(float x) noexcept
+	{
+		// maximum relative error = 4.049%
+		if (std::fabs(x) < 0.347f)
+			return x * (1.0f - 0.0924f * x);
+		else
+		{
+			static constexpr float a = (1 << 23) / float(M_LN2);
+			static constexpr int32_t b = 127 * (1 << 23);
+			const int32_t r = static_cast<int32_t>(a * x);
+			const float s = as_float(b + r);
+			const float t = as_float(b - r);
+			return (s - t) / (s + t);
+		}
+	}
+	float fast_gelu(float x) noexcept
+	{
+		static constexpr float a = (1 << 22) * (1.6849f / float(M_LN2));
+		static constexpr int32_t b = 127 * (1 << 23) - 329698;
+		const int32_t r = static_cast<int32_t>(a * x);
+		const float s = as_float(b + r);
+		const float t = as_float(b - r);
+		return (s * x) / (s + t);
+	}
+
 	template<typename DT, typename AT, typename BT, typename CT>
 	void kernel_gemm_fp32(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,
 			const Fragment &bias, bool use_relu) noexcept
@@ -269,6 +319,52 @@ namespace
 			dst_ptr += dst.stride();
 		}
 	}
+
+	template<typename CT, typename AT, typename BT>
+	void kernel_mha_fp32(Fragment &temp, const void *alpha_ptr, const Fragment &A, const Fragment &B, const Fragment &bias,
+			Fragment &softmax_sum) noexcept
+	{
+		assert(A.is_packed() && A.data() != nullptr);
+		assert(B.is_packed() && B.data() != nullptr);
+		assert(A.rows() == B.rows());
+		const int M = A.columns();
+		const int N = B.columns();
+		const int K = A.rows();
+
+		std::unique_ptr<float[]> acc = std::make_unique<float[]>(M * N);
+		for (int i = 0; i < M * N; i++)
+			acc[i] = 0.0f;
+
+		for (int k = 0; k < K; k++)
+			for (int m = 0; m < M; m++)
+			{
+				const float tmp = convert<AT, float>(A.at<AT>(k, m));
+				for (int n = 0; n < N; n++)
+					acc[m * N + n] += tmp * convert<BT, float>(B.at<BT>(k, n));
+			}
+
+		assert(alpha_ptr != nullptr);
+		const float alpha = reinterpret_cast<const float*>(alpha_ptr)[0];
+
+		assert(bias.is_packed());
+		assert(bias.data() != nullptr);
+		assert(bias.rows() == M);
+		assert(bias.columns() == N);
+		assert(bias.dtype() == B.dtype());
+		assert(temp.columns() == M);
+		for (int m = 0; m < M; m++)
+		{
+			float sum = softmax_sum.at<CT>(0, m);
+			for (int n = 0; n < N; n++)
+			{
+				const float b = convert<BT, float>(bias.at<BT>(m, n));
+				const float tmp = fast_exp(acc[m * N + n] * alpha + b);
+				temp.at<CT>(n, m) = convert<float, CT>(tmp);
+				sum += tmp;
+			}
+			softmax_sum.at<CT>(0, m) = sum;
+		}
+	}
 }
 
 namespace ml
@@ -280,6 +376,10 @@ namespace ml
 	void gemm_def_MxN_fp32(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,
 			const Fragment &bias, bool use_relu) noexcept
 	{
+		assert(A.dtype() == DTYPE_FLOAT32);
+		assert(B.dtype() == DTYPE_FLOAT32);
+		assert(C.dtype() == DTYPE_FLOAT32);
+		assert(D.dtype() == DTYPE_FLOAT32);
 		kernel_gemm_fp32<float, float, float, float>(D, alpha_ptr, A, B, beta_ptr, C, bias, use_relu);
 	}
 	void gemm_def_MxN_fp32_fp16(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,
@@ -331,6 +431,13 @@ namespace ml
 	void unpack_def_MxK_fp16(Matrix &dst, const Position2D &dst_pos, const Fragment &src) noexcept
 	{
 		kernel_unpack<float16, float16>(dst, dst_pos.row, dst_pos.column, src);
+	}
+
+	// multi-head attention kernel
+	void mha_qk_def_MxN_fp32(Fragment &temp, const void *alpha_ptr, const Fragment &Q, const Fragment &K, const Fragment &bias,
+			Fragment &softmax_sum) noexcept
+	{
+		kernel_mha_fp32<float, float, float>(temp, alpha_ptr, Q, K, bias, softmax_sum);
 	}
 
 } /* namespace ml */

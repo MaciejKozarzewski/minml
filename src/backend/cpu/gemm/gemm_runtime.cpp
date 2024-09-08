@@ -356,15 +356,20 @@ namespace ml
 			d_unpacking(matrix_D, Position2D(m, n), fragment);
 	}
 
-	GemmRuntime get_runtime(mlContext_t context, mlDataType_t dtype, char opA, mlShape_t shape_A, char opB, mlShape_t shape_B)
+	GemmRuntime get_runtime(mlContext_t context, mlDataType_t dtype, char opA, char opB, mlShape_t shape_A, mlShape_t shape_B)
 	{
 		assert(shape_A.rank == 2 || shape_A.rank == 3);
 		assert(shape_B.rank == 2 || shape_B.rank == 3);
-		const TypeConfiguration tc { dtype, dtype, dtype, dtype, DTYPE_FLOAT32 };
 
 		const int M = is_transpose(opA) ? shape_A.dim[shape_A.rank - 1] : shape_A.dim[shape_A.rank - 2];
 		const int N = is_transpose(opB) ? shape_B.dim[shape_B.rank - 2] : shape_B.dim[shape_B.rank - 1];
 		const int K = is_transpose(opA) ? shape_A.dim[shape_A.rank - 2] : shape_A.dim[shape_A.rank - 1];
+
+		return get_runtime(context, dtype, opA, opB, M, N, K);
+	}
+	GemmRuntime get_runtime(mlContext_t context, mlDataType_t dtype, char opA, char opB, int M, int N, int K)
+	{
+		const TypeConfiguration tc { dtype, dtype, dtype, dtype, DTYPE_FLOAT32 };
 
 		const std::vector<GemmRuntime> &table = get_gemm_runtime_table(context);
 		GemmRuntime result;

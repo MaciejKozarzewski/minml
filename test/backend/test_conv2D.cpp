@@ -142,8 +142,7 @@ namespace ml
 		Tensor input_matrices = input.view(Shape( { 12 * 13 * 17, 35 }));
 		Tensor output_matrices = output.view(Shape( { 12 * 13 * 17, 21 }));
 
-		gemm(context, 'n', 't', output_matrices, input_matrices, weight_matrices, 1.0f, 0.0f);
-		addBiasAct(context, output, output, bias, ActivationType::SIGMOID);
+		gemm_ex(context, output_matrices, 1.0f, 'n', input_matrices, 't', weight_matrices, 0.0f, output_matrices, bias, ActivationType::SIGMOID);
 		EXPECT_LE(testing::diffForTest(correct_output, output), 1.0e-4f);
 
 		if (testing::has_device_supporting(DataType::FLOAT32))
@@ -160,8 +159,7 @@ namespace ml
 
 			output_matrices.zeroall();
 
-			gemm(context, 'n', 't', output_matrices, input_matrices, weight_matrices, 1.0f, 0.0f);
-			addBiasAct(context, output, output, bias, ActivationType::SIGMOID);
+			gemm_ex(context, output_matrices, 1.0f, 'n', input_matrices, 't', weight_matrices, 0.0f, output_matrices, bias, ActivationType::SIGMOID);
 			context.synchronize();
 			EXPECT_LE(testing::diffForTest(correct_output, output), 1.0e-4f);
 		}
@@ -260,11 +258,15 @@ namespace ml
 		const int filter_in = 35;
 		const int filter_out = 21;
 
-		Tensor input( { batch_size, height, width, filter_in }, "float16", Device::cpu());
-		Tensor output( { batch_size, height, width, filter_out }, "float16", Device::cpu());
+		Tensor input(
+				{	batch_size, height, width, filter_in}, "float16", Device::cpu());
+		Tensor output(
+				{	batch_size, height, width, filter_out}, "float16", Device::cpu());
 		Tensor add(output.shape(), "float16", Device::cpu());
-		Tensor weights( { filter_out, 1, 1, filter_in }, "float16", Device::cpu());
-		Tensor bias( { filter_out }, "float16", Device::cpu());
+		Tensor weights(
+				{	filter_out, 1, 1, filter_in}, "float16", Device::cpu());
+		Tensor bias(
+				{	filter_out}, "float16", Device::cpu());
 		testing::initForTest(weights, 0.0f);
 		testing::initForTest(input, 1.0f);
 		testing::initForTest(bias, 1.0f);
@@ -316,11 +318,15 @@ namespace ml
 		const int filter_in = 35;
 		const int filter_out = 21;
 
-		Tensor input( { batch_size, height, width, filter_in }, "float16", Device::cpu());
-		Tensor output( { batch_size, height, width, filter_out }, "float16", Device::cpu());
+		Tensor input(
+				{	batch_size, height, width, filter_in}, "float16", Device::cpu());
+		Tensor output(
+				{	batch_size, height, width, filter_out}, "float16", Device::cpu());
 		Tensor add(output.shape(), "float16", Device::cpu());
-		Tensor weights( { filter_out, 3, 3, filter_in }, "float16", Device::cpu());
-		Tensor bias( { filter_out }, "float16", Device::cpu());
+		Tensor weights(
+				{	filter_out, 3, 3, filter_in}, "float16", Device::cpu());
+		Tensor bias(
+				{	filter_out}, "float16", Device::cpu());
 		testing::initForTest(weights, 0.0f);
 		testing::initForTest(input, 1.0f);
 		testing::initForTest(bias, 1.0f);
@@ -358,11 +364,15 @@ namespace ml
 		const int filter_in = 35;
 		const int filter_out = 21;
 
-		Tensor input( { batch_size, height, width, filter_in }, "float16", Device::cpu());
-		Tensor output( { batch_size, height, width, filter_out }, "float16", Device::cpu());
+		Tensor input(
+				{	batch_size, height, width, filter_in}, "float16", Device::cpu());
+		Tensor output(
+				{	batch_size, height, width, filter_out}, "float16", Device::cpu());
 		Tensor add(output.shape(), "float16", Device::cpu());
-		Tensor weights( { filter_out, 5, 5, filter_in }, "float16", Device::cpu());
-		Tensor bias( { filter_out }, "float16", Device::cpu());
+		Tensor weights(
+				{	filter_out, 5, 5, filter_in}, "float16", Device::cpu());
+		Tensor bias(
+				{	filter_out}, "float16", Device::cpu());
 		testing::initForTest(weights, 0.0f);
 		testing::initForTest(input, 1.0f);
 		testing::initForTest(bias, 1.0f);

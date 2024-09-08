@@ -63,6 +63,33 @@
 	vaddps(ymm4, ymm14, ymm14)\
 	vaddps(ymm5, ymm15, ymm15)
 
+#define SUB_KERNEL_8xFP32_8xFP32(n) \
+	vmovaps(mem(rbx, n*8*4), ymm0)\
+	vbroadcastss(mem(rax, (8*n+0)*4), ymm1)\
+	vbroadcastss(mem(rax, (8*n+1)*4), ymm2)\
+	vbroadcastss(mem(rax, (8*n+2)*4), ymm3)\
+	vbroadcastss(mem(rax, (8*n+3)*4), ymm4)\
+	vmulps(ymm1, ymm0, ymm1)\
+	vmulps(ymm2, ymm0, ymm2)\
+	vmulps(ymm3, ymm0, ymm3)\
+	vmulps(ymm4, ymm0, ymm4)\
+	vaddps(ymm1, ymm8, ymm8)\
+	vaddps(ymm2, ymm9, ymm9)\
+	vaddps(ymm3, ymm10, ymm10)\
+	vaddps(ymm4, ymm11, ymm11)\
+	vbroadcastss(mem(rax, (8*n+4)*4), ymm1)\
+	vbroadcastss(mem(rax, (8*n+5)*4), ymm2)\
+	vbroadcastss(mem(rax, (8*n+6)*4), ymm3)\
+	vbroadcastss(mem(rax, (8*n+7)*4), ymm4)\
+	vmulps(ymm1, ymm0, ymm1)\
+	vmulps(ymm2, ymm0, ymm2)\
+	vmulps(ymm3, ymm0, ymm3)\
+	vmulps(ymm4, ymm0, ymm4)\
+	vaddps(ymm1, ymm12, ymm12)\
+	vaddps(ymm2, ymm13, ymm13)\
+	vaddps(ymm3, ymm14, ymm14)\
+	vaddps(ymm4, ymm15, ymm15)
+
 #define SCALE_ACCUMULATORS_BY(reg)\
 	vmulps(reg, ymm6, ymm6) \
 	vmulps(reg, ymm7, ymm7) \
@@ -226,6 +253,57 @@
 	vmaxps(ymm0, ymm14, ymm14)\
 	vmaxps(ymm0, ymm15, ymm15)
 
+#define LOAD_ADD_BIAS_8x8xFP32(ptr, stride) \
+	movq(stride, r15) \
+	sal(imm(1), r15) \
+	vmovaps(mem(ptr), ymm0) \
+	vmovaps(mem(ptr, stride, 1), ymm1) \
+	add(r15, ptr) \
+	vmovaps(mem(ptr), ymm2) \
+	vmovaps(mem(ptr, stride, 1), ymm3) \
+	add(r15, ptr) \
+	vmovaps(mem(ptr), ymm4) \
+	vmovaps(mem(ptr, stride, 1), ymm5) \
+	add(r15, ptr) \
+	vmovaps(mem(ptr), ymm6) \
+	vmovaps(mem(ptr, stride, 1), ymm7) \
+	vaddps(ymm0, ymm8, ymm8) \
+	vaddps(ymm1, ymm9, ymm9) \
+	vaddps(ymm2, ymm10, ymm10) \
+	vaddps(ymm3, ymm11, ymm11) \
+	vaddps(ymm4, ymm12, ymm12) \
+	vaddps(ymm5, ymm13, ymm13) \
+	vaddps(ymm6, ymm14, ymm14) \
+	vaddps(ymm7, ymm15, ymm15)
+#define STORE_8x8xFP32() \
+	vmovaps(ymm0, mem(rbx, 0*8*4)) \
+	vmovaps(ymm1, mem(rbx, 1*8*4)) \
+	vmovaps(ymm2, mem(rbx, 2*8*4)) \
+	vmovaps(ymm3, mem(rbx, 3*8*4)) \
+	vmovaps(ymm4, mem(rbx, 4*8*4)) \
+	vmovaps(ymm5, mem(rbx, 5*8*4)) \
+	vmovaps(ymm6, mem(rbx, 6*8*4)) \
+	vmovaps(ymm7, mem(rbx, 7*8*4))
+
+#define CVT_ADD_SUB_1x8xINT32(x, y) \
+	vcvtps2dq(ymm(x), ymm(x)) \
+	vextractf128(imm(1), ymm(x), xmm1) \
+	vpsubd(xmm(x), xmm0, xmm2) \
+	vpsubd(xmm1, xmm0, xmm3) \
+	vpaddd(xmm(x), xmm0, xmm(x)) \
+	vpaddd(xmm1, xmm0, xmm1) \
+	vinsertf128(imm(1), xmm3, ymm2, ymm(y)) \
+	vinsertf128(imm(1), xmm1, ymm(x), ymm(x))
+#define FINALIZE_EXP_4x8xFP32(reg0, reg1, reg2, reg3) \
+	vrcpps(ymm4, ymm4) \
+	vrcpps(ymm5, ymm5) \
+	vrcpps(ymm6, ymm6) \
+	vrcpps(ymm7, ymm7) \
+	vmulps(ymm4, reg0, reg0) \
+	vmulps(ymm5, reg1, reg1) \
+	vmulps(ymm6, reg2, reg2) \
+	vmulps(ymm7, reg3, reg3)
+
 namespace ml
 {
 	using namespace ml::cpu;
@@ -247,7 +325,10 @@ namespace ml
 		assert(cpu::is_aligned(A.data(), 32));
 		assert(cpu::is_aligned(B.data(), 32));
 		assert(beta_ptr != nullptr);
-		assert(cpu::is_aligned(bias.data(), 32));
+		if (bias.is_packed())
+		{
+			assert(cpu::is_aligned(bias.data(), 32));
+		}
 
 		const float *A_ptr = A.data<float>();
 		const float *B_ptr = B.data<float>();
@@ -378,7 +459,10 @@ namespace ml
 		assert(cpu::is_aligned(A.data(), 32));
 		assert(cpu::is_aligned(B.data(), 32));
 		assert(beta_ptr != nullptr);
-		assert(cpu::is_aligned(bias.data(), 32));
+		if (bias.is_packed())
+		{
+			assert(cpu::is_aligned(bias.data(), 32));
+		}
 
 		const float *A_ptr = A.data<float>();
 		const float *B_ptr = B.data<float>();
@@ -703,264 +787,6 @@ namespace ml
 					"%r12", "%r13", "%r14", "%r15")
 		}
 
-		//		assert(dst.stride() == 10);
-		//		assert(ml::cpu::is_aligned(dst.data(), register_size<YMM>()));
-		//
-		//		uint64_t k_iter = dst.rows() / 8;
-		//		uint64_t k_left = dst.rows() % 8;
-		//		const uint64_t src_stride = src.stride() * sizeof(float);
-		//		const void *src_ptr = src.pointer_at(src_pos.row, src_pos.column);
-		//		void *dst_ptr = dst.data();
-		//
-		//		if (src_op == MatrixOp::NORMAL)
-		//		{
-		//			asm volatile(
-		//					"movq %[src_ptr], %%rax \n\t" // src pointer is in rax
-		//					"movq %[dst_ptr], %%rbx \n\t"// dst pointer is in rbx
-		//					"movq %[src_stride], %%r12 \n\t"// src stride is in r12
-		//
-		//					"movq %[k_iter], %%r14 \n\t"// load the number of 8-unrolled iterations
-		//					"test %%r14, %%r14 \n\t"
-		//					"je FINALLOOP%= \n\t"
-		//
-		//					"UNROLLED8%=: \n\t"
-		//					"vmovups 0x00(%%rax), %%ymm0 \n\t"
-		//					"vmovsd  0x20(%%rax), %%xmm1 \n\t"
-		//					"add %%r12, %%rax \n\t"// add stride to src pointer
-		//					"vmovups 0x00(%%rax), %%ymm2 \n\t"
-		//					"vmovsd  0x20(%%rax), %%xmm3 \n\t"
-		//					"add %%r12, %%rax \n\t"// add stride to src pointer
-		//					"vmovups 0x00(%%rax), %%ymm4 \n\t"
-		//					"vmovsd  0x20(%%rax), %%xmm5 \n\t"
-		//					"add %%r12, %%rax \n\t"// add stride to src pointer
-		//					"vmovups 0x00(%%rax), %%ymm6 \n\t"
-		//					"vmovsd  0x20(%%rax), %%xmm7 \n\t"
-		//					"add %%r12, %%rax \n\t"// add stride to src pointer
-		//					"vmovups 0x00(%%rax), %%ymm8 \n\t"
-		//					"vmovsd  0x20(%%rax), %%xmm9 \n\t"
-		//					"add %%r12, %%rax \n\t"// add stride to src pointer
-		//					"vmovups 0x00(%%rax), %%ymm10 \n\t"
-		//					"vmovsd  0x20(%%rax), %%xmm11 \n\t"
-		//					"add %%r12, %%rax \n\t"// add stride to src pointer
-		//					"vmovups 0x00(%%rax), %%ymm12 \n\t"
-		//					"vmovsd  0x20(%%rax), %%xmm13 \n\t"
-		//					"add %%r12, %%rax \n\t"// add stride to src pointer
-		//					"vmovups 0x00(%%rax), %%ymm14 \n\t"
-		//					"vmovsd  0x20(%%rax), %%xmm15 \n\t"
-		//					"add %%r12, %%rax \n\t"// add stride to src pointer
-		//
-		//					"vmovups %%ymm0, (4*(0*10+0))(%%rbx) \n\t"
-		//					"vmovsd  %%xmm1, (4*(0*10+8))(%%rbx) \n\t"
-		//					"vmovups %%ymm2, (4*(1*10+0))(%%rbx) \n\t"
-		//					"vmovsd  %%xmm3, (4*(1*10+8))(%%rbx) \n\t"
-		//					"vmovups %%ymm4, (4*(2*10+0))(%%rbx) \n\t"
-		//					"vmovsd  %%xmm5, (4*(2*10+8))(%%rbx) \n\t"
-		//					"vmovups %%ymm6, (4*(3*10+0))(%%rbx) \n\t"
-		//					"vmovsd  %%xmm7, (4*(3*10+8))(%%rbx) \n\t"
-		//					"vmovups %%ymm8, (4*(4*10+0))(%%rbx) \n\t"
-		//					"vmovsd  %%xmm9, (4*(4*10+8))(%%rbx) \n\t"
-		//					"vmovups %%ymm10, (4*(5*10+0))(%%rbx) \n\t"
-		//					"vmovsd  %%xmm11, (4*(5*10+8))(%%rbx) \n\t"
-		//					"vmovups %%ymm12, (4*(6*10+0))(%%rbx) \n\t"
-		//					"vmovsd  %%xmm13, (4*(6*10+8))(%%rbx) \n\t"
-		//					"vmovups %%ymm14, (4*(7*10+0))(%%rbx) \n\t"
-		//					"vmovsd  %%xmm15, (4*(7*10+8))(%%rbx) \n\t"
-		//
-		//					"add $(4*8*10), %%rbx \n\t"// add stride to dst pointer
-		//
-		//					"dec %%r14 \n\t"
-		//					"jne UNROLLED8%= \n\t"
-		//
-		//					"FINALLOOP%=: \n\t"
-		//					"movq %[k_left], %%r14 \n\t"// load the number of 1-unrolled iterations
-		//					"test %%r14, %%r14 \n\t"
-		//					"je EPILOGUE%= \n\t"
-		//
-		//					"UNROLLED1%=: \n\t"
-		//					"vmovups 0x00(%%rax), %%ymm0 \n\t"
-		//					"vmovsd  0x20(%%rax), %%xmm1 \n\t"
-		//					"add %%r12, %%rax \n\t"// add stride to src pointer
-		//					"vmovups %%ymm0, 0x00(%%rbx) \n\t"
-		//					"vmovsd  %%xmm1, 0x20(%%rbx) \n\t"
-		//					"add $(4*1*10), %%rbx \n\t"// add stride to dst pointer
-		//
-		//					"dec %%r14 \n\t"
-		//					"jne UNROLLED1%= \n\t"
-		//
-		//					"EPILOGUE%=: \n\t"
-		//					"vzeroupper \n\t"
-		//
-		//					:// outputs
-		//					:// inputs
-		//					[src_ptr] "m"(src_ptr),
-		//					[dst_ptr] "m"(dst_ptr),
-		//					[k_iter] "m"(k_iter),
-		//					[k_left] "m"(k_left),
-		//					[src_stride] "m"(src_stride)
-		//					:// clobbers
-		//					"cc", "memory", "%ymm0", "%ymm1", "%ymm2", "%ymm3", "%ymm4", "%ymm5", "%ymm6", "%ymm7",
-		//					"%ymm8", "%ymm9", "%ymm10", "%ymm11", "%ymm12", "%ymm13", "%ymm14", "%ymm15", "%rax", "%rbx",
-		//					"%r12", "%r14");
-		//		}
-		//		else
-		//		{
-		//			asm volatile(
-		//					"movq %[src_ptr], %%rax \n\t" // src pointer is in rax
-		//					"movq %[dst_ptr], %%rbx \n\t"// dst pointer is in rbx
-		//					"movq %[src_stride], %%r12 \n\t"// src stride is in r12
-		//
-		//					"movq %[k_iter], %%r14 \n\t"// load the number of 8-unrolled iterations
-		//					"test %%r14, %%r14 \n\t"
-		//					"je FINALLOOP%= \n\t"
-		//
-		//					"UNROLLED8%=: \n\t"
-		//					// first 8x8 tile
-		//					"movq %%rax, %%r13 \n\t"// tmp src pointer is in r13
-		//					// rows 0-7
-		//					"vmovups 0x0(%%r13), %%ymm0 \n\t"
-		//					"add %%r12, %%r13 \n\t"// add stride to src pointer
-		//					"vmovups 0x0(%%r13), %%ymm1 \n\t"
-		//					"add %%r12, %%r13 \n\t"// add stride to src pointer
-		//					"vmovups 0x0(%%r13), %%ymm2 \n\t"
-		//					"add %%r12, %%r13 \n\t"// add stride to src pointer
-		//					"vmovups 0x0(%%r13), %%ymm3 \n\t"
-		//					"add %%r12, %%r13 \n\t"// add stride to src pointer
-		//					"vmovups 0x0(%%r13), %%ymm4 \n\t"
-		//					"add %%r12, %%r13 \n\t"// add stride to src pointer
-		//					"vmovups 0x0(%%r13), %%ymm5 \n\t"
-		//					"add %%r12, %%r13 \n\t"// add stride to src pointer
-		//					"vmovups 0x0(%%r13), %%ymm6 \n\t"
-		//					"add %%r12, %%r13 \n\t"// add stride to src pointer
-		//					"vmovups 0x0(%%r13), %%ymm7 \n\t"
-		//					"add %%r12, %%r13 \n\t"// add stride to src pointer
-		//
-		//					// transpose 8x8
-		//					// first shuffle
-		//					"vunpcklps %%ymm1, %%ymm0, %%ymm8 \n\t"
-		//					"vunpckhps %%ymm1, %%ymm0, %%ymm9 \n\t"
-		//					"vunpcklps %%ymm3, %%ymm2, %%ymm10 \n\t"
-		//					"vunpckhps %%ymm3, %%ymm2, %%ymm11 \n\t"
-		//					"vunpcklps %%ymm5, %%ymm4, %%ymm12 \n\t"
-		//					"vunpckhps %%ymm5, %%ymm4, %%ymm13 \n\t"
-		//					"vunpcklps %%ymm7, %%ymm6, %%ymm14 \n\t"
-		//					"vunpckhps %%ymm7, %%ymm6, %%ymm15 \n\t"
-		//
-		//					// second shuffle
-		//					"vunpcklpd %%ymm10, %%ymm8, %%ymm0 \n\t"
-		//					"vunpckhpd %%ymm10, %%ymm8, %%ymm1 \n\t"
-		//					"vunpcklpd %%ymm11, %%ymm9, %%ymm2 \n\t"
-		//					"vunpckhpd %%ymm11, %%ymm9, %%ymm3 \n\t"
-		//					"vunpcklpd %%ymm14, %%ymm12, %%ymm4 \n\t"
-		//					"vunpckhpd %%ymm14, %%ymm12, %%ymm5 \n\t"
-		//					"vunpcklpd %%ymm15, %%ymm13, %%ymm6 \n\t"
-		//					"vunpckhpd %%ymm15, %%ymm13, %%ymm7 \n\t"
-		//
-		//					// third shuffle
-		//					"vperm2f128 $0x20, %%ymm4, %%ymm0, %%ymm8 \n\t"
-		//					"vperm2f128 $0x20, %%ymm5, %%ymm1, %%ymm9 \n\t"
-		//					"vperm2f128 $0x20, %%ymm6, %%ymm2, %%ymm10 \n\t"
-		//					"vperm2f128 $0x20, %%ymm7, %%ymm3, %%ymm11 \n\t"
-		//					"vperm2f128 $0x31, %%ymm4, %%ymm0, %%ymm12 \n\t"
-		//					"vperm2f128 $0x31, %%ymm5, %%ymm1, %%ymm13 \n\t"
-		//					"vperm2f128 $0x31, %%ymm6, %%ymm2, %%ymm14 \n\t"
-		//					"vperm2f128 $0x31, %%ymm7, %%ymm3, %%ymm15 \n\t"
-		//
-		//					"vmovups %%ymm8, (4*(0*10+0))(%%rbx) \n\t"
-		//					"vmovups %%ymm9, (4*(1*10+0))(%%rbx) \n\t"
-		//					"vmovups %%ymm10, (4*(2*10+0))(%%rbx) \n\t"
-		//					"vmovups %%ymm11, (4*(3*10+0))(%%rbx) \n\t"
-		//					"vmovups %%ymm12, (4*(4*10+0))(%%rbx) \n\t"
-		//					"vmovups %%ymm13, (4*(5*10+0))(%%rbx) \n\t"
-		//					"vmovups %%ymm14, (4*(6*10+0))(%%rbx) \n\t"
-		//					"vmovups %%ymm15, (4*(7*10+0))(%%rbx) \n\t"
-		//
-		//					// rows 8-9
-		//					"vmovups 0x0(%%r13), %%ymm0 \n\t"
-		//					"add %%r12, %%r13 \n\t"// add stride to src pointer
-		//					"vmovups 0x0(%%r13), %%ymm1 \n\t"
-		//					"add %%r12, %%r13 \n\t"// add stride to src pointer
-		//
-		//					"vunpcklps %%ymm1, %%ymm0, %%ymm4 \n\t"
-		//					"vunpckhps %%ymm1, %%ymm0, %%ymm5 \n\t"
-		//
-		//					"vextractf128 $0x1, %%ymm4, %%xmm6 \n\t"// e4 f4 e5 f5
-		//					"vextractf128 $0x1, %%ymm5, %%xmm7 \n\t"// e6 f6 e7 f7
-		//
-		//					"vmovlpd %%xmm4, (4*(0*10+8))(%%rbx) \n\t"
-		//					"vmovhpd %%xmm4, (4*(1*10+8))(%%rbx) \n\t"
-		//					"vmovlpd %%xmm5, (4*(2*10+8))(%%rbx) \n\t"
-		//					"vmovhpd %%xmm5, (4*(3*10+8))(%%rbx) \n\t"
-		//					"vmovlpd %%xmm6, (4*(4*10+8))(%%rbx) \n\t"
-		//					"vmovhpd %%xmm6, (4*(5*10+8))(%%rbx) \n\t"
-		//					"vmovlpd %%xmm7, (4*(6*10+8))(%%rbx) \n\t"
-		//					"vmovhpd %%xmm7, (4*(7*10+8))(%%rbx) \n\t"
-		//
-		//					"add $(4*8), %%rax \n\t"// add stride to src pointer
-		//					"add $(4*8*10), %%rbx \n\t"// add stride to dst pointer
-		//
-		//					"dec %%r14 \n\t"
-		//					"jne UNROLLED8%= \n\t"
-		//
-		//					"FINALLOOP%=: \n\t"
-		//					"movq %[k_left], %%r14 \n\t"// load the number of 1-unrolled iterations
-		//					"test %%r14, %%r14 \n\t"
-		//					"je EPILOGUE%= \n\t"
-		//
-		//					"UNROLLED1%=: \n\t"
-		//					"movq %%rax, %%r13 \n\t"// tmp src pointer is in r13
-		//
-		//					"vmovss 0x0(%%r13), %%xmm0 \n\t"
-		//					"add %%r12, %%r13 \n\t"// add stride to src pointer
-		//					"vmovss 0x0(%%r13), %%xmm1 \n\t"
-		//					"add %%r12, %%r13 \n\t"// add stride to src pointer
-		//					"vmovss 0x0(%%r13), %%xmm2 \n\t"
-		//					"add %%r12, %%r13 \n\t"// add stride to src pointer
-		//					"vmovss 0x0(%%r13), %%xmm3 \n\t"
-		//					"add %%r12, %%r13 \n\t"// add stride to src pointer
-		//					"vmovss 0x0(%%r13), %%xmm4 \n\t"
-		//					"add %%r12, %%r13 \n\t"// add stride to src pointer
-		//					"vmovss 0x0(%%r13), %%xmm5 \n\t"
-		//					"add %%r12, %%r13 \n\t"// add stride to src pointer
-		//					"vmovss 0x0(%%r13), %%xmm6 \n\t"
-		//					"add %%r12, %%r13 \n\t"// add stride to src pointer
-		//					"vmovss 0x0(%%r13), %%xmm7 \n\t"
-		//					"add %%r12, %%r13 \n\t"// add stride to src pointer
-		//					"vmovss 0x0(%%r13), %%xmm8 \n\t"
-		//					"add %%r12, %%r13 \n\t"// add stride to src pointer
-		//					"vmovss 0x0(%%r13), %%xmm9 \n\t"
-		//
-		//					"vmovss %%xmm0, (4*0)(%%rbx) \n\t"
-		//					"vmovss %%xmm1, (4*1)(%%rbx) \n\t"
-		//					"vmovss %%xmm2, (4*2)(%%rbx) \n\t"
-		//					"vmovss %%xmm3, (4*3)(%%rbx) \n\t"
-		//					"vmovss %%xmm4, (4*4)(%%rbx) \n\t"
-		//					"vmovss %%xmm5, (4*5)(%%rbx) \n\t"
-		//					"vmovss %%xmm6, (4*6)(%%rbx) \n\t"
-		//					"vmovss %%xmm7, (4*7)(%%rbx) \n\t"
-		//					"vmovss %%xmm8, (4*8)(%%rbx) \n\t"
-		//					"vmovss %%xmm9, (4*9)(%%rbx) \n\t"
-		//
-		//					"add $(4*1), %%rax \n\t"// add stride to src pointer
-		//					"add $(4*10*1), %%rbx \n\t"// add stride to dst pointer
-		//
-		//					"dec %%r14 \n\t"
-		//					"jne UNROLLED1%= \n\t"
-		//
-		//					"EPILOGUE%=: \n\t"
-		//					"vzeroupper \n\t"
-		//
-		//					:// outputs
-		//					:// inputs
-		//					[src_ptr] "m"(src_ptr),
-		//					[dst_ptr] "m"(dst_ptr),
-		//					[k_iter] "m"(k_iter),
-		//					[k_left] "m"(k_left),
-		//					[src_stride] "m"(src_stride)
-		//					:// clobbers
-		//					"cc", "memory", "%ymm0", "%ymm1", "%ymm2", "%ymm3", "%ymm4", "%ymm5", "%ymm6", "%ymm7",
-		//					"%ymm8", "%ymm9", "%ymm10", "%ymm11", "%ymm12", "%ymm13", "%ymm14", "%ymm15", "%rax", "%rbx", "%rcx",
-		//					"%r12", "%r13", "%r14");
-		//		}
 	}
 	void pack_avx_10xK_fp16_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept
 	{
@@ -1203,7 +1029,6 @@ namespace ml
 					"%ymm8", "%ymm9", "%ymm10", "%ymm11", "%ymm12", "%ymm13", "%ymm14", "%ymm15", "%rax", "%rbx", "%rcx",
 					"%r12", "%r13", "%r14", "%r15")
 		}
-
 	}
 
 	void pack_avx_8xK_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept
@@ -1671,5 +1496,137 @@ namespace ml
 		}
 	}
 
+	// multi-head attention (MHA) kernel
+	void mha_qk_avx_8x8_fp32(Fragment &temp, const void *alpha_ptr, const Fragment &Q, const Fragment &K, const Fragment &bias,
+			Fragment &softmax_sum) noexcept
+	{
+		assert(Q.rows() == K.rows());
+		assert(Q.stride() == 8);
+		assert(K.stride() == 8);
+		assert(temp.columns() == Q.columns());
+		assert(temp.rows() == K.columns());
+		assert(temp.stride() == 8);
+
+		assert(alpha_ptr != nullptr);
+		assert(cpu::is_aligned(Q.data(), 32));
+		assert(cpu::is_aligned(K.data(), 32));
+		if (bias.is_packed())
+		{
+			assert(cpu::is_aligned(bias.data(), 32));
+		}
+		if (softmax_sum.is_packed())
+		{
+			assert(cpu::is_aligned(softmax_sum.data(), 32));
+		}
+
+		const float *Q_ptr = Q.data<float>();
+		const float *K_ptr = K.data<float>();
+		float *temp_ptr = temp.data<float>();
+		const float *bias_ptr = bias.is_packed() ? bias.data<float>() : nullptr;
+		float *softmax_ptr = softmax_sum.is_packed() ? softmax_sum.data<float>() : nullptr;
+
+		uint64_t k_iter = Q.rows() / 4;
+		uint64_t k_left = Q.rows() % 4;
+		const uint64_t bias_stride = bias.stride() * sizeof(float);
+
+		begin_asm()
+		movq(var(Q_ptr), rax) // lhs pointer is in rax
+		movq(var(K_ptr), rbx)// rhs pointer is in rbx
+		ZERO_ACCUMULATORS()
+
+		movq(var(k_iter), r14)// load the number of 4-unrolled iterations
+		test(r14, r14)
+		je(FINALLOOP)
+
+		label(UNROLLED_x4)
+		SUB_KERNEL_8xFP32_8xFP32(0)
+		SUB_KERNEL_8xFP32_8xFP32(1)
+		SUB_KERNEL_8xFP32_8xFP32(2)
+		SUB_KERNEL_8xFP32_8xFP32(3)
+
+		add(imm(4*8*4), rax)
+		add(imm(4*8*4), rbx)
+		dec(r14)
+		jne(UNROLLED_x4)
+
+		label(FINALLOOP)
+		movq(var(k_left), r14)// load the number of 1-unrolled iterations
+		test(r14, r14)
+		je(EPILOGUE)
+
+		label(UNROLLED_x1)
+		SUB_KERNEL_8xFP32_8xFP32(0)
+		add(imm(1*8*4), rax)
+		add(imm(1*8*4), rbx)
+		dec(r14)
+		jne(UNROLLED_x1)
+
+		label(EPILOGUE)
+
+		movq(var(alpha_ptr), rax)// load address of alpha
+		vbroadcastss(mem(rax), ymm0)
+		SCALE_ACCUMULATORS_BY(ymm0)
+
+		movq(var(bias_ptr), rbx)// load address of bias pointer
+		test(rbx, rbx)
+		je(AFTER_BIAS)
+		movq(var(bias_stride), r14)// load address of bias stride into r14
+		LOAD_ADD_BIAS_8x8xFP32(rbx, r14)
+		label(AFTER_BIAS)
+
+		movq(imm(0x4ab8aa3b4ab8aa3b), r14)
+		movq(imm(0x3f7de0683f7de068), r15)
+		vmovq(r14, xmm1)
+		vmovq(r15, xmm0)
+		vpermpd(imm(0), ymm1, ymm1)// 127 * (1 << 23) - 139160 = 0x3f7de068 (a)
+		vpermpd(imm(0), ymm0, ymm0)// (1 << 22) / float(M_LN2) = 0x4ab8aa3b (b)
+		SCALE_ACCUMULATORS_BY(ymm1)// multiply by a
+
+		CVT_ADD_SUB_1x8xINT32(8, 4)
+		CVT_ADD_SUB_1x8xINT32(9, 5)
+		CVT_ADD_SUB_1x8xINT32(10, 6)
+		CVT_ADD_SUB_1x8xINT32(11, 7)
+		FINALIZE_EXP_4x8xFP32(ymm8, ymm9, ymm10, ymm11)
+		CVT_ADD_SUB_1x8xINT32(12, 4)
+		CVT_ADD_SUB_1x8xINT32(13, 5)
+		CVT_ADD_SUB_1x8xINT32(14, 6)
+		CVT_ADD_SUB_1x8xINT32(15, 7)
+		FINALIZE_EXP_4x8xFP32(ymm12, ymm13, ymm14, ymm15)
+
+		AVX_8x8_TRANSPOSE_INV()
+
+		movq(var(temp_ptr), rbx)// temp pointer is in rbx
+		STORE_8x8xFP32()
+
+		movq(var(softmax_ptr), rbx)// softmax sum pointer is in rbx
+		vmovaps(mem(rbx), ymm15)// load previous sum
+		// sum all accumulators and place result in the first one (ymm8)
+		vaddps(ymm1, ymm0, ymm0)
+		vaddps(ymm3, ymm2, ymm2)
+		vaddps(ymm5, ymm4, ymm4)
+		vaddps(ymm7, ymm6, ymm6)
+		vaddps(ymm4, ymm0, ymm0)
+		vaddps(ymm6, ymm2, ymm2)
+		vaddps(ymm2, ymm0, ymm0)
+		vaddps(ymm15, ymm0, ymm0)// add current sum
+		vmovaps(ymm0, mem(rbx))
+
+		vzeroupper()
+
+		end_asm(:// outputs
+				:// inputs
+				[Q_ptr] "m"(Q_ptr),
+				[K_ptr] "m"(K_ptr),
+				[temp_ptr] "m"(temp_ptr),
+				[k_iter] "m"(k_iter),
+				[k_left] "m"(k_left),
+				[bias_stride] "m"(bias_stride),
+				[alpha_ptr] "m"(alpha_ptr),
+				[bias_ptr] "m"(bias_ptr),
+				[softmax_ptr] "m"(softmax_ptr)
+				:// clobbers
+				"cc", "memory", "%xmm0", "%xmm1", "%xmm2", "%xmm3", "%xmm4", "%xmm5", "%xmm6", "%xmm7",
+				"%xmm8", "%xmm9", "%xmm10", "%xmm11", "%xmm12", "%xmm13", "%xmm14", "%xmm15", "%rax", "%rbx", "%rcx", "%r14", "%r15")
+	}
 } /* namespace ml */
 

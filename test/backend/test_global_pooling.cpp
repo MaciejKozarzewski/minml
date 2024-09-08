@@ -10,6 +10,7 @@
 #include <minml/core/Context.hpp>
 #include <minml/core/Tensor.hpp>
 #include <minml/utils/testing_util.hpp>
+#include <minml/utils/json.hpp>
 
 #include <cmath>
 #include <gtest/gtest.h>
@@ -17,55 +18,67 @@
 namespace
 {
 	using namespace ml;
+	template<typename T = float>
 	void baseline_pooling_forward(const Tensor &input, Tensor &output)
 	{
 		assert(input.rank() == 4);
-		assert(output.rank() == 3);
+		assert(output.rank() == 2);
 		assert(input.firstDim() == output.firstDim());
-		assert(output.dim(1) == 2);
-		assert(input.lastDim() == output.lastDim());
+		assert(2 * input.lastDim() == output.lastDim());
 
-		const float inv = 1.0f / (input.dim(1) * input.dim(2));
+		const int channels = input.lastDim();
+		const T inv = 1.0 / (input.dim(1) * input.dim(2));
 		for (int i = 0; i < input.firstDim(); i++)
 			for (int l = 0; l < input.lastDim(); l++)
 			{
-				float avg_value = 0.0f;
-				float max_value = input.get( { i, 0, 0, l });
+				T avg_value = 0.0;
+				T max_value = input.at( { i, 0, 0, l });
 				for (int j = 0; j < input.dim(1); j++)
 					for (int k = 0; k < input.dim(2); k++)
 					{
-						const float x = input.get( { i, j, k, l });
+						const T x = input.get( { i, j, k, l });
 						avg_value += x;
 						max_value = std::max(max_value, x);
 					}
-				output.set(avg_value * inv, { i, 0, l });
-				output.set(max_value, { i, 1, l });
+				output.at( { i, 0 * channels + l }) = avg_value * inv;
+				output.at( { i, 1 * channels + l }) = max_value;
 			}
 	}
+	template<typename T = float>
 	void baseline_pooling_backward(Tensor &gradient_prev, const Tensor &gradient_next, const Tensor &input, const Tensor &output)
 	{
 		assert(input.shape() == gradient_prev.shape());
 		assert(output.shape() == gradient_next.shape());
 		assert(input.rank() == 4);
-		assert(output.rank() == 3);
+		assert(output.rank() == 2);
 		assert(input.firstDim() == output.firstDim());
-		assert(output.dim(1) == 2);
-		assert(input.lastDim() == output.lastDim());
+		assert(2 * input.lastDim() == output.lastDim());
 
-		const float inv = 1.0f / (input.dim(1) * input.dim(2));
+		const int channels = input.lastDim();
+		const T inv = 1.0 / (input.dim(1) * input.dim(2));
 		for (int i = 0; i < input.dim(0); i++)
-			for (int j = 0; j < input.dim(1); j++)
-				for (int k = 0; k < input.dim(2); k++)
-					for (int l = 0; l < input.dim(3); l++)
+			for (int l = 0; l < input.dim(3); l++)
+			{
+				int max_idx_h = 0;
+				int max_idx_w = 0;
+				T max_value = input.at( { i, 0, 0, l });
+				for (int j = 0; j < input.dim(1); j++)
+					for (int k = 0; k < input.dim(2); k++)
 					{
-						const float max_value = output.get( { i, 1, l });
-
-						const float grad_avg = gradient_next.get( { i, 0, l });
-						const float grad_max = (input.get( { i, j, k, l }) == max_value) ? gradient_next.get( { i, 1, l }) : 0.0f;
-
-						const float tmp = gradient_prev.get( { i, j, k, l }) + inv * grad_avg + grad_max;
-						gradient_prev.set(tmp, { i, j, k, l });
+						const T in = input.at( { i, j, k, l });
+						const T grad_avg = gradient_next.at( { i, 0 * channels + l });
+						gradient_prev.at( { i, j, k, l }) = (T) gradient_prev.at( { i, j, k, l }) + inv * grad_avg;
+						if (in > max_value)
+						{
+							max_value = in;
+							max_idx_h = j;
+							max_idx_w = k;
+						}
 					}
+
+				const T grad_max = gradient_next.at( { i, 1 * channels + l });
+				gradient_prev.at( { i, max_idx_h, max_idx_w, l }) = (T) gradient_prev.at( { i, max_idx_h, max_idx_w, l }) + grad_max;
+			}
 	}
 
 	void baseline_broadcasting_forward(const Tensor &input, Tensor &output, const Tensor &bias, ActivationType act)
@@ -105,16 +118,69 @@ namespace
 				gradient_prev.set(grad, { i, l });
 			}
 	}
+
+	class BaselineGlobalPooling: public Layer
+	{
+		public:
+			BaselineGlobalPooling() :
+					Layer("linear")
+			{
+			}
+			void setInputShape(const std::vector<Shape> &shapes)
+			{
+				m_input_shapes = shapes;
+			}
+			Shape getOutputShape() const
+			{
+				const int batch_size = getInputShape().firstDim();
+				const int channels = getInputShape().lastDim();
+				return Shape( { batch_size, 2 * channels });
+			}
+			std::string name() const
+			{
+				return "BaselineGlobalPooling";
+			}
+			std::unique_ptr<Layer> clone(const Json &config) const
+			{
+				std::unique_ptr<BaselineGlobalPooling> result = std::make_unique<BaselineGlobalPooling>();
+				result->m_dtype = typeFromString(config["dtype"].getString());
+				return result;
+			}
+			void forward(const std::vector<Tensor> &input, Tensor &output)
+			{
+				if (input[0].dtype() == DataType::FLOAT32)
+					baseline_pooling_forward<float>(input[0], output);
+				if (input[0].dtype() == DataType::FLOAT64)
+					baseline_pooling_forward<double>(input[0], output);
+			}
+			void backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next)
+			{
+				if (input[0].dtype() == DataType::FLOAT32)
+					baseline_pooling_backward<float>(gradient_prev[0], gradient_next, input[0], output);
+				if (input[0].dtype() == DataType::FLOAT64)
+					baseline_pooling_backward<double>(gradient_prev[0], gradient_next, input[0], output);
+			}
+	};
+
 }
 
 namespace ml
 {
+//	TEST(TestGlobalPooling, baseline)
+//	{
+//		testing::GradientCheck gradcheck { BaselineGlobalPooling() };
+//		gradcheck.setInputShape(Shape( { 13, 7, 8, 34 }));
+//
+//		gradcheck.check(1000, 1.0e-4, "all");
+//
+//		exit(0);
+//	}
 	TEST(TestGlobalPooling, forward_fp32)
 	{
 		Context context;
 		Tensor input( { 12, 13, 14, 134 }, "float32", Device::cpu());
-		Tensor output( { input.firstDim(), 2, input.lastDim() }, input.dtype(), Device::cpu());
-		Tensor correct_output(output.shape(), input.dtype(), Device::cpu());
+		Tensor output( { input.firstDim(), 2 * input.lastDim() }, input.dtype(), Device::cpu());
+		Tensor correct_output = zeros_like(output);
 
 		testing::initForTest(input, 0.0);
 
@@ -141,11 +207,11 @@ namespace ml
 	{
 		Context context;
 		Tensor input( { 12, 13, 14, 34 }, "float32", Device::cpu());
-		Tensor gradient_prev(input.shape(), "float32", Device::cpu());
-		Tensor output( { input.firstDim(), 2, input.lastDim() }, "float32", Device::cpu());
-		Tensor gradient_next(output.shape(), "float32", Device::cpu());
+		Tensor gradient_prev = zeros_like(input);
+		Tensor output( { input.firstDim(), 2 * input.lastDim() }, "float32", Device::cpu());
+		Tensor gradient_next = zeros_like(output);
 
-		Tensor correct_gradient_prev(gradient_prev.shape(), "float32", Device::cpu());
+		Tensor correct_gradient_prev = zeros_like(gradient_prev);
 
 		testing::initForTest(input, 0.0);
 		testing::initForTest(gradient_next, 1.57);
@@ -246,8 +312,8 @@ namespace ml
 	{
 		Context context;
 		Tensor input( { 12, 13, 14, 34 }, "float16", Device::cpu());
-		Tensor output( { input.firstDim(), 2, input.lastDim() }, input.dtype(), Device::cpu());
-		Tensor correct_output(output.shape(), input.dtype(), Device::cpu());
+		Tensor output( { input.firstDim(), 2 * input.lastDim() }, input.dtype(), Device::cpu());
+		Tensor correct_output = zeros_like(output);
 
 		testing::initForTest(input, 0.0);
 

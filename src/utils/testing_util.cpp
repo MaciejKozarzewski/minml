@@ -337,7 +337,8 @@ namespace ml
 					const int r = (n >= m_layer->getWeights().getParam().volume()) ? j : randInt(m_layer->getWeights().getParam().volume());
 					const double grad = compute_gradient(m_layer->getWeights().getParam(), r, epsilon);
 					max_diff = std::max(max_diff, std::abs(grad - reinterpret_cast<const double*>(m_layer->getWeights().getGradient().data())[r]));
-//					std::cout << grad << " vs " << reinterpret_cast<const double*>(m_layer->getWeights().getGradient().data())[r] << '\n';
+//					std::cout << r << " : " << grad << " vs " << reinterpret_cast<const double*>(m_layer->getWeights().getGradient().data())[r]
+//							<< '\n';
 				}
 
 			if (mode == "bias" or mode == "all")
@@ -347,7 +348,7 @@ namespace ml
 
 					const double grad = compute_gradient(m_layer->getBias().getParam(), r, epsilon);
 					max_diff = std::max(max_diff, std::abs(grad - reinterpret_cast<const double*>(m_layer->getBias().getGradient().data())[r]));
-//					std::cout << grad << " vs " << reinterpret_cast<const double*>(m_layer->getBias().getGradient().data())[r] << '\n';
+//					std::cout << r << " : " << grad << " vs " << reinterpret_cast<const double*>(m_layer->getBias().getGradient().data())[r] << '\n';
 				}
 			std::cout << max_diff << '\n';
 			return max_diff;

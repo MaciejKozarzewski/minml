@@ -855,6 +855,44 @@ namespace
 			}
 		}
 	}
+	template<typename T, int N>
+	__global__ void kernel_rmsnorm_forward_v2(const T *input, T *output, const T *weights, int first_dim, int last_dim)
+	{
+		extern __shared__ char shared_array[];
+
+		float *shared_input = reinterpret_cast<float*>(shared_array);
+		float *shared_weights = shared_input + last_dim;
+
+		for (int j = N * threadIdx.x; j < last_dim; j += N * blockDim.x)
+			vector_copy<N>(shared_weights + j, weights + j);
+		__syncthreads();
+
+		__shared__ cg::block_tile_memory<256> btm;
+		cg::thread_block thb = cg::this_thread_block(btm);
+		cg::thread_block_tile<256> tile = cg::tiled_partition<256>(thb);
+
+		for (int i = blockIdx.x; i < first_dim; i += gridDim.x)
+		{
+			float sum_squares = 0.0f;
+			for (int j = N * threadIdx.x; j < last_dim; j += N * blockDim.x)
+			{
+				const vec<float, N> in = load_vec<float, N>(input + i * last_dim + j);
+				sum_squares += horizontal_add(square(in));
+				store_vec(shared_input + j, in);
+			}
+			sum_squares = cg::reduce(tile, sum_squares, cg::plus<float>());
+			const float rms = std::sqrt(sum_squares / last_dim);
+			const float inv_rms = 1.0f / (1.0e-6f + rms);
+
+			for (int j = N * threadIdx.x; j < last_dim; j += N * blockDim.x)
+			{
+				const vec<float, N> gamma = load_vec<float, N>(weights + j);
+				const vec<float, N> in = load_vec<float, N>(shared_input + j);
+				const vec<float, N> out = gamma * in * inv_rms;
+				store_vec(output + i * last_dim + j, out);
+			}
+		}
+	}
 	template<int N>
 	__global__ void kernel_rmsnorm_backward(const float *input, float *gradient_prev, float *gradient_next, const float *weights,
 			float *weights_update, int first_dim, int last_dim)
@@ -1174,24 +1212,31 @@ namespace ml
 		const int first_dim = volume_without_last_dim(shape);
 		const int last_dim = get_last_dim(shape);
 
-		dim3 blockDim(128);
-		dim3 gridDim(std::min(2048, first_dim));
+		dim3 blockDim(256);
+		dim3 gridDim(std::min(1024, first_dim));
 
 		cudaStream_t stream = cuda::Context::getStream(context);
 
+		const int shared_mem = sizeof(float) * 2 * last_dim;
 		switch (dtype)
 		{
 			case DTYPE_FLOAT16:
 			{
+				if (last_dim % 4 == 0)
+					kernel_rmsnorm_forward_v2<half, 4> <<<gridDim, blockDim, shared_mem, stream >>>(getPointer<half>(input), getPointer<half>(output),
+							getPointer<half>(weights), first_dim, last_dim);
+				else
+					kernel_rmsnorm_forward_v2<half, 1> <<<gridDim, blockDim, shared_mem, stream >>>(getPointer<half>(input), getPointer<half>(output),
+							getPointer<half>(weights), first_dim, last_dim);
 				break;
 			}
 			case DTYPE_FLOAT32:
 			{
 				if (last_dim % 4 == 0)
-					kernel_rmsnorm_forward<float, 4> <<<gridDim, blockDim, 0, stream >>>(getPointer<float>(input), getPointer<float>(output),
+					kernel_rmsnorm_forward_v2<float, 4> <<<gridDim, blockDim, shared_mem, stream >>>(getPointer<float>(input), getPointer<float>(output),
 							getPointer<float>(weights), first_dim, last_dim);
 				else
-					kernel_rmsnorm_forward<float, 1> <<<gridDim, blockDim, 0, stream >>>(getPointer<float>(input), getPointer<float>(output),
+					kernel_rmsnorm_forward_v2<float, 1> <<<gridDim, blockDim, shared_mem, stream >>>(getPointer<float>(input), getPointer<float>(output),
 							getPointer<float>(weights), first_dim, last_dim);
 				break;
 			}

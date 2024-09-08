@@ -558,10 +558,10 @@ namespace ml
 	}
 	TEST(TestBatchNorm, backward)
 	{
-		const int batch_size = 256;
-		const int height = 15;
-		const int width = 15;
-		const int filters = 64;
+		const int batch_size = 123;
+		const int height = 11;
+		const int width = 12;
+		const int filters = 34;
 		Context context;
 
 		Tensor input( { batch_size * height * width, filters }, "float32", Device::cpu());
@@ -709,7 +709,7 @@ namespace ml
 	TEST(TestLayerNorm, backward)
 	{
 		const int batch_size = 123;
-		const int filters = 43;
+		const int filters = 44;
 		Context context;
 
 		Tensor input( { batch_size, filters }, "float32", Device::cpu());
@@ -770,6 +770,15 @@ namespace ml
 		}
 	}
 
+//	TEST(TestRMSNorm, baseline)
+//	{
+//		testing::GradientCheck gradcheck { BaselineRMSN() };
+//		gradcheck.setInputShape(Shape( { 31, 43 }));
+//
+//		gradcheck.check(1000, 1.0e-4, "all");
+//
+//		exit(0);
+//	}
 	TEST(TestRMSNorm, forward)
 	{
 		const int batch_size = 123;

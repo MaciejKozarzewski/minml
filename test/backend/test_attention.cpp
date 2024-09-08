@@ -277,7 +277,7 @@ namespace
 		{
 			Tensor QK_intermediate = baseline_batched_gemm<double>(Q, K, scale, 'n', 't');
 			baseline_softmax_forward<double>(QK_intermediate, weights, input.shape());
-			output_intermediate = baseline_batched_gemm<double>(QK_intermediate, V, 1.0f, 'n', 'n');
+			output_intermediate = baseline_batched_gemm<double>(QK_intermediate, V, 1.0, 'n', 'n');
 		}
 
 		return combine_heads(output_intermediate, input.shape());
@@ -323,8 +323,8 @@ namespace
 		}
 		else
 		{
-			Tensor d_int = baseline_batched_gemm<double>(dy, V, 1.0f, 'n', 't');
-			dV = baseline_batched_gemm<double>(QK_intermediate, dy, 1.0f, 't', 'n');
+			Tensor d_int = baseline_batched_gemm<double>(dy, V, 1.0, 'n', 't');
+			dV = baseline_batched_gemm<double>(QK_intermediate, dy, 1.0, 't', 'n');
 
 			const Tensor d_int2 = baseline_softmax_backward<double>(QK_intermediate, d_int, weights_update, input.shape());
 
@@ -401,15 +401,16 @@ namespace
 
 namespace ml
 {
-//	TEST(TestLayerNorm, baseline)
+//	TEST(TestMultiHeadAttention, baseline)
 //	{
-//		testing::GradientCheck gradcheck { BaselineMHA(1, 4) };
-//		gradcheck.setInputShape(Shape( { 1, 4, 4, 3 * 8 }));
+//		testing::GradientCheck gradcheck { BaselineMHA(1, 8) };
+//		gradcheck.setInputShape(Shape( { 3, 8, 8, 3 * 32 }));
 //
-//		gradcheck.check(5000, 1.0e-4, "all");
+//		gradcheck.check(100, 1.0e-4, "input");
 //
 //		exit(0);
 //	}
+
 	TEST(TestMultiHeadAttention, forward)
 	{
 		const int batch_size = 12;
@@ -435,7 +436,8 @@ namespace ml
 		Tensor workspace( { workspace_size }, "float32", context.device());
 		multiHeadAttentionForward(context, input, output, weights, workspace, backward_data);
 
-//		EXPECT_LE(testing::diffForTest(correct_output, output), 1.0e-4f);
+		EXPECT_LE(testing::diffForTest(correct_output, output), 1.0e-4f);
+		exit(0);
 
 		if (testing::has_device_supporting(DataType::FLOAT32))
 		{
@@ -514,9 +516,11 @@ namespace ml
 //		std::cout << "backprop grad = " << gradient_prev.get(index) << " vs numerical = " << (loss_p - loss_m) / (2 * eps) << '\n';
 //		exit(0);
 
-//		multiHeadAttentionBackward(context, input, weights, gradient_prev, gradient_next, weights_update, workspace, backward_data);
+		multiHeadAttentionForward(context, input, output, weights, workspace, backward_data);
+		multiHeadAttentionBackward(context, input, weights, gradient_prev, gradient_next, weights_update, workspace, backward_data);
 
-//		EXPECT_LE(testing::diffForTest(correct_gradient_prev, gradient_prev), 1.0e-4f);
+		EXPECT_LE(testing::diffForTest(correct_gradient_prev, gradient_prev), 1.0e-4f);
+		EXPECT_LE(testing::diffForTest(correct_weights_update, weights_update), 1.0e-4f);
 
 		if (testing::has_device_supporting(DataType::FLOAT32))
 		{

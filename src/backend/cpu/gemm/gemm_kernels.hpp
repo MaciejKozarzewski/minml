@@ -33,6 +33,9 @@ namespace ml
 	void pack_def_MxK_fp16(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept;
 	void unpack_def_MxK_fp32(Matrix &dst, const Position2D &dst_pos, const Fragment &src) noexcept;
 	void unpack_def_MxK_fp16(Matrix &dst, const Position2D &dst_pos, const Fragment &src) noexcept;
+	// multi-head attention (MHA) kernel
+	void mha_qk_def_MxN_fp32(Fragment &temp, const void *alpha_ptr, const Fragment &Q, const Fragment &K, const Fragment &bias,
+			Fragment &softmax_sum) noexcept;
 
 	/*
 	 * SSE2 kernels
@@ -42,6 +45,9 @@ namespace ml
 
 	void pack_sse2_4xK_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept;
 	void pack_sse2_8xK_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept;
+	// multi-head attention (MHA) kernel
+	void mha_qk_sse2_4x8_fp32(Fragment &temp, const void *alpha_ptr, const Fragment &Q, const Fragment &K, const Fragment &bias,
+			Fragment &softmax_sum) noexcept;
 
 	/*
 	 * AVX kernels
@@ -55,6 +61,9 @@ namespace ml
 	void pack_avx_10xK_fp16_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept;
 	void pack_avx_8xK_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept;
 	void pack_avx_8xK_fp16_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept;
+	// multi-head attention (MHA) kernel
+	void mha_qk_avx_8x8_fp32(Fragment &temp, const void *alpha_ptr, const Fragment &Q, const Fragment &K, const Fragment &bias,
+			Fragment &softmax_sum) noexcept;
 
 	/*
 	 * AVX2 kernels
@@ -66,6 +75,9 @@ namespace ml
 
 	void pack_avx2_fma_12xK_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept;
 	void pack_avx2_fma_12xK_fp16_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept;
+	// multi-head attention (MHA) kernel
+	void mha_qk_avx2_fma_12x8_fp32(Fragment &temp, const void *alpha_ptr, const Fragment &Q, const Fragment &K, const Fragment &bias,
+			Fragment &softmax_sum) noexcept;
 
 	/*
 	 * AVX512 kernels
@@ -79,6 +91,9 @@ namespace ml
 	void pack_avx512f_24xK_fp16_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept;
 	void pack_avx512f_16xK_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept;
 	void pack_avx512f_16xK_fp16_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept;
+	// multi-head attention (MHA) kernel
+	void mha_qk_avx512f_24x16_fp32(Fragment &temp, const void *alpha_ptr, const Fragment &Q, const Fragment &K, const Fragment &bias,
+			Fragment &softmax_sum) noexcept;
 
 } /* namespace ml */
 

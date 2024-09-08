@@ -431,6 +431,10 @@
 #define divpd(_0, _1) INSTR_(divpd, _0, _1)
 #define xorps(_0, _1) INSTR_(xorps, _0, _1)
 #define xorpd(_0, _1) INSTR_(xorpd, _0, _1)
+#define rcpps(_0, _1) INSTR_(rcpps, _0, _1)
+
+#define paddd(_0, _1) INSTR_(paddd, _0, _1)
+#define psubd(_0, _1) INSTR_(psubd, _0, _1)
 
 #define ucomiss(_0, _1) INSTR_(ucomiss, _0, _1)
 #define ucomisd(_0, _1) INSTR_(ucomisd, _0, _1)
@@ -462,6 +466,10 @@
 #define vxorps(_0, _1, _2) INSTR_(vxorps, _0, _1, _2)
 #define vxorpd(_0, _1, _2) INSTR_(vxorpd, _0, _1, _2)
 #define vpxord(_0, _1, _2) INSTR_(vpxord, _0, _1, _2)
+#define vrcpps(_0, _1) INSTR_(vrcpps, _0, _1)
+
+#define vpaddd(_0, _1, _2) INSTR_(vpaddd, _0, _1, _2)
+#define vpsubd(_0, _1, _2) INSTR_(vpsubd, _0, _1, _2)
 
 #define vucomiss(_0, _1) INSTR_(vucomiss, _0, _1)
 #define vucomisd(_0, _1) INSTR_(vucomisd, _0, _1)
@@ -583,14 +591,18 @@
 #define cvtsd2ss(_0, _1) INSTR_(cvtsd2ss, _0, _1)
 #define cvtps2pd(_0, _1) INSTR_(cvtps2pd, _0, _1)
 #define cvtpd2ps(_0, _1) INSTR_(cvtpd2ps, _0, _1)
+#define cvtps2dq(_0, _1) INSTR_(cvtps2dq, _0, _1)
 
 #define vcvtss2sd(_0, _1) INSTR_(vcvtss2sd, _0, _1)
 #define vcvtsd2ss(_0, _1) INSTR_(vcvtsd2ss, _0, _1)
 #define vcvtps2pd(_0, _1) INSTR_(vcvtps2pd, _0, _1)
 #define vcvtpd2ps(_0, _1) INSTR_(vcvtpd2ps, _0, _1)
+#define vcvtps2dq(_0, _1) INSTR_(vcvtps2dq, _0, _1)
 
 #define vcvtph2ps(_0, _1) INSTR_(vcvtph2ps, _0, _1)
 #define vcvtps2ph(_0, _1, _2) INSTR_(vcvtps2ph, _0, _1, _2)
+
+
 
 /*
  * Vector shuffles
@@ -602,6 +614,8 @@
 #define unpckhps(_0, _1) INSTR_(unpckhps, _0, _1)
 #define unpcklpd(_0, _1) INSTR_(unpcklpd, _0, _1)
 #define unpckhpd(_0, _1) INSTR_(unpckhpd, _0, _1)
+#define movlhps(_0, _1) INSTR_(movlhps, _0, _1)
+#define movhlps(_0, _1) INSTR_(movhlps, _0, _1)
 
 #define vshufps(_0, _1, _2, _3) INSTR_(vshufps, _0, _1, _2, _3)
 #define vshufpd(_0, _1, _2, _3) INSTR_(vshufpd, _0, _1, _2, _3)
