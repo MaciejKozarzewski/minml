@@ -203,6 +203,9 @@ namespace
 		return (s * x) / (s + t);
 	}
 
+	/*
+	 * computes D = optional_relu(alpha * op(A) * op(B) + beta * C + broadcast(bias))
+	 */
 	template<typename DT, typename AT, typename BT, typename CT>
 	void kernel_gemm_fp32(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,
 			const Fragment &bias, bool use_relu) noexcept

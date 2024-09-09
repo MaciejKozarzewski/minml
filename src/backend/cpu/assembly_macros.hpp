@@ -433,6 +433,7 @@
 #define xorpd(_0, _1) INSTR_(xorpd, _0, _1)
 #define rcpps(_0, _1) INSTR_(rcpps, _0, _1)
 
+#define pmaddwd(_0, _1) INSTR_(pmaddwd, _0, _1)
 #define paddd(_0, _1) INSTR_(paddd, _0, _1)
 #define psubd(_0, _1) INSTR_(psubd, _0, _1)
 
@@ -468,6 +469,7 @@
 #define vpxord(_0, _1, _2) INSTR_(vpxord, _0, _1, _2)
 #define vrcpps(_0, _1) INSTR_(vrcpps, _0, _1)
 
+#define vpmaddwd(_0, _1, _2) INSTR_(vpmaddwd, _0, _1, _2)
 #define vpaddd(_0, _1, _2) INSTR_(vpaddd, _0, _1, _2)
 #define vpsubd(_0, _1, _2) INSTR_(vpsubd, _0, _1, _2)
 
@@ -598,6 +600,7 @@
 #define vcvtps2pd(_0, _1) INSTR_(vcvtps2pd, _0, _1)
 #define vcvtpd2ps(_0, _1) INSTR_(vcvtpd2ps, _0, _1)
 #define vcvtps2dq(_0, _1) INSTR_(vcvtps2dq, _0, _1)
+#define vcvtdq2ps(_0, _1) INSTR_(vcvtdq2ps, _0, _1)
 
 #define vcvtph2ps(_0, _1) INSTR_(vcvtph2ps, _0, _1)
 #define vcvtps2ph(_0, _1, _2) INSTR_(vcvtps2ph, _0, _1, _2)

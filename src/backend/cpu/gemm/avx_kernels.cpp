@@ -211,12 +211,23 @@
 	vmovsd (mem(rax, 8*4), xmm(reg1))\
 	add(r12, rax)
 
-#define LOAD_2x10xFP32(reg0, reg1, reg2, reg3)\
-	vmovups(mem(rax), ymm(reg0))\
-	vmovsd (mem(rax, 8*4), xmm(reg1))\
-	vmovups(mem(rax, r15, 1), ymm(reg2))\
-	vmovsd (mem(rax, r15, 1, 8*4), xmm(reg3))\
-	add(r12, rax)
+#define STORE_8x10xFP32() \
+	vmovups(ymm0, mem(rbx, (0*10+0)*4)) \
+	vmovsd (xmm1, mem(rbx, (0*10+8)*4)) \
+	vmovups(ymm2, mem(rbx, (1*10+0)*4)) \
+	vmovsd (xmm3, mem(rbx, (1*10+8)*4)) \
+	vmovups(ymm4, mem(rbx, (2*10+0)*4)) \
+	vmovsd (xmm5, mem(rbx, (2*10+8)*4)) \
+	vmovups(ymm6, mem(rbx, (3*10+0)*4)) \
+	vmovsd (xmm7, mem(rbx, (3*10+8)*4)) \
+	vmovups(ymm8, mem(rbx, (4*10+0)*4)) \
+	vmovsd (xmm9, mem(rbx, (4*10+8)*4)) \
+	vmovups(ymm10, mem(rbx, (5*10+0)*4)) \
+	vmovsd (xmm11, mem(rbx, (5*10+8)*4)) \
+	vmovups(ymm12, mem(rbx, (6*10+0)*4)) \
+	vmovsd (xmm13, mem(rbx, (6*10+8)*4)) \
+	vmovups(ymm14, mem(rbx, (7*10+0)*4)) \
+	vmovsd (xmm15, mem(rbx, (7*10+8)*4))
 
 #define LOAD_1x10xFP16(reg0, reg1)\
 	vmovups(mem(rax), xmm(reg0))\
@@ -253,20 +264,16 @@
 	vmaxps(ymm0, ymm14, ymm14)\
 	vmaxps(ymm0, ymm15, ymm15)
 
-#define LOAD_ADD_BIAS_8x8xFP32(ptr, stride) \
-	movq(stride, r15) \
-	sal(imm(1), r15) \
-	vmovaps(mem(ptr), ymm0) \
-	vmovaps(mem(ptr, stride, 1), ymm1) \
-	add(r15, ptr) \
-	vmovaps(mem(ptr), ymm2) \
-	vmovaps(mem(ptr, stride, 1), ymm3) \
-	add(r15, ptr) \
-	vmovaps(mem(ptr), ymm4) \
-	vmovaps(mem(ptr, stride, 1), ymm5) \
-	add(r15, ptr) \
-	vmovaps(mem(ptr), ymm6) \
-	vmovaps(mem(ptr, stride, 1), ymm7) \
+#define LOAD_ADD_BIAS_8x8xFP32() \
+	vmovaps(mem(rbx), ymm0) \
+	vmovaps(mem(rbx, r14, 1), ymm1) \
+	vmovaps(mem(rbx, r14, 2), ymm2) \
+	vmovaps(mem(rbx, r13, 1), ymm3) \
+	add(r15, rbx) \
+	vmovaps(mem(rbx), ymm4) \
+	vmovaps(mem(rbx, r14, 1), ymm5) \
+	vmovaps(mem(rbx, r14, 2), ymm6) \
+	vmovaps(mem(rbx, r13, 1), ymm7) \
 	vaddps(ymm0, ymm8, ymm8) \
 	vaddps(ymm1, ymm9, ymm9) \
 	vaddps(ymm2, ymm10, ymm10) \
@@ -379,13 +386,12 @@ namespace ml
 
 		movq(var(alpha_ptr), rax)// load address of alpha
 		movq(var(beta_ptr), rbx)// load address of beta
-
 		vbroadcastss(mem(rax), ymm1)
 		vbroadcastss(mem(rbx), ymm0)
-
 		SCALE_ACCUMULATORS_BY(ymm1)
 
-		movq(var(bias_ptr), rax)// load address of bias pointer
+		// load address of bias pointer
+		movq(var(bias_ptr), rax)
 		test(rax, rax)
 		je(AFTER_BIAS)
 		vmovaps(mem(rax), ymm2)// load bias
@@ -394,27 +400,25 @@ namespace ml
 
 		vxorps(ymm1, ymm1, ymm1)
 		vucomiss(xmm0, xmm1)// set ZF if beta == 0.
-		je(APPLY_RELU)// if not loading C, jump to ReLU
+		je(AFTER_LOAD_C)// if not loading C, jump to ReLU
 		// load C, scale and add to accumulators
 		movq(var(C_stride), r14)// C stride is r14
 		movq(var(C_ptr), rcx)// C pointer is in rcx
-
 		LOAD_5x8xFP32()
 		SCALE_5x8xFP32_BY_BETA()
 		ADD_5x8xFP32_TO_ACCUMULATORS(ymm6, ymm7, ymm8, ymm9, ymm10)
-
 		LOAD_5x8xFP32()
 		SCALE_5x8xFP32_BY_BETA()
 		ADD_5x8xFP32_TO_ACCUMULATORS(ymm11, ymm12, ymm13, ymm14, ymm15)
+		label(AFTER_LOAD_C)
 
-		label(APPLY_RELU)
-		movq(var(flag_relu), r14)// load flag if to use relu
+		// load flag if to use relu
+		movq(var(flag_relu), r14)
 		test(r14, r14)
-		je(STORE_D)
-		// apply ReLU case
+		je(AFTER_RELU)
 		RELU_10x8xFP32()
+		label(AFTER_RELU)
 
-		label(STORE_D)
 		movq(var(D_stride), r14)// D stride is r14
 		movq(var(D_ptr), rcx)// D pointer is in rcx
 
@@ -515,7 +519,6 @@ namespace ml
 		movq(var(beta_ptr), rbx)// load address of beta
 		vbroadcastss(mem(rax), ymm1)
 		vbroadcastss(mem(rbx), ymm0)
-
 		SCALE_ACCUMULATORS_BY(ymm1)
 
 		movq(var(bias_ptr), rax)// load address of bias pointer
@@ -527,28 +530,26 @@ namespace ml
 
 		vxorps(ymm1, ymm1, ymm1)
 		vucomiss(xmm0, xmm1)// set ZF if beta == 0.
-		je(APPLY_RELU)
+		je(AFTER_LOAD_C)
 		movq(var(C_stride), r14)// C stride is r14
 		movq(var(C_ptr), rcx)// C pointer is in rcx
-
 		LOAD_5x8xFP16()
 		CONVERT_5x8xFP16_TO_5x8xFP32()
 		SCALE_5x8xFP32_BY_BETA()
 		ADD_5x8xFP32_TO_ACCUMULATORS(ymm6, ymm7, ymm8, ymm9, ymm10)
-
 		LOAD_5x8xFP16()
 		CONVERT_5x8xFP16_TO_5x8xFP32()
 		SCALE_5x8xFP32_BY_BETA()
 		ADD_5x8xFP32_TO_ACCUMULATORS(ymm11, ymm12, ymm13, ymm14, ymm15)
+		label(AFTER_LOAD_C)
 
-		label(APPLY_RELU)
-		movq(var(flag_relu), r14)// load flag if to use relu
+		// load flag if to use relu
+		movq(var(flag_relu), r14)
 		test(r14, r14)
-		je(STORE_D)
-		// apply ReLU case
+		je(AFTER_RELU)
 		RELU_10x8xFP32()
+		label(AFTER_RELU)
 
-		label(STORE_D)
 		movq(var(D_stride), r14)// D stride is r14
 		movq(var(D_ptr), rcx)// D pointer is in rcx
 
@@ -597,29 +598,39 @@ namespace ml
 			movq(var(src_ptr), rax) // src pointer is in rax
 			movq(var(dst_ptr), rbx)// dst pointer is in rbx
 			movq(var(src_stride), r12)// src stride is in r12
-			movq(r12, r15)
-			sal(imm(1), r12)
+			movq(r12, r13)// r13 = r12
+			sal(imm(1), r13)// r13 = 2 * r12 (2 * stride)
+			add(r12, r13)// r13 = 2 * r12 + r12 = 3 * r12 (3*D_stride)
+			movq(r12, r15)// r15 = r12
+			sal(imm(2), r15)// r15 = 4 * r12 (4 * stride)
 
 			movq(var(k_iter), r14)// load the number of 8-unrolled iterations
 			test(r14, r14)
 			je(FINALLOOP)
 
 			label(UNROLLED8)
-			LOAD_2x10xFP32(0, 1, 2, 3)
-			LOAD_2x10xFP32(4, 5, 6, 7)
-			LOAD_2x10xFP32(8, 9, 10, 11)
-			LOAD_2x10xFP32(12, 13, 14, 15)
+			vmovups(mem(rax), ymm0)
+			vmovsd (mem(rax, 8*4), xmm1)
+			vmovups(mem(rax, r12, 1), ymm2)
+			vmovsd (mem(rax, r12, 1, 8*4), xmm3)
+			vmovups(mem(rax, r12, 2), ymm4)
+			vmovsd (mem(rax, r12, 2, 8*4), xmm5)
+			vmovups(mem(rax, r13, 1), ymm6)
+			vmovsd (mem(rax, r13, 1, 8*4), xmm7)
+			add(r15, rax)
+			vmovups(mem(rax), ymm8)
+			vmovsd (mem(rax, 8*4), xmm9)
+			vmovups(mem(rax, r12, 1), ymm10)
+			vmovsd (mem(rax, r12, 1, 8*4), xmm11)
+			vmovups(mem(rax, r12, 2), ymm12)
+			vmovsd (mem(rax, r12, 2, 8*4), xmm13)
+			vmovups(mem(rax, r13, 1), ymm14)
+			vmovsd (mem(rax, r13, 1, 8*4), xmm15)
+			add(r15, rax)
 
-			STORE_1x10xFP32(0, 0, 1)
-			STORE_1x10xFP32(1, 2, 3)
-			STORE_1x10xFP32(2, 4, 5)
-			STORE_1x10xFP32(3, 6, 7)
-			STORE_1x10xFP32(4, 8, 9)
-			STORE_1x10xFP32(5, 10, 11)
-			STORE_1x10xFP32(6, 12, 13)
-			STORE_1x10xFP32(7, 14, 15)
+			STORE_8x10xFP32()
 
-			add(imm(4*8*10), rbx)// add stride to dst pointer
+			add(imm(8*10*4), rbx)// add stride to dst pointer
 
 			dec(r14)
 			jne(UNROLLED8)
@@ -629,11 +640,13 @@ namespace ml
 			test(r14, r14)
 			je(EPILOGUE)
 
-			sar(imm(1), r12)// divide stride by 2, effectively reverting to reading single row at the time
 			label(UNROLLED1)
-			LOAD_1x10xFP32(0, 1)
-			STORE_1x10xFP32(0, 0, 1)
-			add(imm(4*1*10), rbx)// add stride to dst pointer
+			vmovups(mem(rax), ymm0)
+			vmovsd (mem(rax, 8*4), xmm1)
+			add(r12, rax)
+			vmovups(ymm0, mem(rbx))
+			vmovsd (xmm1, mem(rbx, 8*4))
+			add(imm(1*10*4), rbx)// add stride to dst pointer
 
 			dec(r14)
 			jne(UNROLLED1)
@@ -652,7 +665,7 @@ namespace ml
 					:// clobbers
 					"cc", "memory", "%ymm0", "%ymm1", "%ymm2", "%ymm3", "%ymm4", "%ymm5", "%ymm6", "%ymm7",
 					"%ymm8", "%ymm9", "%ymm10", "%ymm11", "%ymm12", "%ymm13", "%ymm14", "%ymm15", "%rax", "%rbx",
-					"%r12", "%r14", "%r15")
+					"%r12", "%r13", "%r14", "%r15")
 		}
 		else
 		{
@@ -660,48 +673,44 @@ namespace ml
 			movq(var(src_ptr), rax) // src pointer is in rax
 			movq(var(dst_ptr), rbx)// dst pointer is in rbx
 			movq(var(src_stride), r12)// src stride is in r12
+			movq(r12, r13)// r13 = r12
+			sal(imm(1), r13)// r13 = 2 * r12 (2 * stride)
+			add(r12, r13)// r13 = 2 * r12 + r12 = 3 * r12 (3*stride)
+			movq(r12, r15)// r15 = r12
+			sal(imm(2), r15)// r15 = 4 * r12 (4 * stride)
 
 			movq(var(k_iter), r14)// load the number of 8-unrolled iterations
 			test(r14, r14)
 			je(FINALLOOP)
 
 			label(UNROLLED8)
-			// first 8x8 tile
-			movq(rax, r13)// tmp src pointer is in r13
-			// rows 0-7
-			vmovups(mem(r13), ymm0)
-			add(r12, r13)// add stride to src pointer
-			vmovups(mem(r13), ymm1)
-			add(r12, r13)// add stride to src pointer
-			vmovups(mem(r13), ymm2)
-			add(r12, r13)// add stride to src pointer
-			vmovups(mem(r13), ymm3)
-			add(r12, r13)// add stride to src pointer
-			vmovups(mem(r13), ymm4)
-			add(r12, r13)// add stride to src pointer
-			vmovups(mem(r13), ymm5)
-			add(r12, r13)// add stride to src pointer
-			vmovups(mem(r13), ymm6)
-			add(r12, r13)// add stride to src pointer
-			vmovups(mem(r13), ymm7)
-			add(r12, r13)// add stride to src pointer
+			// load 8x8 tile
+			movq(rax, rcx)// tmp src pointer is in rcx
+			vmovups(mem(rcx), ymm0)
+			vmovups(mem(rcx, r12, 1), ymm1)
+			vmovups(mem(rcx, r12, 2), ymm2)
+			vmovups(mem(rcx, r13, 1), ymm3)
+			add(r15, rcx)
+			vmovups(mem(rcx), ymm4)
+			vmovups(mem(rcx, r12, 1), ymm5)
+			vmovups(mem(rcx, r12, 2), ymm6)
+			vmovups(mem(rcx, r13, 1), ymm7)
+			add(r15, rcx)
 
 			AVX_8x8_TRANSPOSE()
 
-			vmovups(ymm8, mem(rbx,4*(0*10+0)))
-			vmovups(ymm9, mem(rbx,4*(1*10+0)))
-			vmovups(ymm10, mem(rbx,4*(2*10+0)))
-			vmovups(ymm11, mem(rbx,4*(3*10+0)))
-			vmovups(ymm12, mem(rbx,4*(4*10+0)))
-			vmovups(ymm13, mem(rbx,4*(5*10+0)))
-			vmovups(ymm14, mem(rbx,4*(6*10+0)))
-			vmovups(ymm15, mem(rbx,4*(7*10+0)))
+			vmovups(ymm8, mem(rbx, 4*(0*10+0)))
+			vmovups(ymm9, mem(rbx, 4*(1*10+0)))
+			vmovups(ymm10, mem(rbx, 4*(2*10+0)))
+			vmovups(ymm11, mem(rbx, 4*(3*10+0)))
+			vmovups(ymm12, mem(rbx, 4*(4*10+0)))
+			vmovups(ymm13, mem(rbx, 4*(5*10+0)))
+			vmovups(ymm14, mem(rbx, 4*(6*10+0)))
+			vmovups(ymm15, mem(rbx, 4*(7*10+0)))
 
 			// rows 8-9
-			vmovups(mem(r13), ymm0)
-			add(r12, r13)
-			vmovups(mem(r13), ymm1)
-			add(r12, r13)
+			vmovups(mem(rcx), ymm0)
+			vmovups(mem(rcx, r12, 1), ymm1)
 
 			vunpcklps(ymm1, ymm0, ymm4)
 			vunpckhps(ymm1, ymm0, ymm5)
@@ -730,28 +739,19 @@ namespace ml
 			je(EPILOGUE)
 
 			label(UNROLLED1)
-			movq(rax, r13)// tmp src pointer is in r13
-
-			vmovss(mem(r13), xmm0)
-			add(r12, r13)// add stride to src pointer
-			vmovss(mem(r13), xmm1)
-			add(r12, r13)// add stride to src pointer
-			vmovss(mem(r13), xmm2)
-			add(r12, r13)// add stride to src pointer
-			vmovss(mem(r13), xmm3)
-			add(r12, r13)// add stride to src pointer
-			vmovss(mem(r13), xmm4)
-			add(r12, r13)// add stride to src pointer
-			vmovss(mem(r13), xmm5)
-			add(r12, r13)// add stride to src pointer
-			vmovss(mem(r13), xmm6)
-			add(r12, r13)// add stride to src pointer
-			vmovss(mem(r13), xmm7)
-			add(r12, r13)// add stride to src pointer
-			vmovss(mem(r13), xmm8)
-			add(r12, r13)// add stride to src pointer
-			vmovss(mem(r13), xmm9)
-			add(r12, r13)// add stride to src pointer
+			movq(rax, rcx)// tmp src pointer is in rcx
+			vmovss(mem(rcx), xmm0)
+			vmovss(mem(rcx, r12, 1), xmm1)
+			vmovss(mem(rcx, r12, 2), xmm2)
+			vmovss(mem(rcx, r13, 1), xmm3)
+			add(r15, rcx)
+			vmovss(mem(rcx), xmm4)
+			vmovss(mem(rcx, r12, 1), xmm5)
+			vmovss(mem(rcx, r12, 2), xmm6)
+			vmovss(mem(rcx, r13, 1), xmm7)
+			add(r15, rcx)
+			vmovss(mem(rcx), xmm8)
+			vmovss(mem(rcx, r12, 1), xmm9)
 
 			vmovss(xmm0, mem(rbx, 0*4))
 			vmovss(xmm1, mem(rbx, 1*4))
@@ -1522,8 +1522,8 @@ namespace ml
 		const float *Q_ptr = Q.data<float>();
 		const float *K_ptr = K.data<float>();
 		float *temp_ptr = temp.data<float>();
-		const float *bias_ptr = bias.is_packed() ? bias.data<float>() : nullptr;
-		float *softmax_ptr = softmax_sum.is_packed() ? softmax_sum.data<float>() : nullptr;
+		const float *bias_ptr = bias.data<float>();
+		float *softmax_ptr = softmax_sum.data<float>();
 
 		uint64_t k_iter = Q.rows() / 4;
 		uint64_t k_left = Q.rows() % 4;
@@ -1568,11 +1568,13 @@ namespace ml
 		SCALE_ACCUMULATORS_BY(ymm0)
 
 		movq(var(bias_ptr), rbx)// load address of bias pointer
-		test(rbx, rbx)
-		je(AFTER_BIAS)
 		movq(var(bias_stride), r14)// load address of bias stride into r14
-		LOAD_ADD_BIAS_8x8xFP32(rbx, r14)
-		label(AFTER_BIAS)
+		movq(r14, r13)
+		sal(imm(1), r13)// r13 = stride * 2
+		add(r14, r13)// r13 == stride * 3
+		movq(r14, r15)
+		sal(imm(2), r15)// r15 = stride * 4
+		LOAD_ADD_BIAS_8x8xFP32()
 
 		movq(imm(0x4ab8aa3b4ab8aa3b), r14)
 		movq(imm(0x3f7de0683f7de068), r15)
@@ -1625,8 +1627,8 @@ namespace ml
 				[bias_ptr] "m"(bias_ptr),
 				[softmax_ptr] "m"(softmax_ptr)
 				:// clobbers
-				"cc", "memory", "%xmm0", "%xmm1", "%xmm2", "%xmm3", "%xmm4", "%xmm5", "%xmm6", "%xmm7",
-				"%xmm8", "%xmm9", "%xmm10", "%xmm11", "%xmm12", "%xmm13", "%xmm14", "%xmm15", "%rax", "%rbx", "%rcx", "%r14", "%r15")
+				"cc", "memory", "%ymm0", "%ymm1", "%ymm2", "%ymm3", "%ymm4", "%ymm5", "%ymm6", "%ymm7",
+				"%ymm8", "%ymm9", "%ymm10", "%ymm11", "%ymm12", "%ymm13", "%ymm14", "%ymm15", "%rax", "%rbx", "%rcx", "%r13", "%r14", "%r15")
 	}
 } /* namespace ml */
 

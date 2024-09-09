@@ -305,35 +305,35 @@ namespace ml
 		movss(mem(rbx), xmm1)
 		pshufd(imm(0), xmm0, xmm0)
 		pshufd(imm(0), xmm1, xmm1)
-
 		SCALE_ACCUMULATORS_BY(xmm0)
 
-		movq(var(bias_ptr), rax)// load address of bias pointer
+		// load address of bias pointer
+		movq(var(bias_ptr), rax)
 		test(rax, rax)
 		je(AFTER_BIAS)
 		movaps(mem(rax, 0*4*4), xmm2)// load bias
 		movaps(mem(rax, 1*4*4), xmm3)// load bias
 		ADD_BIAS_4x8xFP32(xmm2, xmm3)
-
 		label(AFTER_BIAS)
+
 		// load destination pointer and stride
 		xorps(xmm0, xmm0)
 		ucomiss(xmm1, xmm0)// set ZF if beta == 0.
-		je(APPLY_RELU)
+		je(AFTER_LOAD_C)
 		// beta != 0 case
 		movq(var(C_ptr), rcx)// C pointer is in rcx
 		movq(var(C_stride), r14)// C stride is r14
-
 		LOAD_ADD_2x8xFP32(xmm1, xmm8, xmm9, xmm10, xmm11)
 		LOAD_ADD_2x8xFP32(xmm1, xmm12, xmm13, xmm14, xmm15)
+		label(AFTER_LOAD_C)
 
-		label(APPLY_RELU)
-		movq(var(flag_relu), r14)// load flag if to use relu
+		// load flag if to use relu
+		movq(var(flag_relu), r14)
 		test(r14, r14)
-		je(STORE_D)
+		je(AFTER_RELU)
 		RELU_4x8xFP32()
+		label(AFTER_RELU)
 
-		label(STORE_D)
 		movq(var(D_stride), r14)// D stride is r14
 		movq(var(D_ptr), rcx)// D pointer is in rcx
 

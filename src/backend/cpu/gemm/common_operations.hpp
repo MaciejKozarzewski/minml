@@ -68,4 +68,21 @@
 	vperm2f128(imm(0x31), ymm14, ymm10, ymm6) \
 	vperm2f128(imm(0x31), ymm15, ymm11, ymm7)
 
+/*
+ * Takes 8 registers from ymm4-ymm7, transposes them and puts lower halves into xmm4-xmm7 and upper halves into xmm0-xmm3
+ */
+#define AVX_4x8_TRANSPOSE() \
+	vunpcklps(ymm5, ymm4, ymm0) \
+	vunpckhps(ymm5, ymm4, ymm1) \
+	vunpcklps(ymm7, ymm6, ymm2) \
+	vunpckhps(ymm7, ymm6, ymm3) \
+	vunpcklpd(ymm2, ymm0, ymm4) \
+	vunpckhpd(ymm2, ymm0, ymm5) \
+	vunpcklpd(ymm3, ymm1, ymm6) \
+	vunpckhpd(ymm3, ymm1, ymm7) \
+	vextractf128(imm(0x1), ymm4, xmm0) \
+	vextractf128(imm(0x1), ymm5, xmm1) \
+	vextractf128(imm(0x1), ymm6, xmm2) \
+	vextractf128(imm(0x1), ymm7, xmm3)
+
 #endif /* BACKEND_CPU_GEMM_COMMON_OPERATIONS_HPP_ */
