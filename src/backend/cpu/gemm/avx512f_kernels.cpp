@@ -221,330 +221,411 @@
 	vmaxps(zmm0, zmm30, zmm30)\
 	vmaxps(zmm0, zmm31, zmm31)
 
-#define LOAD_4x1xFP16(reg0, reg1, reg2, reg3)\
-	movzw(mem(rax), rcx)\
-	vmovq(rcx, xmm(reg0))\
-	vcvtph2ps(xmm(reg0), xmm(reg0))\
-	add(r12, rax)\
-	movzw(mem(rax), rcx)\
-	vmovq(rcx, xmm(reg1))\
-	vcvtph2ps(xmm(reg1), xmm(reg1))\
-	add(r12, rax)\
-	movzw(mem(rax), rcx)\
-	vmovq(rcx, xmm(reg2))\
-	vcvtph2ps(xmm(reg2), xmm(reg2))\
-	add(r12, rax)\
-	movzw(mem(rax), rcx)\
-	vmovq(rcx, xmm(reg3))\
-	vcvtph2ps(xmm(reg3), xmm(reg3))\
-	add(r12, rax)
-#define LOAD_4x1xFP32(reg0, reg1, reg2, reg3)\
-	vmovss(mem(rax), xmm(reg0))\
-	add(r12, rax)\
-	vmovss(mem(rax), xmm(reg1))\
-	add(r12, rax)\
-	vmovss(mem(rax), xmm(reg2))\
-	add(r12, rax)\
-	vmovss(mem(rax), xmm(reg3))\
-	add(r12, rax)
-#define STORE_4x1xFP32(reg0, reg1, reg2, reg3)\
-	vmovss(xmm(reg0), mem(rbx, 4*reg0))\
-	vmovss(xmm(reg1), mem(rbx, 4*reg1))\
-	vmovss(xmm(reg2), mem(rbx, 4*reg2))\
-	vmovss(xmm(reg3), mem(rbx, 4*reg3))
 
-#define LOAD_1x16xFP32(reg)\
-	vmovups(mem(rax), reg)\
-	add(r12, rax)
-#define STORE_1x16xFP32(reg, row) vmovups(reg, mem(rbx, row*16*4))
-#define LOAD_1x24xFP32(reg0, reg1)\
-	vmovups(mem(rax, 0*4), reg0)\
-	vmovups(mem(rax, 16*4), reg1)\
-	add(r12, rax)
+/*
+ * FP16 -> FP32 conversion
+ */
+#define CONVERT_1x16xFP16_TO_FP32(reg) \
+	vcvtph2ps(ymm(reg), zmm(reg))
+#define CONVERT_1x24xFP16_TO_FP32(reg0, reg1) \
+	vcvtph2ps(ymm(reg0), zmm(reg0)) \
+	vcvtph2ps(xmm(reg1), ymm(reg1))
+
+#define CONVERT_4x16xFP16_TO_FP32(reg0, reg1, reg2, reg3) \
+	CONVERT_1x16xFP16_TO_FP32(reg0) \
+	CONVERT_1x16xFP16_TO_FP32(reg1) \
+	CONVERT_1x16xFP16_TO_FP32(reg2) \
+	CONVERT_1x16xFP16_TO_FP32(reg3)
+#define CONVERT_4x24xFP16_TO_FP32(reg00, reg01, reg10, reg11, reg20, reg21, reg30, reg31) \
+	CONVERT_1x24xFP16_TO_FP32(reg00, reg01) \
+	CONVERT_1x24xFP16_TO_FP32(reg10, reg11) \
+	CONVERT_1x24xFP16_TO_FP32(reg20, reg21) \
+	CONVERT_1x24xFP16_TO_FP32(reg30, reg31)
+
+/*
+ * FP16 loads
+ */
+#define LOAD_4x1xFP16(ptr, reg0, reg1, reg2, reg3)\
+	movzw(mem(ptr), r8) \
+	movzw(mem(ptr, r12, 1), r9) \
+	movzw(mem(ptr, r12, 2), r10) \
+	movzw(mem(ptr, r13, 1), r11) \
+	add(r15, ptr) \
+	vmovq(r8, xmm(reg0)) \
+	vmovq(r9, xmm(reg1)) \
+	vmovq(r10, xmm(reg2)) \
+	vmovq(r11, xmm(reg3)) \
+	vcvtph2ps(xmm(reg0), xmm(reg0)) \
+	vcvtph2ps(xmm(reg1), xmm(reg1)) \
+	vcvtph2ps(xmm(reg2), xmm(reg2)) \
+	vcvtph2ps(xmm(reg3), xmm(reg3))
+#define LOAD_1x16xFP16(ptr, reg)\
+	vmovups(mem(ptr), reg) \
+	add(r12, ptr)
+#define LOAD_1x24xFP16(ptr, reg0, reg1) \
+	vmovups(mem(ptr, 0*2), reg0) \
+	vmovups(mem(ptr, 16*2), reg1) \
+	add(r12, ptr)
+
+#define LOAD_4x16xFP16(ptr, reg0, reg1, reg2, reg3) \
+	vmovups(mem(ptr), reg0) \
+	vmovups(mem(ptr, r12, 1), reg1) \
+	vmovups(mem(ptr, r12, 2), reg2) \
+	vmovups(mem(ptr, r13, 1), reg3) \
+	add(r15, ptr)
+#define LOAD_4x24xFP16(ptr, reg00, reg01, reg10, reg11, reg20, reg21, reg30, reg31) \
+	vmovups(mem(ptr), reg00) \
+	vmovups(mem(ptr, 16*2), reg01) \
+	vmovups(mem(ptr, r12, 1), reg10) \
+	vmovups(mem(ptr, r12, 1, 16*2), reg11) \
+	vmovups(mem(ptr, r12, 2), reg20) \
+	vmovups(mem(ptr, r12, 2, 16*2), reg21) \
+	vmovups(mem(ptr, r13, 1), reg30) \
+	vmovups(mem(ptr, r13, 1, 16*2), reg31) \
+	add(r15, ptr)
+
+#define LOAD_8x16xFP16(ptr) \
+	LOAD_4x16xFP16(ptr, ymm24, ymm25, ymm26, ymm27) \
+	LOAD_4x16xFP16(ptr, ymm28, ymm29, ymm30, ymm31) \
+	CONVERT_4x16xFP16_TO_FP32(24, 25, 26, 27) \
+	CONVERT_4x16xFP16_TO_FP32(28, 29, 30, 31)
+#define LOAD_16x16xFP16(ptr) \
+	LOAD_4x16xFP16(ptr, ymm8, ymm9, ymm10, ymm11) \
+	LOAD_4x16xFP16(ptr, ymm12, ymm13, ymm14, ymm15) \
+	LOAD_4x16xFP16(ptr, ymm16, ymm17, ymm18, ymm19) \
+	LOAD_4x16xFP16(ptr, ymm20, ymm21, ymm22, ymm23) \
+	CONVERT_4x16xFP16_TO_FP32(8, 9, 10, 11) \
+	CONVERT_4x16xFP16_TO_FP32(12, 13, 14, 15) \
+	CONVERT_4x16xFP16_TO_FP32(16, 17, 18, 19) \
+	CONVERT_4x16xFP16_TO_FP32(20, 21, 22, 23)
+#define LOAD_16x24xFP16(ptr) \
+	LOAD_4x24xFP16(ptr, ymm0, xmm1, ymm2, xmm3, ymm4, xmm5, ymm6, xmm7) \
+	LOAD_4x24xFP16(ptr, ymm8, xmm9, ymm10, xmm11, ymm12, xmm13, ymm14, xmm15) \
+	LOAD_4x24xFP16(ptr, ymm16, xmm17, ymm18, xmm19, ymm20, xmm21, ymm22, xmm23) \
+	LOAD_4x24xFP16(ptr, ymm24, xmm25, ymm26, xmm27, ymm28, xmm29, ymm30, xmm31) \
+	CONVERT_4x24xFP16_TO_FP32(0, 1, 2, 3, 4, 5, 6, 7) \
+	CONVERT_4x24xFP16_TO_FP32(8, 9, 10, 11, 12, 13, 14, 15) \
+	CONVERT_4x24xFP16_TO_FP32(16, 17, 18, 19, 20, 21, 22, 23) \
+	CONVERT_4x24xFP16_TO_FP32(24, 25, 26, 27, 28, 29, 30, 31)
+
+
+
+/*
+ * FP32 loads
+ */
+#define LOAD_4x1xFP32(ptr, reg0, reg1, reg2, reg3) \
+	vmovss(mem(ptr), reg0) \
+	vmovss(mem(ptr, r12, 1), reg1) \
+	vmovss(mem(ptr, r12, 2), reg2) \
+	vmovss(mem(ptr, r13, 1), reg3) \
+	add(r15, ptr)
+#define LOAD_1x16xFP32(ptr, reg) \
+	vmovups(mem(ptr), reg) \
+	add(r12, ptr)
+#define LOAD_1x24xFP32(ptr, reg0, reg1) \
+	vmovups(mem(ptr, 0*4), reg0) \
+	vmovups(mem(ptr, 16*4), reg1) \
+	add(r12, ptr)
+
+#define LOAD_4x16xFP32(ptr, reg0, reg1, reg2, reg3) \
+	vmovups(mem(ptr), reg0) \
+	vmovups(mem(ptr, r12, 1), reg1) \
+	vmovups(mem(ptr, r12, 2), reg2) \
+	vmovups(mem(ptr, r13, 1), reg3) \
+	add(r15, ptr)
+#define LOAD_4x24xFP32(ptr, reg00, reg01, reg10, reg11, reg20, reg21, reg30, reg31) \
+	vmovups(mem(ptr), reg00) \
+	vmovups(mem(ptr, 16*4), reg01) \
+	vmovups(mem(ptr, r12, 1), reg10) \
+	vmovups(mem(ptr, r12, 1, 16*4), reg11) \
+	vmovups(mem(ptr, r12, 2), reg20) \
+	vmovups(mem(ptr, r12, 2, 16*4), reg21) \
+	vmovups(mem(ptr, r13, 1), reg30) \
+	vmovups(mem(ptr, r13, 1, 16*4), reg31) \
+	add(r15, ptr)
+
+#define LOAD_8x16xFP32(ptr) \
+	LOAD_4x16xFP32(ptr, zmm24, zmm25, zmm26, zmm27) \
+	LOAD_4x16xFP32(ptr, zmm28, zmm29, zmm30, zmm31)
+#define LOAD_16x16xFP32(ptr) \
+	LOAD_4x16xFP32(ptr, zmm8, zmm9, zmm10, zmm11) \
+	LOAD_4x16xFP32(ptr, zmm12, zmm13, zmm14, zmm15) \
+	LOAD_4x16xFP32(ptr, zmm16, zmm17, zmm18, zmm19) \
+	LOAD_4x16xFP32(ptr, zmm20, zmm21, zmm22, zmm23)
+#define LOAD_16x24xFP32(ptr) \
+	LOAD_4x24xFP32(ptr, zmm0, ymm1, zmm2, ymm3, zmm4, ymm5, zmm6, ymm7) \
+	LOAD_4x24xFP32(ptr, zmm8, ymm9, zmm10, ymm11, zmm12, ymm13, zmm14, ymm15) \
+	LOAD_4x24xFP32(ptr, zmm16, ymm17, zmm18, ymm19, zmm20, ymm21, zmm22, ymm23) \
+	LOAD_4x24xFP32(ptr, zmm24, ymm25, zmm26, ymm27, zmm28, ymm29, zmm30, ymm31)
+
+/*
+ * FP32 store
+ */
+#define STORE_4x1xFP32(offset, reg0, reg1, reg2, reg3) \
+	vmovss(reg0, mem(rbx, 4*(offset+0))) \
+	vmovss(reg1, mem(rbx, 4*(offset+1))) \
+	vmovss(reg2, mem(rbx, 4*(offset+2))) \
+	vmovss(reg3, mem(rbx, 4*(offset+3))) \
+
+#define STORE_1x16xFP32(reg, row) \
+	vmovups(reg, mem(rbx, row*16*4))
 #define STORE_1x24xFP32(reg0, reg1, row)\
 	vmovups(reg0, mem(rbx, (row*24+0)*4))\
 	vmovaps(reg1, mem(rbx, (row*24+16)*4))
 
-#define LOAD_1x16xFP16(reg)\
-	vmovups(mem(rax), reg)\
-	add(r12, rax)
-#define LOAD_1x24xFP16(reg0, reg1)\
-	vmovups(mem(rax, 0*2), reg0)\
-	vmovups(mem(rax, 16*2), reg1)\
-	add(r12, rax)
-
-#define CONVERT_1x24xFP16_TO_FP32(reg0, reg1)\
-	vcvtph2ps(ymm(reg0), zmm(reg0))\
-	vcvtph2ps(xmm(reg1), ymm(reg1))
-#define CONVERT_1x16xFP16_TO_FP32(reg)\
-	vcvtph2ps(ymm(reg), zmm(reg))
-#define CONVERT_2x24xFP16_TO_FP32(reg0, reg1, reg2, reg3)\
-	vcvtph2ps(ymm(reg0), zmm(reg0))\
-	vcvtph2ps(xmm(reg1), ymm(reg1))\
-	vcvtph2ps(ymm(reg2), zmm(reg2))\
-	vcvtph2ps(xmm(reg3), ymm(reg3))
-#define CONVERT_4x16xFP16_TO_FP32(reg0, reg1, reg2, reg3)\
-	vcvtph2ps(ymm(reg0), zmm(reg0))\
-	vcvtph2ps(ymm(reg1), zmm(reg1))\
-	vcvtph2ps(ymm(reg2), zmm(reg2))\
-	vcvtph2ps(ymm(reg3), zmm(reg3))
-
-#define LOAD_16x24xFP16()\
-	LOAD_1x24xFP16(ymm0, xmm1)\
-	LOAD_1x24xFP16(ymm2, xmm3)\
-	LOAD_1x24xFP16(ymm4, xmm5)\
-	LOAD_1x24xFP16(ymm6, xmm7)\
-	LOAD_1x24xFP16(ymm8, xmm9)\
-	LOAD_1x24xFP16(ymm10, xmm11)\
-	LOAD_1x24xFP16(ymm12, xmm13)\
-	LOAD_1x24xFP16(ymm14, xmm15)\
-	LOAD_1x24xFP16(ymm16, xmm17)\
-	LOAD_1x24xFP16(ymm18, xmm19)\
-	LOAD_1x24xFP16(ymm20, xmm21)\
-	LOAD_1x24xFP16(ymm22, xmm23)\
-	LOAD_1x24xFP16(ymm24, xmm25)\
-	LOAD_1x24xFP16(ymm26, xmm27)\
-	LOAD_1x24xFP16(ymm28, xmm29)\
-	LOAD_1x24xFP16(ymm30, xmm31)\
-	CONVERT_2x24xFP16_TO_FP32(0, 1, 2, 3)\
-	CONVERT_2x24xFP16_TO_FP32(4, 5, 6, 7)\
-	CONVERT_2x24xFP16_TO_FP32(8, 9, 10, 11)\
-	CONVERT_2x24xFP16_TO_FP32(12, 13, 14, 15)\
-	CONVERT_2x24xFP16_TO_FP32(16, 17, 18, 19)\
-	CONVERT_2x24xFP16_TO_FP32(20, 21, 22, 23)\
-	CONVERT_2x24xFP16_TO_FP32(24, 25, 26, 27)\
-	CONVERT_2x24xFP16_TO_FP32(28, 29, 30, 31)
-#define LOAD_16x16xFP16()\
-	LOAD_1x16xFP16(ymm0)\
-	LOAD_1x16xFP16(ymm1)\
-	LOAD_1x16xFP16(ymm2)\
-	LOAD_1x16xFP16(ymm3)\
-	LOAD_1x16xFP16(ymm4)\
-	LOAD_1x16xFP16(ymm5)\
-	LOAD_1x16xFP16(ymm6)\
-	LOAD_1x16xFP16(ymm7)\
-	LOAD_1x16xFP16(ymm8)\
-	LOAD_1x16xFP16(ymm9)\
-	LOAD_1x16xFP16(ymm10)\
-	LOAD_1x16xFP16(ymm11)\
-	LOAD_1x16xFP16(ymm12)\
-	LOAD_1x16xFP16(ymm13)\
-	LOAD_1x16xFP16(ymm14)\
-	LOAD_1x16xFP16(ymm15)\
-	CONVERT_4x16xFP16_TO_FP32(0, 1, 2, 3)\
-	CONVERT_4x16xFP16_TO_FP32(4, 5, 6, 7)\
-	CONVERT_4x16xFP16_TO_FP32(8, 9, 10, 11)\
-	CONVERT_4x16xFP16_TO_FP32(12, 13, 14, 15)
-#define LOAD_8x16xFP16()\
-	LOAD_1x16xFP16(ymm0)\
-	LOAD_1x16xFP16(ymm1)\
-	LOAD_1x16xFP16(ymm2)\
-	LOAD_1x16xFP16(ymm3)\
-	LOAD_1x16xFP16(ymm4)\
-	LOAD_1x16xFP16(ymm5)\
-	LOAD_1x16xFP16(ymm6)\
-	LOAD_1x16xFP16(ymm7)\
-	CONVERT_4x16xFP16_TO_FP32(0, 1, 2, 3)\
-	CONVERT_4x16xFP16_TO_FP32(4, 5, 6, 7)
-
-#define LOAD_16x24xFP32()\
-	LOAD_1x24xFP32(zmm0, ymm1)\
-	LOAD_1x24xFP32(zmm2, ymm3)\
-	LOAD_1x24xFP32(zmm4, ymm5)\
-	LOAD_1x24xFP32(zmm6, ymm7)\
-	LOAD_1x24xFP32(zmm8, ymm9)\
-	LOAD_1x24xFP32(zmm10, ymm11)\
-	LOAD_1x24xFP32(zmm12, ymm13)\
-	LOAD_1x24xFP32(zmm14, ymm15)\
-	LOAD_1x24xFP32(zmm16, ymm17)\
-	LOAD_1x24xFP32(zmm18, ymm19)\
-	LOAD_1x24xFP32(zmm20, ymm21)\
-	LOAD_1x24xFP32(zmm22, ymm23)\
-	LOAD_1x24xFP32(zmm24, ymm25)\
-	LOAD_1x24xFP32(zmm26, ymm27)\
-	LOAD_1x24xFP32(zmm28, ymm29)\
-	LOAD_1x24xFP32(zmm30, ymm31)
-#define STORE_16x24xFP32()\
-	STORE_1x24xFP32(zmm0, ymm1, 0)\
-	STORE_1x24xFP32(zmm2, ymm3, 1)\
-	STORE_1x24xFP32(zmm4, ymm5, 2)\
-	STORE_1x24xFP32(zmm6, ymm7, 3)\
-	STORE_1x24xFP32(zmm8, ymm9, 4)\
-	STORE_1x24xFP32(zmm10, ymm11, 5)\
-	STORE_1x24xFP32(zmm12, ymm13, 6)\
-	STORE_1x24xFP32(zmm14, ymm15, 7)\
-	STORE_1x24xFP32(zmm16, ymm17, 8)\
-	STORE_1x24xFP32(zmm18, ymm19, 9)\
-	STORE_1x24xFP32(zmm20, ymm21, 10)\
-	STORE_1x24xFP32(zmm22, ymm23, 11)\
-	STORE_1x24xFP32(zmm24, ymm25, 12)\
-	STORE_1x24xFP32(zmm26, ymm27, 13)\
-	STORE_1x24xFP32(zmm28, ymm29, 14)\
+#define STORE_16x24xFP32() \
+	STORE_1x24xFP32(zmm0, ymm1, 0) \
+	STORE_1x24xFP32(zmm2, ymm3, 1) \
+	STORE_1x24xFP32(zmm4, ymm5, 2) \
+	STORE_1x24xFP32(zmm6, ymm7, 3) \
+	STORE_1x24xFP32(zmm8, ymm9, 4) \
+	STORE_1x24xFP32(zmm10, ymm11, 5) \
+	STORE_1x24xFP32(zmm12, ymm13, 6) \
+	STORE_1x24xFP32(zmm14, ymm15, 7) \
+	STORE_1x24xFP32(zmm16, ymm17, 8) \
+	STORE_1x24xFP32(zmm18, ymm19, 9) \
+	STORE_1x24xFP32(zmm20, ymm21, 10) \
+	STORE_1x24xFP32(zmm22, ymm23, 11) \
+	STORE_1x24xFP32(zmm24, ymm25, 12) \
+	STORE_1x24xFP32(zmm26, ymm27, 13) \
+	STORE_1x24xFP32(zmm28, ymm29, 14) \
 	STORE_1x24xFP32(zmm30, ymm31, 15)
+#define STORE_16x16xFP32(ptr, stride, offset) \
+	vmovups(zmm0, mem(ptr, (0*stride+offset)*4)) \
+	vmovups(zmm1, mem(ptr, (1*stride+offset)*4)) \
+	vmovups(zmm2, mem(ptr, (2*stride+offset)*4)) \
+	vmovups(zmm3, mem(ptr, (3*stride+offset)*4)) \
+	vmovups(zmm4, mem(ptr, (4*stride+offset)*4)) \
+	vmovups(zmm5, mem(ptr, (5*stride+offset)*4)) \
+	vmovups(zmm6, mem(ptr, (6*stride+offset)*4)) \
+	vmovups(zmm7, mem(ptr, (7*stride+offset)*4)) \
+	vmovups(zmm24, mem(ptr, (8*stride+offset)*4)) \
+	vmovups(zmm25, mem(ptr, (9*stride+offset)*4)) \
+	vmovups(zmm26, mem(ptr, (10*stride+offset)*4)) \
+	vmovups(zmm27, mem(ptr, (11*stride+offset)*4)) \
+	vmovups(zmm28, mem(ptr, (12*stride+offset)*4)) \
+	vmovups(zmm29, mem(ptr, (13*stride+offset)*4)) \
+	vmovups(zmm30, mem(ptr, (14*stride+offset)*4)) \
+	vmovups(zmm31, mem(ptr, (15*stride+offset)*4))
+#define STORE_16x8xFP32(ptr, stride, offset) \
+	vmovups(ymm0, mem(ptr, (0*stride+offset)*4)) \
+	vmovups(ymm1, mem(ptr, (1*stride+offset)*4)) \
+	vmovups(ymm2, mem(ptr, (2*stride+offset)*4)) \
+	vmovups(ymm3, mem(ptr, (3*stride+offset)*4)) \
+	vmovups(ymm4, mem(ptr, (4*stride+offset)*4)) \
+	vmovups(ymm5, mem(ptr, (5*stride+offset)*4)) \
+	vmovups(ymm6, mem(ptr, (6*stride+offset)*4)) \
+	vmovups(ymm7, mem(ptr, (7*stride+offset)*4)) \
+	vmovups(ymm24, mem(ptr, (8*stride+offset)*4)) \
+	vmovups(ymm25, mem(ptr, (9*stride+offset)*4)) \
+	vmovups(ymm26, mem(ptr, (10*stride+offset)*4)) \
+	vmovups(ymm27, mem(ptr, (11*stride+offset)*4)) \
+	vmovups(ymm28, mem(ptr, (12*stride+offset)*4)) \
+	vmovups(ymm29, mem(ptr, (13*stride+offset)*4)) \
+	vmovups(ymm30, mem(ptr, (14*stride+offset)*4)) \
+	vmovups(ymm31, mem(ptr, (15*stride+offset)*4))
 
-#define LOAD_16x16xFP32()\
-	LOAD_1x16xFP32(zmm0)\
-	LOAD_1x16xFP32(zmm1)\
-	LOAD_1x16xFP32(zmm2)\
-	LOAD_1x16xFP32(zmm3)\
-	LOAD_1x16xFP32(zmm4)\
-	LOAD_1x16xFP32(zmm5)\
-	LOAD_1x16xFP32(zmm6)\
-	LOAD_1x16xFP32(zmm7)\
-	LOAD_1x16xFP32(zmm8)\
-	LOAD_1x16xFP32(zmm9)\
-	LOAD_1x16xFP32(zmm10)\
-	LOAD_1x16xFP32(zmm11)\
-	LOAD_1x16xFP32(zmm12)\
-	LOAD_1x16xFP32(zmm13)\
-	LOAD_1x16xFP32(zmm14)\
-	LOAD_1x16xFP32(zmm15)
-#define STORE_16x16xFP32(stride)\
-	vmovups(zmm0, mem(rbx, 0*stride*4))\
-	vmovups(zmm1, mem(rbx, 1*stride*4))\
-	vmovups(zmm2, mem(rbx, 2*stride*4))\
-	vmovups(zmm3, mem(rbx, 3*stride*4))\
-	vmovups(zmm4, mem(rbx, 4*stride*4))\
-	vmovups(zmm5, mem(rbx, 5*stride*4))\
-	vmovups(zmm6, mem(rbx, 6*stride*4))\
-	vmovups(zmm7, mem(rbx, 7*stride*4))\
-	vmovups(zmm8, mem(rbx, 8*stride*4))\
-	vmovups(zmm9, mem(rbx, 9*stride*4))\
-	vmovups(zmm10, mem(rbx, 10*stride*4))\
-	vmovups(zmm11, mem(rbx, 11*stride*4))\
-	vmovups(zmm12, mem(rbx, 12*stride*4))\
-	vmovups(zmm13, mem(rbx, 13*stride*4))\
-	vmovups(zmm14, mem(rbx, 14*stride*4))\
-	vmovups(zmm15, mem(rbx, 15*stride*4))
+// MHA macros
+#define ADD_BIAS_8x16xFP32(reg0, reg1, reg2, reg3, reg4, reg5, reg6, reg7) \
+	vmovaps(mem(rbx), zmm0) \
+	vmovaps(mem(rbx, r14, 1), zmm1) \
+	vmovaps(mem(rbx, r14, 2), zmm2) \
+	vmovaps(mem(rbx, r13, 1), zmm3) \
+	add(r15, rbx) \
+	vmovaps(mem(rbx), zmm4) \
+	vmovaps(mem(rbx, r14, 1), zmm5) \
+	vmovaps(mem(rbx, r14, 2), zmm6) \
+	vmovaps(mem(rbx, r13, 1), zmm7) \
+	add(r15, rbx) \
+	vaddps(zmm0, reg0, reg0) \
+	vaddps(zmm1, reg1, reg1) \
+	vaddps(zmm2, reg2, reg2) \
+	vaddps(zmm3, reg3, reg3) \
+	vaddps(zmm4, reg4, reg4) \
+	vaddps(zmm5, reg5, reg5) \
+	vaddps(zmm6, reg6, reg6) \
+	vaddps(zmm7, reg7, reg7)
+#define SETUP_EXP_CONSTANTS() \
+	movq(imm(0x4ab8aa3b4ab8aa3b), r14) \
+	movq(imm(0x3f7de0683f7de068), r15) \
+	vmovq(r14, xmm0) \
+	vmovq(r15, xmm1) \
+	vbroadcastss(xmm0, zmm0) \
+	vbroadcastss(xmm1, zmm1)
+#define EXP_6x16xFP32(reg0, reg1, reg2, reg3, reg4, reg5) \
+	vmulps(zmm0, reg0, reg0) \
+	vmulps(zmm0, reg1, reg1) \
+	vmulps(zmm0, reg2, reg2) \
+	vmulps(zmm0, reg3, reg3) \
+	vmulps(zmm0, reg4, reg4) \
+	vmulps(zmm0, reg5, reg5) \
+	vcvtps2dq(reg0, reg0) \
+	vcvtps2dq(reg1, reg1) \
+	vcvtps2dq(reg2, reg2) \
+	vcvtps2dq(reg3, reg3) \
+	vcvtps2dq(reg4, reg4) \
+	vcvtps2dq(reg5, reg5) \
+	vpsubd(reg0, zmm1, zmm2) \
+	vpsubd(reg1, zmm1, zmm3) \
+	vpsubd(reg2, zmm1, zmm4) \
+	vpsubd(reg3, zmm1, zmm5) \
+	vpsubd(reg4, zmm1, zmm6) \
+	vpsubd(reg5, zmm1, zmm7) \
+	vrcp14ps(zmm2, zmm2) \
+	vrcp14ps(zmm3, zmm3) \
+	vrcp14ps(zmm4, zmm4) \
+	vrcp14ps(zmm5, zmm5) \
+	vrcp14ps(zmm6, zmm6) \
+	vrcp14ps(zmm7, zmm7) \
+	vpaddd(reg0, zmm1, reg0) \
+	vpaddd(reg1, zmm1, reg1) \
+	vpaddd(reg2, zmm1, reg2) \
+	vpaddd(reg3, zmm1, reg3) \
+	vpaddd(reg4, zmm1, reg4) \
+	vpaddd(reg5, zmm1, reg5) \
+	vmulps(zmm2, reg0, reg0) \
+	vmulps(zmm3, reg1, reg1) \
+	vmulps(zmm4, reg2, reg2) \
+	vmulps(zmm5, reg3, reg3) \
+	vmulps(zmm6, reg4, reg4) \
+	vmulps(zmm7, reg5, reg5)
 
-#define LOAD_8x16xFP32()\
-	LOAD_1x16xFP32(zmm0)\
-	LOAD_1x16xFP32(zmm1)\
-	LOAD_1x16xFP32(zmm2)\
-	LOAD_1x16xFP32(zmm3)\
-	LOAD_1x16xFP32(zmm4)\
-	LOAD_1x16xFP32(zmm5)\
-	LOAD_1x16xFP32(zmm6)\
-	LOAD_1x16xFP32(zmm7)
-#define STORE_16x8xFP32()\
-	vextractf32x8(imm(0x1), zmm0, ymm8)\
-	vextractf32x8(imm(0x1), zmm1, ymm9)\
-	vextractf32x8(imm(0x1), zmm2, ymm10)\
-	vextractf32x8(imm(0x1), zmm3, ymm11)\
-	vextractf32x8(imm(0x1), zmm4, ymm12)\
-	vextractf32x8(imm(0x1), zmm5, ymm13)\
-	vextractf32x8(imm(0x1), zmm6, ymm14)\
-	vextractf32x8(imm(0x1), zmm7, ymm15)\
-	vmovaps(ymm0, mem(rbx, (0*24+16)*4))\
-	vmovaps(ymm1, mem(rbx, (1*24+16)*4))\
-	vmovaps(ymm2, mem(rbx, (2*24+16)*4))\
-	vmovaps(ymm3, mem(rbx, (3*24+16)*4))\
-	vmovaps(ymm4, mem(rbx, (4*24+16)*4))\
-	vmovaps(ymm5, mem(rbx, (5*24+16)*4))\
-	vmovaps(ymm6, mem(rbx, (6*24+16)*4))\
-	vmovaps(ymm7, mem(rbx, (7*24+16)*4))\
-	vmovaps(ymm8, mem(rbx, (8*24+16)*4))\
-	vmovaps(ymm9, mem(rbx, (9*24+16)*4))\
-	vmovaps(ymm10, mem(rbx, (10*24+16)*4))\
-	vmovaps(ymm11, mem(rbx, (11*24+16)*4))\
-	vmovaps(ymm12, mem(rbx, (12*24+16)*4))\
-	vmovaps(ymm13, mem(rbx, (13*24+16)*4))\
-	vmovaps(ymm14, mem(rbx, (14*24+16)*4))\
-	vmovaps(ymm15, mem(rbx, (15*24+16)*4))
-
-#define TRANSPOSE_SHUFFLE_1()\
-	vunpcklps(zmm1, zmm0, zmm16)\
-	vunpckhps(zmm1, zmm0, zmm17)\
-	vunpcklps(zmm3, zmm2, zmm18)\
-	vunpckhps(zmm3, zmm2, zmm19)\
-	vunpcklps(zmm5, zmm4, zmm20)\
-	vunpckhps(zmm5, zmm4, zmm21)\
-	vunpcklps(zmm7, zmm6, zmm22)\
-	vunpckhps(zmm7, zmm6, zmm23)\
-	vunpcklps(zmm9, zmm8, zmm24)\
-	vunpckhps(zmm9, zmm8, zmm25)\
-	vunpcklps(zmm11, zmm10, zmm26)\
-	vunpckhps(zmm11, zmm10, zmm27)\
-	vunpcklps(zmm13, zmm12, zmm28)\
-	vunpckhps(zmm13, zmm12, zmm29)\
-	vunpcklps(zmm15, zmm14, zmm30)\
-	vunpckhps(zmm15, zmm14, zmm31)
-#define TRANSPOSE_SHUFFLE_2()\
-	vunpcklpd(zmm18, zmm16, zmm0)\
-	vunpckhpd(zmm18, zmm16, zmm1)\
-	vunpcklpd(zmm19, zmm17, zmm2)\
-	vunpckhpd(zmm19, zmm17, zmm3)\
-	vunpcklpd(zmm22, zmm20, zmm4)\
-	vunpckhpd(zmm22, zmm20, zmm5)\
-	vunpcklpd(zmm23, zmm21, zmm6)\
-	vunpckhpd(zmm23, zmm21, zmm7)\
-	vunpcklpd(zmm26, zmm24, zmm8)\
-	vunpckhpd(zmm26, zmm24, zmm9)\
-	vunpcklpd(zmm27, zmm25, zmm10)\
-	vunpckhpd(zmm27, zmm25, zmm11)\
-	vunpcklpd(zmm30, zmm28, zmm12)\
-	vunpckhpd(zmm30, zmm28, zmm13)\
-	vunpcklpd(zmm31, zmm29, zmm14)\
-	vunpckhpd(zmm31, zmm29, zmm15)
-#define TRANSPOSE_SHUFFLE_3()\
-	vshuff32x4(imm(0x88), zmm4, zmm0, zmm16)\
-	vshuff32x4(imm(0x88), zmm5, zmm1, zmm17)\
-	vshuff32x4(imm(0x88), zmm6, zmm2, zmm18)\
-	vshuff32x4(imm(0x88), zmm7, zmm3, zmm19)\
-	vshuff32x4(imm(0xDD), zmm4, zmm0, zmm20)\
-	vshuff32x4(imm(0xDD), zmm5, zmm1, zmm21)\
-	vshuff32x4(imm(0xDD), zmm6, zmm2, zmm22)\
-	vshuff32x4(imm(0xDD), zmm7, zmm3, zmm23)\
-	vshuff32x4(imm(0x88), zmm12, zmm8, zmm24)\
-	vshuff32x4(imm(0x88), zmm13, zmm9, zmm25)\
-	vshuff32x4(imm(0x88), zmm14, zmm10, zmm26)\
-	vshuff32x4(imm(0x88), zmm15, zmm11, zmm27)\
-	vshuff32x4(imm(0xDD), zmm12, zmm8, zmm28)\
-	vshuff32x4(imm(0xDD), zmm13, zmm9, zmm29)\
-	vshuff32x4(imm(0xDD), zmm14, zmm10, zmm30)\
-	vshuff32x4(imm(0xDD), zmm15, zmm11, zmm31)\
-
-#define TRANSPOSE_SHUFFLE_4a()\
-	vshuff32x4(imm(0x88), zmm24, zmm16, zmm0)\
-	vshuff32x4(imm(0x88), zmm25, zmm17, zmm1)\
-	vshuff32x4(imm(0x88), zmm26, zmm18, zmm2)\
-	vshuff32x4(imm(0x88), zmm27, zmm19, zmm3)\
-	vshuff32x4(imm(0x88), zmm28, zmm20, zmm4)\
-	vshuff32x4(imm(0x88), zmm29, zmm21, zmm5)\
-	vshuff32x4(imm(0x88), zmm30, zmm22, zmm6)\
-	vshuff32x4(imm(0x88), zmm31, zmm23, zmm7)\
-	vshuff32x4(imm(0xDD), zmm24, zmm16, zmm8)\
-	vshuff32x4(imm(0xDD), zmm25, zmm17, zmm9)\
-	vshuff32x4(imm(0xDD), zmm26, zmm18, zmm10)\
-	vshuff32x4(imm(0xDD), zmm27, zmm19, zmm11)\
-	vshuff32x4(imm(0xDD), zmm28, zmm20, zmm12)\
-	vshuff32x4(imm(0xDD), zmm29, zmm21, zmm13)\
-	vshuff32x4(imm(0xDD), zmm30, zmm22, zmm14)\
-	vshuff32x4(imm(0xDD), zmm31, zmm23, zmm15)
-#define TRANSPOSE_SHUFFLE_4b()\
-	vshuff32x4(imm(0xD8), zmm16, zmm16, zmm0)\
-	vshuff32x4(imm(0xD8), zmm17, zmm17, zmm1)\
-	vshuff32x4(imm(0xD8), zmm18, zmm18, zmm2)\
-	vshuff32x4(imm(0xD8), zmm19, zmm19, zmm3)\
-	vshuff32x4(imm(0xD8), zmm20, zmm20, zmm4)\
-	vshuff32x4(imm(0xD8), zmm21, zmm21, zmm5)\
-	vshuff32x4(imm(0xD8), zmm22, zmm22, zmm6)\
-	vshuff32x4(imm(0xD8), zmm23, zmm23, zmm7)
-
-#define TRANSPOSE_16x16xFP32()\
-	TRANSPOSE_SHUFFLE_1()\
-	TRANSPOSE_SHUFFLE_2()\
-	TRANSPOSE_SHUFFLE_3()\
-	TRANSPOSE_SHUFFLE_4a()
-
-#define TRANSPOSE_8x16xFP32()\
-	TRANSPOSE_SHUFFLE_1()\
-	TRANSPOSE_SHUFFLE_2()\
-	TRANSPOSE_SHUFFLE_3()\
-	TRANSPOSE_SHUFFLE_4b()
+// transposes registers zmm8-zmm23 into ymm0-ymm7 and ymm24-ymm31
+#define TRANSPOSE_8x16xFP32() \
+	vunpcklps(zmm25, zmm24, zmm0) \
+	vunpckhps(zmm25, zmm24, zmm1) \
+	vunpcklps(zmm27, zmm26, zmm2) \
+	vunpckhps(zmm27, zmm26, zmm3) \
+	vunpcklps(zmm29, zmm28, zmm4) \
+	vunpckhps(zmm29, zmm28, zmm5) \
+	vunpcklps(zmm31, zmm30, zmm6) \
+	vunpckhps(zmm31, zmm30, zmm7) \
+	vunpcklpd(zmm2, zmm0, zmm24) \
+	vunpckhpd(zmm2, zmm0, zmm25) \
+	vunpcklpd(zmm3, zmm1, zmm26) \
+	vunpckhpd(zmm3, zmm1, zmm27) \
+	vunpcklpd(zmm6, zmm4, zmm28) \
+	vunpckhpd(zmm6, zmm4, zmm29) \
+	vunpcklpd(zmm7, zmm5, zmm30) \
+	vunpckhpd(zmm7, zmm5, zmm31) \
+	vshuff32x4(imm(0x88), zmm28, zmm24, zmm0) \
+	vshuff32x4(imm(0x88), zmm29, zmm25, zmm1) \
+	vshuff32x4(imm(0x88), zmm30, zmm26, zmm2) \
+	vshuff32x4(imm(0x88), zmm31, zmm27, zmm3) \
+	vshuff32x4(imm(0xDD), zmm28, zmm24, zmm4) \
+	vshuff32x4(imm(0xDD), zmm29, zmm25, zmm5) \
+	vshuff32x4(imm(0xDD), zmm30, zmm26, zmm6) \
+	vshuff32x4(imm(0xDD), zmm31, zmm27, zmm7) \
+	vshuff32x4(imm(0xD8), zmm0, zmm0, zmm0) \
+	vshuff32x4(imm(0xD8), zmm1, zmm1, zmm1) \
+	vshuff32x4(imm(0xD8), zmm2, zmm2, zmm2) \
+	vshuff32x4(imm(0xD8), zmm3, zmm3, zmm3) \
+	vshuff32x4(imm(0xD8), zmm4, zmm4, zmm4) \
+	vshuff32x4(imm(0xD8), zmm5, zmm5, zmm5) \
+	vshuff32x4(imm(0xD8), zmm6, zmm6, zmm6) \
+	vshuff32x4(imm(0xD8), zmm7, zmm7, zmm7) \
+	vextractf32x8(imm(0x1), zmm0, ymm24) \
+	vextractf32x8(imm(0x1), zmm1, ymm25) \
+	vextractf32x8(imm(0x1), zmm2, ymm26) \
+	vextractf32x8(imm(0x1), zmm3, ymm27) \
+	vextractf32x8(imm(0x1), zmm4, ymm28) \
+	vextractf32x8(imm(0x1), zmm5, ymm29) \
+	vextractf32x8(imm(0x1), zmm6, ymm30) \
+	vextractf32x8(imm(0x1), zmm7, ymm31)
+// transposes registers zmm8-zmm23 into zmm0-zmm7 and zmm24-zmm31
+#define TRANSPOSE_16x16xFP32() \
+	vunpcklps(zmm9, zmm8, zmm0) \
+	vunpckhps(zmm9, zmm8, zmm1) \
+	vunpcklps(zmm11, zmm10, zmm2) \
+	vunpckhps(zmm11, zmm10, zmm3) \
+	vunpcklps(zmm13, zmm12, zmm4) \
+	vunpckhps(zmm13, zmm12, zmm5) \
+	vunpcklps(zmm15, zmm14, zmm6) \
+	vunpckhps(zmm15, zmm14, zmm7) \
+	vunpcklps(zmm17, zmm16, zmm24) \
+	vunpckhps(zmm17, zmm16, zmm25) \
+	vunpcklps(zmm19, zmm18, zmm26) \
+	vunpckhps(zmm19, zmm18, zmm27) \
+	vunpcklps(zmm21, zmm20, zmm28) \
+	vunpckhps(zmm21, zmm20, zmm29) \
+	vunpcklps(zmm23, zmm22, zmm30) \
+	vunpckhps(zmm23, zmm22, zmm31) \
+	vunpcklpd(zmm2, zmm0, zmm8) \
+	vunpckhpd(zmm2, zmm0, zmm9) \
+	vunpcklpd(zmm3, zmm1, zmm10) \
+	vunpckhpd(zmm3, zmm1, zmm11) \
+	vunpcklpd(zmm6, zmm4, zmm12) \
+	vunpckhpd(zmm6, zmm4, zmm13) \
+	vunpcklpd(zmm7, zmm5, zmm14) \
+	vunpckhpd(zmm7, zmm5, zmm15) \
+	vunpcklpd(zmm26, zmm24, zmm16) \
+	vunpckhpd(zmm26, zmm24, zmm17) \
+	vunpcklpd(zmm27, zmm25, zmm18) \
+	vunpckhpd(zmm27, zmm25, zmm19) \
+	vunpcklpd(zmm30, zmm28, zmm20) \
+	vunpckhpd(zmm30, zmm28, zmm21) \
+	vunpcklpd(zmm31, zmm29, zmm22) \
+	vunpckhpd(zmm31, zmm29, zmm23) \
+	vshuff32x4(imm(0x88), zmm12, zmm8, zmm0) \
+	vshuff32x4(imm(0x88), zmm13, zmm9, zmm1) \
+	vshuff32x4(imm(0x88), zmm14, zmm10, zmm2) \
+	vshuff32x4(imm(0x88), zmm15, zmm11, zmm3) \
+	vshuff32x4(imm(0xDD), zmm12, zmm8, zmm4) \
+	vshuff32x4(imm(0xDD), zmm13, zmm9, zmm5) \
+	vshuff32x4(imm(0xDD), zmm14, zmm10, zmm6) \
+	vshuff32x4(imm(0xDD), zmm15, zmm11, zmm7) \
+	vshuff32x4(imm(0x88), zmm20, zmm16, zmm24) \
+	vshuff32x4(imm(0x88), zmm21, zmm17, zmm25) \
+	vshuff32x4(imm(0x88), zmm22, zmm18, zmm26) \
+	vshuff32x4(imm(0x88), zmm23, zmm19, zmm27) \
+	vshuff32x4(imm(0xDD), zmm20, zmm16, zmm28) \
+	vshuff32x4(imm(0xDD), zmm21, zmm17, zmm29) \
+	vshuff32x4(imm(0xDD), zmm22, zmm18, zmm30) \
+	vshuff32x4(imm(0xDD), zmm23, zmm19, zmm31) \
+	vshuff32x4(imm(0x88), zmm24, zmm0, zmm8) \
+	vshuff32x4(imm(0x88), zmm25, zmm1, zmm9) \
+	vshuff32x4(imm(0x88), zmm26, zmm2, zmm10) \
+	vshuff32x4(imm(0x88), zmm27, zmm3, zmm11) \
+	vshuff32x4(imm(0x88), zmm28, zmm4, zmm12) \
+	vshuff32x4(imm(0x88), zmm29, zmm5, zmm13) \
+	vshuff32x4(imm(0x88), zmm30, zmm6, zmm14) \
+	vshuff32x4(imm(0x88), zmm31, zmm7, zmm15) \
+	vshuff32x4(imm(0xDD), zmm24, zmm0, zmm24) \
+	vshuff32x4(imm(0xDD), zmm25, zmm1, zmm25) \
+	vshuff32x4(imm(0xDD), zmm26, zmm2, zmm26) \
+	vshuff32x4(imm(0xDD), zmm27, zmm3, zmm27) \
+	vshuff32x4(imm(0xDD), zmm28, zmm4, zmm28) \
+	vshuff32x4(imm(0xDD), zmm29, zmm5, zmm29) \
+	vshuff32x4(imm(0xDD), zmm30, zmm6, zmm30) \
+	vshuff32x4(imm(0xDD), zmm31, zmm7, zmm31) \
+	vmovaps(zmm8, zmm0) \
+	vmovaps(zmm9, zmm1) \
+	vmovaps(zmm10, zmm2) \
+	vmovaps(zmm11, zmm3) \
+	vmovaps(zmm12, zmm4) \
+	vmovaps(zmm13, zmm5) \
+	vmovaps(zmm14, zmm6) \
+	vmovaps(zmm15, zmm7)
+#define REDUCE_SUM() \
+	vaddps(zmm24, zmm0, zmm0) \
+	vaddps(zmm25, zmm1, zmm1) \
+	vaddps(zmm26, zmm2, zmm2) \
+	vaddps(zmm27, zmm3, zmm3) \
+	vaddps(zmm28, zmm4, zmm4) \
+	vaddps(zmm29, zmm5, zmm5) \
+	vaddps(zmm30, zmm6, zmm6) \
+	vaddps(zmm31, zmm7, zmm7) \
+	vaddps(zmm1, zmm0, zmm0) \
+	vaddps(zmm3, zmm2, zmm2) \
+	vaddps(zmm5, zmm4, zmm4) \
+	vaddps(zmm7, zmm6, zmm6) \
+	vaddps(zmm2, zmm0, zmm0) \
+	vaddps(zmm6, zmm4, zmm4) \
+	vaddps(zmm4, zmm0, zmm0)
 
 namespace ml
 {
+//#define __AVX512F__
 	using namespace ml::cpu;
 #ifdef __AVX512F__
 	void gemm_avx512f_24x16_fp32(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,
@@ -637,7 +718,7 @@ namespace ml
 
 		vxorps(zmm1, zmm1, zmm1)
 		vucomiss(xmm0, xmm1)// set ZF if beta == 0.
-		je(APPLY_RELU)
+		je(AFTER_LOAD_C)
 		movq(var(C_stride), r14)// C stride is r14
 		movq(var(C_ptr), rcx)// C pointer is in rcx
 		movq(r14, r15)// r15 = r14
@@ -652,15 +733,15 @@ namespace ml
 		LOAD_ADD_3x16xFP32(zmm0, zmm23, zmm24, zmm25)
 		LOAD_ADD_3x16xFP32(zmm0, zmm26, zmm27, zmm28)
 		LOAD_ADD_3x16xFP32(zmm0, zmm29, zmm30, zmm31)
+		label(AFTER_LOAD_C)
 
-		label(APPLY_RELU)
-		movq(var(flag_relu), r14)// load flag if to use relu
+		// load flag if to use relu
+		movq(var(flag_relu), r14)
 		test(r14, r14)
-		je(STORE_D)
-		// apply ReLU case
+		je(AFTER_RELU)
 		RELU_24x16xFP32()
+		label(AFTER_RELU)
 
-		label(STORE_D)
 		movq(var(D_stride), r14)// D stride is r14
 		movq(var(D_ptr), rcx)// D pointer is in rcx
 		movq(r14, r15)// r15 = r14
@@ -789,7 +870,7 @@ namespace ml
 
 		vxorps(zmm1, zmm1, zmm1)
 		vucomiss(xmm0, xmm1)// set ZF if beta == 0.
-		je(APPLY_RELU)
+		je(AFTER_LOAD_C)
 		movq(var(C_stride), r14)// C stride is r14
 		movq(var(C_ptr), rcx)// C pointer is in rcx
 		movq(r14, r15)// r15 = r14
@@ -804,15 +885,14 @@ namespace ml
 		LOAD_ADD_3x16xFP16(zmm0, zmm23, zmm24, zmm25)
 		LOAD_ADD_3x16xFP16(zmm0, zmm26, zmm27, zmm28)
 		LOAD_ADD_3x16xFP16(zmm0, zmm29, zmm30, zmm31)
+		label(AFTER_LOAD_C)
 
-		label(APPLY_RELU)
 		movq(var(flag_relu), r14)// load flag if to use relu
 		test(r14, r14)
-		je(STORE_D)
-		// apply ReLU case
+		je(AFTER_RELU)
 		RELU_24x16xFP32()
+		label(AFTER_RELU)
 
-		label(STORE_D)
 		movq(var(D_stride), r14)// D stride is r14
 		movq(var(D_ptr), rcx)// D pointer is in rcx
 		movq(r14, r15)// r15 = r14
@@ -871,15 +951,20 @@ namespace ml
 			movq(var(src_ptr), rax) // src pointer is in rax
 			movq(var(dst_ptr), rbx)// dst pointer is in rbx
 			movq(var(src_stride), r12)// src stride is in r12
+			movq(r12, r13)// r13 = r12
+			sal(imm(1), r13)// r13 = 2 * r12 (2 * stride)
+			add(r12, r13)// r13 = 2 * r12 + r12 = 3 * r12 (3*D_stride)
+			movq(r12, r15)// r15 = r12
+			sal(imm(2), r15)// r15 = 4 * r12 (4 * stride)
 
 			movq(var(k_iter), r14)// load the number of 16-unrolled iterations
 			test(r14, r14)
 			je(FINALLOOP)
 
 			label(UNROLLED16)
-			LOAD_16x24xFP32()
+			LOAD_16x24xFP32(rax)
 			STORE_16x24xFP32()
-			add(imm(4*16*24), rbx)// add stride to dst pointer
+			add(imm(16*24*4), rbx)// add stride to dst pointer
 
 			dec(r14)
 			jne(UNROLLED16)
@@ -890,9 +975,9 @@ namespace ml
 			je(EPILOGUE)
 
 			label(UNROLLED1)
-			LOAD_1x24xFP32(zmm0, ymm1)
+			LOAD_1x24xFP32(rax, zmm0, ymm1)
 			STORE_1x24xFP32(zmm0, ymm1, 0)
-			add(imm(4*1*24), rbx)// add stride to dst pointer
+			add(imm(1*24*4), rbx)// add stride to dst pointer
 
 			dec(r14)
 			jne(UNROLLED1)
@@ -911,14 +996,19 @@ namespace ml
 					"cc", "memory", "%zmm0", "%zmm1", "%zmm2", "%zmm3", "%zmm4", "%zmm5", "%zmm6", "%zmm7",
 					"%zmm8", "%zmm9", "%zmm10", "%zmm11", "%zmm12", "%zmm13", "%zmm14", "%zmm15", "%zmm16",
 					"%zmm17", "%zmm18", "%zmm19", "%zmm20", "%zmm21", "%zmm22", "%zmm23", "%zmm24", "%zmm25",
-					"%zmm26", "%zmm27", "%zmm28", "%zmm29", "%zmm30", "%zmm31", "%rax", "%rbx", "%r12", "%r14")
+					"%zmm26", "%zmm27", "%zmm28", "%zmm29", "%zmm30", "%zmm31", "%rax", "%rbx", "%r12", "%r13", "%r14", "%r15")
 		}
 		else
 		{
 			begin_asm()
-			movq(var(src_ptr), r13) // src pointer is in rax
+			movq(var(src_ptr), rax) // src pointer is in rax
 			movq(var(dst_ptr), rbx)// dst pointer is in rbx
 			movq(var(src_stride), r12)// src stride is in r12
+			movq(r12, r13)// r13 = r12
+			sal(imm(1), r13)// r13 = 2 * r12 (2 * stride)
+			add(r12, r13)// r13 = 2 * r12 + r12 = 3 * r12 (3*D_stride)
+			movq(r12, r15)// r15 = r12
+			sal(imm(2), r15)// r15 = 4 * r12 (4 * stride)
 
 			movq(var(k_iter), r14)// load the number of 16-unrolled iterations
 			test(r14, r14)
@@ -926,19 +1016,19 @@ namespace ml
 
 			label(UNROLLED16)
 			// first 16x16 tile
-			movq(r13, rax)
+			movq(rax, rcx)
 
 			// first 16x16 tile
-			LOAD_16x16xFP32()
+			LOAD_16x16xFP32(rcx)
 			TRANSPOSE_16x16xFP32()
-			STORE_16x16xFP32(24)
+			STORE_16x16xFP32(rbx, 24, 0)
 
 			// second 8x16 tile
-			LOAD_8x16xFP32()
+			LOAD_8x16xFP32(rcx)
 			TRANSPOSE_8x16xFP32()
-			STORE_16x8xFP32()
+			STORE_16x8xFP32(rbx, 24, 16)
 
-			add(imm(4*16), r13)// add stride to src pointer
+			add(imm(4*16), rax)// add stride to src pointer
 			add(imm(4*24*16), rbx)// add stride to dst pointer
 
 			dec(r14)
@@ -950,24 +1040,24 @@ namespace ml
 			je(EPILOGUE)
 
 			label(UNROLLED1)
-			movq(r13, rax)
+			movq(rax, rcx)
 
-			LOAD_4x1xFP32(0, 1, 2, 3)
-			LOAD_4x1xFP32(4, 5, 6, 7)
-			LOAD_4x1xFP32(8, 9, 10, 11)
-			LOAD_4x1xFP32(12, 13, 14, 15)
-			LOAD_4x1xFP32(16, 17, 18, 19)
-			LOAD_4x1xFP32(20, 21, 22, 23)
+			LOAD_4x1xFP32(rcx, xmm0, xmm1, xmm2, xmm3)
+			LOAD_4x1xFP32(rcx, xmm4, xmm5, xmm6, xmm7)
+			LOAD_4x1xFP32(rcx, xmm8, xmm9, xmm10, xmm11)
+			LOAD_4x1xFP32(rcx, xmm12, xmm13, xmm14, xmm15)
+			LOAD_4x1xFP32(rcx, xmm16, xmm17, xmm18, xmm19)
+			LOAD_4x1xFP32(rcx, xmm20, xmm21, xmm22, xmm23)
 
-			STORE_4x1xFP32(0, 1, 2, 3)
-			STORE_4x1xFP32(4, 5, 6, 7)
-			STORE_4x1xFP32(8, 9, 10, 11)
-			STORE_4x1xFP32(12, 13, 14, 15)
-			STORE_4x1xFP32(16, 17, 18, 19)
-			STORE_4x1xFP32(20, 21, 22, 23)
+			STORE_4x1xFP32(0, xmm0, xmm1, xmm2, xmm3)
+			STORE_4x1xFP32(4, xmm4, xmm5, xmm6, xmm7)
+			STORE_4x1xFP32(8, xmm8, xmm9, xmm10, xmm11)
+			STORE_4x1xFP32(12, xmm12, xmm13, xmm14, xmm15)
+			STORE_4x1xFP32(16, xmm16, xmm17, xmm18, xmm19)
+			STORE_4x1xFP32(20, xmm20, xmm21, xmm22, xmm23)
 
-			add(imm(4*1), r13)// add stride to src pointer
-			add(imm(4*24*1), rbx)// add stride to dst pointer
+			add(imm(4*1), rax)// add stride to src pointer
+			add(imm(24*1*4), rbx)// add stride to dst pointer
 
 			dec(r14)
 			jne(UNROLLED1)
@@ -986,7 +1076,7 @@ namespace ml
 					"%zmm8", "%zmm9", "%zmm10", "%zmm11", "%zmm12", "%zmm13", "%zmm14", "%zmm15", "%zmm16",
 					"%zmm17", "%zmm18", "%zmm19", "%zmm20", "%zmm21", "%zmm22", "%zmm23", "%zmm24", "%zmm25",
 					"%zmm26", "%zmm27", "%zmm28", "%zmm29", "%zmm30", "%zmm31", "%rax", "%rbx", "%rcx",
-					"%r12", "%r13", "%r14")
+					"%r12", "%r13", "%r14", "%r15")
 		}
 	}
 	void pack_avx512f_16xK_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept
@@ -1006,15 +1096,23 @@ namespace ml
 			movq(var(src_ptr), rax) // src pointer is in rax
 			movq(var(dst_ptr), rbx)// dst pointer is in rbx
 			movq(var(src_stride), r12)// src stride is in r12
+			movq(r12, r13)// r13 = r12
+			sal(imm(1), r13)// r13 = 2 * r12 (2 * stride)
+			add(r12, r13)// r13 = 2 * r12 + r12 = 3 * r12 (3*D_stride)
+			movq(r12, r15)// r15 = r12
+			sal(imm(2), r15)// r15 = 4 * r12 (4 * stride)
 
 			movq(var(k_iter), r14)// load the number of 16-unrolled iterations
 			test(r14, r14)
 			je(FINALLOOP)
 
 			label(UNROLLED16)
-			LOAD_16x16xFP32()
-			STORE_16x16xFP32(16)
-			add(imm(4*16*16), rbx)// add stride to dst pointer
+			LOAD_4x16xFP32(rax, zmm0, zmm1, zmm2, zmm3)
+			LOAD_4x16xFP32(rax, zmm4, zmm5, zmm6, zmm7)
+			LOAD_4x16xFP32(rax, zmm24, zmm25, zmm26, zmm27)
+			LOAD_4x16xFP32(rax, zmm28, zmm29, zmm30, zmm31)
+			STORE_16x16xFP32(rbx, 16, 0)
+			add(imm(16*16*4), rbx)// add stride to dst pointer
 
 			dec(r14)
 			jne(UNROLLED16)
@@ -1025,9 +1123,9 @@ namespace ml
 			je(EPILOGUE)
 
 			label(UNROLLED1)
-			LOAD_1x16xFP32(zmm0)
+			LOAD_1x16xFP32(rax, zmm0)
 			STORE_1x16xFP32(zmm0, 0)
-			add(imm(4*1*16), rbx)// add stride to dst pointer
+			add(imm(1*16*4), rbx)// add stride to dst pointer
 
 			dec(r14)
 			jne(UNROLLED1)
@@ -1047,14 +1145,19 @@ namespace ml
 					"%zmm8", "%zmm9", "%zmm10", "%zmm11", "%zmm12", "%zmm13", "%zmm14", "%zmm15", "%zmm16",
 					"%zmm17", "%zmm18", "%zmm19", "%zmm20", "%zmm21", "%zmm22", "%zmm23", "%zmm24", "%zmm25",
 					"%zmm26", "%zmm27", "%zmm28", "%zmm29", "%zmm30", "%zmm31", "%rax", "%rbx",
-					"%r12", "%r14")
+					"%r12", "%r13", "%r14", "%r15")
 		}
 		else
 		{
 			begin_asm()
-			movq(var(src_ptr), r13) // src pointer is in rax
+			movq(var(src_ptr), rax) // src pointer is in rax
 			movq(var(dst_ptr), rbx)// dst pointer is in rbx
 			movq(var(src_stride), r12)// src stride is in r12
+			movq(r12, r13)// r13 = r12
+			sal(imm(1), r13)// r13 = 2 * r12 (2 * stride)
+			add(r12, r13)// r13 = 2 * r12 + r12 = 3 * r12 (3*D_stride)
+			movq(r12, r15)// r15 = r12
+			sal(imm(2), r15)// r15 = 4 * r12 (4 * stride)
 
 			movq(var(k_iter), r14)// load the number of 16-unrolled iterations
 			test(r14, r14)
@@ -1062,13 +1165,13 @@ namespace ml
 
 			label(UNROLLED16)
 			// first 16x16 tile
-			movq(r13, rax)// tmp src pointer is in r13
+			movq(rax, rcx)// tmp src pointer is in r13
 
-			LOAD_16x16xFP32()
+			LOAD_16x16xFP32(rcx)
 			TRANSPOSE_16x16xFP32()
-			STORE_16x16xFP32(16)
+			STORE_16x16xFP32(rbx, 16, 0)
 
-			add(imm(4*16), r13)// add stride to src pointer
+			add(imm(4*16), rax)// add stride to src pointer
 			add(imm(4*16*16), rbx)// add stride to dst pointer
 
 			dec(r14)
@@ -1080,20 +1183,20 @@ namespace ml
 			je(EPILOGUE)
 
 			label(UNROLLED1)
-			movq(r13, rax)// tmp src pointer is in r13
+			movq(rax, rcx)
 
-			LOAD_4x1xFP32(0, 1, 2, 3)
-			LOAD_4x1xFP32(4, 5, 6, 7)
-			LOAD_4x1xFP32(8, 9, 10, 11)
-			LOAD_4x1xFP32(12, 13, 14, 15)
+			LOAD_4x1xFP32(rcx, xmm0, xmm1, xmm2, xmm3)
+			LOAD_4x1xFP32(rcx, xmm4, xmm5, xmm6, xmm7)
+			LOAD_4x1xFP32(rcx, xmm8, xmm9, xmm10, xmm11)
+			LOAD_4x1xFP32(rcx, xmm12, xmm13, xmm14, xmm15)
 
-			STORE_4x1xFP32(0, 1, 2, 3)
-			STORE_4x1xFP32(4, 5, 6, 7)
-			STORE_4x1xFP32(8, 9, 10, 11)
-			STORE_4x1xFP32(12, 13, 14, 15)
+			STORE_4x1xFP32(0, xmm0, xmm1, xmm2, xmm3)
+			STORE_4x1xFP32(4, xmm4, xmm5, xmm6, xmm7)
+			STORE_4x1xFP32(8, xmm8, xmm9, xmm10, xmm11)
+			STORE_4x1xFP32(12, xmm12, xmm13, xmm14, xmm15)
 
-			add(imm(4*1), r13)// add stride to src pointer
-			add(imm(4*16*1), rbx)// add stride to dst pointer
+			add(imm(4*1), rax)// add stride to src pointer
+			add(imm(16*1*4), rbx)// add stride to dst pointer
 
 			dec(r14)
 			jne(UNROLLED1)
@@ -1112,7 +1215,7 @@ namespace ml
 					"%zmm8", "%zmm9", "%zmm10", "%zmm11", "%zmm12", "%zmm13", "%zmm14", "%zmm15", "%zmm16",
 					"%zmm17", "%zmm18", "%zmm19", "%zmm20", "%zmm21", "%zmm22", "%zmm23", "%zmm24", "%zmm25",
 					"%zmm26", "%zmm27", "%zmm28", "%zmm29", "%zmm30", "%zmm31", "%rax", "%rbx", "%rcx",
-					"%r12", "%r13", "%r14")
+					"%r12", "%r13", "%r14", "%r15")
 		}
 	}
 
@@ -1133,15 +1236,20 @@ namespace ml
 			movq(var(src_ptr), rax) // src pointer is in rax
 			movq(var(dst_ptr), rbx)// dst pointer is in rbx
 			movq(var(src_stride), r12)// src stride is in r12
+			movq(r12, r13)// r13 = r12
+			sal(imm(1), r13)// r13 = 2 * r12 (2 * stride)
+			add(r12, r13)// r13 = 2 * r12 + r12 = 3 * r12 (3*D_stride)
+			movq(r12, r15)// r15 = r12
+			sal(imm(2), r15)// r15 = 4 * r12 (4 * stride)
 
 			movq(var(k_iter), r14)// load the number of 16-unrolled iterations
 			test(r14, r14)
 			je(FINALLOOP)
 
 			label(UNROLLED16)
-			LOAD_16x24xFP16()
+			LOAD_16x24xFP16(rax)
 			STORE_16x24xFP32()
-			add(imm(4*16*24), rbx)// add stride to dst pointer
+			add(imm(16*24*4), rbx)// add stride to dst pointer
 
 			dec(r14)
 			jne(UNROLLED16)
@@ -1152,10 +1260,10 @@ namespace ml
 			je(EPILOGUE)
 
 			label(UNROLLED1)
-			LOAD_1x24xFP16(ymm0, xmm1)
+			LOAD_1x24xFP16(rax, zmm0, ymm1)
 			CONVERT_1x24xFP16_TO_FP32(0, 1)
 			STORE_1x24xFP32(zmm0, ymm1, 0)
-			add(imm(4*1*24), rbx)// add stride to dst pointer
+			add(imm(1*24*4), rbx)// add stride to dst pointer
 
 			dec(r14)
 			jne(UNROLLED1)
@@ -1174,14 +1282,19 @@ namespace ml
 					"cc", "memory", "%zmm0", "%zmm1", "%zmm2", "%zmm3", "%zmm4", "%zmm5", "%zmm6", "%zmm7",
 					"%zmm8", "%zmm9", "%zmm10", "%zmm11", "%zmm12", "%zmm13", "%zmm14", "%zmm15", "%zmm16",
 					"%zmm17", "%zmm18", "%zmm19", "%zmm20", "%zmm21", "%zmm22", "%zmm23", "%zmm24", "%zmm25",
-					"%zmm26", "%zmm27", "%zmm28", "%zmm29", "%zmm30", "%zmm31", "%rax", "%rbx", "%r12", "%r14")
+					"%zmm26", "%zmm27", "%zmm28", "%zmm29", "%zmm30", "%zmm31", "%rax", "%rbx", "%r12", "%r13", "%r14", "%r15")
 		}
 		else
 		{
 			begin_asm()
-			movq(var(src_ptr), r13) // src pointer is in rax
+			movq(var(src_ptr), rax) // src pointer is in rax
 			movq(var(dst_ptr), rbx)// dst pointer is in rbx
 			movq(var(src_stride), r12)// src stride is in r12
+			movq(r12, r13)// r13 = r12
+			sal(imm(1), r13)// r13 = 2 * r12 (2 * stride)
+			add(r12, r13)// r13 = 2 * r12 + r12 = 3 * r12 (3*D_stride)
+			movq(r12, r15)// r15 = r12
+			sal(imm(2), r15)// r15 = 4 * r12 (4 * stride)
 
 			movq(var(k_iter), r14)// load the number of 16-unrolled iterations
 			test(r14, r14)
@@ -1189,19 +1302,19 @@ namespace ml
 
 			label(UNROLLED16)
 			// first 16x16 tile
-			movq(r13, rax)
+			movq(rax, rcx)
 
 			// first 16x16 tile
-			LOAD_16x16xFP16()
+			LOAD_16x16xFP16(rcx)
 			TRANSPOSE_16x16xFP32()
-			STORE_16x16xFP32(24)
+			STORE_16x16xFP32(rbx, 24, 0)
 
 			// second 8x16 tile
-			LOAD_8x16xFP16()
+			LOAD_8x16xFP16(rcx)
 			TRANSPOSE_8x16xFP32()
-			STORE_16x8xFP32()
+			STORE_16x8xFP32(rbx, 24, 16)
 
-			add(imm(2*16), r13)// add stride to src pointer
+			add(imm(2*16), rax)// add stride to src pointer
 			add(imm(4*24*16), rbx)// add stride to dst pointer
 
 			dec(r14)
@@ -1213,24 +1326,24 @@ namespace ml
 			je(EPILOGUE)
 
 			label(UNROLLED1)
-			movq(r13, rax)
+			movq(rax, rcx)
 
-			LOAD_4x1xFP16(0, 1, 2, 3)
-			LOAD_4x1xFP16(4, 5, 6, 7)
-			LOAD_4x1xFP16(8, 9, 10, 11)
-			LOAD_4x1xFP16(12, 13, 14, 15)
-			LOAD_4x1xFP16(16, 17, 18, 19)
-			LOAD_4x1xFP16(20, 21, 22, 23)
+			LOAD_4x1xFP16(rcx, 0, 1, 2, 3)
+			LOAD_4x1xFP16(rcx, 4, 5, 6, 7)
+			LOAD_4x1xFP16(rcx, 8, 9, 10, 11)
+			LOAD_4x1xFP16(rcx, 12, 13, 14, 15)
+			LOAD_4x1xFP16(rcx, 16, 17, 18, 19)
+			LOAD_4x1xFP16(rcx, 20, 21, 22, 23)
 
-			STORE_4x1xFP32(0, 1, 2, 3)
-			STORE_4x1xFP32(4, 5, 6, 7)
-			STORE_4x1xFP32(8, 9, 10, 11)
-			STORE_4x1xFP32(12, 13, 14, 15)
-			STORE_4x1xFP32(16, 17, 18, 19)
-			STORE_4x1xFP32(20, 21, 22, 23)
+			STORE_4x1xFP32(0, xmm0, xmm1, xmm2, xmm3)
+			STORE_4x1xFP32(4, xmm4, xmm5, xmm6, xmm7)
+			STORE_4x1xFP32(8, xmm8, xmm9, xmm10, xmm11)
+			STORE_4x1xFP32(12, xmm12, xmm13, xmm14, xmm15)
+			STORE_4x1xFP32(16, xmm16, xmm17, xmm18, xmm19)
+			STORE_4x1xFP32(20, xmm20, xmm21, xmm22, xmm23)
 
-			add(imm(2*1), r13)// add stride to src pointer
-			add(imm(4*24*1), rbx)// add stride to dst pointer
+			add(imm(2*1), rax)// add stride to src pointer
+			add(imm(24*1*4), rbx)// add stride to dst pointer
 
 			dec(r14)
 			jne(UNROLLED1)
@@ -1249,7 +1362,7 @@ namespace ml
 					"%zmm8", "%zmm9", "%zmm10", "%zmm11", "%zmm12", "%zmm13", "%zmm14", "%zmm15", "%zmm16",
 					"%zmm17", "%zmm18", "%zmm19", "%zmm20", "%zmm21", "%zmm22", "%zmm23", "%zmm24", "%zmm25",
 					"%zmm26", "%zmm27", "%zmm28", "%zmm29", "%zmm30", "%zmm31", "%rax", "%rbx", "%rcx",
-					"%r12", "%r13", "%r14")
+					"%r8", "%r9", "%r10", "%r11", "%r12", "%r13", "%r14", "%r15")
 		}
 	}
 	void pack_avx512f_16xK_fp16_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept
@@ -1269,15 +1382,27 @@ namespace ml
 			movq(var(src_ptr), rax) // src pointer is in rax
 			movq(var(dst_ptr), rbx)// dst pointer is in rbx
 			movq(var(src_stride), r12)// src stride is in r12
+			movq(r12, r13)// r13 = r12
+			sal(imm(1), r13)// r13 = 2 * r12 (2 * stride)
+			add(r12, r13)// r13 = 2 * r12 + r12 = 3 * r12 (3*D_stride)
+			movq(r12, r15)// r15 = r12
+			sal(imm(2), r15)// r15 = 4 * r12 (4 * stride)
 
 			movq(var(k_iter), r14)// load the number of 16-unrolled iterations
 			test(r14, r14)
 			je(FINALLOOP)
 
 			label(UNROLLED16)
-			LOAD_16x16xFP16()
-			STORE_16x16xFP32(16)
-			add(imm(4*16*16), rbx)// add stride to dst pointer
+			LOAD_4x16xFP16(rax, zmm0, zmm1, zmm2, zmm3)
+			LOAD_4x16xFP16(rax, zmm4, zmm5, zmm6, zmm7)
+			LOAD_4x16xFP16(rax, zmm24, zmm25, zmm26, zmm27)
+			LOAD_4x16xFP16(rax, zmm28, zmm29, zmm30, zmm31)
+			CONVERT_4x16xFP16_TO_FP32(0, 1, 2, 3)
+			CONVERT_4x16xFP16_TO_FP32(4, 5, 6, 7)
+			CONVERT_4x16xFP16_TO_FP32(24, 25, 26, 27)
+			CONVERT_4x16xFP16_TO_FP32(28, 29, 30, 31)
+			STORE_16x16xFP32(rbx, 16, 0)
+			add(imm(16*16*4), rbx)// add stride to dst pointer
 
 			dec(r14)
 			jne(UNROLLED16)
@@ -1288,10 +1413,10 @@ namespace ml
 			je(EPILOGUE)
 
 			label(UNROLLED1)
-			LOAD_1x16xFP16(ymm0)
+			LOAD_1x16xFP16(rax, ymm0)
 			CONVERT_1x16xFP16_TO_FP32(0)
 			STORE_1x16xFP32(zmm0, 0)
-			add(imm(4*1*16), rbx)// add stride to dst pointer
+			add(imm(1*16*4), rbx)// add stride to dst pointer
 
 			dec(r14)
 			jne(UNROLLED1)
@@ -1310,14 +1435,20 @@ namespace ml
 					"cc", "memory", "%zmm0", "%zmm1", "%zmm2", "%zmm3", "%zmm4", "%zmm5", "%zmm6", "%zmm7",
 					"%zmm8", "%zmm9", "%zmm10", "%zmm11", "%zmm12", "%zmm13", "%zmm14", "%zmm15", "%zmm16",
 					"%zmm17", "%zmm18", "%zmm19", "%zmm20", "%zmm21", "%zmm22", "%zmm23", "%zmm24", "%zmm25",
-					"%zmm26", "%zmm27", "%zmm28", "%zmm29", "%zmm30", "%zmm31", "%rax", "%rbx", "%r12", "%r14")
+					"%zmm26", "%zmm27", "%zmm28", "%zmm29", "%zmm30", "%zmm31", "%rax", "%rbx",
+					"%r12", "%r13", "%r14", "%r15")
 		}
 		else
 		{
 			begin_asm()
-			movq(var(src_ptr), r13) // src pointer is in rax
+			movq(var(src_ptr), rax) // src pointer is in rax
 			movq(var(dst_ptr), rbx)// dst pointer is in rbx
 			movq(var(src_stride), r12)// src stride is in r12
+			movq(r12, r13)// r13 = r12
+			sal(imm(1), r13)// r13 = 2 * r12 (2 * stride)
+			add(r12, r13)// r13 = 2 * r12 + r12 = 3 * r12 (3*D_stride)
+			movq(r12, r15)// r15 = r12
+			sal(imm(2), r15)// r15 = 4 * r12 (4 * stride)
 
 			movq(var(k_iter), r14)// load the number of 16-unrolled iterations
 			test(r14, r14)
@@ -1325,13 +1456,13 @@ namespace ml
 
 			label(UNROLLED16)
 			// first 16x16 tile
-			movq(r13, rax)// tmp src pointer is in r13
+			movq(rax, rcx)// tmp src pointer is in rcx
 
-			LOAD_16x16xFP16()
+			LOAD_16x16xFP16(rcx)
 			TRANSPOSE_16x16xFP32()
-			STORE_16x16xFP32(16)
+			STORE_16x16xFP32(rbx, 16, 0)
 
-			add(imm(2*16), r13)// add stride to src pointer
+			add(imm(2*16), rax)// add stride to src pointer
 			add(imm(4*16*16), rbx)// add stride to dst pointer
 
 			dec(r14)
@@ -1343,20 +1474,20 @@ namespace ml
 			je(EPILOGUE)
 
 			label(UNROLLED1)
-			movq(r13, rax)// tmp src pointer is in r13
+			movq(rax, rcx)
 
-			LOAD_4x1xFP16(0, 1, 2, 3)
-			LOAD_4x1xFP16(4, 5, 6, 7)
-			LOAD_4x1xFP16(8, 9, 10, 11)
-			LOAD_4x1xFP16(12, 13, 14, 15)
+			LOAD_4x1xFP16(rcx, 0, 1, 2, 3)
+			LOAD_4x1xFP16(rcx, 4, 5, 6, 7)
+			LOAD_4x1xFP16(rcx, 8, 9, 10, 11)
+			LOAD_4x1xFP16(rcx, 12, 13, 14, 15)
 
-			STORE_4x1xFP32(0, 1, 2, 3)
-			STORE_4x1xFP32(4, 5, 6, 7)
-			STORE_4x1xFP32(8, 9, 10, 11)
-			STORE_4x1xFP32(12, 13, 14, 15)
+			STORE_4x1xFP32(0, xmm0, xmm1, xmm2, xmm3)
+			STORE_4x1xFP32(4, xmm4, xmm5, xmm6, xmm7)
+			STORE_4x1xFP32(8, xmm8, xmm9, xmm10, xmm11)
+			STORE_4x1xFP32(12, xmm12, xmm13, xmm14, xmm15)
 
-			add(imm(2*1), r13)// add stride to src pointer
-			add(imm(4*16*1), rbx)// add stride to dst pointer
+			add(imm(2*1), rax)// add stride to src pointer
+			add(imm(16*1*4), rbx)// add stride to dst pointer
 
 			dec(r14)
 			jne(UNROLLED1)
@@ -1375,8 +1506,141 @@ namespace ml
 					"%zmm8", "%zmm9", "%zmm10", "%zmm11", "%zmm12", "%zmm13", "%zmm14", "%zmm15", "%zmm16",
 					"%zmm17", "%zmm18", "%zmm19", "%zmm20", "%zmm21", "%zmm22", "%zmm23", "%zmm24", "%zmm25",
 					"%zmm26", "%zmm27", "%zmm28", "%zmm29", "%zmm30", "%zmm31", "%rax", "%rbx", "%rcx",
-					"%r12", "%r13", "%r14")
+					"%r12", "%r13", "%r14", "%r15")
 		}
+	}
+
+	void mha_qk_avx512f_24x16_fp32(Fragment &temp, const void *alpha_ptr, const Fragment &Q, const Fragment &K, const Fragment &bias,
+			Fragment &softmax_sum) noexcept
+	{
+		assert(Q.rows() == K.rows());
+		assert(Q.stride() == 24);
+		assert(K.stride() == 16);
+		assert(temp.columns() == Q.columns());
+		assert(temp.rows() == K.columns());
+		assert(temp.stride() == 24);
+
+		assert(alpha_ptr != nullptr);
+		assert(cpu::is_aligned(Q.data(), 64));
+		assert(cpu::is_aligned(K.data(), 64));
+		if (bias.is_packed())
+		{
+			assert(cpu::is_aligned(bias.data(), 64));
+		}
+		if (softmax_sum.is_packed())
+		{
+			assert(cpu::is_aligned(softmax_sum.data(), 64));
+		}
+
+		const float *Q_ptr = Q.data<float>();
+		const float *K_ptr = K.data<float>();
+		float *temp_ptr = temp.data<float>();
+		const float *bias_ptr = bias.data<float>();
+		float *softmax_ptr = softmax_sum.data<float>();
+
+		uint64_t k_iter = Q.rows() / 4;
+		uint64_t k_left = Q.rows() % 4;
+		const uint64_t bias_stride = bias.stride() * sizeof(float);
+
+		begin_asm()
+
+		movq(var(Q_ptr), rax)
+		movq(var(K_ptr), rbx)
+		ZERO_ACCUMULATORS()
+
+		movq(var(k_iter), r14) // load the number of 4-unrolled iterations
+		test(r14, r14)
+		je(FINALLOOP)
+
+		label(UNROLLED_x4)
+		SUB_KERNEL_24xFP32_16xFP32(0)
+		SUB_KERNEL_24xFP32_16xFP32(1)
+		SUB_KERNEL_24xFP32_16xFP32(2)
+		SUB_KERNEL_24xFP32_16xFP32(3)
+
+		add(imm(4*24*4), rax)// 4 iterations x 24 elements x 4 bytes
+		add(imm(4*16*4), rbx)// 4 iterations x 16 elements x 4 bytes
+		dec(r14)
+		jne(UNROLLED_x4)
+
+		label(FINALLOOP)
+		movq(var(k_left), r14)// load the number of 1-unrolled iterations
+		test(r14, r14)
+		je(EPILOGUE)
+
+		label(UNROLLED_x1)
+		SUB_KERNEL_24xFP32_16xFP32(0)
+		add(imm(1*24*4), rax)// 1 iteration x 24 elements x 4 bytes
+		add(imm(1*16*4), rbx)// 1 iteration x 16 elements x 4 bytes
+		dec(r14)
+		jne(UNROLLED_x1)
+
+		label(EPILOGUE)
+
+		movq(var(alpha_ptr), rax)// load address of alpha
+		vbroadcastss(mem(rax), zmm1)
+
+		// permute back to original layout
+		PERMUTE_AND_SCALE_6x16xFP32(zmm8, zmm9, zmm10, zmm11, zmm12, zmm13)
+		PERMUTE_AND_SCALE_6x16xFP32(zmm14, zmm15, zmm16, zmm17, zmm18, zmm19)
+		PERMUTE_AND_SCALE_6x16xFP32(zmm20, zmm21, zmm22, zmm23, zmm24, zmm25)
+		PERMUTE_AND_SCALE_6x16xFP32(zmm26, zmm27, zmm28, zmm29, zmm30, zmm31)
+
+		movq(var(bias_ptr), rbx)// load address of bias pointer
+		movq(var(bias_stride), r14)// load address of bias stride into r14
+		movq(r14, r13)
+		sal(imm(1), r13)// r13 = stride * 2
+		add(r14, r13)// r13 == stride * 3
+		movq(r14, r15)
+		sal(imm(2), r15)// r15 = stride * 4
+		ADD_BIAS_8x16xFP32(zmm8, zmm9, zmm10, zmm11, zmm12, zmm13, zmm14, zmm15)
+		ADD_BIAS_8x16xFP32(zmm16, zmm17, zmm18, zmm19, zmm20, zmm21, zmm22, zmm23)
+		ADD_BIAS_8x16xFP32(zmm24, zmm25, zmm26, zmm27, zmm28, zmm29, zmm30, zmm31)
+
+		SETUP_EXP_CONSTANTS()
+		EXP_6x16xFP32(zmm8, zmm9, zmm10, zmm11, zmm12, zmm13)
+		EXP_6x16xFP32(zmm14, zmm15, zmm16, zmm17, zmm18, zmm19)
+		EXP_6x16xFP32(zmm20, zmm21, zmm22, zmm23, zmm24, zmm25)
+		EXP_6x16xFP32(zmm26, zmm27, zmm28, zmm29, zmm30, zmm31)
+
+		movq(var(temp_ptr), rbx)// temp pointer is in rbx
+		movq(var(softmax_ptr), rcx)// softmax sum pointer is in rcx
+		// store 8x16 tile
+		TRANSPOSE_8x16xFP32()
+		STORE_16x8xFP32(rbx, 24, 16)
+		REDUCE_SUM()
+		vmovaps(mem(rcx, 16*4), ymm1)
+		vaddps(ymm1, ymm0, ymm0)
+		vmovaps(ymm0, mem(rcx, 16*4))
+
+		//store 16x16 tile
+		TRANSPOSE_16x16xFP32()
+		STORE_16x16xFP32(rbx, 24, 0)
+		REDUCE_SUM()
+		vmovaps(mem(rcx), zmm1)
+		vaddps(zmm1, zmm0, zmm0)
+		vmovaps(zmm0, mem(rcx))
+
+		vzeroupper()
+
+		end_asm(
+				:// outputs
+				:// inputs
+				[Q_ptr] "m"(Q_ptr),
+				[K_ptr] "m"(K_ptr),
+				[temp_ptr] "m"(temp_ptr),
+				[k_iter] "m"(k_iter),
+				[k_left] "m"(k_left),
+				[bias_stride] "m"(bias_stride),
+				[alpha_ptr] "m"(alpha_ptr),
+				[bias_ptr] "m"(bias_ptr),
+				[softmax_ptr] "m"(softmax_ptr)
+				:// clobbers
+				"cc", "memory", "%zmm0", "%zmm1", "%zmm2", "%zmm3", "%zmm4", "%zmm5", "%zmm6", "%zmm7",
+				"%zmm8", "%zmm9", "%zmm10", "%zmm11", "%zmm12", "%zmm13", "%zmm14", "%zmm15",
+				"%zmm16", "%zmm17", "%zmm18", "%zmm19", "%zmm20", "%zmm21", "%zmm22", "%zmm23",
+				"%zmm24", "%zmm25", "%zmm26", "%zmm27", "%zmm28", "%zmm29", "%zmm30", "%zmm31",
+				"%rax", "%rbx", "%rcx", "%rdx", "%r12", "%r13", "%r14", "%r15")
 	}
 #else
 	void gemm_avx512f_24x16_fp32(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,
@@ -1397,6 +1661,10 @@ namespace ml
 	{
 	}
 	void pack_avx512f_16xK_fp16_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept
+	{
+	}
+	void mha_qk_avx512f_24x16_fp32(Fragment &temp, const void *alpha_ptr, const Fragment &Q, const Fragment &K, const Fragment &bias,
+			Fragment &softmax_sum) noexcept
 	{
 	}
 #endif

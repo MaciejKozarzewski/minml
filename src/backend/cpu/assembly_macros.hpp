@@ -468,6 +468,7 @@
 #define vxorpd(_0, _1, _2) INSTR_(vxorpd, _0, _1, _2)
 #define vpxord(_0, _1, _2) INSTR_(vpxord, _0, _1, _2)
 #define vrcpps(_0, _1) INSTR_(vrcpps, _0, _1)
+#define vrcp14ps(_0, _1) INSTR_(vrcp14ps, _0, _1)
 
 #define vpmaddwd(_0, _1, _2) INSTR_(vpmaddwd, _0, _1, _2)
 #define vpaddd(_0, _1, _2) INSTR_(vpaddd, _0, _1, _2)
@@ -646,6 +647,8 @@
 #define vblendpd(_0, _1, _2, _3) INSTR_(vblendpd, _0, _1, _2, _3)
 #define vblendmps(_0, _1, _2) INSTR_(vblendmps, _0, _1, _2)
 #define vblendmpd(_0, _1, _2) INSTR_(vblendmpd, _0, _1, _2)
+#define vmovlhps(_0, _1, _2) INSTR_(vmovlhps, _0, _1, _2)
+#define vmovhlps(_0, _1, _2) INSTR_(vmovhlps, _0, _1, _2)
 
 /*
  * Prefetches

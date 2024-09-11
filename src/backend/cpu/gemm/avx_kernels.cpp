@@ -63,33 +63,6 @@
 	vaddps(ymm4, ymm14, ymm14)\
 	vaddps(ymm5, ymm15, ymm15)
 
-#define SUB_KERNEL_8xFP32_8xFP32(n) \
-	vmovaps(mem(rbx, n*8*4), ymm0)\
-	vbroadcastss(mem(rax, (8*n+0)*4), ymm1)\
-	vbroadcastss(mem(rax, (8*n+1)*4), ymm2)\
-	vbroadcastss(mem(rax, (8*n+2)*4), ymm3)\
-	vbroadcastss(mem(rax, (8*n+3)*4), ymm4)\
-	vmulps(ymm1, ymm0, ymm1)\
-	vmulps(ymm2, ymm0, ymm2)\
-	vmulps(ymm3, ymm0, ymm3)\
-	vmulps(ymm4, ymm0, ymm4)\
-	vaddps(ymm1, ymm8, ymm8)\
-	vaddps(ymm2, ymm9, ymm9)\
-	vaddps(ymm3, ymm10, ymm10)\
-	vaddps(ymm4, ymm11, ymm11)\
-	vbroadcastss(mem(rax, (8*n+4)*4), ymm1)\
-	vbroadcastss(mem(rax, (8*n+5)*4), ymm2)\
-	vbroadcastss(mem(rax, (8*n+6)*4), ymm3)\
-	vbroadcastss(mem(rax, (8*n+7)*4), ymm4)\
-	vmulps(ymm1, ymm0, ymm1)\
-	vmulps(ymm2, ymm0, ymm2)\
-	vmulps(ymm3, ymm0, ymm3)\
-	vmulps(ymm4, ymm0, ymm4)\
-	vaddps(ymm1, ymm12, ymm12)\
-	vaddps(ymm2, ymm13, ymm13)\
-	vaddps(ymm3, ymm14, ymm14)\
-	vaddps(ymm4, ymm15, ymm15)
-
 #define SCALE_ACCUMULATORS_BY(reg)\
 	vmulps(reg, ymm6, ymm6) \
 	vmulps(reg, ymm7, ymm7) \
@@ -264,52 +237,66 @@
 	vmaxps(ymm0, ymm14, ymm14)\
 	vmaxps(ymm0, ymm15, ymm15)
 
-#define LOAD_ADD_BIAS_8x8xFP32() \
+#define LOAD_ADD_BIAS_10x8xFP32() \
 	vmovaps(mem(rbx), ymm0) \
 	vmovaps(mem(rbx, r14, 1), ymm1) \
 	vmovaps(mem(rbx, r14, 2), ymm2) \
 	vmovaps(mem(rbx, r13, 1), ymm3) \
+	vmovaps(mem(rbx, r15, 1), ymm4) \
 	add(r15, rbx) \
-	vmovaps(mem(rbx), ymm4) \
-	vmovaps(mem(rbx, r14, 1), ymm5) \
-	vmovaps(mem(rbx, r14, 2), ymm6) \
-	vmovaps(mem(rbx, r13, 1), ymm7) \
-	vaddps(ymm0, ymm8, ymm8) \
-	vaddps(ymm1, ymm9, ymm9) \
-	vaddps(ymm2, ymm10, ymm10) \
-	vaddps(ymm3, ymm11, ymm11) \
-	vaddps(ymm4, ymm12, ymm12) \
-	vaddps(ymm5, ymm13, ymm13) \
-	vaddps(ymm6, ymm14, ymm14) \
-	vaddps(ymm7, ymm15, ymm15)
-#define STORE_8x8xFP32() \
-	vmovaps(ymm0, mem(rbx, 0*8*4)) \
-	vmovaps(ymm1, mem(rbx, 1*8*4)) \
-	vmovaps(ymm2, mem(rbx, 2*8*4)) \
-	vmovaps(ymm3, mem(rbx, 3*8*4)) \
-	vmovaps(ymm4, mem(rbx, 4*8*4)) \
-	vmovaps(ymm5, mem(rbx, 5*8*4)) \
-	vmovaps(ymm6, mem(rbx, 6*8*4)) \
-	vmovaps(ymm7, mem(rbx, 7*8*4))
-
-#define CVT_ADD_SUB_1x8xINT32(x, y) \
-	vcvtps2dq(ymm(x), ymm(x)) \
-	vextractf128(imm(1), ymm(x), xmm1) \
-	vpsubd(xmm(x), xmm0, xmm2) \
+	add(r14, rbx) \
+	vaddps(ymm0, ymm6, ymm6) \
+	vaddps(ymm1, ymm7, ymm7) \
+	vaddps(ymm2, ymm8, ymm8) \
+	vaddps(ymm3, ymm9, ymm9) \
+	vaddps(ymm4, ymm10, ymm10) \
+	vmovaps(mem(rbx), ymm0) \
+	vmovaps(mem(rbx, r14, 1), ymm1) \
+	vmovaps(mem(rbx, r14, 2), ymm2) \
+	vmovaps(mem(rbx, r13, 1), ymm3) \
+	vmovaps(mem(rbx, r15, 1), ymm4) \
+	vaddps(ymm0, ymm11, ymm11) \
+	vaddps(ymm1, ymm12, ymm12) \
+	vaddps(ymm2, ymm13, ymm13) \
+	vaddps(ymm3, ymm14, ymm14) \
+	vaddps(ymm4, ymm15, ymm15)
+#define EXP_FIRST_STAGE_10x8xFP32() \
+	movq(imm(0x4ab8aa3b4ab8aa3b), r14) \
+	vmovq(r14, xmm0) \
+	vpermpd(imm(0), ymm0, ymm0) \
+	vmulps(ymm0, ymm6, ymm6) \
+	vmulps(ymm0, ymm7, ymm7) \
+	vmulps(ymm0, ymm8, ymm8) \
+	vmulps(ymm0, ymm9, ymm9) \
+	vmulps(ymm0, ymm10, ymm10) \
+	vmulps(ymm0, ymm11, ymm11) \
+	vmulps(ymm0, ymm12, ymm12) \
+	vmulps(ymm0, ymm13, ymm13) \
+	vmulps(ymm0, ymm14, ymm14) \
+	vmulps(ymm0, ymm15, ymm15) \
+	vcvtps2dq(ymm6, ymm6) \
+	vcvtps2dq(ymm7, ymm7) \
+	vcvtps2dq(ymm8, ymm8) \
+	vcvtps2dq(ymm9, ymm9) \
+	vcvtps2dq(ymm10, ymm10) \
+	vcvtps2dq(ymm11, ymm11) \
+	vcvtps2dq(ymm12, ymm12) \
+	vcvtps2dq(ymm13, ymm13) \
+	vcvtps2dq(ymm14, ymm14) \
+	vcvtps2dq(ymm15, ymm15) \
+	movq(imm(0x3f7de0683f7de068), r14) \
+	vmovq(r14, xmm0) \
+	vpermpd(imm(0), ymm0, ymm0)
+#define EXP_SECOND_STAGE_1x8xFP32(r) \
+	vextractf128(imm(1), ymm(r), xmm1) \
+	vpsubd(xmm(r), xmm0, xmm2) \
 	vpsubd(xmm1, xmm0, xmm3) \
-	vpaddd(xmm(x), xmm0, xmm(x)) \
+	vinsertf128(imm(1), xmm3, ymm2, ymm2) \
+	vrcpps(ymm2, ymm2) \
+	vpaddd(xmm(r), xmm0, xmm(r)) \
 	vpaddd(xmm1, xmm0, xmm1) \
-	vinsertf128(imm(1), xmm3, ymm2, ymm(y)) \
-	vinsertf128(imm(1), xmm1, ymm(x), ymm(x))
-#define FINALIZE_EXP_4x8xFP32(reg0, reg1, reg2, reg3) \
-	vrcpps(ymm4, ymm4) \
-	vrcpps(ymm5, ymm5) \
-	vrcpps(ymm6, ymm6) \
-	vrcpps(ymm7, ymm7) \
-	vmulps(ymm4, reg0, reg0) \
-	vmulps(ymm5, reg1, reg1) \
-	vmulps(ymm6, reg2, reg2) \
-	vmulps(ymm7, reg3, reg3)
+	vinsertf128(imm(1), xmm1, ymm(r), ymm(r)) \
+	vmulps(ymm(r), ymm2, ymm(r))
 
 namespace ml
 {
@@ -1497,15 +1484,15 @@ namespace ml
 	}
 
 	// multi-head attention (MHA) kernel
-	void mha_qk_avx_8x8_fp32(Fragment &temp, const void *alpha_ptr, const Fragment &Q, const Fragment &K, const Fragment &bias,
+	void mha_qk_avx_10x8_fp32(Fragment &temp, const void *alpha_ptr, const Fragment &Q, const Fragment &K, const Fragment &bias,
 			Fragment &softmax_sum) noexcept
 	{
 		assert(Q.rows() == K.rows());
-		assert(Q.stride() == 8);
+		assert(Q.stride() == 10);
 		assert(K.stride() == 8);
 		assert(temp.columns() == Q.columns());
 		assert(temp.rows() == K.columns());
-		assert(temp.stride() == 8);
+		assert(temp.stride() == 10);
 
 		assert(alpha_ptr != nullptr);
 		assert(cpu::is_aligned(Q.data(), 32));
@@ -1539,12 +1526,12 @@ namespace ml
 		je(FINALLOOP)
 
 		label(UNROLLED_x4)
-		SUB_KERNEL_8xFP32_8xFP32(0)
-		SUB_KERNEL_8xFP32_8xFP32(1)
-		SUB_KERNEL_8xFP32_8xFP32(2)
-		SUB_KERNEL_8xFP32_8xFP32(3)
+		SUB_KERNEL_10xFP32_8xFP32(0)
+		SUB_KERNEL_10xFP32_8xFP32(1)
+		SUB_KERNEL_10xFP32_8xFP32(2)
+		SUB_KERNEL_10xFP32_8xFP32(3)
 
-		add(imm(4*8*4), rax)
+		add(imm(4*10*4), rax)
 		add(imm(4*8*4), rbx)
 		dec(r14)
 		jne(UNROLLED_x4)
@@ -1555,8 +1542,8 @@ namespace ml
 		je(EPILOGUE)
 
 		label(UNROLLED_x1)
-		SUB_KERNEL_8xFP32_8xFP32(0)
-		add(imm(1*8*4), rax)
+		SUB_KERNEL_10xFP32_8xFP32(0)
+		add(imm(1*10*4), rax)
 		add(imm(1*8*4), rbx)
 		dec(r14)
 		jne(UNROLLED_x1)
@@ -1574,34 +1561,61 @@ namespace ml
 		add(r14, r13)// r13 == stride * 3
 		movq(r14, r15)
 		sal(imm(2), r15)// r15 = stride * 4
-		LOAD_ADD_BIAS_8x8xFP32()
+		LOAD_ADD_BIAS_10x8xFP32()
 
-		movq(imm(0x4ab8aa3b4ab8aa3b), r14)
-		movq(imm(0x3f7de0683f7de068), r15)
-		vmovq(r14, xmm1)
-		vmovq(r15, xmm0)
-		vpermpd(imm(0), ymm1, ymm1)// 127 * (1 << 23) - 139160 = 0x3f7de068 (a)
-		vpermpd(imm(0), ymm0, ymm0)// (1 << 22) / float(M_LN2) = 0x4ab8aa3b (b)
-		SCALE_ACCUMULATORS_BY(ymm1)// multiply by a
-
-		CVT_ADD_SUB_1x8xINT32(8, 4)
-		CVT_ADD_SUB_1x8xINT32(9, 5)
-		CVT_ADD_SUB_1x8xINT32(10, 6)
-		CVT_ADD_SUB_1x8xINT32(11, 7)
-		FINALIZE_EXP_4x8xFP32(ymm8, ymm9, ymm10, ymm11)
-		CVT_ADD_SUB_1x8xINT32(12, 4)
-		CVT_ADD_SUB_1x8xINT32(13, 5)
-		CVT_ADD_SUB_1x8xINT32(14, 6)
-		CVT_ADD_SUB_1x8xINT32(15, 7)
-		FINALIZE_EXP_4x8xFP32(ymm12, ymm13, ymm14, ymm15)
-
-		AVX_8x8_TRANSPOSE_INV()
+		EXP_FIRST_STAGE_10x8xFP32()
+		EXP_SECOND_STAGE_1x8xFP32(6)
+		EXP_SECOND_STAGE_1x8xFP32(7)
+		EXP_SECOND_STAGE_1x8xFP32(8)
+		EXP_SECOND_STAGE_1x8xFP32(9)
+		EXP_SECOND_STAGE_1x8xFP32(10)
+		EXP_SECOND_STAGE_1x8xFP32(11)
+		EXP_SECOND_STAGE_1x8xFP32(12)
+		EXP_SECOND_STAGE_1x8xFP32(13)
+		EXP_SECOND_STAGE_1x8xFP32(14)
+		EXP_SECOND_STAGE_1x8xFP32(15)
 
 		movq(var(temp_ptr), rbx)// temp pointer is in rbx
-		STORE_8x8xFP32()
+		movq(var(softmax_ptr), rcx)// softmax sum pointer is in rcx
 
-		movq(var(softmax_ptr), rbx)// softmax sum pointer is in rbx
-		vmovaps(mem(rbx), ymm15)// load previous sum
+		// store 2x8 tile
+		vunpcklps(ymm7, ymm6, ymm0)
+		vunpckhps(ymm7, ymm6, ymm1)
+		vextractf128(imm(0x1), ymm0, xmm2)// e4 f4 e5 f5
+		vextractf128(imm(0x1), ymm1, xmm3)// e6 f6 e7 f7
+
+		vmovlpd(xmm0, mem(rbx, 4*(0*10+0)))
+		vmovhpd(xmm0, mem(rbx, 4*(1*10+0)))
+		vmovlpd(xmm1, mem(rbx, 4*(2*10+0)))
+		vmovhpd(xmm1, mem(rbx, 4*(3*10+0)))
+		vmovlpd(xmm2, mem(rbx, 4*(4*10+0)))
+		vmovhpd(xmm2, mem(rbx, 4*(5*10+0)))
+		vmovlpd(xmm3, mem(rbx, 4*(6*10+0)))
+		vmovhpd(xmm3, mem(rbx, 4*(7*10+0)))
+
+		// sum first 2 elements
+		vmovsd(mem(rcx), xmm4) // load previous sum
+		vaddps(ymm1, ymm0, ymm0)
+		vaddps(ymm3, ymm2, ymm2)
+		vaddps(ymm2, ymm0, ymm0)
+		vmovhlps(xmm0, xmm1, xmm1) // copy 3rd and 4th elements into 1st and 2nd to be added together in next line
+		vaddps(xmm1, xmm0, xmm0)
+		vaddps(xmm4, xmm0, xmm0)
+		vmovsd(xmm0, mem(rcx)) // store updated sum 2xfp32
+
+		// store 8x8 tile
+		AVX_8x8_TRANSPOSE_INV()
+
+		vmovups(ymm0, mem(rbx, 4*(0*10+2)))
+		vmovups(ymm1, mem(rbx, 4*(1*10+2)))
+		vmovups(ymm2, mem(rbx, 4*(2*10+2)))
+		vmovups(ymm3, mem(rbx, 4*(3*10+2)))
+		vmovups(ymm4, mem(rbx, 4*(4*10+2)))
+		vmovups(ymm5, mem(rbx, 4*(5*10+2)))
+		vmovups(ymm6, mem(rbx, 4*(6*10+2)))
+		vmovups(ymm7, mem(rbx, 4*(7*10+2)))
+
+		vmovups(mem(rcx, 2*4), ymm15) // load previous sum
 		// sum all accumulators and place result in the first one (ymm8)
 		vaddps(ymm1, ymm0, ymm0)
 		vaddps(ymm3, ymm2, ymm2)
@@ -1610,8 +1624,8 @@ namespace ml
 		vaddps(ymm4, ymm0, ymm0)
 		vaddps(ymm6, ymm2, ymm2)
 		vaddps(ymm2, ymm0, ymm0)
-		vaddps(ymm15, ymm0, ymm0)// add current sum
-		vmovaps(ymm0, mem(rbx))
+		vaddps(ymm15, ymm0, ymm0) // add current sum
+		vmovups(ymm0, mem(rcx, 2*4)) // store updated sum 8xfp32
 
 		vzeroupper()
 
