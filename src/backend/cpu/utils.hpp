@@ -12,6 +12,7 @@
 
 #include <memory>
 #include <string>
+#include <cassert>
 
 namespace ml
 {
@@ -80,6 +81,7 @@ namespace ml
 					const size_t shift = (remainder == 0) ? 0 : (alignment - remainder);
 
 					m_offset += shift + size;
+					assert(m_offset <= m_max_size);
 					return ptr + shift;
 				}
 		};

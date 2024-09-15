@@ -5,6 +5,7 @@ add_library(gemm_backend OBJECT avx_kernels.cpp
 								def_kernels.cpp
 								gemm_runtime.cpp
 								gemm.cpp
+								mha_runtime.cpp
 								sse2_kernels.cpp)
 								
 set_target_properties(gemm_backend PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED YES CXX_EXTENSIONS NO)

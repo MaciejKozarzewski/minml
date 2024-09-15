@@ -14,6 +14,7 @@ namespace ml
 {
 	class Fragment;
 	class Matrix;
+	class BatchedMatrix;
 	struct Position2D;
 	enum class MatrixOp;
 	class GemmRuntime;
@@ -24,76 +25,64 @@ namespace ml
 	/*
 	 * default kernels
 	 */
-	void gemm_def_MxN_fp32(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,
+	void gemm_def_MxN(Fragment &D, const Fragment &alpha, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,
 			const Fragment &bias, bool use_relu) noexcept;
-	void gemm_def_MxN_fp32_fp16(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,
-			const Fragment &bias, bool use_relu) noexcept;
-	void pack_def_MxK_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept;
-	void pack_def_MxK_fp16_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept;
-	void pack_def_MxK_fp16(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept;
-	void unpack_def_MxK_fp32(Matrix &dst, const Position2D &dst_pos, const Fragment &src) noexcept;
-	void unpack_def_MxK_fp16(Matrix &dst, const Position2D &dst_pos, const Fragment &src) noexcept;
+	void pack_def_MxK(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept;
+	void unpack_def_MxK(Matrix &dst, const Position2D &dst_pos, const Fragment &src) noexcept;
 	// multi-head attention (MHA) kernel
-	void mha_qk_def_MxN_fp32(Fragment &temp, const void *alpha_ptr, const Fragment &Q, const Fragment &K, const Fragment &bias,
+	void mha_qk_def_MxN(Fragment &temp, const void *alpha_ptr, const Fragment &Q, const Fragment &K, const Fragment &bias,
 			Fragment &softmax_sum) noexcept;
+	void mha_pack_bias_def(Fragment &dst, const BatchedMatrix &src, int head, int height, int width, int range) noexcept;
 
 	/*
 	 * SSE2 kernels
 	 */
-	void gemm_sse2_4x8_fp32(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,
+	void gemm_sse2_4x8(Fragment &D, const Fragment &alpha, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,
 			const Fragment &bias, bool use_relu) noexcept;
-
-	void pack_sse2_4xK_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept;
-	void pack_sse2_8xK_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept;
+	void pack_sse2_4xK(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept;
+	void pack_sse2_8xK(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept;
 	// multi-head attention (MHA) kernel
-	void mha_qk_sse2_4x8_fp32(Fragment &temp, const void *alpha_ptr, const Fragment &Q, const Fragment &K, const Fragment &bias,
+	void mha_qk_sse2_4x8(Fragment &temp, const void *alpha_ptr, const Fragment &Q, const Fragment &K, const Fragment &bias,
 			Fragment &softmax_sum) noexcept;
+	void mha_pack_bias_sse2(Fragment &dst, const BatchedMatrix &src, int head, int height, int width, int range) noexcept;
 
 	/*
 	 * AVX kernels
 	 */
-	void gemm_avx_10x8_fp32(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,
+	void gemm_avx_10x8(Fragment &D, const Fragment &alpha, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,
 			const Fragment &bias, bool use_relu) noexcept;
-	void gemm_avx_10x8_fp32_fp16(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,
-			const Fragment &bias, bool use_relu) noexcept;
-
-	void pack_avx_10xK_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept;
-	void pack_avx_10xK_fp16_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept;
-	void pack_avx_8xK_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept;
-	void pack_avx_8xK_fp16_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept;
+	void pack_avx_10xK(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept;
+	void pack_avx_8xK(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept;
 	// multi-head attention (MHA) kernel
-	void mha_qk_avx_10x8_fp32(Fragment &temp, const void *alpha_ptr, const Fragment &Q, const Fragment &K, const Fragment &bias,
+	void mha_qk_avx_10x8(Fragment &temp, const void *alpha_ptr, const Fragment &Q, const Fragment &K, const Fragment &bias,
 			Fragment &softmax_sum) noexcept;
+	void mha_pack_bias_avx(Fragment &dst, const BatchedMatrix &src, int head, int height, int width, int range) noexcept;
 
 	/*
 	 * AVX2 kernels
 	 */
-	void gemm_avx2_fma_12x8_fp32(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,
+	void gemm_avx2_12x8(Fragment &D, const Fragment &alpha, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,
 			const Fragment &bias, bool use_relu) noexcept;
-	void gemm_avx2_fma_12x8_fp32_fp16(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr,
-			const Fragment &C, const Fragment &bias, bool use_relu) noexcept;
-
-	void pack_avx2_fma_12xK_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept;
-	void pack_avx2_fma_12xK_fp16_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept;
+	void gemm_avx2_6x16(Fragment &D, const Fragment &alpha, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,
+			const Fragment &bias, bool use_relu) noexcept;
+	void pack_avx2_12xK(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept;
+	void pack_avx2_6xK(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept;
+	void pack_avx2_16xK(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept;
 	// multi-head attention (MHA) kernel
-	void mha_qk_avx2_fma_12x8_fp32(Fragment &temp, const void *alpha_ptr, const Fragment &Q, const Fragment &K, const Fragment &bias,
+	void mha_qk_avx2_12x8(Fragment &temp, const void *alpha_ptr, const Fragment &Q, const Fragment &K, const Fragment &bias,
 			Fragment &softmax_sum) noexcept;
 
 	/*
 	 * AVX512 kernels
 	 */
-	void gemm_avx512f_24x16_fp32(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,
+	void gemm_avx512f_24x16(Fragment &D, const Fragment &alpha, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,
 			const Fragment &bias, bool use_relu) noexcept;
-	void gemm_avx512f_24x16_fp32_fp16(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr,
-			const Fragment &C, const Fragment &bias, bool use_relu) noexcept;
-
-	void pack_avx512f_24xK_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept;
-	void pack_avx512f_24xK_fp16_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept;
-	void pack_avx512f_16xK_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept;
-	void pack_avx512f_16xK_fp16_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept;
+	void pack_avx512f_24xK(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept;
+	void pack_avx512f_16xK(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept;
 	// multi-head attention (MHA) kernel
-	void mha_qk_avx512f_24x16_fp32(Fragment &temp, const void *alpha_ptr, const Fragment &Q, const Fragment &K, const Fragment &bias,
+	void mha_qk_avx512f_24x16(Fragment &temp, const void *alpha_ptr, const Fragment &Q, const Fragment &K, const Fragment &bias,
 			Fragment &softmax_sum) noexcept;
+	void mha_pack_bias_avx512(Fragment &dst, const BatchedMatrix &src, int head, int height, int width, int range) noexcept;
 
 } /* namespace ml */
 

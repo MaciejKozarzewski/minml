@@ -203,11 +203,81 @@ namespace
 		return (s * x) / (s + t);
 	}
 
+	template<typename DT, typename AT, typename BT, typename CT>
+	void kernel_gemm(Fragment &D, const Fragment &alpha, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,
+			const Fragment &bias, bool use_relu) noexcept
+	{
+		assert(A.is_packed() && A.data() != nullptr);
+		assert(B.is_packed() && B.data() != nullptr);
+		assert(A.rows() == B.rows());
+		const int M = A.columns();
+		const int N = B.columns();
+		const int K = A.rows();
+
+		std::unique_ptr<float[]> acc = std::make_unique<float[]>(M * N);
+		for (int i = 0; i < M * N; i++)
+			acc[i] = 0.0f;
+
+		for (int k = 0; k < K; k++)
+			for (int m = 0; m < M; m++)
+			{
+				const float tmp = convert<AT, float>(A.at<AT>(k, m));
+				for (int n = 0; n < N; n++)
+					acc[m * N + n] += tmp * convert<BT, float>(B.at<BT>(k, n));
+			}
+
+		assert(alpha.is_packed());
+		assert(alpha.is_fp32());
+		if (alpha.rows() == 1 and alpha.columns() == 1)
+		{
+			for (int i = 0; i < M * N; i++)
+				acc[i] *= alpha.at<float>(0, 0);
+		}
+		if (alpha.rows() == M and alpha.columns() == 1)
+		{
+			for (int m = 0; m < M; m++)
+				for (int n = 0; n < N; n++)
+					acc[m * N + n] *= alpha.at<float>(m, 0);
+		}
+
+		if (bias.is_packed())
+		{
+			assert(bias.data() != nullptr);
+			assert(bias.rows() == 1);
+			assert(bias.columns() == N);
+			assert(bias.dtype() == B.dtype());
+			for (int m = 0; m < M; m++)
+				for (int n = 0; n < N; n++)
+					acc[m * N + n] += convert<BT, float>(bias.at<BT>(0, n));
+		}
+
+		assert(beta_ptr != nullptr);
+		const float beta = reinterpret_cast<const float*>(beta_ptr)[0];
+		if (beta != 0.0f)
+		{
+			assert(C.size() == D.size());
+			for (int m = 0; m < M; m++)
+				for (int n = 0; n < N; n++)
+					acc[m * N + n] += beta * convert<DT, float>(C.at<DT>(m, n));
+		}
+		if (use_relu)
+		{
+			for (int i = 0; i < M * N; i++)
+				acc[i] = relu(acc[i]);
+		}
+
+		assert(D.rows() == M);
+		assert(D.columns() == N);
+		for (int m = 0; m < M; m++)
+			for (int n = 0; n < N; n++)
+				D.at<DT>(m, n) = convert<float, DT>(acc[m * N + n]);
+	}
+
 	/*
 	 * computes D = optional_relu(alpha * op(A) * op(B) + beta * C + broadcast(bias))
 	 */
 	template<typename DT, typename AT, typename BT, typename CT>
-	void kernel_gemm_fp32(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,
+	void kernel_gemm(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,
 			const Fragment &bias, bool use_relu) noexcept
 	{
 		assert(A.is_packed() && A.data() != nullptr);
@@ -324,8 +394,7 @@ namespace
 	}
 
 	template<typename CT, typename AT, typename BT>
-	void kernel_mha_fp32(Fragment &temp, const void *alpha_ptr, const Fragment &A, const Fragment &B, const Fragment &bias,
-			Fragment &softmax_sum) noexcept
+	void kernel_mha(Fragment &temp, const void *alpha_ptr, const Fragment &A, const Fragment &B, const Fragment &bias, Fragment &softmax_sum) noexcept
 	{
 		assert(A.is_packed() && A.data() != nullptr);
 		assert(B.is_packed() && B.data() != nullptr);
@@ -357,7 +426,7 @@ namespace
 		assert(temp.columns() == M);
 		for (int m = 0; m < M; m++)
 		{
-			float sum = softmax_sum.at<CT>(0, m);
+			float sum = softmax_sum.is_packed() ? softmax_sum.at<CT>(m, 0) : 0.0f;
 			for (int n = 0; n < N; n++)
 			{
 				const float b = convert<BT, float>(bias.at<BT>(m, n));
@@ -365,82 +434,107 @@ namespace
 				temp.at<CT>(n, m) = convert<float, CT>(tmp);
 				sum += tmp;
 			}
-			softmax_sum.at<CT>(0, m) = sum;
+			if (softmax_sum.is_packed())
+				softmax_sum.at<CT>(m, 0) = sum;
 		}
 	}
 }
 
 namespace ml
 {
+	void gemm_def_MxN(Fragment &D, const Fragment &alpha, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,
+			const Fragment &bias, bool use_relu) noexcept
+	{
+		assert(A.is_fp32());
+		assert(B.is_fp32());
+		assert(C.is_fp32() || C.is_fp16());
+		assert(D.is_fp32() || D.is_fp16());
+		if (C.is_fp32())
+		{
+			if (D.is_fp32())
+				kernel_gemm<float, float, float, float>(D, alpha, A, B, beta_ptr, C, bias, use_relu);
+			else
+				kernel_gemm<float16, float, float, float>(D, alpha, A, B, beta_ptr, C, bias, use_relu);
+		}
+		else
+		{
+			if (D.is_fp32())
+				kernel_gemm<float, float, float, float16>(D, alpha, A, B, beta_ptr, C, bias, use_relu);
+			else
+				kernel_gemm<float16, float, float, float16>(D, alpha, A, B, beta_ptr, C, bias, use_relu);
+		}
+	}
+
 	/*
 	 * Computes D = alpha * A * B + beta * C
 	 * C and D may point to the same object
 	 */
-	void gemm_def_MxN_fp32(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,
+	void gemm_def_MxN(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,
 			const Fragment &bias, bool use_relu) noexcept
 	{
-		assert(A.dtype() == DTYPE_FLOAT32);
-		assert(B.dtype() == DTYPE_FLOAT32);
-		assert(C.dtype() == DTYPE_FLOAT32);
-		assert(D.dtype() == DTYPE_FLOAT32);
-		kernel_gemm_fp32<float, float, float, float>(D, alpha_ptr, A, B, beta_ptr, C, bias, use_relu);
-	}
-	void gemm_def_MxN_fp32_fp16(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,
-			const Fragment &bias, bool use_relu) noexcept
-	{
-		assert(D.dtype() == DTYPE_FLOAT16);
-		assert(C.dtype() == DTYPE_FLOAT16);
-		assert(A.dtype() == DTYPE_FLOAT16 || A.dtype() == DTYPE_FLOAT32);
-		assert(B.dtype() == DTYPE_FLOAT16 || B.dtype() == DTYPE_FLOAT32);
-		if (A.dtype() == DTYPE_FLOAT16)
+		assert(A.is_fp32());
+		assert(B.is_fp32());
+		assert(C.is_fp32() || C.is_fp16());
+		assert(D.is_fp32() || D.is_fp16());
+		if (C.is_fp32())
 		{
-			if (B.dtype() == DTYPE_FLOAT16)
-				kernel_gemm_fp32<float16, float16, float16, float16>(D, alpha_ptr, A, B, beta_ptr, C, bias, use_relu);
+			if (D.is_fp32())
+				kernel_gemm<float, float, float, float>(D, alpha_ptr, A, B, beta_ptr, C, bias, use_relu);
 			else
-				kernel_gemm_fp32<float16, float16, float, float16>(D, alpha_ptr, A, B, beta_ptr, C, bias, use_relu);
+				kernel_gemm<float16, float, float, float>(D, alpha_ptr, A, B, beta_ptr, C, bias, use_relu);
 		}
 		else
 		{
-			if (B.dtype() == DTYPE_FLOAT16)
-				kernel_gemm_fp32<float16, float, float16, float16>(D, alpha_ptr, A, B, beta_ptr, C, bias, use_relu);
+			if (D.is_fp32())
+				kernel_gemm<float, float, float, float16>(D, alpha_ptr, A, B, beta_ptr, C, bias, use_relu);
 			else
-				kernel_gemm_fp32<float16, float, float, float16>(D, alpha_ptr, A, B, beta_ptr, C, bias, use_relu);
+				kernel_gemm<float16, float, float, float16>(D, alpha_ptr, A, B, beta_ptr, C, bias, use_relu);
 		}
 	}
-
-	void pack_def_MxK_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept
+	void pack_def_MxK(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept
 	{
-		assert(dst.dtype() == DTYPE_FLOAT32);
-		assert(src.dtype() == DTYPE_FLOAT32);
-		kernel_pack<float, float>(dst, src, src_pos.row, src_pos.column, src_op);
+		assert(dst.is_fp32() || dst.is_fp16());
+		assert(src.is_fp32() || src.is_fp16());
+		if (src.is_fp32())
+		{
+			if (dst.is_fp32())
+				kernel_pack<float, float>(dst, src, src_pos.row, src_pos.column, src_op);
+			else
+				kernel_pack<float, float16>(dst, src, src_pos.row, src_pos.column, src_op);
+		}
+		else
+		{
+			if (dst.is_fp32())
+				kernel_pack<float16, float>(dst, src, src_pos.row, src_pos.column, src_op);
+			else
+				kernel_pack<float16, float16>(dst, src, src_pos.row, src_pos.column, src_op);
+		}
 	}
-	void pack_def_MxK_fp16_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept
+	void unpack_def_MxK(Matrix &dst, const Position2D &dst_pos, const Fragment &src) noexcept
 	{
-		assert(dst.dtype() == DTYPE_FLOAT32);
-		assert(src.dtype() == DTYPE_FLOAT16);
-		kernel_pack<float16, float>(dst, src, src_pos.row, src_pos.column, src_op);
-	}
-	void pack_def_MxK_fp16(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept
-	{
-		assert(dst.dtype() == DTYPE_FLOAT16);
-		assert(src.dtype() == DTYPE_FLOAT16);
-		kernel_pack<float16, float16>(dst, src, src_pos.row, src_pos.column, src_op);
-	}
-
-	void unpack_def_MxK_fp32(Matrix &dst, const Position2D &dst_pos, const Fragment &src) noexcept
-	{
+		assert(dst.is_fp32() || dst.is_fp16());
+		assert(src.is_fp32() || src.is_fp16());
+		if (src.is_fp32())
+		{
+			if (dst.is_fp32())
+				kernel_unpack<float, float>(dst, dst_pos.row, dst_pos.column, src);
+			else
+				kernel_unpack<float, float16>(dst, dst_pos.row, dst_pos.column, src);
+		}
+		else
+		{
+			if (dst.is_fp32())
+				kernel_unpack<float16, float>(dst, dst_pos.row, dst_pos.column, src);
+			else
+				kernel_unpack<float16, float16>(dst, dst_pos.row, dst_pos.column, src);
+		}
 		kernel_unpack<float, float>(dst, dst_pos.row, dst_pos.column, src);
 	}
-	void unpack_def_MxK_fp16(Matrix &dst, const Position2D &dst_pos, const Fragment &src) noexcept
-	{
-		kernel_unpack<float16, float16>(dst, dst_pos.row, dst_pos.column, src);
-	}
-
 	// multi-head attention kernel
-	void mha_qk_def_MxN_fp32(Fragment &temp, const void *alpha_ptr, const Fragment &Q, const Fragment &K, const Fragment &bias,
+	void mha_qk_def_MxN(Fragment &temp, const void *alpha_ptr, const Fragment &Q, const Fragment &K, const Fragment &bias,
 			Fragment &softmax_sum) noexcept
 	{
-		kernel_mha_fp32<float, float, float>(temp, alpha_ptr, Q, K, bias, softmax_sum);
+		kernel_mha<float, float, float>(temp, alpha_ptr, Q, K, bias, softmax_sum);
 	}
 
 } /* namespace ml */

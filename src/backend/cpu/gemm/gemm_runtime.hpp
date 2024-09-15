@@ -133,10 +133,8 @@ namespace ml
 
 	struct TypeConfiguration
 	{
-			mlDataType_t matrix_d_dtype;
-			mlDataType_t matrix_a_dtype;
-			mlDataType_t matrix_b_dtype;
-			mlDataType_t matrix_c_dtype;
+			mlDataType_t input_dtype;
+			mlDataType_t output_dtype;
 			mlDataType_t compute_dtype;
 	};
 
@@ -175,22 +173,19 @@ namespace ml
 		public:
 			using packing_function = std::function<void(Fragment&, const Matrix&, const Position2D&, MatrixOp)>;
 			using unpacking_function = std::function<void(Matrix&, const Position2D&,const Fragment&)>;
-			using gemm_function = std::function<void(Fragment &, const void *, const Fragment &, const Fragment &, const void *,
+			using gemm_function = std::function<void(Fragment &, const Fragment&, const Fragment &, const Fragment &, const void *,
 					const Fragment &, const Fragment &, bool)>;
 
 			TypeConfiguration type_configuration;
 			TileDimensions inner_tile;
 			gemm_function gemm_kernel;
-			packing_function a_packing, b_packing, c_packing, d_packing;
-			packing_function edge_a_packing, edge_b_packing;
-			unpacking_function d_unpacking;
+			packing_function a_packing, b_packing;
 			PerfEstimator perf_estimator;
 
 			GemmRuntime() noexcept = default;
 			bool can_work_with_types(const TypeConfiguration &tc) const noexcept
 			{
-				return type_configuration.matrix_a_dtype == tc.matrix_a_dtype and type_configuration.matrix_b_dtype == tc.matrix_b_dtype
-						and type_configuration.matrix_c_dtype == tc.matrix_c_dtype and type_configuration.matrix_d_dtype == tc.matrix_d_dtype
+				return type_configuration.input_dtype == tc.input_dtype and type_configuration.output_dtype == tc.output_dtype
 						and type_configuration.compute_dtype == tc.compute_dtype;
 			}
 			float get_expected_gflops(int M, int N, int K) const noexcept
@@ -261,8 +256,8 @@ namespace ml
 			void unpack_fragment_D(Fragment &fragment, int m, int n);
 	};
 
-	GemmRuntime get_runtime(mlContext_t context, mlDataType_t dtype, char opA, char opB, mlShape_t shape_A, mlShape_t shape_B);
-	GemmRuntime get_runtime(mlContext_t context, mlDataType_t dtype, char opA, char opB, int M, int N, int K);
+	GemmRuntime get_gemm_runtime(mlContext_t context, mlDataType_t dtype, char opA, char opB, mlShape_t shape_A, mlShape_t shape_B);
+	GemmRuntime get_gemm_runtime(mlContext_t context, mlDataType_t dtype, char opA, char opB, int M, int N, int K);
 }
 
 #endif /* BACKEND_CPU_KERNELS_GEMM_GEMM_RUNTIME_HPP_ */

@@ -15,8 +15,6 @@
 
 #include "../assembly_macros.hpp"
 
-namespace ml
-{
 #define ZERO_ACCUMULATORS()\
 	xorps(xmm8, xmm8)\
 	xorps(xmm9, xmm9)\
@@ -56,15 +54,43 @@ namespace ml
 	addps(xmm4, xmm14)\
 	addps(xmm5, xmm15)
 
-#define SCALE_ACCUMULATORS_BY(reg)\
-	mulps(reg, xmm8)\
-	mulps(reg, xmm9)\
-	mulps(reg, xmm10)\
-	mulps(reg, xmm11)\
-	mulps(reg, xmm12)\
-	mulps(reg, xmm13)\
-	mulps(reg, xmm14)\
+#define SCALE_ACCUMULATORS_BY(reg) \
+	mulps(reg, xmm8) \
+	mulps(reg, xmm9) \
+	mulps(reg, xmm10) \
+	mulps(reg, xmm11) \
+	mulps(reg, xmm12) \
+	mulps(reg, xmm13) \
+	mulps(reg, xmm14) \
 	mulps(reg, xmm15)
+#define SCALE_ACCUMULATORS_1x1(p) \
+	movss(mem(rax), xmm0) \
+	pshufd(imm(0), xmm0, xmm0) \
+	mulps(xmm0, xmm8) \
+	mulps(xmm0, xmm9) \
+	mulps(xmm0, xmm10) \
+	mulps(xmm0, xmm11) \
+	mulps(xmm0, xmm12) \
+	mulps(xmm0, xmm13) \
+	mulps(xmm0, xmm14) \
+	mulps(xmm0, xmm15)
+#define SCALE_ACCUMULATORS_4x1() \
+	movups(mem(rax), xmm0) \
+	movaps(xmm0, xmm1) \
+	movaps(xmm0, xmm2) \
+	movaps(xmm0, xmm3) \
+	pshufd(imm(0x00), xmm0, xmm0) \
+	pshufd(imm(0x55), xmm1, xmm1) \
+	pshufd(imm(0xAA), xmm2, xmm2) \
+	pshufd(imm(0xFF), xmm3, xmm3) \
+	mulps(xmm0, xmm8) \
+	mulps(xmm0, xmm9) \
+	mulps(xmm1, xmm10) \
+	mulps(xmm1, xmm11) \
+	mulps(xmm2, xmm12) \
+	mulps(xmm2, xmm13) \
+	mulps(xmm3, xmm14) \
+	mulps(xmm3, xmm15)
 
 #define LOAD_ADD_2x8xFP32(beta, reg00, reg01, reg10, reg11)\
 	movups(mem(rcx, 0*4*4), xmm4)\
@@ -233,16 +259,23 @@ namespace ml
 	mulps(tmp2, x2)\
 	mulps(tmp3, x3)
 
-	void gemm_sse2_4x8_fp32(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,
+namespace ml
+{
+	void gemm_sse2_4x8(Fragment &D, const Fragment &alpha, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,
 			const Fragment &bias, bool use_relu) noexcept
 	{
+		assert(A.is_fp32());
+		assert(B.is_fp32());
+		assert(C.is_fp32());
+		assert(D.is_fp32());
 		assert(A.rows() == B.rows());
 		assert(A.stride() == 4);
 		assert(B.stride() == 8);
 		assert(D.rows() == A.columns());
 		assert(D.columns() == B.columns());
 
-		assert(alpha_ptr != nullptr);
+		assert(alpha.is_packed());
+		assert(alpha.is_fp32());
 		assert(cpu::is_aligned(A.data(), 16));
 		assert(cpu::is_aligned(B.data(), 16));
 		assert(beta_ptr != nullptr);
@@ -263,6 +296,9 @@ namespace ml
 		const uint64_t C_stride = C.stride() * sizeof(float);
 		const uint64_t D_stride = D.stride() * sizeof(float);
 		const uint64_t flag_relu = use_relu;
+
+		const void *alpha_ptr = alpha.data();
+		const uint64_t scalar_alpha = alpha.rows() == 1;
 
 		begin_asm()
 		movq(var(A_ptr), rax) // A pointer is in rax
@@ -300,12 +336,15 @@ namespace ml
 		label(EPILOGUE)
 
 		movq(var(alpha_ptr), rax)// load address of alpha
-		movq(var(beta_ptr), rbx)// load address of beta
-		movss(mem(rax), xmm0)
-		movss(mem(rbx), xmm1)
-		pshufd(imm(0), xmm0, xmm0)
-		pshufd(imm(0), xmm1, xmm1)
-		SCALE_ACCUMULATORS_BY(xmm0)
+		movq(var(scalar_alpha), r14)
+		test(r14, r14)
+		je(COLUMN_ALPHA)
+		SCALE_ACCUMULATORS_1x1()
+		jmp(AFTER_ALPHA_SCALING)
+
+		label(COLUMN_ALPHA)
+		SCALE_ACCUMULATORS_4x1()
+		label(AFTER_ALPHA_SCALING)
 
 		// load address of bias pointer
 		movq(var(bias_ptr), rax)
@@ -316,7 +355,9 @@ namespace ml
 		ADD_BIAS_4x8xFP32(xmm2, xmm3)
 		label(AFTER_BIAS)
 
-		// load destination pointer and stride
+		movq(var(beta_ptr), rbx)// load address of beta
+		movss(mem(rbx), xmm1)
+		pshufd(imm(0), xmm1, xmm1)
 		xorps(xmm0, xmm0)
 		ucomiss(xmm1, xmm0)// set ZF if beta == 0.
 		je(AFTER_LOAD_C)
@@ -353,18 +394,26 @@ namespace ml
 				[alpha_ptr] "m"(alpha_ptr),
 				[beta_ptr] "m"(beta_ptr),
 				[flag_relu] "m"(flag_relu),
-				[bias_ptr] "m"(bias_ptr)
+				[bias_ptr] "m"(bias_ptr),
+				[scalar_alpha] "m"(scalar_alpha)
 				:// clobbers
 				"cc", "memory", "%xmm0", "%xmm1", "%xmm2", "%xmm3", "%xmm4", "%xmm5", "%xmm6", "%xmm7",
 				"%xmm8", "%xmm9", "%xmm10", "%xmm11", "%xmm12", "%xmm13", "%xmm14", "%xmm15", "%rax", "%rbx", "%rcx", "%r14")
 	}
 
-	void pack_sse2_4xK_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept
+	void pack_sse2_4xK(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept
 	{
+		if (dst.is_partial())
+		{
+			pack_def_MxK(dst, src, src_pos, src_op);
+			return;
+		}
+		assert(src.is_fp32());
+		assert(dst.is_fp32());
 		assert(dst.stride() == 4);
 		assert(ml::cpu::is_aligned(dst.data(), 16));
 
-		const uint64_t src_stride = src.stride() * sizeof(float);
+		const uint64_t src_stride = src.stride_in_bytes();
 		const void *src_ptr = src.pointer_at(src_pos.row, src_pos.column);
 		void *dst_ptr = dst.data();
 		uint64_t k_iter = dst.rows() / 8;
@@ -483,12 +532,19 @@ namespace ml
 					"%r12", "%r13", "%r14", "%r15")
 		}
 	}
-	void pack_sse2_8xK_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept
+	void pack_sse2_8xK(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept
 	{
+		if (dst.is_partial())
+		{
+			pack_def_MxK(dst, src, src_pos, src_op);
+			return;
+		}
+		assert(src.is_fp32());
+		assert(dst.is_fp32());
 		assert(dst.stride() == 8);
 		assert(ml::cpu::is_aligned(dst.data(), 16));
 
-		const uint64_t src_stride = src.stride() * sizeof(float);
+		const uint64_t src_stride = src.stride_in_bytes();
 		const void *src_ptr = src.pointer_at(src_pos.row, src_pos.column);
 		void *dst_ptr = dst.data();
 
@@ -631,9 +687,13 @@ namespace ml
 	}
 
 	// multi-head attention (MHA) kernel
-	void mha_qk_sse2_4x8_fp32(Fragment &temp, const void *alpha_ptr, const Fragment &Q, const Fragment &K, const Fragment &bias,
+	void mha_qk_sse2_4x8(Fragment &temp, const void *alpha_ptr, const Fragment &Q, const Fragment &K, const Fragment &bias,
 			Fragment &softmax_sum) noexcept
 	{
+		assert(Q.is_fp32());
+		assert(K.is_fp32());
+		assert(temp.is_fp32());
+		assert(bias.is_fp32());
 		assert(Q.rows() == K.rows());
 		assert(Q.stride() == 4);
 		assert(K.stride() == 8);
@@ -644,24 +704,24 @@ namespace ml
 		assert(alpha_ptr != nullptr);
 		assert(cpu::is_aligned(Q.data(), 16));
 		assert(cpu::is_aligned(K.data(), 16));
-		if (bias.is_packed())
-		{
-			assert(cpu::is_aligned(bias.data(), 16));
-		}
-		if (softmax_sum.is_packed())
-		{
-			assert(cpu::is_aligned(softmax_sum.data(), 16));
-		}
+		assert(cpu::is_aligned(bias.data(), 16));
 
 		const float *Q_ptr = Q.data<float>();
 		const float *K_ptr = K.data<float>();
 		float *temp_ptr = temp.data<float>();
-		const float *bias_ptr = bias.is_packed() ? bias.data<float>() : nullptr;
+		const float *bias_ptr = bias.data<float>();
 		float *softmax_ptr = softmax_sum.is_packed() ? softmax_sum.data<float>() : nullptr;
+		if (softmax_sum.is_packed())
+		{
+			assert(softmax_sum.is_fp32());
+			assert(softmax_sum.rows() >= temp.columns());
+			assert(cpu::is_aligned(softmax_sum.data(), 16));
+		}
 
 		uint64_t k_iter = Q.rows() / 4;
 		uint64_t k_left = Q.rows() % 4;
-		const uint64_t bias_stride = bias.stride() * sizeof(float);
+		const uint64_t bias_stride = bias.stride_in_bytes();
+		assert(bias_stride % 16 == 0);
 
 		begin_asm()
 		movq(var(Q_ptr), rax) // Q pointer is in rax
@@ -721,6 +781,8 @@ namespace ml
 		STORE_8x4xFP32(xmm8, xmm10, xmm12, xmm14, xmm9, xmm11, xmm13, xmm15)
 
 		movq(var(softmax_ptr), rbx)// softmax sum pointer is in rbx
+		test(rbx, rbx)
+		je(SKIP_REDUCTION)
 		movaps(mem(rbx), xmm0)// load previous sum
 		// sum all accumulators and place result in the first one (xmm8)
 		addps(xmm9, xmm8)
@@ -732,6 +794,7 @@ namespace ml
 		addps(xmm12, xmm8)
 		addps(xmm8, xmm0)// add current sum
 		movaps(xmm0, mem(rbx))
+		label(SKIP_REDUCTION)
 
 		end_asm(:// outputs
 				:// inputs
@@ -748,5 +811,30 @@ namespace ml
 				"cc", "memory", "%xmm0", "%xmm1", "%xmm2", "%xmm3", "%xmm4", "%xmm5", "%xmm6", "%xmm7",
 				"%xmm8", "%xmm9", "%xmm10", "%xmm11", "%xmm12", "%xmm13", "%xmm14", "%xmm15", "%rax", "%rbx", "%rcx", "%r14", "%r15")
 	}
+	void mha_pack_bias_def(Fragment &dst, const BatchedMatrix &src, int head, int height, int width, int range) noexcept
+	{
+		assert(dst.is_packed());
+		assert(dst.is_fp32());
+		assert(dst.rows() >= height * width);
+		assert(dst.columns() >= height * width);
+
+//		const void* src_ptr = src.pointer_at(head, 0, 0);
+//		void * dst_ptr = dst.data();
+//
+//		const uint64_t _height = height;
+//		const uint64_t _width = width;
+//
+//		for (int h1 = 0; h1 < height; h1++)
+//			for (int w1 = 0; w1 < width; w1++)
+//			{
+//				float *dst_ptr = dst.data<float>() + (h1 * width + w1) * dst.stride();
+//				for (int h2 = 0; h2 < height; h2++)
+//				{
+//					memcpy(dst_ptr, src.pointer_at(head, range + h2 - h1, range + 0 - w1), sizeof(float) * width);
+//					dst_ptr += width;
+//				}
+//			}
+	}
+
 } /* namespace ml */
 

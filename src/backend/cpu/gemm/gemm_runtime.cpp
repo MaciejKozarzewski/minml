@@ -41,16 +41,11 @@ namespace
 	{
 		std::vector<GemmRuntime> result(1);
 		// 4x8
-		result[0].type_configuration = { DTYPE_FLOAT32, DTYPE_FLOAT32, DTYPE_FLOAT32, DTYPE_FLOAT32, DTYPE_FLOAT32 };
+		result[0].type_configuration = { DTYPE_FLOAT32, DTYPE_FLOAT32, DTYPE_FLOAT32 };
 		result[0].inner_tile = { 4, 8, 256 };
-		result[0].gemm_kernel = gemm_sse2_4x8_fp32;
-		result[0].a_packing = pack_sse2_4xK_fp32;
-		result[0].b_packing = pack_sse2_8xK_fp32;
-		result[0].c_packing = pack_def_MxK_fp32;
-		result[0].d_packing = pack_def_MxK_fp32;
-		result[0].d_unpacking = unpack_def_MxK_fp32;
-		result[0].edge_a_packing = pack_def_MxK_fp32;
-		result[0].edge_b_packing = pack_def_MxK_fp32;
+		result[0].gemm_kernel = gemm_sse2_4x8;
+		result[0].a_packing = pack_sse2_4xK;
+		result[0].b_packing = pack_sse2_8xK;
 		result[0].perf_estimator = PerfEstimator(15.8, 14.2);
 
 		return result;
@@ -59,29 +54,19 @@ namespace
 	{
 		std::vector<GemmRuntime> result(2);
 		// 10x8 fp32
-		result[0].type_configuration = { DTYPE_FLOAT32, DTYPE_FLOAT32, DTYPE_FLOAT32, DTYPE_FLOAT32, DTYPE_FLOAT32 };
+		result[0].type_configuration = { DTYPE_FLOAT32, DTYPE_FLOAT32, DTYPE_FLOAT32 };
 		result[0].inner_tile = { 10, 8, 256 };
-		result[0].gemm_kernel = gemm_avx_10x8_fp32;
-		result[0].a_packing = pack_avx_10xK_fp32;
-		result[0].b_packing = pack_avx_8xK_fp32;
-		result[0].c_packing = pack_def_MxK_fp32;
-		result[0].d_packing = pack_def_MxK_fp32;
-		result[0].d_unpacking = unpack_def_MxK_fp32;
-		result[0].edge_a_packing = pack_def_MxK_fp32;
-		result[0].edge_b_packing = pack_def_MxK_fp32;
+		result[0].gemm_kernel = gemm_avx_10x8;
+		result[0].a_packing = pack_avx_10xK;
+		result[0].b_packing = pack_avx_8xK;
 		result[0].perf_estimator = PerfEstimator(31.6, 16.7);
 
 		// 10x8 fp16/fp32
-		result[1].type_configuration = { DTYPE_FLOAT16, DTYPE_FLOAT16, DTYPE_FLOAT16, DTYPE_FLOAT16, DTYPE_FLOAT32 };
+		result[1].type_configuration = { DTYPE_FLOAT16, DTYPE_FLOAT16, DTYPE_FLOAT32 };
 		result[1].inner_tile = { 10, 8, 512 };
-		result[1].gemm_kernel = gemm_avx_10x8_fp32_fp16;
-		result[1].a_packing = pack_avx_10xK_fp16_fp32;
-		result[1].b_packing = pack_avx_8xK_fp16_fp32;
-		result[1].c_packing = pack_def_MxK_fp16;
-		result[1].d_packing = pack_def_MxK_fp16;
-		result[1].d_unpacking = unpack_def_MxK_fp16;
-		result[1].edge_a_packing = pack_def_MxK_fp16_fp32;
-		result[1].edge_b_packing = pack_def_MxK_fp16_fp32;
+		result[1].gemm_kernel = gemm_avx_10x8;
+		result[1].a_packing = pack_avx_10xK;
+		result[1].b_packing = pack_avx_8xK;
 		result[1].perf_estimator = PerfEstimator(31.4, 14.6);
 
 		return result;
@@ -91,29 +76,19 @@ namespace
 		std::vector<GemmRuntime> result(2);
 
 		// 12x8 fp32
-		result[0].type_configuration = { DTYPE_FLOAT32, DTYPE_FLOAT32, DTYPE_FLOAT32, DTYPE_FLOAT32, DTYPE_FLOAT32 };
+		result[0].type_configuration = { DTYPE_FLOAT32, DTYPE_FLOAT32, DTYPE_FLOAT32 };
 		result[0].inner_tile = { 12, 8, 1024 };
-		result[0].gemm_kernel = gemm_avx2_fma_12x8_fp32;
-		result[0].a_packing = pack_avx2_fma_12xK_fp32;
-		result[0].b_packing = pack_avx_8xK_fp32;
-		result[0].c_packing = pack_def_MxK_fp32;
-		result[0].d_packing = pack_def_MxK_fp32;
-		result[0].d_unpacking = unpack_def_MxK_fp32;
-		result[0].edge_a_packing = pack_def_MxK_fp32;
-		result[0].edge_b_packing = pack_def_MxK_fp32;
+		result[0].gemm_kernel = gemm_avx2_12x8;
+		result[0].a_packing = pack_avx2_12xK;
+		result[0].b_packing = pack_avx_8xK;
 		result[0].perf_estimator = PerfEstimator(62.8, 23.4);
 
 		// 12x8 fp16/fp32
-		result[1].type_configuration = { DTYPE_FLOAT16, DTYPE_FLOAT16, DTYPE_FLOAT16, DTYPE_FLOAT16, DTYPE_FLOAT32 };
+		result[1].type_configuration = { DTYPE_FLOAT16, DTYPE_FLOAT16, DTYPE_FLOAT32 };
 		result[1].inner_tile = { 12, 8, 1024 };
-		result[1].gemm_kernel = gemm_avx2_fma_12x8_fp32_fp16;
-		result[1].a_packing = pack_avx2_fma_12xK_fp16_fp32;
-		result[1].b_packing = pack_avx_8xK_fp16_fp32;
-		result[1].c_packing = pack_def_MxK_fp16;
-		result[1].d_packing = pack_def_MxK_fp16;
-		result[1].d_unpacking = unpack_def_MxK_fp16;
-		result[1].edge_a_packing = pack_def_MxK_fp16_fp32;
-		result[1].edge_b_packing = pack_def_MxK_fp16_fp32;
+		result[1].gemm_kernel = gemm_avx2_12x8;
+		result[1].a_packing = pack_avx2_12xK;
+		result[1].b_packing = pack_avx_8xK;
 		result[1].perf_estimator = PerfEstimator(61.2, 25.5);
 
 		return result;
@@ -123,29 +98,19 @@ namespace
 		std::vector<GemmRuntime> result(2);
 
 		// 24x16 fp32
-		result[0].type_configuration = { DTYPE_FLOAT32, DTYPE_FLOAT32, DTYPE_FLOAT32, DTYPE_FLOAT32, DTYPE_FLOAT32 };
+		result[0].type_configuration = { DTYPE_FLOAT32, DTYPE_FLOAT32, DTYPE_FLOAT32 };
 		result[0].inner_tile = { 24, 16, 1024 };
-		result[0].gemm_kernel = gemm_avx512f_24x16_fp32;
-		result[0].a_packing = pack_avx512f_24xK_fp32;
-		result[0].b_packing = pack_avx512f_16xK_fp32;
-		result[0].c_packing = pack_def_MxK_fp32;
-		result[0].d_packing = pack_def_MxK_fp32;
-		result[0].d_unpacking = unpack_def_MxK_fp32;
-		result[0].edge_a_packing = pack_def_MxK_fp32;
-		result[0].edge_b_packing = pack_def_MxK_fp32;
+		result[0].gemm_kernel = gemm_avx512f_24x16;
+		result[0].a_packing = pack_avx512f_24xK;
+		result[0].b_packing = pack_avx512f_16xK;
 		result[0].perf_estimator = PerfEstimator(114.3, 42.8);
 
 		// 24x16 fp16/fp32
-		result[1].type_configuration = { DTYPE_FLOAT16, DTYPE_FLOAT16, DTYPE_FLOAT16, DTYPE_FLOAT16, DTYPE_FLOAT32 };
+		result[1].type_configuration = { DTYPE_FLOAT16, DTYPE_FLOAT16, DTYPE_FLOAT32 };
 		result[1].inner_tile = { 24, 16, 1024 };
-		result[1].gemm_kernel = gemm_avx512f_24x16_fp32_fp16;
-		result[1].a_packing = pack_avx512f_24xK_fp16_fp32;
-		result[1].b_packing = pack_avx512f_16xK_fp16_fp32;
-		result[1].c_packing = pack_def_MxK_fp16;
-		result[1].d_packing = pack_def_MxK_fp16;
-		result[1].d_unpacking = unpack_def_MxK_fp16;
-		result[1].edge_a_packing = pack_def_MxK_fp16_fp32;
-		result[1].edge_b_packing = pack_def_MxK_fp16_fp32;
+		result[1].gemm_kernel = gemm_avx512f_24x16;
+		result[1].a_packing = pack_avx512f_24xK;
+		result[1].b_packing = pack_avx512f_16xK;
 		result[1].perf_estimator = PerfEstimator(114.3, 42.8);
 
 		return result;
@@ -192,10 +157,12 @@ namespace ml
 		bool is_using_bias = (bias.data() != nullptr);
 		Fragment C_fragment, D_fragment;
 
+		Fragment alpha_fragment(&alpha, DTYPE_FLOAT32, 0);
+		alpha_fragment.mark_as_packed_with_size( { 1, 1 });
+
 		for (int outer_m = 0; outer_m < total_size.M; outer_m += outer_tile.M)
 			for (int outer_k = 0; outer_k < total_size.K; outer_k += outer_tile.K)
 			{
-				const float tmp_alpha = alpha;
 				const float tmp_beta = (outer_k == 0) ? beta : 1.0f;
 				const bool is_last_k_tile = (total_size.K - outer_k) <= outer_tile.K;
 
@@ -226,7 +193,7 @@ namespace ml
 							else
 								C_fragment = D_fragment;
 
-							gemm_kernel(D_fragment, &tmp_alpha, *A_frag_iter, *B_frag_iter, &tmp_beta, C_fragment, *bias_frag_iter,
+							gemm_kernel(D_fragment, alpha_fragment, *A_frag_iter, *B_frag_iter, &tmp_beta, C_fragment, *bias_frag_iter,
 									use_relu and is_last_k_tile);
 							unpack_fragment_D(D_fragment, inner_m, inner_n);
 							A_frag_iter.advance();
@@ -280,10 +247,7 @@ namespace ml
 		fragment.mark_as_packed_with_size(Size2D(k_to_pack, m_to_pack));
 
 		const Position2D pos = get_position(k, m, op_A);
-		if (fragment.columns() == fragment.stride())
-			a_packing(fragment, matrix_A, pos, op_A);
-		else
-			edge_a_packing(fragment, matrix_A, pos, op_A);
+		a_packing(fragment, matrix_A, pos, op_A);
 	}
 	void GemmRuntime::pack_fragment_B(Fragment &fragment, int n, int k)
 	{
@@ -292,10 +256,7 @@ namespace ml
 		fragment.mark_as_packed_with_size(Size2D(k_to_pack, n_to_pack));
 
 		const Position2D pos = get_position(k, n, op_B);
-		if (fragment.columns() == fragment.stride())
-			b_packing(fragment, matrix_B, pos, op_B);
-		else
-			edge_b_packing(fragment, matrix_B, pos, op_B);
+		b_packing(fragment, matrix_B, pos, op_B);
 	}
 	void GemmRuntime::pack_fragment_C(Fragment &fragment, int m, int n)
 	{
@@ -313,7 +274,7 @@ namespace ml
 		{
 			fragment = edge_C_fragment;
 			fragment.set_size(Size2D(rows_to_pack, cols_to_pack), inner_tile.N);
-			c_packing(fragment, matrix_C, Position2D(m, n), MatrixOp::NORMAL);
+			pack_def_MxK(fragment, matrix_C, Position2D(m, n), MatrixOp::NORMAL);
 		}
 	}
 	void GemmRuntime::pack_fragment_D(Fragment &fragment, int m, int n)
@@ -332,7 +293,7 @@ namespace ml
 		{
 			fragment = edge_D_fragment;
 			fragment.set_size(Size2D(rows_to_pack, cols_to_pack), inner_tile.N);
-			d_packing(fragment, matrix_D, Position2D(m, n), MatrixOp::NORMAL);
+			pack_def_MxK(fragment, matrix_D, Position2D(m, n), MatrixOp::NORMAL);
 		}
 	}
 	void GemmRuntime::pack_fragment_bias(Fragment &fragment, int n)
@@ -341,10 +302,7 @@ namespace ml
 		fragment.mark_as_packed_with_size(Size2D(1, n_to_pack));
 
 		const Position2D pos = get_position(1, n, MatrixOp::NORMAL);
-		if (fragment.columns() == fragment.stride())
-			b_packing(fragment, bias, pos, MatrixOp::NORMAL);
-		else
-			edge_b_packing(fragment, bias, pos, MatrixOp::NORMAL);
+		b_packing(fragment, bias, pos, MatrixOp::NORMAL);
 	}
 	void GemmRuntime::unpack_fragment_D(Fragment &fragment, int m, int n)
 	{
@@ -353,10 +311,10 @@ namespace ml
 
 		const bool is_tile_full = (rows_to_unpack == inner_tile.M) and (cols_to_unpack == inner_tile.N);
 		if (not is_tile_full)
-			d_unpacking(matrix_D, Position2D(m, n), fragment);
+			unpack_def_MxK(matrix_D, Position2D(m, n), fragment);
 	}
 
-	GemmRuntime get_runtime(mlContext_t context, mlDataType_t dtype, char opA, char opB, mlShape_t shape_A, mlShape_t shape_B)
+	GemmRuntime get_gemm_runtime(mlContext_t context, mlDataType_t dtype, char opA, char opB, mlShape_t shape_A, mlShape_t shape_B)
 	{
 		assert(shape_A.rank == 2 || shape_A.rank == 3);
 		assert(shape_B.rank == 2 || shape_B.rank == 3);
@@ -365,11 +323,11 @@ namespace ml
 		const int N = is_transpose(opB) ? shape_B.dim[shape_B.rank - 2] : shape_B.dim[shape_B.rank - 1];
 		const int K = is_transpose(opA) ? shape_A.dim[shape_A.rank - 2] : shape_A.dim[shape_A.rank - 1];
 
-		return get_runtime(context, dtype, opA, opB, M, N, K);
+		return get_gemm_runtime(context, dtype, opA, opB, M, N, K);
 	}
-	GemmRuntime get_runtime(mlContext_t context, mlDataType_t dtype, char opA, char opB, int M, int N, int K)
+	GemmRuntime get_gemm_runtime(mlContext_t context, mlDataType_t dtype, char opA, char opB, int M, int N, int K)
 	{
-		const TypeConfiguration tc { dtype, dtype, dtype, dtype, DTYPE_FLOAT32 };
+		const TypeConfiguration tc { dtype, dtype, DTYPE_FLOAT32 };
 
 		const std::vector<GemmRuntime> &table = get_gemm_runtime_table(context);
 		GemmRuntime result;

@@ -101,6 +101,24 @@ namespace ml
 				return row * stride() + col;
 			}
 
+			bool is_partial() const noexcept
+			{
+				assert(columns() <= stride());
+				return columns() < stride();
+			}
+			bool is_fp16() const noexcept
+			{
+				return dtype() == DTYPE_FLOAT16;
+			}
+			bool is_fp32() const noexcept
+			{
+				return dtype() == DTYPE_FLOAT32;
+			}
+			uint64_t stride_in_bytes() const noexcept
+			{
+				return stride() * size_of(dtype());
+			}
+
 			void set_size(Size2D size, int stride) noexcept
 			{
 				m_is_packed = false;
@@ -111,14 +129,6 @@ namespace ml
 			{
 				m_size = size;
 				m_is_packed = true;
-			}
-			Fragment get_subfragment(Position2D pos, Size2D size) const noexcept
-			{
-				assert(is_packed());
-				void *shifted_ptr = reinterpret_cast<uint8_t*>(m_data) + size_of(dtype()) * offset_at(pos.row, pos.column);
-				Fragment result(shifted_ptr, dtype(), stride());
-				result.mark_as_packed_with_size(size);
-				return result;
 			}
 			void print_info() const
 			{

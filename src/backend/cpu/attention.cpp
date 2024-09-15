@@ -10,6 +10,7 @@
 
 #include "gemm/Matrix.hpp"
 #include "gemm/gemm_runtime.hpp"
+#include "gemm/mha_runtime.hpp"
 #include "indexers.hpp"
 #include "fp16.hpp"
 
@@ -18,71 +19,6 @@
 namespace
 {
 	using namespace ml;
-
-	class MatrixSlicer
-	{
-			const uint8_t *q_ptr;
-			const uint8_t *k_ptr;
-			const uint8_t *v_ptr;
-			uint8_t *qk_ptr;
-			uint8_t *output_ptr;
-
-			int batch_strides[3]; // input, QK, output
-			int head_strides[3]; // input, QK, output
-
-//			int tokens;
-//			int embedding_dim;
-//			int num_heads;
-//			int head_dim;
-//			int dtype_size;
-//			int batch_qkv_stride;
-//			int batch_qk_stride;
-//			int batch_output_stride;
-		public:
-			MatrixSlicer(const mlShape_t &shape, mlDataType_t dtype, const void *input, void *workspace, void *output, int num_heads)
-//					tokens(shape.dim[1]),
-//					embedding_dim(shape.dim[2] / 3),
-//					dtype_size(size_of(dtype)),
-//					q_ptr(reinterpret_cast<const uint8_t*>(input)),
-//					k_ptr(q_ptr + embedding_dim * dtype_size),
-//					v_ptr(k_ptr + embedding_dim * dtype_size),
-//					qk_ptr(reinterpret_cast<uint8_t*>(workspace)),
-//					output_ptr(reinterpret_cast<uint8_t*>(output)),
-//					num_heads(num_heads),
-//					head_dim(embedding_dim / num_heads),
-//					batch_qkv_stride(shape.dim[1] * shape.dim[2] * dtype_size)
-			{
-				assert(shape.rank == 3);
-				assert(shape.dim[2] % 3 == 0);
-				const int batch_size = shape.dim[0];
-				const int tokens = shape.dim[1];
-				const int embedding_dim = shape.dim[2] / 3;
-				const int dtype_size = size_of(dtype);
-
-				assert(num_heads > 0);
-				assert(embedding_dim % num_heads == 0);
-				const int head_dim = embedding_dim / num_heads;
-
-				q_ptr = reinterpret_cast<const uint8_t*>(input);
-				k_ptr = q_ptr + embedding_dim * dtype_size;
-				v_ptr = k_ptr + embedding_dim * dtype_size;
-
-				qk_ptr = reinterpret_cast<uint8_t*>(workspace);
-				output_ptr = reinterpret_cast<uint8_t*>(output);
-
-				batch_strides[0] = tokens * embedding_dim * 3 * dtype_size;
-				batch_strides[1] = tokens * tokens * dtype_size;
-				batch_strides[2] = tokens * embedding_dim * dtype_size;
-
-				head_strides[0] = embedding_dim * 3 * dtype_size;
-
-			}
-			Matrix get_Q_head(int batch_idx, int head_idx) const noexcept
-			{
-
-			}
-
-	};
 
 	template<typename T>
 	T clamp(T x, T lower, T upper) noexcept
@@ -120,7 +56,7 @@ namespace
 	{
 		// maximum relative error = 0.628981%
 		constexpr float a = (1 << 22) / float(M_LN2);
-		constexpr int32_t b = 127 * (1 << 23) -139160;
+		constexpr int32_t b = 127 * (1 << 23) - 139160;
 		const int32_t r = static_cast<int32_t>(a * x);
 		const float s = to_float(b + r);
 		const float t = to_float(b - r);
@@ -170,7 +106,7 @@ namespace
 	void gemm_batched(mlContext_t context, char opA, char opB, mlDataType_t dtype, int M, int N, int K, float alpha, std::vector<void*> &A, int lda,
 			std::vector<void*> &B, int ldb, std::vector<void*> &C, int ldc, int batch_count)
 	{
-		GemmRuntime rt = get_runtime(context, dtype, opA, opB, M, N, K);
+		GemmRuntime rt = get_gemm_runtime(context, dtype, opA, opB, M, N, K);
 
 		for (int i = 0; i < batch_count; i++)
 		{
@@ -232,8 +168,7 @@ namespace
 						float sum = 0.0f;
 						for (int i = 0; i < height * width; i++)
 						{
-//							const T tmp = std::exp(input_cache_ptr[i] - max_value);
-							const T tmp = fast_exp(input_cache_ptr[i] - max_value);
+							const T tmp = std::exp(input_cache_ptr[i] - max_value);
 							sum += tmp;
 							input_cache_ptr[i] = tmp;
 						}
@@ -285,7 +220,6 @@ namespace
 						output_ptr += height * width;
 						gradient_ptr += height * width;
 					}
-				weights_update_ptr += weights_size * round_up(weights_size, 4);
 			}
 	}
 
@@ -301,55 +235,13 @@ namespace
 		const int embedding = input_shape.dim[3] / 3;
 		const int num_heads = weights_shape.dim[0];
 		const int head_dim = embedding / num_heads;
-		const int range = weights_shape.dim[1];
 
-		void *local_workspace = ml::cpu::Context::getWorkspace(context);
-
-		GemmRuntime rt1 = get_runtime(context, dtype, 'n', 't', tokens, tokens, head_dim);
-		GemmRuntime rt2 = get_runtime(context, dtype, 'n', 'n', tokens, head_dim, tokens);
-
-		const Indexer<5> input_indexer(batch_size, tokens, 3, num_heads, head_dim);
-		const Indexer<4> workspace_indexer(batch_size, num_heads, tokens, tokens);
-		const Indexer<4> output_indexer(batch_size, tokens, num_heads, head_dim);
-
-		for (int b = 0; b < batch_size; b++)
-			for (int h = 0; h < num_heads; h++)
-			{
-				void *q_ptr = apply_offset(const_cast<void*>(input), size_of(dtype) * input_indexer.at(b, 0, 0, h, 0));
-				void *k_ptr = apply_offset(const_cast<void*>(input), size_of(dtype) * input_indexer.at(b, 0, 1, h, 0));
-				void *v_ptr = apply_offset(const_cast<void*>(input), size_of(dtype) * input_indexer.at(b, 0, 2, h, 0));
-				void *out_ptr = apply_offset(const_cast<void*>(output), size_of(dtype) * output_indexer.at(b, 0, h, 0));
-
-				const Matrix matrix_q(q_ptr, dtype, tokens, head_dim, 3 * embedding);
-				const Matrix matrix_k(k_ptr, dtype, tokens, head_dim, 3 * embedding);
-				const Matrix matrix_v(v_ptr, dtype, tokens, head_dim, 3 * embedding);
-				Matrix matrix_qk(workspace, dtype, tokens, tokens, tokens);
-				Matrix matrix_out(out_ptr, dtype, tokens, head_dim, embedding);
-
-				rt1.setMatrixA(matrix_q, 'n');
-				rt1.setMatrixB(matrix_k, 't');
-				rt1.setMatrixC(matrix_qk);
-				rt1.setMatrixD(matrix_qk);
-				if (b == 0 and h == 0)
-				{
-					rt1.setScalingFactors(1.0f / std::sqrt(head_dim), 0.0f);
-					rt1.setup(context);
-				}
-				rt1.run();
-
-//				softmax_forward_in_place<float>(workspace, weights, 1, 1, height, width, range, local_workspace);
-
-				rt2.setMatrixA(matrix_qk, 'n');
-				rt2.setMatrixB(matrix_v, 'n');
-				rt2.setMatrixC(matrix_out);
-				rt2.setMatrixD(matrix_out);
-				if (b == 0 and h == 0)
-				{
-					rt2.setScalingFactors(1.0f, 0.0f);
-					rt2.setup(context);
-				}
-				rt2.run();
-			}
+		MhaRuntime rt = get_mha_runtime(context, dtype, tokens, head_dim);
+		rt.setInput(input, input_shape, dtype);
+		rt.setOutput(output, make_shape( { batch_size, height, width, embedding }), dtype);
+		rt.setBias(weights, weights_shape, dtype);
+		rt.setup(context);
+		rt.run();
 	}
 }
 
@@ -372,8 +264,12 @@ namespace ml
 	void cpu_multi_head_attention_forward(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, mlDataType_t dtype, const void *input,
 			void *output, const void *weights, void *workspace, void *backward_data)
 	{
-//		fused_mha_forward(context, input_shape, weights_shape, dtype, input, output, weights, workspace, backward_data);
-//		return;
+		if (backward_data == nullptr)
+		{
+			fused_mha_forward(context, input_shape, weights_shape, dtype, input, output, weights, workspace, backward_data);
+			return;
+		}
+
 		assert(input_shape.rank == 4);
 		assert(weights_shape.rank == 3);
 		const int batch_size = input_shape.dim[0];

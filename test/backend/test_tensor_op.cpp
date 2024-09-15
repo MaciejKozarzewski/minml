@@ -114,6 +114,8 @@ namespace ml
 	}
 	TEST(TestTensorOp, addBiasAct_fp16)
 	{
+		if (not Device::cpu().supportsType(DataType::FLOAT16))
+			GTEST_SKIP();
 		Context context;
 		Tensor correct_output( { 123, 34 }, DataType::FLOAT32, Device::cpu());
 		Tensor output( { 123, 34 }, DataType::FLOAT16, Device::cpu());

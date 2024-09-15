@@ -36,70 +36,83 @@ namespace ml
 
 	class MhaRuntime
 	{
-			Matrix matrix_Q, matrix_K, matrix_V, bias;
+			BatchedMatrix matrix_QKV, matrix_output, matrix_bias;
 
-			TileDimensions outer_tile, total_size;
+			TileDimensions total_size;
 
-			ArrayOfFragments Q_fragments, K_fragments, V_fragments, bias_fragments;
-			Fragment edge_out_fragment, bias_copy;
+			ArrayOfFragments K_fragments, V_fragments;
+			Fragment Q_fragment, temp_qk_fragment, edge_out_fragment, bias_fragment, softmax_sum_fragment;
+
+			int batch_size = 0;
+			int height = 0;
+			int width = 0;
+			int embedding = 0;
+			int num_heads = 0;
+			int bias_range = 0;
+			int tokens = 0;
+			int head_dim = 0;
 
 		public:
 			using packing_function = std::function<void(Fragment&, const Matrix&, const Position2D&, MatrixOp)>;
 			using unpacking_function = std::function<void(Matrix&, const Position2D&,const Fragment&)>;
 			using mha1_function = std::function<void(Fragment&, const void*, const Fragment&, const Fragment&, const Fragment&, Fragment&)>;
-			using mha2_function = std::function<void(Fragment &, const void *, const Fragment &, const Fragment &, const void *,
+			using mha2_function = std::function<void(Fragment &, const Fragment&, const Fragment &, const Fragment &, const void *,
 					const Fragment &, const Fragment &, bool)>;
 
 			MhaTypeConfiguration type_configuration;
 			TileDimensions inner_tile;
 			mha1_function softmax_qk_kernel;
 			mha2_function mult_by_v_kernel;
-			packing_function q_packing, k_packing, v_packing;
-			packing_function edge_q_packing, edge_k_packing, edge_v_packing;
-			unpacking_function out_unpacking;
+			packing_function q_packing, kv_packing;
 			PerfEstimator perf_estimator;
 
 			MhaRuntime() noexcept = default;
 			bool can_work_with_types(const MhaTypeConfiguration &tc) const noexcept
 			{
-				return true;
+				return type_configuration.matrix_q_dtype == tc.matrix_q_dtype and type_configuration.matrix_k_dtype == tc.matrix_k_dtype
+						and type_configuration.matrix_v_dtype == tc.matrix_v_dtype and type_configuration.bias_dtype == tc.bias_dtype
+						and type_configuration.compute_dtype == tc.compute_dtype;
 			}
-			float get_expected_gflops(int M, int N, int K) const noexcept
+			float get_expected_gflops(int tokens, int head_dim) const noexcept
 			{
-				return perf_estimator( { M, N, K }, inner_tile);
+				return perf_estimator( { tokens, tokens, head_dim }, inner_tile);
 			}
-			void setMatrixQ(const Matrix &mat)
+			void setInput(const void *ptr, mlShape_t shape, mlDataType_t dtype)
 			{
-				matrix_Q = mat;
+				assert(shape.rank == 4);
+				batch_size = shape.dim[0];
+				height = shape.dim[1];
+				width = shape.dim[2];
+				assert(shape.dim[3] % 3 == 0);
+				embedding = shape.dim[3] / 3;
+				matrix_QKV = BatchedMatrix(ptr, dtype, shape.dim[0], shape.dim[1] * shape.dim[2], shape.dim[3], shape.dim[3]);
 			}
-			void setMatrixK(const Matrix &mat)
+			void setOutput(void *ptr, mlShape_t shape, mlDataType_t dtype)
 			{
-				matrix_Q = mat;
+				assert(shape.rank == 4);
+				matrix_output = BatchedMatrix(ptr, dtype, shape.dim[0], shape.dim[1] * shape.dim[2], shape.dim[3], shape.dim[3]);
 			}
-			void setMatrixV(const Matrix &mat)
+			void setBias(const void *ptr, mlShape_t shape, mlDataType_t dtype)
 			{
-				matrix_V = mat;
-			}
-			void setBias(const Matrix &mat)
-			{
-				bias = mat;
-				bias_copy.set_size( Size2D(), 0);
+				assert(shape.rank == 3);
+				num_heads = shape.dim[0];
+				assert(embedding % num_heads == 0);
+				bias_range = (shape.dim[1] - 1) / 2;
+				matrix_bias = BatchedMatrix(ptr, dtype, shape.dim[0], shape.dim[1], shape.dim[2], shape.dim[2]);
 			}
 			void setup(mlContext_t context);
 			void run();
 		private:
-			void find_tile_sizes();
 			void create_fragments(mlContext_t context);
-			void pack_fragment_Q(Fragment &fragment, int m, int k);
-			void pack_fragment_K(Fragment &fragment, int n, int k);
-			void pack_fragment_V(Fragment &fragment, int n, int k);
-			void pack_fragment_out(Fragment &fragment, int m, int n);
-			void pack_fragment_bias(Fragment &fragment, int m, int n);
-			void unpack_fragment_out(Fragment &fragment, int m, int n);
+			void pack_fragment_Q(const Matrix &Q, Fragment &fragment, int m, int k);
+			void pack_fragment_K(const Matrix &K, Fragment &fragment, int n, int k);
+			void pack_fragment_V(const Matrix &V, Fragment &fragment, int n, int k);
+			void pack_fragment_out(Matrix &out, Fragment &fragment, int m, int n);
+			void pack_fragment_bias(int head_idx);
+			void unpack_fragment_out(Matrix &out, Fragment &fragment, int m, int n);
 	};
 
-	MhaRuntime get_mha_runtime(mlContext_t context, mlDataType_t dtype, char opA, char opB, mlShape_t shape_A, mlShape_t shape_B);
-	MhaRuntime get_mha_runtime(mlContext_t context, mlDataType_t dtype, char opA, char opB, int M, int N, int K);
+	MhaRuntime get_mha_runtime(mlContext_t context, mlDataType_t dtype, int tokens, int head_dim);
 }
 
 #endif /* BACKEND_CPU_GEMM_MHA_RUNTIME_HPP_ */

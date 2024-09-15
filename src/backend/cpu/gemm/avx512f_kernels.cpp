@@ -124,6 +124,98 @@
 	vmulps(zmm1, zmm4, reg4)\
 	vmulps(zmm1, reg5, reg5)
 
+#define PERMUTE_8x16xFP32(reg0, reg1, reg2, reg3, reg4, reg5, reg6, reg7)\
+	movq(imm(0x5555), rdx) \
+	kmovw(edx, k(1)) \
+	movq(imm(0xAAAA), rdx) \
+	kmovw(edx, k(2)) \
+	vpermilps(imm(0xB1), reg1, zmm0) \
+	vpermilps(imm(0xB1), reg3, zmm1) \
+	vpermilps(imm(0xB1), reg5, zmm2) \
+	vpermilps(imm(0xB1), reg7, zmm3) \
+	vblendmps(reg0, zmm0, reg1 mask_k(2)) \
+	vblendmps(reg0, zmm0, reg0 mask_k(1)) \
+	vblendmps(reg2, zmm1, reg3 mask_k(2)) \
+	vblendmps(reg2, zmm1, reg2 mask_k(1)) \
+	vblendmps(reg4, zmm2, reg5 mask_k(2)) \
+	vblendmps(reg4, zmm2, reg4 mask_k(1)) \
+	vblendmps(reg6, zmm3, reg7 mask_k(2)) \
+	vblendmps(reg6, zmm3, reg6 mask_k(1))
+#define SCALE_ACCUMULATORS_1x1() \
+	vbroadcastss(mem(rax), zmm0) \
+	vmulps(zmm0, zmm8, zmm8) \
+	vmulps(zmm0, zmm9, zmm9) \
+	vmulps(zmm0, zmm10, zmm10) \
+	vmulps(zmm0, zmm11, zmm11) \
+	vmulps(zmm0, zmm12, zmm12) \
+	vmulps(zmm0, zmm13, zmm13) \
+	vmulps(zmm0, zmm14, zmm14) \
+	vmulps(zmm0, zmm15, zmm15) \
+	vmulps(zmm0, zmm16, zmm16) \
+	vmulps(zmm0, zmm17, zmm17) \
+	vmulps(zmm0, zmm18, zmm18) \
+	vmulps(zmm0, zmm19, zmm19) \
+	vmulps(zmm0, zmm20, zmm20) \
+	vmulps(zmm0, zmm21, zmm21) \
+	vmulps(zmm0, zmm22, zmm22) \
+	vmulps(zmm0, zmm23, zmm23) \
+	vmulps(zmm0, zmm24, zmm24) \
+	vmulps(zmm0, zmm25, zmm25) \
+	vmulps(zmm0, zmm26, zmm26) \
+	vmulps(zmm0, zmm27, zmm27) \
+	vmulps(zmm0, zmm28, zmm28) \
+	vmulps(zmm0, zmm29, zmm29) \
+	vmulps(zmm0, zmm30, zmm30) \
+	vmulps(zmm0, zmm31, zmm31)
+#define SCALE_ACCUMULATORS_24x1() \
+	vbroadcastss(mem(rax, 0*4), zmm0) \
+	vbroadcastss(mem(rax, 1*4), zmm1) \
+	vbroadcastss(mem(rax, 2*4), zmm2) \
+	vbroadcastss(mem(rax, 3*4), zmm3) \
+	vbroadcastss(mem(rax, 4*4), zmm4) \
+	vbroadcastss(mem(rax, 5*4), zmm5) \
+	vbroadcastss(mem(rax, 6*4), zmm6) \
+	vbroadcastss(mem(rax, 7*4), zmm7) \
+	vmulps(zmm0, zmm8, zmm8) \
+	vmulps(zmm1, zmm9, zmm9) \
+	vmulps(zmm2, zmm10, zmm10) \
+	vmulps(zmm3, zmm11, zmm11) \
+	vmulps(zmm4, zmm12, zmm12) \
+	vmulps(zmm5, zmm13, zmm13) \
+	vmulps(zmm6, zmm14, zmm14) \
+	vmulps(zmm7, zmm15, zmm15) \
+	vbroadcastss(mem(rax, 8*4), zmm0) \
+	vbroadcastss(mem(rax, 9*4), zmm1) \
+	vbroadcastss(mem(rax, 10*4), zmm2) \
+	vbroadcastss(mem(rax, 11*4), zmm3) \
+	vbroadcastss(mem(rax, 12*4), zmm4) \
+	vbroadcastss(mem(rax, 13*4), zmm5) \
+	vbroadcastss(mem(rax, 14*4), zmm6) \
+	vbroadcastss(mem(rax, 15*4), zmm7) \
+	vmulps(zmm0, zmm16, zmm16) \
+	vmulps(zmm1, zmm17, zmm17) \
+	vmulps(zmm2, zmm18, zmm18) \
+	vmulps(zmm3, zmm19, zmm19) \
+	vmulps(zmm4, zmm20, zmm20) \
+	vmulps(zmm5, zmm21, zmm21) \
+	vmulps(zmm6, zmm22, zmm22) \
+	vmulps(zmm7, zmm23, zmm23) \
+	vbroadcastss(mem(rax, 16*4), zmm0) \
+	vbroadcastss(mem(rax, 17*4), zmm1) \
+	vbroadcastss(mem(rax, 18*4), zmm2) \
+	vbroadcastss(mem(rax, 19*4), zmm3) \
+	vbroadcastss(mem(rax, 20*4), zmm4) \
+	vbroadcastss(mem(rax, 21*4), zmm5) \
+	vbroadcastss(mem(rax, 22*4), zmm6) \
+	vbroadcastss(mem(rax, 23*4), zmm7) \
+	vmulps(zmm0, zmm24, zmm24) \
+	vmulps(zmm1, zmm25, zmm25) \
+	vmulps(zmm2, zmm26, zmm26) \
+	vmulps(zmm3, zmm27, zmm27) \
+	vmulps(zmm4, zmm28, zmm28) \
+	vmulps(zmm5, zmm29, zmm29) \
+	vmulps(zmm6, zmm30, zmm30) \
+	vmulps(zmm7, zmm31, zmm31)
 #define CONVERT_ACCUMULATORS_TO_FP16()\
 	vcvtps2ph(imm(0x03), zmm8, ymm8)\
 	vcvtps2ph(imm(0x03), zmm9, ymm9)\
@@ -221,7 +313,6 @@
 	vmaxps(zmm0, zmm30, zmm30)\
 	vmaxps(zmm0, zmm31, zmm31)
 
-
 /*
  * FP16 -> FP32 conversion
  */
@@ -307,8 +398,6 @@
 	CONVERT_4x24xFP16_TO_FP32(8, 9, 10, 11, 12, 13, 14, 15) \
 	CONVERT_4x24xFP16_TO_FP32(16, 17, 18, 19, 20, 21, 22, 23) \
 	CONVERT_4x24xFP16_TO_FP32(24, 25, 26, 27, 28, 29, 30, 31)
-
-
 
 /*
  * FP32 loads
@@ -628,20 +717,21 @@ namespace ml
 //#define __AVX512F__
 	using namespace ml::cpu;
 #ifdef __AVX512F__
-	void gemm_avx512f_24x16_fp32(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,
+	void gemm_avx512f_24x16(Fragment &D, const Fragment &alpha, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,
 			const Fragment &bias, bool use_relu) noexcept
 	{
-		assert(A.dtype() == DTYPE_FLOAT32);
-		assert(B.dtype() == DTYPE_FLOAT32);
-		assert(C.dtype() == DTYPE_FLOAT32);
-		assert(D.dtype() == DTYPE_FLOAT32);
+		assert(A.is_fp32());
+		assert(B.is_fp32());
+		assert(C.is_fp32() || C.is_fp16());
+		assert(D.is_fp32() || D.is_fp16());
 		assert(A.rows() == B.rows());
 		assert(A.stride() == 24);
 		assert(B.stride() == 16);
 		assert(D.rows() == A.columns());
 		assert(D.columns() == B.columns());
 
-		assert(alpha_ptr != nullptr);
+		assert(alpha.is_packed());
+		assert(alpha.is_fp32());
 		assert(cpu::is_aligned(A.data(), 64));
 		assert(cpu::is_aligned(B.data(), 64));
 		assert(beta_ptr != nullptr);
@@ -650,18 +740,21 @@ namespace ml
 			assert(cpu::is_aligned(bias.data(), 64));
 		}
 
-		const float *A_ptr = A.data<float>();
-		const float *B_ptr = B.data<float>();
-		const float *C_ptr = C.data<float>();
-		float *D_ptr = D.data<float>();
-		const float *bias_ptr = bias.is_packed() ? bias.data<float>() : nullptr;
+		const void *A_ptr = A.data();
+		const void *B_ptr = B.data();
+		const void *C_ptr = C.data();
+		void *D_ptr = D.data();
+		const void *bias_ptr = bias.is_packed() ? bias.data() : nullptr;
+		const void *alpha_ptr = alpha.data();
 
 		const int K = A.rows();
 		uint64_t k_iter = K / 4;
 		uint64_t k_left = K % 4;
-		const uint64_t C_stride = C.stride() * sizeof(float);
-		const uint64_t D_stride = D.stride() * sizeof(float);
+		const uint64_t C_stride = C.stride_in_bytes();
+		const uint64_t D_stride = D.stride_in_bytes();
 		const uint64_t flag_relu = use_relu;
+		const uint64_t cd_in_fp16 = C.is_fp16() | (D.is_fp16() << 1);
+		const uint64_t scalar_alpha = alpha.rows() == 1;
 
 		begin_asm()
 
@@ -697,17 +790,21 @@ namespace ml
 		jne(UNROLLED_x1)
 
 		label(EPILOGUE)
+		// permute back to original layout
+		PERMUTE_8x16xFP32(zmm8, zmm9, zmm10, zmm11, zmm12, zmm13, zmm14, zmm15)
+		PERMUTE_8x16xFP32(zmm16, zmm17, zmm18, zmm19, zmm20, zmm21, zmm22, zmm23)
+		PERMUTE_8x16xFP32(zmm24, zmm25, zmm26, zmm27, zmm28, zmm29, zmm30, zmm31)
 
 		movq(var(alpha_ptr), rax)// load address of alpha
-		movq(var(beta_ptr), rbx)// load address of beta
-		vbroadcastss(mem(rax), zmm1)
-		vbroadcastss(mem(rbx), zmm0)
+		movq(var(scalar_alpha), r14)
+		test(r14, r14)
+		je(COLUMN_ALPHA)
+		SCALE_ACCUMULATORS_1x1()
+		jmp(AFTER_ALPHA_SCALING)
 
-		// permute back to original layout
-		PERMUTE_AND_SCALE_6x16xFP32(zmm8, zmm9, zmm10, zmm11, zmm12, zmm13)
-		PERMUTE_AND_SCALE_6x16xFP32(zmm14, zmm15, zmm16, zmm17, zmm18, zmm19)
-		PERMUTE_AND_SCALE_6x16xFP32(zmm20, zmm21, zmm22, zmm23, zmm24, zmm25)
-		PERMUTE_AND_SCALE_6x16xFP32(zmm26, zmm27, zmm28, zmm29, zmm30, zmm31)
+		label(COLUMN_ALPHA)
+		SCALE_ACCUMULATORS_24x1()
+		label(AFTER_ALPHA_SCALING)
 
 		movq(var(bias_ptr), rax)// load address of bias pointer
 		test(rax, rax)
@@ -716,6 +813,8 @@ namespace ml
 		ADD_BIAS_24x16xFP32(zmm2)
 		label(AFTER_BIAS)
 
+		movq(var(beta_ptr), rbx)// load address of beta
+		vbroadcastss(mem(rbx), zmm0)
 		vxorps(zmm1, zmm1, zmm1)
 		vucomiss(xmm0, xmm1)// set ZF if beta == 0.
 		je(AFTER_LOAD_C)
@@ -725,6 +824,21 @@ namespace ml
 		sal(imm(1), r15)// r15 = 2 * r14
 		add(r14, r15)// r15 = 2 * r14 + r14 = 3 * r14 (3*C_stride)
 
+		movq(var(cd_in_fp16), r11)// load fp16 flags
+		and_(imm(0x1), r11)// if set
+		test(r11, r11)
+		je(C_IN_FP32)
+		LOAD_ADD_3x16xFP16(zmm0, zmm8, zmm9, zmm10)
+		LOAD_ADD_3x16xFP16(zmm0, zmm11, zmm12, zmm13)
+		LOAD_ADD_3x16xFP16(zmm0, zmm14, zmm15, zmm16)
+		LOAD_ADD_3x16xFP16(zmm0, zmm17, zmm18, zmm19)
+		LOAD_ADD_3x16xFP16(zmm0, zmm20, zmm21, zmm22)
+		LOAD_ADD_3x16xFP16(zmm0, zmm23, zmm24, zmm25)
+		LOAD_ADD_3x16xFP16(zmm0, zmm26, zmm27, zmm28)
+		LOAD_ADD_3x16xFP16(zmm0, zmm29, zmm30, zmm31)
+		jmp(AFTER_LOAD_C)
+
+		label(C_IN_FP32)
 		LOAD_ADD_3x16xFP32(zmm0, zmm8, zmm9, zmm10)
 		LOAD_ADD_3x16xFP32(zmm0, zmm11, zmm12, zmm13)
 		LOAD_ADD_3x16xFP32(zmm0, zmm14, zmm15, zmm16)
@@ -748,6 +862,22 @@ namespace ml
 		sal(imm(1), r15)// r15 = 2 * r14
 		add(r14, r15)// r15 = 2 * r14 + r14 = 3 * r14 (3*D_stride)
 
+		movq(var(cd_in_fp16), r11)// load fp16 flags
+		and_(imm(0x2), r11)// if set
+		test(r11, r11)
+		je(D_IN_FP32)
+		CONVERT_ACCUMULATORS_TO_FP16()
+		STORE_3x16xFP16(ymm8, ymm9, ymm10)
+		STORE_3x16xFP16(ymm11, ymm12, ymm13)
+		STORE_3x16xFP16(ymm14, ymm15, ymm16)
+		STORE_3x16xFP16(ymm17, ymm18, ymm19)
+		STORE_3x16xFP16(ymm20, ymm21, ymm22)
+		STORE_3x16xFP16(ymm23, ymm24, ymm25)
+		STORE_3x16xFP16(ymm26, ymm27, ymm28)
+		STORE_3x16xFP16(ymm29, ymm30, ymm31)
+		jmp(END)
+
+		label(D_IN_FP32)
 		STORE_3x16xFP32(zmm8, zmm9, zmm10)
 		STORE_3x16xFP32(zmm11, zmm12, zmm13)
 		STORE_3x16xFP32(zmm14, zmm15, zmm16)
@@ -757,6 +887,7 @@ namespace ml
 		STORE_3x16xFP32(zmm26, zmm27, zmm28)
 		STORE_3x16xFP32(zmm29, zmm30, zmm31)
 
+		label(END)
 		vzeroupper()
 
 		end_asm(
@@ -773,746 +904,603 @@ namespace ml
 				[alpha_ptr] "m"(alpha_ptr),
 				[beta_ptr] "m"(beta_ptr),
 				[flag_relu] "m"(flag_relu),
-				[bias_ptr] "m"(bias_ptr)
+				[bias_ptr] "m"(bias_ptr),
+				[cd_in_fp16] "m"(cd_in_fp16),
+				[scalar_alpha] "m"(scalar_alpha)
 				:// clobbers
 				"cc", "memory", "%zmm0", "%zmm1", "%zmm2", "%zmm3", "%zmm4", "%zmm5", "%zmm6", "%zmm7",
 				"%zmm8", "%zmm9", "%zmm10", "%zmm11", "%zmm12", "%zmm13", "%zmm14", "%zmm15", "%zmm16",
 				"%zmm17", "%zmm18", "%zmm19", "%zmm20", "%zmm21", "%zmm22", "%zmm23", "%zmm24", "%zmm25",
-				"%zmm26", "%zmm27", "%zmm28", "%zmm29", "%zmm30", "%zmm31", "%rax", "%rbx", "%rcx", "%rdx", "%r14", "%r15")
+				"%zmm26", "%zmm27", "%zmm28", "%zmm29", "%zmm30", "%zmm31", "%rax", "%rbx", "%rcx", "%rdx", "%r11", "%r14", "%r15")
 	}
-	void gemm_avx512f_24x16_fp32_fp16(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr,
-			const Fragment &C, const Fragment &bias, bool use_relu) noexcept
-	{
-		assert(A.dtype() == DTYPE_FLOAT32);
-		assert(B.dtype() == DTYPE_FLOAT32);
-		assert(C.dtype() == DTYPE_FLOAT16);
-		assert(D.dtype() == DTYPE_FLOAT16);
-		assert(A.rows() == B.rows());
-		assert(A.stride() == 24);
-		assert(B.stride() == 16);
-		assert(D.rows() == A.columns());
-		assert(D.columns() == B.columns());
 
-		assert(alpha_ptr != nullptr);
-		assert(cpu::is_aligned(A.data(), 64));
-		assert(cpu::is_aligned(B.data(), 64));
-		assert(beta_ptr != nullptr);
-		if (bias.is_packed())
+	void pack_avx512f_24xK(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept
+	{
+		if (dst.is_partial())
 		{
-			assert(cpu::is_aligned(bias.data(), 64));
+			pack_def_MxK(dst, src, src_pos, src_op);
+			return;
 		}
 
-		const float *A_ptr = A.data<float>();
-		const float *B_ptr = B.data<float>();
-		const float16 *C_ptr = C.data<float16>();
-		float16 *D_ptr = D.data<float16>();
-		const float *bias_ptr = bias.is_packed() ? bias.data<float>() : nullptr;
-
-		const int K = A.rows();
-		uint64_t k_iter = K / 4;
-		uint64_t k_left = K % 4;
-		const uint64_t C_stride = C.stride() * sizeof(float16);
-		const uint64_t D_stride = D.stride() * sizeof(float16);
-		const uint64_t flag_relu = use_relu;
-
-		begin_asm()
-
-		movq(var(A_ptr), rax)
-		movq(var(B_ptr), rbx)
-		ZERO_ACCUMULATORS()
-
-		movq(var(k_iter), r14) // load the number of 4-unrolled iterations
-		test(r14, r14)
-		je(FINALLOOP)
-
-		label(UNROLLED_x4)
-		SUB_KERNEL_24xFP32_16xFP32(0)
-		SUB_KERNEL_24xFP32_16xFP32(1)
-		SUB_KERNEL_24xFP32_16xFP32(2)
-		SUB_KERNEL_24xFP32_16xFP32(3)
-
-		add(imm(4*24*4), rax)// 4 iterations x 24 elements x 4 bytes
-		add(imm(4*16*4), rbx)// 4 iterations x 16 elements x 4 bytes
-		dec(r14)
-		jne(UNROLLED_x4)
-
-		label(FINALLOOP)
-		movq(var(k_left), r14)// load the number of 1-unrolled iterations
-		test(r14, r14)
-		je(EPILOGUE)
-
-		label(UNROLLED_x1)
-		SUB_KERNEL_24xFP32_16xFP32(0)
-		add(imm(1*24*4), rax)// 1 iteration x 24 elements x 4 bytes
-		add(imm(1*16*4), rbx)// 1 iteration x 16 elements x 4 bytes
-		dec(r14)
-		jne(UNROLLED_x1)
-
-		label(EPILOGUE)
-
-		movq(var(alpha_ptr), rax)// load address of alpha
-		movq(var(beta_ptr), rbx)// load address of beta
-		vbroadcastss(mem(rax), zmm1)
-		vbroadcastss(mem(rbx), zmm0)
-
-		// permute back to original layout
-		PERMUTE_AND_SCALE_6x16xFP32(zmm8, zmm9, zmm10, zmm11, zmm12, zmm13)
-		PERMUTE_AND_SCALE_6x16xFP32(zmm14, zmm15, zmm16, zmm17, zmm18, zmm19)
-		PERMUTE_AND_SCALE_6x16xFP32(zmm20, zmm21, zmm22, zmm23, zmm24, zmm25)
-		PERMUTE_AND_SCALE_6x16xFP32(zmm26, zmm27, zmm28, zmm29, zmm30, zmm31)
-
-		movq(var(bias_ptr), rax)// load address of bias pointer
-		test(rax, rax)
-		je(AFTER_BIAS)
-		vmovaps(mem(rax), zmm2)// load bias
-		ADD_BIAS_24x16xFP32(zmm2)
-		label(AFTER_BIAS)
-
-		vxorps(zmm1, zmm1, zmm1)
-		vucomiss(xmm0, xmm1)// set ZF if beta == 0.
-		je(AFTER_LOAD_C)
-		movq(var(C_stride), r14)// C stride is r14
-		movq(var(C_ptr), rcx)// C pointer is in rcx
-		movq(r14, r15)// r15 = r14
-		sal(imm(1), r15)// r15 = 2 * r14
-		add(r14, r15)// r15 = 2 * r14 + r14 = 3 * r14 (3*C_stride)
-
-		LOAD_ADD_3x16xFP16(zmm0, zmm8, zmm9, zmm10)
-		LOAD_ADD_3x16xFP16(zmm0, zmm11, zmm12, zmm13)
-		LOAD_ADD_3x16xFP16(zmm0, zmm14, zmm15, zmm16)
-		LOAD_ADD_3x16xFP16(zmm0, zmm17, zmm18, zmm19)
-		LOAD_ADD_3x16xFP16(zmm0, zmm20, zmm21, zmm22)
-		LOAD_ADD_3x16xFP16(zmm0, zmm23, zmm24, zmm25)
-		LOAD_ADD_3x16xFP16(zmm0, zmm26, zmm27, zmm28)
-		LOAD_ADD_3x16xFP16(zmm0, zmm29, zmm30, zmm31)
-		label(AFTER_LOAD_C)
-
-		movq(var(flag_relu), r14)// load flag if to use relu
-		test(r14, r14)
-		je(AFTER_RELU)
-		RELU_24x16xFP32()
-		label(AFTER_RELU)
-
-		movq(var(D_stride), r14)// D stride is r14
-		movq(var(D_ptr), rcx)// D pointer is in rcx
-		movq(r14, r15)// r15 = r14
-		sal(imm(1), r15)// r15 = 2 * r14
-		add(r14, r15)// r15 = 2 * r14 + r14 = 3 * r14 (3*D_stride)
-
-		CONVERT_ACCUMULATORS_TO_FP16()
-
-		STORE_3x16xFP16(ymm8, ymm9, ymm10)
-		STORE_3x16xFP16(ymm11, ymm12, ymm13)
-		STORE_3x16xFP16(ymm14, ymm15, ymm16)
-		STORE_3x16xFP16(ymm17, ymm18, ymm19)
-		STORE_3x16xFP16(ymm20, ymm21, ymm22)
-		STORE_3x16xFP16(ymm23, ymm24, ymm25)
-		STORE_3x16xFP16(ymm26, ymm27, ymm28)
-		STORE_3x16xFP16(ymm29, ymm30, ymm31)
-
-		vzeroupper()
-
-		end_asm(
-				:// outputs
-				:// inputs
-				[A_ptr] "m"(A_ptr),
-				[B_ptr] "m"(B_ptr),
-				[C_ptr] "m"(C_ptr),
-				[D_ptr] "m"(D_ptr),
-				[k_iter] "m"(k_iter),
-				[k_left] "m"(k_left),
-				[C_stride] "m"(C_stride),
-				[D_stride] "m"(D_stride),
-				[alpha_ptr] "m"(alpha_ptr),
-				[beta_ptr] "m"(beta_ptr),
-				[flag_relu] "m"(flag_relu),
-				[bias_ptr] "m"(bias_ptr)
-				:// clobbers
-				"cc", "memory", "%zmm0", "%zmm1", "%zmm2", "%zmm3", "%zmm4", "%zmm5", "%zmm6", "%zmm7",
-				"%zmm8", "%zmm9", "%zmm10", "%zmm11", "%zmm12", "%zmm13", "%zmm14", "%zmm15", "%zmm16",
-				"%zmm17", "%zmm18", "%zmm19", "%zmm20", "%zmm21", "%zmm22", "%zmm23", "%zmm24", "%zmm25",
-				"%zmm26", "%zmm27", "%zmm28", "%zmm29", "%zmm30", "%zmm31", "%rax", "%rbx", "%rcx", "%rdx", "%r14", "%r15")
-	}
-
-	void pack_avx512f_24xK_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept
-	{
+		assert(src.is_fp32() || src.is_fp16());
+		assert(dst.is_fp32());
 		assert(dst.stride() == 24);
 		assert(ml::cpu::is_aligned(dst.data(), 64));
 
 		const uint64_t k_iter = dst.rows() / 16;
 		const uint64_t k_left = dst.rows() % 16;
-		const uint64_t src_stride = src.stride() * sizeof(float);
+		const uint64_t src_stride = src.stride_in_bytes();
 		const void *src_ptr = src.pointer_at(src_pos.row, src_pos.column);
 		void *dst_ptr = dst.data();
 
 		if (src_op == MatrixOp::NORMAL)
 		{
-			begin_asm()
-			movq(var(src_ptr), rax) // src pointer is in rax
-			movq(var(dst_ptr), rbx)// dst pointer is in rbx
-			movq(var(src_stride), r12)// src stride is in r12
-			movq(r12, r13)// r13 = r12
-			sal(imm(1), r13)// r13 = 2 * r12 (2 * stride)
-			add(r12, r13)// r13 = 2 * r12 + r12 = 3 * r12 (3*D_stride)
-			movq(r12, r15)// r15 = r12
-			sal(imm(2), r15)// r15 = 4 * r12 (4 * stride)
+			if (src.is_fp32())
+			{
+				begin_asm()
+				movq(var(src_ptr), rax) // src pointer is in rax
+				movq(var(dst_ptr), rbx)// dst pointer is in rbx
+				movq(var(src_stride), r12)// src stride is in r12
+				movq(r12, r13)// r13 = r12
+				sal(imm(1), r13)// r13 = 2 * r12 (2 * stride)
+				add(r12, r13)// r13 = 2 * r12 + r12 = 3 * r12 (3*D_stride)
+				movq(r12, r15)// r15 = r12
+				sal(imm(2), r15)// r15 = 4 * r12 (4 * stride)
 
-			movq(var(k_iter), r14)// load the number of 16-unrolled iterations
-			test(r14, r14)
-			je(FINALLOOP)
+				movq(var(k_iter), r14)// load the number of 16-unrolled iterations
+				test(r14, r14)
+				je(FINALLOOP)
 
-			label(UNROLLED16)
-			LOAD_16x24xFP32(rax)
-			STORE_16x24xFP32()
-			add(imm(16*24*4), rbx)// add stride to dst pointer
+				label(UNROLLED16)
+				LOAD_16x24xFP32(rax)
+				STORE_16x24xFP32()
+				add(imm(16*24*4), rbx)// add stride to dst pointer
 
-			dec(r14)
-			jne(UNROLLED16)
+				dec(r14)
+				jne(UNROLLED16)
 
-			label(FINALLOOP)
-			movq(var(k_left), r14)// load the number of 1-unrolled iterations
-			test(r14, r14)
-			je(EPILOGUE)
+				label(FINALLOOP)
+				movq(var(k_left), r14)// load the number of 1-unrolled iterations
+				test(r14, r14)
+				je(EPILOGUE)
 
-			label(UNROLLED1)
-			LOAD_1x24xFP32(rax, zmm0, ymm1)
-			STORE_1x24xFP32(zmm0, ymm1, 0)
-			add(imm(1*24*4), rbx)// add stride to dst pointer
+				label(UNROLLED1)
+				LOAD_1x24xFP32(rax, zmm0, ymm1)
+				STORE_1x24xFP32(zmm0, ymm1, 0)
+				add(imm(1*24*4), rbx)// add stride to dst pointer
 
-			dec(r14)
-			jne(UNROLLED1)
+				dec(r14)
+				jne(UNROLLED1)
 
-			label(EPILOGUE)
-			vzeroupper()
+				label(EPILOGUE)
+				vzeroupper()
 
-			end_asm(:// outputs
-					:// inputs
-					[src_ptr] "m"(src_ptr),
-					[dst_ptr] "m"(dst_ptr),
-					[k_iter] "m"(k_iter),
-					[k_left] "m"(k_left),
-					[src_stride] "m"(src_stride)
-					:// clobbers
-					"cc", "memory", "%zmm0", "%zmm1", "%zmm2", "%zmm3", "%zmm4", "%zmm5", "%zmm6", "%zmm7",
-					"%zmm8", "%zmm9", "%zmm10", "%zmm11", "%zmm12", "%zmm13", "%zmm14", "%zmm15", "%zmm16",
-					"%zmm17", "%zmm18", "%zmm19", "%zmm20", "%zmm21", "%zmm22", "%zmm23", "%zmm24", "%zmm25",
-					"%zmm26", "%zmm27", "%zmm28", "%zmm29", "%zmm30", "%zmm31", "%rax", "%rbx", "%r12", "%r13", "%r14", "%r15")
+				end_asm(:// outputs
+						:// inputs
+						[src_ptr] "m"(src_ptr),
+						[dst_ptr] "m"(dst_ptr),
+						[k_iter] "m"(k_iter),
+						[k_left] "m"(k_left),
+						[src_stride] "m"(src_stride)
+						:// clobbers
+						"cc", "memory", "%zmm0", "%zmm1", "%zmm2", "%zmm3", "%zmm4", "%zmm5", "%zmm6", "%zmm7",
+						"%zmm8", "%zmm9", "%zmm10", "%zmm11", "%zmm12", "%zmm13", "%zmm14", "%zmm15", "%zmm16",
+						"%zmm17", "%zmm18", "%zmm19", "%zmm20", "%zmm21", "%zmm22", "%zmm23", "%zmm24", "%zmm25",
+						"%zmm26", "%zmm27", "%zmm28", "%zmm29", "%zmm30", "%zmm31", "%rax", "%rbx", "%r12", "%r13", "%r14", "%r15")
+			}
+			else
+			{
+				begin_asm()
+				movq(var(src_ptr), rax) // src pointer is in rax
+				movq(var(dst_ptr), rbx)// dst pointer is in rbx
+				movq(var(src_stride), r12)// src stride is in r12
+				movq(r12, r13)// r13 = r12
+				sal(imm(1), r13)// r13 = 2 * r12 (2 * stride)
+				add(r12, r13)// r13 = 2 * r12 + r12 = 3 * r12 (3*D_stride)
+				movq(r12, r15)// r15 = r12
+				sal(imm(2), r15)// r15 = 4 * r12 (4 * stride)
+
+				movq(var(k_iter), r14)// load the number of 16-unrolled iterations
+				test(r14, r14)
+				je(FINALLOOP)
+
+				label(UNROLLED16)
+				LOAD_16x24xFP16(rax)
+				STORE_16x24xFP32()
+				add(imm(16*24*4), rbx)// add stride to dst pointer
+
+				dec(r14)
+				jne(UNROLLED16)
+
+				label(FINALLOOP)
+				movq(var(k_left), r14)// load the number of 1-unrolled iterations
+				test(r14, r14)
+				je(EPILOGUE)
+
+				label(UNROLLED1)
+				LOAD_1x24xFP16(rax, zmm0, ymm1)
+				CONVERT_1x24xFP16_TO_FP32(0, 1)
+				STORE_1x24xFP32(zmm0, ymm1, 0)
+				add(imm(1*24*4), rbx)// add stride to dst pointer
+
+				dec(r14)
+				jne(UNROLLED1)
+
+				label(EPILOGUE)
+				vzeroupper()
+
+				end_asm(:// outputs
+						:// inputs
+						[src_ptr] "m"(src_ptr),
+						[dst_ptr] "m"(dst_ptr),
+						[k_iter] "m"(k_iter),
+						[k_left] "m"(k_left),
+						[src_stride] "m"(src_stride)
+						:// clobbers
+						"cc", "memory", "%zmm0", "%zmm1", "%zmm2", "%zmm3", "%zmm4", "%zmm5", "%zmm6", "%zmm7",
+						"%zmm8", "%zmm9", "%zmm10", "%zmm11", "%zmm12", "%zmm13", "%zmm14", "%zmm15", "%zmm16",
+						"%zmm17", "%zmm18", "%zmm19", "%zmm20", "%zmm21", "%zmm22", "%zmm23", "%zmm24", "%zmm25",
+						"%zmm26", "%zmm27", "%zmm28", "%zmm29", "%zmm30", "%zmm31", "%rax", "%rbx", "%r12", "%r13", "%r14", "%r15")
+			}
 		}
 		else
 		{
-			begin_asm()
-			movq(var(src_ptr), rax) // src pointer is in rax
-			movq(var(dst_ptr), rbx)// dst pointer is in rbx
-			movq(var(src_stride), r12)// src stride is in r12
-			movq(r12, r13)// r13 = r12
-			sal(imm(1), r13)// r13 = 2 * r12 (2 * stride)
-			add(r12, r13)// r13 = 2 * r12 + r12 = 3 * r12 (3*D_stride)
-			movq(r12, r15)// r15 = r12
-			sal(imm(2), r15)// r15 = 4 * r12 (4 * stride)
+			if (src.is_fp32())
+			{
+				begin_asm()
+				movq(var(src_ptr), rax) // src pointer is in rax
+				movq(var(dst_ptr), rbx)// dst pointer is in rbx
+				movq(var(src_stride), r12)// src stride is in r12
+				movq(r12, r13)// r13 = r12
+				sal(imm(1), r13)// r13 = 2 * r12 (2 * stride)
+				add(r12, r13)// r13 = 2 * r12 + r12 = 3 * r12 (3*D_stride)
+				movq(r12, r15)// r15 = r12
+				sal(imm(2), r15)// r15 = 4 * r12 (4 * stride)
 
-			movq(var(k_iter), r14)// load the number of 16-unrolled iterations
-			test(r14, r14)
-			je(FINALLOOP)
+				movq(var(k_iter), r14)// load the number of 16-unrolled iterations
+				test(r14, r14)
+				je(FINALLOOP)
 
-			label(UNROLLED16)
-			// first 16x16 tile
-			movq(rax, rcx)
+				label(UNROLLED16)
+				// first 16x16 tile
+				movq(rax, rcx)
 
-			// first 16x16 tile
-			LOAD_16x16xFP32(rcx)
-			TRANSPOSE_16x16xFP32()
-			STORE_16x16xFP32(rbx, 24, 0)
+				// first 16x16 tile
+				LOAD_16x16xFP32(rcx)
+				TRANSPOSE_16x16xFP32()
+				STORE_16x16xFP32(rbx, 24, 0)
 
-			// second 8x16 tile
-			LOAD_8x16xFP32(rcx)
-			TRANSPOSE_8x16xFP32()
-			STORE_16x8xFP32(rbx, 24, 16)
+				// second 8x16 tile
+				LOAD_8x16xFP32(rcx)
+				TRANSPOSE_8x16xFP32()
+				STORE_16x8xFP32(rbx, 24, 16)
 
-			add(imm(4*16), rax)// add stride to src pointer
-			add(imm(4*24*16), rbx)// add stride to dst pointer
+				add(imm(4*16), rax)// add stride to src pointer
+				add(imm(4*24*16), rbx)// add stride to dst pointer
 
-			dec(r14)
-			jne(UNROLLED16)
+				dec(r14)
+				jne(UNROLLED16)
 
-			label(FINALLOOP)
-			movq(var(k_left), r14)// load the number of 1-unrolled iterations
-			test(r14, r14)
-			je(EPILOGUE)
+				label(FINALLOOP)
+				movq(var(k_left), r14)// load the number of 1-unrolled iterations
+				test(r14, r14)
+				je(EPILOGUE)
 
-			label(UNROLLED1)
-			movq(rax, rcx)
+				label(UNROLLED1)
+				movq(rax, rcx)
 
-			LOAD_4x1xFP32(rcx, xmm0, xmm1, xmm2, xmm3)
-			LOAD_4x1xFP32(rcx, xmm4, xmm5, xmm6, xmm7)
-			LOAD_4x1xFP32(rcx, xmm8, xmm9, xmm10, xmm11)
-			LOAD_4x1xFP32(rcx, xmm12, xmm13, xmm14, xmm15)
-			LOAD_4x1xFP32(rcx, xmm16, xmm17, xmm18, xmm19)
-			LOAD_4x1xFP32(rcx, xmm20, xmm21, xmm22, xmm23)
+				LOAD_4x1xFP32(rcx, xmm0, xmm1, xmm2, xmm3)
+				LOAD_4x1xFP32(rcx, xmm4, xmm5, xmm6, xmm7)
+				LOAD_4x1xFP32(rcx, xmm8, xmm9, xmm10, xmm11)
+				LOAD_4x1xFP32(rcx, xmm12, xmm13, xmm14, xmm15)
+				LOAD_4x1xFP32(rcx, xmm16, xmm17, xmm18, xmm19)
+				LOAD_4x1xFP32(rcx, xmm20, xmm21, xmm22, xmm23)
 
-			STORE_4x1xFP32(0, xmm0, xmm1, xmm2, xmm3)
-			STORE_4x1xFP32(4, xmm4, xmm5, xmm6, xmm7)
-			STORE_4x1xFP32(8, xmm8, xmm9, xmm10, xmm11)
-			STORE_4x1xFP32(12, xmm12, xmm13, xmm14, xmm15)
-			STORE_4x1xFP32(16, xmm16, xmm17, xmm18, xmm19)
-			STORE_4x1xFP32(20, xmm20, xmm21, xmm22, xmm23)
+				STORE_4x1xFP32(0, xmm0, xmm1, xmm2, xmm3)
+				STORE_4x1xFP32(4, xmm4, xmm5, xmm6, xmm7)
+				STORE_4x1xFP32(8, xmm8, xmm9, xmm10, xmm11)
+				STORE_4x1xFP32(12, xmm12, xmm13, xmm14, xmm15)
+				STORE_4x1xFP32(16, xmm16, xmm17, xmm18, xmm19)
+				STORE_4x1xFP32(20, xmm20, xmm21, xmm22, xmm23)
 
-			add(imm(4*1), rax)// add stride to src pointer
-			add(imm(24*1*4), rbx)// add stride to dst pointer
+				add(imm(4*1), rax)// add stride to src pointer
+				add(imm(24*1*4), rbx)// add stride to dst pointer
 
-			dec(r14)
-			jne(UNROLLED1)
+				dec(r14)
+				jne(UNROLLED1)
 
-			label(EPILOGUE)
-			vzeroupper()
-			end_asm(:// outputs
-					:// inputs
-					[src_ptr] "m"(src_ptr),
-					[dst_ptr] "m"(dst_ptr),
-					[k_iter] "m"(k_iter),
-					[k_left] "m"(k_left),
-					[src_stride] "m"(src_stride)
-					:// clobbers
-					"cc", "memory", "%zmm0", "%zmm1", "%zmm2", "%zmm3", "%zmm4", "%zmm5", "%zmm6", "%zmm7",
-					"%zmm8", "%zmm9", "%zmm10", "%zmm11", "%zmm12", "%zmm13", "%zmm14", "%zmm15", "%zmm16",
-					"%zmm17", "%zmm18", "%zmm19", "%zmm20", "%zmm21", "%zmm22", "%zmm23", "%zmm24", "%zmm25",
-					"%zmm26", "%zmm27", "%zmm28", "%zmm29", "%zmm30", "%zmm31", "%rax", "%rbx", "%rcx",
-					"%r12", "%r13", "%r14", "%r15")
+				label(EPILOGUE)
+				vzeroupper()
+				end_asm(:// outputs
+						:// inputs
+						[src_ptr] "m"(src_ptr),
+						[dst_ptr] "m"(dst_ptr),
+						[k_iter] "m"(k_iter),
+						[k_left] "m"(k_left),
+						[src_stride] "m"(src_stride)
+						:// clobbers
+						"cc", "memory", "%zmm0", "%zmm1", "%zmm2", "%zmm3", "%zmm4", "%zmm5", "%zmm6", "%zmm7",
+						"%zmm8", "%zmm9", "%zmm10", "%zmm11", "%zmm12", "%zmm13", "%zmm14", "%zmm15", "%zmm16",
+						"%zmm17", "%zmm18", "%zmm19", "%zmm20", "%zmm21", "%zmm22", "%zmm23", "%zmm24", "%zmm25",
+						"%zmm26", "%zmm27", "%zmm28", "%zmm29", "%zmm30", "%zmm31", "%rax", "%rbx", "%rcx",
+						"%r12", "%r13", "%r14", "%r15")
+			}
+			else
+			{
+				begin_asm()
+				movq(var(src_ptr), rax) // src pointer is in rax
+				movq(var(dst_ptr), rbx)// dst pointer is in rbx
+				movq(var(src_stride), r12)// src stride is in r12
+				movq(r12, r13)// r13 = r12
+				sal(imm(1), r13)// r13 = 2 * r12 (2 * stride)
+				add(r12, r13)// r13 = 2 * r12 + r12 = 3 * r12 (3*D_stride)
+				movq(r12, r15)// r15 = r12
+				sal(imm(2), r15)// r15 = 4 * r12 (4 * stride)
+
+				movq(var(k_iter), r14)// load the number of 16-unrolled iterations
+				test(r14, r14)
+				je(FINALLOOP)
+
+				label(UNROLLED16)
+				// first 16x16 tile
+				movq(rax, rcx)
+
+				// first 16x16 tile
+				LOAD_16x16xFP16(rcx)
+				TRANSPOSE_16x16xFP32()
+				STORE_16x16xFP32(rbx, 24, 0)
+
+				// second 8x16 tile
+				LOAD_8x16xFP16(rcx)
+				TRANSPOSE_8x16xFP32()
+				STORE_16x8xFP32(rbx, 24, 16)
+
+				add(imm(2*16), rax)// add stride to src pointer
+				add(imm(4*24*16), rbx)// add stride to dst pointer
+
+				dec(r14)
+				jne(UNROLLED16)
+
+				label(FINALLOOP)
+				movq(var(k_left), r14)// load the number of 1-unrolled iterations
+				test(r14, r14)
+				je(EPILOGUE)
+
+				label(UNROLLED1)
+				movq(rax, rcx)
+
+				LOAD_4x1xFP16(rcx, 0, 1, 2, 3)
+				LOAD_4x1xFP16(rcx, 4, 5, 6, 7)
+				LOAD_4x1xFP16(rcx, 8, 9, 10, 11)
+				LOAD_4x1xFP16(rcx, 12, 13, 14, 15)
+				LOAD_4x1xFP16(rcx, 16, 17, 18, 19)
+				LOAD_4x1xFP16(rcx, 20, 21, 22, 23)
+
+				STORE_4x1xFP32(0, xmm0, xmm1, xmm2, xmm3)
+				STORE_4x1xFP32(4, xmm4, xmm5, xmm6, xmm7)
+				STORE_4x1xFP32(8, xmm8, xmm9, xmm10, xmm11)
+				STORE_4x1xFP32(12, xmm12, xmm13, xmm14, xmm15)
+				STORE_4x1xFP32(16, xmm16, xmm17, xmm18, xmm19)
+				STORE_4x1xFP32(20, xmm20, xmm21, xmm22, xmm23)
+
+				add(imm(2*1), rax)// add stride to src pointer
+				add(imm(24*1*4), rbx)// add stride to dst pointer
+
+				dec(r14)
+				jne(UNROLLED1)
+
+				label(EPILOGUE)
+				vzeroupper()
+				end_asm(:// outputs
+						:// inputs
+						[src_ptr] "m"(src_ptr),
+						[dst_ptr] "m"(dst_ptr),
+						[k_iter] "m"(k_iter),
+						[k_left] "m"(k_left),
+						[src_stride] "m"(src_stride)
+						:// clobbers
+						"cc", "memory", "%zmm0", "%zmm1", "%zmm2", "%zmm3", "%zmm4", "%zmm5", "%zmm6", "%zmm7",
+						"%zmm8", "%zmm9", "%zmm10", "%zmm11", "%zmm12", "%zmm13", "%zmm14", "%zmm15", "%zmm16",
+						"%zmm17", "%zmm18", "%zmm19", "%zmm20", "%zmm21", "%zmm22", "%zmm23", "%zmm24", "%zmm25",
+						"%zmm26", "%zmm27", "%zmm28", "%zmm29", "%zmm30", "%zmm31", "%rax", "%rbx", "%rcx",
+						"%r8", "%r9", "%r10", "%r11", "%r12", "%r13", "%r14", "%r15")
+			}
 		}
 	}
-	void pack_avx512f_16xK_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept
+	void pack_avx512f_16xK(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept
 	{
+		if (dst.is_partial())
+		{
+			pack_def_MxK(dst, src, src_pos, src_op);
+			return;
+		}
+
+		assert(src.is_fp32() || src.is_fp16());
+		assert(dst.is_fp32());
 		assert(dst.stride() == 16);
 		assert(ml::cpu::is_aligned(dst.data(), 64));
 
 		const uint64_t k_iter = dst.rows() / 16;
 		const uint64_t k_left = dst.rows() % 16;
-		const uint64_t src_stride = src.stride() * sizeof(float);
+		const uint64_t src_stride = src.stride_in_bytes();
 		const void *src_ptr = src.pointer_at(src_pos.row, src_pos.column);
 		void *dst_ptr = dst.data();
 
 		if (src_op == MatrixOp::NORMAL)
 		{
-			begin_asm()
-			movq(var(src_ptr), rax) // src pointer is in rax
-			movq(var(dst_ptr), rbx)// dst pointer is in rbx
-			movq(var(src_stride), r12)// src stride is in r12
-			movq(r12, r13)// r13 = r12
-			sal(imm(1), r13)// r13 = 2 * r12 (2 * stride)
-			add(r12, r13)// r13 = 2 * r12 + r12 = 3 * r12 (3*D_stride)
-			movq(r12, r15)// r15 = r12
-			sal(imm(2), r15)// r15 = 4 * r12 (4 * stride)
+			if (src.is_fp32())
+			{
+				begin_asm()
+				movq(var(src_ptr), rax) // src pointer is in rax
+				movq(var(dst_ptr), rbx)// dst pointer is in rbx
+				movq(var(src_stride), r12)// src stride is in r12
+				movq(r12, r13)// r13 = r12
+				sal(imm(1), r13)// r13 = 2 * r12 (2 * stride)
+				add(r12, r13)// r13 = 2 * r12 + r12 = 3 * r12 (3*D_stride)
+				movq(r12, r15)// r15 = r12
+				sal(imm(2), r15)// r15 = 4 * r12 (4 * stride)
 
-			movq(var(k_iter), r14)// load the number of 16-unrolled iterations
-			test(r14, r14)
-			je(FINALLOOP)
+				movq(var(k_iter), r14)// load the number of 16-unrolled iterations
+				test(r14, r14)
+				je(FINALLOOP)
 
-			label(UNROLLED16)
-			LOAD_4x16xFP32(rax, zmm0, zmm1, zmm2, zmm3)
-			LOAD_4x16xFP32(rax, zmm4, zmm5, zmm6, zmm7)
-			LOAD_4x16xFP32(rax, zmm24, zmm25, zmm26, zmm27)
-			LOAD_4x16xFP32(rax, zmm28, zmm29, zmm30, zmm31)
-			STORE_16x16xFP32(rbx, 16, 0)
-			add(imm(16*16*4), rbx)// add stride to dst pointer
+				label(UNROLLED16)
+				LOAD_4x16xFP32(rax, zmm0, zmm1, zmm2, zmm3)
+				LOAD_4x16xFP32(rax, zmm4, zmm5, zmm6, zmm7)
+				LOAD_4x16xFP32(rax, zmm24, zmm25, zmm26, zmm27)
+				LOAD_4x16xFP32(rax, zmm28, zmm29, zmm30, zmm31)
+				STORE_16x16xFP32(rbx, 16, 0)
+				add(imm(16*16*4), rbx)// add stride to dst pointer
 
-			dec(r14)
-			jne(UNROLLED16)
+				dec(r14)
+				jne(UNROLLED16)
 
-			label(FINALLOOP)
-			movq(var(k_left), r14)// load the number of 1-unrolled iterations
-			test(r14, r14)
-			je(EPILOGUE)
+				label(FINALLOOP)
+				movq(var(k_left), r14)// load the number of 1-unrolled iterations
+				test(r14, r14)
+				je(EPILOGUE)
 
-			label(UNROLLED1)
-			LOAD_1x16xFP32(rax, zmm0)
-			STORE_1x16xFP32(zmm0, 0)
-			add(imm(1*16*4), rbx)// add stride to dst pointer
+				label(UNROLLED1)
+				LOAD_1x16xFP32(rax, zmm0)
+				STORE_1x16xFP32(zmm0, 0)
+				add(imm(1*16*4), rbx)// add stride to dst pointer
 
-			dec(r14)
-			jne(UNROLLED1)
+				dec(r14)
+				jne(UNROLLED1)
 
-			label(EPILOGUE)
-			vzeroupper()
+				label(EPILOGUE)
+				vzeroupper()
 
-			end_asm(:// outputs
-					:// inputs
-					[src_ptr] "m"(src_ptr),
-					[dst_ptr] "m"(dst_ptr),
-					[k_iter] "m"(k_iter),
-					[k_left] "m"(k_left),
-					[src_stride] "m"(src_stride)
-					:// clobbers
-					"cc", "memory", "%zmm0", "%zmm1", "%zmm2", "%zmm3", "%zmm4", "%zmm5", "%zmm6", "%zmm7",
-					"%zmm8", "%zmm9", "%zmm10", "%zmm11", "%zmm12", "%zmm13", "%zmm14", "%zmm15", "%zmm16",
-					"%zmm17", "%zmm18", "%zmm19", "%zmm20", "%zmm21", "%zmm22", "%zmm23", "%zmm24", "%zmm25",
-					"%zmm26", "%zmm27", "%zmm28", "%zmm29", "%zmm30", "%zmm31", "%rax", "%rbx",
-					"%r12", "%r13", "%r14", "%r15")
+				end_asm(:// outputs
+						:// inputs
+						[src_ptr] "m"(src_ptr),
+						[dst_ptr] "m"(dst_ptr),
+						[k_iter] "m"(k_iter),
+						[k_left] "m"(k_left),
+						[src_stride] "m"(src_stride)
+						:// clobbers
+						"cc", "memory", "%zmm0", "%zmm1", "%zmm2", "%zmm3", "%zmm4", "%zmm5", "%zmm6", "%zmm7",
+						"%zmm8", "%zmm9", "%zmm10", "%zmm11", "%zmm12", "%zmm13", "%zmm14", "%zmm15", "%zmm16",
+						"%zmm17", "%zmm18", "%zmm19", "%zmm20", "%zmm21", "%zmm22", "%zmm23", "%zmm24", "%zmm25",
+						"%zmm26", "%zmm27", "%zmm28", "%zmm29", "%zmm30", "%zmm31", "%rax", "%rbx",
+						"%r12", "%r13", "%r14", "%r15")
+			}
+			else
+			{
+				begin_asm()
+				movq(var(src_ptr), rax) // src pointer is in rax
+				movq(var(dst_ptr), rbx)// dst pointer is in rbx
+				movq(var(src_stride), r12)// src stride is in r12
+				movq(r12, r13)// r13 = r12
+				sal(imm(1), r13)// r13 = 2 * r12 (2 * stride)
+				add(r12, r13)// r13 = 2 * r12 + r12 = 3 * r12 (3*D_stride)
+				movq(r12, r15)// r15 = r12
+				sal(imm(2), r15)// r15 = 4 * r12 (4 * stride)
+
+				movq(var(k_iter), r14)// load the number of 16-unrolled iterations
+				test(r14, r14)
+				je(FINALLOOP)
+
+				label(UNROLLED16)
+				LOAD_4x16xFP16(rax, zmm0, zmm1, zmm2, zmm3)
+				LOAD_4x16xFP16(rax, zmm4, zmm5, zmm6, zmm7)
+				LOAD_4x16xFP16(rax, zmm24, zmm25, zmm26, zmm27)
+				LOAD_4x16xFP16(rax, zmm28, zmm29, zmm30, zmm31)
+				CONVERT_4x16xFP16_TO_FP32(0, 1, 2, 3)
+				CONVERT_4x16xFP16_TO_FP32(4, 5, 6, 7)
+				CONVERT_4x16xFP16_TO_FP32(24, 25, 26, 27)
+				CONVERT_4x16xFP16_TO_FP32(28, 29, 30, 31)
+				STORE_16x16xFP32(rbx, 16, 0)
+				add(imm(16*16*4), rbx)// add stride to dst pointer
+
+				dec(r14)
+				jne(UNROLLED16)
+
+				label(FINALLOOP)
+				movq(var(k_left), r14)// load the number of 1-unrolled iterations
+				test(r14, r14)
+				je(EPILOGUE)
+
+				label(UNROLLED1)
+				LOAD_1x16xFP16(rax, ymm0)
+				CONVERT_1x16xFP16_TO_FP32(0)
+				STORE_1x16xFP32(zmm0, 0)
+				add(imm(1*16*4), rbx)// add stride to dst pointer
+
+				dec(r14)
+				jne(UNROLLED1)
+
+				label(EPILOGUE)
+				vzeroupper()
+
+				end_asm(:// outputs
+						:// inputs
+						[src_ptr] "m"(src_ptr),
+						[dst_ptr] "m"(dst_ptr),
+						[k_iter] "m"(k_iter),
+						[k_left] "m"(k_left),
+						[src_stride] "m"(src_stride)
+						:// clobbers
+						"cc", "memory", "%zmm0", "%zmm1", "%zmm2", "%zmm3", "%zmm4", "%zmm5", "%zmm6", "%zmm7",
+						"%zmm8", "%zmm9", "%zmm10", "%zmm11", "%zmm12", "%zmm13", "%zmm14", "%zmm15", "%zmm16",
+						"%zmm17", "%zmm18", "%zmm19", "%zmm20", "%zmm21", "%zmm22", "%zmm23", "%zmm24", "%zmm25",
+						"%zmm26", "%zmm27", "%zmm28", "%zmm29", "%zmm30", "%zmm31", "%rax", "%rbx",
+						"%r12", "%r13", "%r14", "%r15")
+			}
 		}
 		else
 		{
-			begin_asm()
-			movq(var(src_ptr), rax) // src pointer is in rax
-			movq(var(dst_ptr), rbx)// dst pointer is in rbx
-			movq(var(src_stride), r12)// src stride is in r12
-			movq(r12, r13)// r13 = r12
-			sal(imm(1), r13)// r13 = 2 * r12 (2 * stride)
-			add(r12, r13)// r13 = 2 * r12 + r12 = 3 * r12 (3*D_stride)
-			movq(r12, r15)// r15 = r12
-			sal(imm(2), r15)// r15 = 4 * r12 (4 * stride)
+			if (src.is_fp32())
+			{
+				begin_asm()
+				movq(var(src_ptr), rax) // src pointer is in rax
+				movq(var(dst_ptr), rbx)// dst pointer is in rbx
+				movq(var(src_stride), r12)// src stride is in r12
+				movq(r12, r13)// r13 = r12
+				sal(imm(1), r13)// r13 = 2 * r12 (2 * stride)
+				add(r12, r13)// r13 = 2 * r12 + r12 = 3 * r12 (3*D_stride)
+				movq(r12, r15)// r15 = r12
+				sal(imm(2), r15)// r15 = 4 * r12 (4 * stride)
 
-			movq(var(k_iter), r14)// load the number of 16-unrolled iterations
-			test(r14, r14)
-			je(FINALLOOP)
+				movq(var(k_iter), r14)// load the number of 16-unrolled iterations
+				test(r14, r14)
+				je(FINALLOOP)
 
-			label(UNROLLED16)
-			// first 16x16 tile
-			movq(rax, rcx)// tmp src pointer is in r13
+				label(UNROLLED16)
+				// first 16x16 tile
+				movq(rax, rcx)// tmp src pointer is in r13
 
-			LOAD_16x16xFP32(rcx)
-			TRANSPOSE_16x16xFP32()
-			STORE_16x16xFP32(rbx, 16, 0)
+				LOAD_16x16xFP32(rcx)
+				TRANSPOSE_16x16xFP32()
+				STORE_16x16xFP32(rbx, 16, 0)
 
-			add(imm(4*16), rax)// add stride to src pointer
-			add(imm(4*16*16), rbx)// add stride to dst pointer
+				add(imm(4*16), rax)// add stride to src pointer
+				add(imm(4*16*16), rbx)// add stride to dst pointer
 
-			dec(r14)
-			jne(UNROLLED16)
+				dec(r14)
+				jne(UNROLLED16)
 
-			label(FINALLOOP)
-			movq(var(k_left), r14)// load the number of 1-unrolled iterations
-			test(r14, r14)
-			je(EPILOGUE)
+				label(FINALLOOP)
+				movq(var(k_left), r14)// load the number of 1-unrolled iterations
+				test(r14, r14)
+				je(EPILOGUE)
 
-			label(UNROLLED1)
-			movq(rax, rcx)
+				label(UNROLLED1)
+				movq(rax, rcx)
 
-			LOAD_4x1xFP32(rcx, xmm0, xmm1, xmm2, xmm3)
-			LOAD_4x1xFP32(rcx, xmm4, xmm5, xmm6, xmm7)
-			LOAD_4x1xFP32(rcx, xmm8, xmm9, xmm10, xmm11)
-			LOAD_4x1xFP32(rcx, xmm12, xmm13, xmm14, xmm15)
+				LOAD_4x1xFP32(rcx, xmm0, xmm1, xmm2, xmm3)
+				LOAD_4x1xFP32(rcx, xmm4, xmm5, xmm6, xmm7)
+				LOAD_4x1xFP32(rcx, xmm8, xmm9, xmm10, xmm11)
+				LOAD_4x1xFP32(rcx, xmm12, xmm13, xmm14, xmm15)
 
-			STORE_4x1xFP32(0, xmm0, xmm1, xmm2, xmm3)
-			STORE_4x1xFP32(4, xmm4, xmm5, xmm6, xmm7)
-			STORE_4x1xFP32(8, xmm8, xmm9, xmm10, xmm11)
-			STORE_4x1xFP32(12, xmm12, xmm13, xmm14, xmm15)
+				STORE_4x1xFP32(0, xmm0, xmm1, xmm2, xmm3)
+				STORE_4x1xFP32(4, xmm4, xmm5, xmm6, xmm7)
+				STORE_4x1xFP32(8, xmm8, xmm9, xmm10, xmm11)
+				STORE_4x1xFP32(12, xmm12, xmm13, xmm14, xmm15)
 
-			add(imm(4*1), rax)// add stride to src pointer
-			add(imm(16*1*4), rbx)// add stride to dst pointer
+				add(imm(4*1), rax)// add stride to src pointer
+				add(imm(16*1*4), rbx)// add stride to dst pointer
 
-			dec(r14)
-			jne(UNROLLED1)
+				dec(r14)
+				jne(UNROLLED1)
 
-			label(EPILOGUE)
-			vzeroupper()
-			end_asm(:// outputs
-					:// inputs
-					[src_ptr] "m"(src_ptr),
-					[dst_ptr] "m"(dst_ptr),
-					[k_iter] "m"(k_iter),
-					[k_left] "m"(k_left),
-					[src_stride] "m"(src_stride)
-					:// clobbers
-					"cc", "memory", "%zmm0", "%zmm1", "%zmm2", "%zmm3", "%zmm4", "%zmm5", "%zmm6", "%zmm7",
-					"%zmm8", "%zmm9", "%zmm10", "%zmm11", "%zmm12", "%zmm13", "%zmm14", "%zmm15", "%zmm16",
-					"%zmm17", "%zmm18", "%zmm19", "%zmm20", "%zmm21", "%zmm22", "%zmm23", "%zmm24", "%zmm25",
-					"%zmm26", "%zmm27", "%zmm28", "%zmm29", "%zmm30", "%zmm31", "%rax", "%rbx", "%rcx",
-					"%r12", "%r13", "%r14", "%r15")
+				label(EPILOGUE)
+				vzeroupper()
+				end_asm(:// outputs
+						:// inputs
+						[src_ptr] "m"(src_ptr),
+						[dst_ptr] "m"(dst_ptr),
+						[k_iter] "m"(k_iter),
+						[k_left] "m"(k_left),
+						[src_stride] "m"(src_stride)
+						:// clobbers
+						"cc", "memory", "%zmm0", "%zmm1", "%zmm2", "%zmm3", "%zmm4", "%zmm5", "%zmm6", "%zmm7",
+						"%zmm8", "%zmm9", "%zmm10", "%zmm11", "%zmm12", "%zmm13", "%zmm14", "%zmm15", "%zmm16",
+						"%zmm17", "%zmm18", "%zmm19", "%zmm20", "%zmm21", "%zmm22", "%zmm23", "%zmm24", "%zmm25",
+						"%zmm26", "%zmm27", "%zmm28", "%zmm29", "%zmm30", "%zmm31", "%rax", "%rbx", "%rcx",
+						"%r12", "%r13", "%r14", "%r15")
+			}
+			else
+			{
+				begin_asm()
+				movq(var(src_ptr), rax) // src pointer is in rax
+				movq(var(dst_ptr), rbx)// dst pointer is in rbx
+				movq(var(src_stride), r12)// src stride is in r12
+				movq(r12, r13)// r13 = r12
+				sal(imm(1), r13)// r13 = 2 * r12 (2 * stride)
+				add(r12, r13)// r13 = 2 * r12 + r12 = 3 * r12 (3*D_stride)
+				movq(r12, r15)// r15 = r12
+				sal(imm(2), r15)// r15 = 4 * r12 (4 * stride)
+
+				movq(var(k_iter), r14)// load the number of 16-unrolled iterations
+				test(r14, r14)
+				je(FINALLOOP)
+
+				label(UNROLLED16)
+				// first 16x16 tile
+				movq(rax, rcx)// tmp src pointer is in rcx
+
+				LOAD_16x16xFP16(rcx)
+				TRANSPOSE_16x16xFP32()
+				STORE_16x16xFP32(rbx, 16, 0)
+
+				add(imm(2*16), rax)// add stride to src pointer
+				add(imm(4*16*16), rbx)// add stride to dst pointer
+
+				dec(r14)
+				jne(UNROLLED16)
+
+				label(FINALLOOP)
+				movq(var(k_left), r14)// load the number of 1-unrolled iterations
+				test(r14, r14)
+				je(EPILOGUE)
+
+				label(UNROLLED1)
+				movq(rax, rcx)
+
+				LOAD_4x1xFP16(rcx, 0, 1, 2, 3)
+				LOAD_4x1xFP16(rcx, 4, 5, 6, 7)
+				LOAD_4x1xFP16(rcx, 8, 9, 10, 11)
+				LOAD_4x1xFP16(rcx, 12, 13, 14, 15)
+
+				STORE_4x1xFP32(0, xmm0, xmm1, xmm2, xmm3)
+				STORE_4x1xFP32(4, xmm4, xmm5, xmm6, xmm7)
+				STORE_4x1xFP32(8, xmm8, xmm9, xmm10, xmm11)
+				STORE_4x1xFP32(12, xmm12, xmm13, xmm14, xmm15)
+
+				add(imm(2*1), rax)// add stride to src pointer
+				add(imm(16*1*4), rbx)// add stride to dst pointer
+
+				dec(r14)
+				jne(UNROLLED1)
+
+				label(EPILOGUE)
+				vzeroupper()
+				end_asm(:// outputs
+						:// inputs
+						[src_ptr] "m"(src_ptr),
+						[dst_ptr] "m"(dst_ptr),
+						[k_iter] "m"(k_iter),
+						[k_left] "m"(k_left),
+						[src_stride] "m"(src_stride)
+						:// clobbers
+						"cc", "memory", "%zmm0", "%zmm1", "%zmm2", "%zmm3", "%zmm4", "%zmm5", "%zmm6", "%zmm7",
+						"%zmm8", "%zmm9", "%zmm10", "%zmm11", "%zmm12", "%zmm13", "%zmm14", "%zmm15", "%zmm16",
+						"%zmm17", "%zmm18", "%zmm19", "%zmm20", "%zmm21", "%zmm22", "%zmm23", "%zmm24", "%zmm25",
+						"%zmm26", "%zmm27", "%zmm28", "%zmm29", "%zmm30", "%zmm31", "%rax", "%rbx", "%rcx",
+						"%r12", "%r13", "%r14", "%r15")
+			}
 		}
 	}
 
-	void pack_avx512f_24xK_fp16_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept
-	{
-		assert(dst.stride() == 24);
-		assert(ml::cpu::is_aligned(dst.data(), 64));
-
-		const uint64_t k_iter = dst.rows() / 16;
-		const uint64_t k_left = dst.rows() % 16;
-		const uint64_t src_stride = src.stride() * sizeof(float16);
-		const void *src_ptr = src.pointer_at(src_pos.row, src_pos.column);
-		void *dst_ptr = dst.data();
-
-		if (src_op == MatrixOp::NORMAL)
-		{
-			begin_asm()
-			movq(var(src_ptr), rax) // src pointer is in rax
-			movq(var(dst_ptr), rbx)// dst pointer is in rbx
-			movq(var(src_stride), r12)// src stride is in r12
-			movq(r12, r13)// r13 = r12
-			sal(imm(1), r13)// r13 = 2 * r12 (2 * stride)
-			add(r12, r13)// r13 = 2 * r12 + r12 = 3 * r12 (3*D_stride)
-			movq(r12, r15)// r15 = r12
-			sal(imm(2), r15)// r15 = 4 * r12 (4 * stride)
-
-			movq(var(k_iter), r14)// load the number of 16-unrolled iterations
-			test(r14, r14)
-			je(FINALLOOP)
-
-			label(UNROLLED16)
-			LOAD_16x24xFP16(rax)
-			STORE_16x24xFP32()
-			add(imm(16*24*4), rbx)// add stride to dst pointer
-
-			dec(r14)
-			jne(UNROLLED16)
-
-			label(FINALLOOP)
-			movq(var(k_left), r14)// load the number of 1-unrolled iterations
-			test(r14, r14)
-			je(EPILOGUE)
-
-			label(UNROLLED1)
-			LOAD_1x24xFP16(rax, zmm0, ymm1)
-			CONVERT_1x24xFP16_TO_FP32(0, 1)
-			STORE_1x24xFP32(zmm0, ymm1, 0)
-			add(imm(1*24*4), rbx)// add stride to dst pointer
-
-			dec(r14)
-			jne(UNROLLED1)
-
-			label(EPILOGUE)
-			vzeroupper()
-
-			end_asm(:// outputs
-					:// inputs
-					[src_ptr] "m"(src_ptr),
-					[dst_ptr] "m"(dst_ptr),
-					[k_iter] "m"(k_iter),
-					[k_left] "m"(k_left),
-					[src_stride] "m"(src_stride)
-					:// clobbers
-					"cc", "memory", "%zmm0", "%zmm1", "%zmm2", "%zmm3", "%zmm4", "%zmm5", "%zmm6", "%zmm7",
-					"%zmm8", "%zmm9", "%zmm10", "%zmm11", "%zmm12", "%zmm13", "%zmm14", "%zmm15", "%zmm16",
-					"%zmm17", "%zmm18", "%zmm19", "%zmm20", "%zmm21", "%zmm22", "%zmm23", "%zmm24", "%zmm25",
-					"%zmm26", "%zmm27", "%zmm28", "%zmm29", "%zmm30", "%zmm31", "%rax", "%rbx", "%r12", "%r13", "%r14", "%r15")
-		}
-		else
-		{
-			begin_asm()
-			movq(var(src_ptr), rax) // src pointer is in rax
-			movq(var(dst_ptr), rbx)// dst pointer is in rbx
-			movq(var(src_stride), r12)// src stride is in r12
-			movq(r12, r13)// r13 = r12
-			sal(imm(1), r13)// r13 = 2 * r12 (2 * stride)
-			add(r12, r13)// r13 = 2 * r12 + r12 = 3 * r12 (3*D_stride)
-			movq(r12, r15)// r15 = r12
-			sal(imm(2), r15)// r15 = 4 * r12 (4 * stride)
-
-			movq(var(k_iter), r14)// load the number of 16-unrolled iterations
-			test(r14, r14)
-			je(FINALLOOP)
-
-			label(UNROLLED16)
-			// first 16x16 tile
-			movq(rax, rcx)
-
-			// first 16x16 tile
-			LOAD_16x16xFP16(rcx)
-			TRANSPOSE_16x16xFP32()
-			STORE_16x16xFP32(rbx, 24, 0)
-
-			// second 8x16 tile
-			LOAD_8x16xFP16(rcx)
-			TRANSPOSE_8x16xFP32()
-			STORE_16x8xFP32(rbx, 24, 16)
-
-			add(imm(2*16), rax)// add stride to src pointer
-			add(imm(4*24*16), rbx)// add stride to dst pointer
-
-			dec(r14)
-			jne(UNROLLED16)
-
-			label(FINALLOOP)
-			movq(var(k_left), r14)// load the number of 1-unrolled iterations
-			test(r14, r14)
-			je(EPILOGUE)
-
-			label(UNROLLED1)
-			movq(rax, rcx)
-
-			LOAD_4x1xFP16(rcx, 0, 1, 2, 3)
-			LOAD_4x1xFP16(rcx, 4, 5, 6, 7)
-			LOAD_4x1xFP16(rcx, 8, 9, 10, 11)
-			LOAD_4x1xFP16(rcx, 12, 13, 14, 15)
-			LOAD_4x1xFP16(rcx, 16, 17, 18, 19)
-			LOAD_4x1xFP16(rcx, 20, 21, 22, 23)
-
-			STORE_4x1xFP32(0, xmm0, xmm1, xmm2, xmm3)
-			STORE_4x1xFP32(4, xmm4, xmm5, xmm6, xmm7)
-			STORE_4x1xFP32(8, xmm8, xmm9, xmm10, xmm11)
-			STORE_4x1xFP32(12, xmm12, xmm13, xmm14, xmm15)
-			STORE_4x1xFP32(16, xmm16, xmm17, xmm18, xmm19)
-			STORE_4x1xFP32(20, xmm20, xmm21, xmm22, xmm23)
-
-			add(imm(2*1), rax)// add stride to src pointer
-			add(imm(24*1*4), rbx)// add stride to dst pointer
-
-			dec(r14)
-			jne(UNROLLED1)
-
-			label(EPILOGUE)
-			vzeroupper()
-			end_asm(:// outputs
-					:// inputs
-					[src_ptr] "m"(src_ptr),
-					[dst_ptr] "m"(dst_ptr),
-					[k_iter] "m"(k_iter),
-					[k_left] "m"(k_left),
-					[src_stride] "m"(src_stride)
-					:// clobbers
-					"cc", "memory", "%zmm0", "%zmm1", "%zmm2", "%zmm3", "%zmm4", "%zmm5", "%zmm6", "%zmm7",
-					"%zmm8", "%zmm9", "%zmm10", "%zmm11", "%zmm12", "%zmm13", "%zmm14", "%zmm15", "%zmm16",
-					"%zmm17", "%zmm18", "%zmm19", "%zmm20", "%zmm21", "%zmm22", "%zmm23", "%zmm24", "%zmm25",
-					"%zmm26", "%zmm27", "%zmm28", "%zmm29", "%zmm30", "%zmm31", "%rax", "%rbx", "%rcx",
-					"%r8", "%r9", "%r10", "%r11", "%r12", "%r13", "%r14", "%r15")
-		}
-	}
-	void pack_avx512f_16xK_fp16_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept
-	{
-		assert(dst.stride() == 16);
-		assert(ml::cpu::is_aligned(dst.data(), 64));
-
-		const uint64_t k_iter = dst.rows() / 16;
-		const uint64_t k_left = dst.rows() % 16;
-		const uint64_t src_stride = src.stride() * sizeof(float16);
-		const void *src_ptr = src.pointer_at(src_pos.row, src_pos.column);
-		void *dst_ptr = dst.data();
-
-		if (src_op == MatrixOp::NORMAL)
-		{
-			begin_asm()
-			movq(var(src_ptr), rax) // src pointer is in rax
-			movq(var(dst_ptr), rbx)// dst pointer is in rbx
-			movq(var(src_stride), r12)// src stride is in r12
-			movq(r12, r13)// r13 = r12
-			sal(imm(1), r13)// r13 = 2 * r12 (2 * stride)
-			add(r12, r13)// r13 = 2 * r12 + r12 = 3 * r12 (3*D_stride)
-			movq(r12, r15)// r15 = r12
-			sal(imm(2), r15)// r15 = 4 * r12 (4 * stride)
-
-			movq(var(k_iter), r14)// load the number of 16-unrolled iterations
-			test(r14, r14)
-			je(FINALLOOP)
-
-			label(UNROLLED16)
-			LOAD_4x16xFP16(rax, zmm0, zmm1, zmm2, zmm3)
-			LOAD_4x16xFP16(rax, zmm4, zmm5, zmm6, zmm7)
-			LOAD_4x16xFP16(rax, zmm24, zmm25, zmm26, zmm27)
-			LOAD_4x16xFP16(rax, zmm28, zmm29, zmm30, zmm31)
-			CONVERT_4x16xFP16_TO_FP32(0, 1, 2, 3)
-			CONVERT_4x16xFP16_TO_FP32(4, 5, 6, 7)
-			CONVERT_4x16xFP16_TO_FP32(24, 25, 26, 27)
-			CONVERT_4x16xFP16_TO_FP32(28, 29, 30, 31)
-			STORE_16x16xFP32(rbx, 16, 0)
-			add(imm(16*16*4), rbx)// add stride to dst pointer
-
-			dec(r14)
-			jne(UNROLLED16)
-
-			label(FINALLOOP)
-			movq(var(k_left), r14)// load the number of 1-unrolled iterations
-			test(r14, r14)
-			je(EPILOGUE)
-
-			label(UNROLLED1)
-			LOAD_1x16xFP16(rax, ymm0)
-			CONVERT_1x16xFP16_TO_FP32(0)
-			STORE_1x16xFP32(zmm0, 0)
-			add(imm(1*16*4), rbx)// add stride to dst pointer
-
-			dec(r14)
-			jne(UNROLLED1)
-
-			label(EPILOGUE)
-			vzeroupper()
-
-			end_asm(:// outputs
-					:// inputs
-					[src_ptr] "m"(src_ptr),
-					[dst_ptr] "m"(dst_ptr),
-					[k_iter] "m"(k_iter),
-					[k_left] "m"(k_left),
-					[src_stride] "m"(src_stride)
-					:// clobbers
-					"cc", "memory", "%zmm0", "%zmm1", "%zmm2", "%zmm3", "%zmm4", "%zmm5", "%zmm6", "%zmm7",
-					"%zmm8", "%zmm9", "%zmm10", "%zmm11", "%zmm12", "%zmm13", "%zmm14", "%zmm15", "%zmm16",
-					"%zmm17", "%zmm18", "%zmm19", "%zmm20", "%zmm21", "%zmm22", "%zmm23", "%zmm24", "%zmm25",
-					"%zmm26", "%zmm27", "%zmm28", "%zmm29", "%zmm30", "%zmm31", "%rax", "%rbx",
-					"%r12", "%r13", "%r14", "%r15")
-		}
-		else
-		{
-			begin_asm()
-			movq(var(src_ptr), rax) // src pointer is in rax
-			movq(var(dst_ptr), rbx)// dst pointer is in rbx
-			movq(var(src_stride), r12)// src stride is in r12
-			movq(r12, r13)// r13 = r12
-			sal(imm(1), r13)// r13 = 2 * r12 (2 * stride)
-			add(r12, r13)// r13 = 2 * r12 + r12 = 3 * r12 (3*D_stride)
-			movq(r12, r15)// r15 = r12
-			sal(imm(2), r15)// r15 = 4 * r12 (4 * stride)
-
-			movq(var(k_iter), r14)// load the number of 16-unrolled iterations
-			test(r14, r14)
-			je(FINALLOOP)
-
-			label(UNROLLED16)
-			// first 16x16 tile
-			movq(rax, rcx)// tmp src pointer is in rcx
-
-			LOAD_16x16xFP16(rcx)
-			TRANSPOSE_16x16xFP32()
-			STORE_16x16xFP32(rbx, 16, 0)
-
-			add(imm(2*16), rax)// add stride to src pointer
-			add(imm(4*16*16), rbx)// add stride to dst pointer
-
-			dec(r14)
-			jne(UNROLLED16)
-
-			label(FINALLOOP)
-			movq(var(k_left), r14)// load the number of 1-unrolled iterations
-			test(r14, r14)
-			je(EPILOGUE)
-
-			label(UNROLLED1)
-			movq(rax, rcx)
-
-			LOAD_4x1xFP16(rcx, 0, 1, 2, 3)
-			LOAD_4x1xFP16(rcx, 4, 5, 6, 7)
-			LOAD_4x1xFP16(rcx, 8, 9, 10, 11)
-			LOAD_4x1xFP16(rcx, 12, 13, 14, 15)
-
-			STORE_4x1xFP32(0, xmm0, xmm1, xmm2, xmm3)
-			STORE_4x1xFP32(4, xmm4, xmm5, xmm6, xmm7)
-			STORE_4x1xFP32(8, xmm8, xmm9, xmm10, xmm11)
-			STORE_4x1xFP32(12, xmm12, xmm13, xmm14, xmm15)
-
-			add(imm(2*1), rax)// add stride to src pointer
-			add(imm(16*1*4), rbx)// add stride to dst pointer
-
-			dec(r14)
-			jne(UNROLLED1)
-
-			label(EPILOGUE)
-			vzeroupper()
-			end_asm(:// outputs
-					:// inputs
-					[src_ptr] "m"(src_ptr),
-					[dst_ptr] "m"(dst_ptr),
-					[k_iter] "m"(k_iter),
-					[k_left] "m"(k_left),
-					[src_stride] "m"(src_stride)
-					:// clobbers
-					"cc", "memory", "%zmm0", "%zmm1", "%zmm2", "%zmm3", "%zmm4", "%zmm5", "%zmm6", "%zmm7",
-					"%zmm8", "%zmm9", "%zmm10", "%zmm11", "%zmm12", "%zmm13", "%zmm14", "%zmm15", "%zmm16",
-					"%zmm17", "%zmm18", "%zmm19", "%zmm20", "%zmm21", "%zmm22", "%zmm23", "%zmm24", "%zmm25",
-					"%zmm26", "%zmm27", "%zmm28", "%zmm29", "%zmm30", "%zmm31", "%rax", "%rbx", "%rcx",
-					"%r12", "%r13", "%r14", "%r15")
-		}
-	}
-
-	void mha_qk_avx512f_24x16_fp32(Fragment &temp, const void *alpha_ptr, const Fragment &Q, const Fragment &K, const Fragment &bias,
+	void mha_qk_avx512f_24x16(Fragment &temp, const void *alpha_ptr, const Fragment &Q, const Fragment &K, const Fragment &bias,
 			Fragment &softmax_sum) noexcept
 	{
+		assert(temp.is_fp32());
+		assert(Q.is_fp32());
+		assert(K.is_fp32());
+		assert(bias.is_fp32());
+		assert(softmax_sum.is_fp32());
 		assert(Q.rows() == K.rows());
 		assert(Q.stride() == 24);
 		assert(K.stride() == 16);
@@ -1523,24 +1511,24 @@ namespace ml
 		assert(alpha_ptr != nullptr);
 		assert(cpu::is_aligned(Q.data(), 64));
 		assert(cpu::is_aligned(K.data(), 64));
-		if (bias.is_packed())
-		{
-			assert(cpu::is_aligned(bias.data(), 64));
-		}
-		if (softmax_sum.is_packed())
-		{
-			assert(cpu::is_aligned(softmax_sum.data(), 64));
-		}
+		assert(cpu::is_aligned(bias.data(), 64));
 
 		const float *Q_ptr = Q.data<float>();
 		const float *K_ptr = K.data<float>();
 		float *temp_ptr = temp.data<float>();
 		const float *bias_ptr = bias.data<float>();
-		float *softmax_ptr = softmax_sum.data<float>();
+		float *softmax_ptr = softmax_sum.is_packed() ? softmax_sum.data<float>() : nullptr;
+		if(softmax_sum.is_packed())
+		{
+			assert(softmax_sum.is_fp32());
+			assert(softmax_sum.rows() >= temp.columns());
+			assert(cpu::is_aligned(softmax_sum.data(), 32));
+		}
 
 		uint64_t k_iter = Q.rows() / 4;
 		uint64_t k_left = Q.rows() % 4;
-		const uint64_t bias_stride = bias.stride() * sizeof(float);
+		const uint64_t bias_stride = bias.stride_in_bytes();
+		assert(bias_stride % 64 == 0);
 
 		begin_asm()
 
@@ -1608,18 +1596,24 @@ namespace ml
 		// store 8x16 tile
 		TRANSPOSE_8x16xFP32()
 		STORE_16x8xFP32(rbx, 24, 16)
+		test(rcx, rcx)
+		je(SKIP_REDUCTION_1)
 		REDUCE_SUM()
 		vmovaps(mem(rcx, 16*4), ymm1)
 		vaddps(ymm1, ymm0, ymm0)
 		vmovaps(ymm0, mem(rcx, 16*4))
+		label(SKIP_REDUCTION_1)
 
 		//store 16x16 tile
 		TRANSPOSE_16x16xFP32()
 		STORE_16x16xFP32(rbx, 24, 0)
+		test(rcx, rcx)
+		je(SKIP_REDUCTION_2)
 		REDUCE_SUM()
 		vmovaps(mem(rcx), zmm1)
 		vaddps(zmm1, zmm0, zmm0)
 		vmovaps(zmm0, mem(rcx))
+		label(SKIP_REDUCTION_2)
 
 		vzeroupper()
 
@@ -1643,27 +1637,17 @@ namespace ml
 				"%rax", "%rbx", "%rcx", "%rdx", "%r12", "%r13", "%r14", "%r15")
 	}
 #else
-	void gemm_avx512f_24x16_fp32(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,
+	void gemm_avx512f_24x16(Fragment &D, const Fragment &alpha, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,
 			const Fragment &bias, bool use_relu) noexcept
 	{
 	}
-	void gemm_avx512f_24x16_fp32_fp16(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr,
-			const Fragment &C, const Fragment &bias, bool use_relu) noexcept
+	void pack_avx512f_24xK(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept
 	{
 	}
-	void pack_avx512f_24xK_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept
+	void pack_avx512f_16xK(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept
 	{
 	}
-	void pack_avx512f_24xK_fp16_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept
-	{
-	}
-	void pack_avx512f_16xK_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept
-	{
-	}
-	void pack_avx512f_16xK_fp16_fp32(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept
-	{
-	}
-	void mha_qk_avx512f_24x16_fp32(Fragment &temp, const void *alpha_ptr, const Fragment &Q, const Fragment &K, const Fragment &bias,
+	void mha_qk_avx512f_24x16(Fragment &temp, const void *alpha_ptr, const Fragment &Q, const Fragment &K, const Fragment &bias,
 			Fragment &softmax_sum) noexcept
 	{
 	}
