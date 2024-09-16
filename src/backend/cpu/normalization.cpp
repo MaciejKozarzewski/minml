@@ -13,6 +13,7 @@
 #include <cmath>
 #include <cassert>
 #include <iostream>
+#include <vector>
 
 namespace
 {
@@ -278,6 +279,8 @@ namespace ml
 
 		assert(cpu::Context::getWorkspaceSize(context) >= last_dim * sizeof(AvgVarStats<float> ));
 		AvgVarStats<float> *stats = cpu::Context::getWorkspace<AvgVarStats<float>>(context);
+		for (int j = 0; j < last_dim; j++)
+			stats[j] = AvgVarStats<float>();
 
 		const AvgVarStats<float> *running_stat_ptr = getPointer<AvgVarStats<float>>(running_stat);
 		for (int i = 0; i < first_dim; i++)

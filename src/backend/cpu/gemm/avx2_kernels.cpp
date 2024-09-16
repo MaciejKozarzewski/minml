@@ -1461,7 +1461,7 @@ namespace ml
 						:// clobbers
 						"cc", "memory", "%ymm0", "%ymm1", "%ymm2", "%ymm3", "%ymm4", "%ymm5", "%ymm6", "%ymm7",
 						"%ymm8", "%ymm9", "%ymm10", "%ymm11", "%ymm12", "%ymm13", "%ymm14", "%ymm15", "%rax", "%rbx",
-						"%r12", "%r14", "%r15")
+						"%r12", "%r13", "%r14", "%r15")
 			}
 		}
 		else
@@ -1764,7 +1764,8 @@ namespace ml
 						[src_stride] "m"(src_stride)
 						:// clobbers
 						"cc", "memory", "%ymm0", "%ymm1", "%ymm2", "%ymm3", "%ymm4", "%ymm5", "%ymm6", "%ymm7",
-						"%ymm8", "%ymm9", "%ymm10", "%ymm11", "%ymm12", "%ymm13", "%ymm14", "%ymm15", "%rax", "%rbx", "%r12", "%r13", "%r14", "%r15")
+						"%ymm8", "%ymm9", "%ymm10", "%ymm11", "%ymm12", "%ymm13", "%ymm14", "%ymm15", "%rax", "%rbx",
+						"%r12", "%r13", "%r14", "%r15")
 			}
 			else
 			{
@@ -1827,7 +1828,8 @@ namespace ml
 						[convert_fp16] "m"(convert_fp16)
 						:// clobbers
 						"cc", "memory", "%ymm0", "%ymm1", "%ymm2", "%ymm3", "%ymm4", "%ymm5", "%ymm6", "%ymm7",
-						"%ymm8", "%ymm9", "%ymm10", "%ymm11", "%ymm12", "%ymm13", "%ymm14", "%ymm15", "%rax", "%rbx", "%r12", "%r13", "%r14", "%r15")
+						"%ymm8", "%ymm9", "%ymm10", "%ymm11", "%ymm12", "%ymm13", "%ymm14", "%ymm15", "%rax", "%rbx",
+						"%r12", "%r13", "%r14", "%r15")
 			}
 		}
 		else
