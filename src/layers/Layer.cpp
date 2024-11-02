@@ -29,6 +29,7 @@
 #include <minml/layers/GlobalBroadcastHW.hpp>
 #include <minml/layers/GlobalPooling.hpp>
 #include <minml/layers/MultiHeadAttention.hpp>
+#include <minml/layers/PositionalEncoding.hpp>
 #include <minml/layers/RMSNormalization.hpp>
 #include <minml/layers/Softmax.hpp>
 #include <minml/layers/SpaceToDepth.hpp>
@@ -56,6 +57,8 @@ namespace ml
 				return "softmax";
 			case ActivationType::GELU:
 				return "gelu";
+			case ActivationType::EXP:
+				return "exp";
 		}
 	}
 	ActivationType activationFromString(const std::string &str)
@@ -72,6 +75,8 @@ namespace ml
 			return ActivationType::SOFTMAX;
 		if (str == "gelu")
 			return ActivationType::GELU;
+		if (str == "exp")
+			return ActivationType::EXP;
 		throw LogicError(METHOD_NAME, "unknown nonlinearity '" + str + "'");
 	}
 
@@ -249,9 +254,10 @@ namespace ml
 		static const GlobalBroadcastHW global_broadcast;
 		static const GlobalPooling global_pooling;
 		static const LayerNormalization layernorm;
-		static const MultiHeadAttention mha(0, 0);
+		static const MultiHeadAttention mha(0, 0, false);
 		static const Input input;
 		static const RMSNormalization rmsnorm;
+		static const PositionalEncoding positional_encoding;
 		static const Softmax softmax( { 0 });
 		static const SpaceToDepth space_to_depth(0);
 		static const SqueezeAndExcitation se;
@@ -279,6 +285,8 @@ namespace ml
 			result = mha.clone(json);
 		if (name == input.name())
 			result = input.clone(json);
+		if (name == positional_encoding.name())
+			result = positional_encoding.clone(json);
 		if (name == rmsnorm.name())
 			result = rmsnorm.clone(json);
 		if (name == softmax.name())

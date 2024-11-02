@@ -694,55 +694,62 @@ namespace ml
 		}
 	}
 
-	int multiHeadAttentionGetWorkspaceSize(const Context &context, const Shape &inputShape, const Shape &weightsShape, bool training)
+	int multiHeadAttentionGetWorkspaceSize(const Context &context, const Shape &inputShape, const Shape &weightsShape, int num_heads, bool training)
 	{
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
-				return cpu_multi_head_attention_get_workspace_size(get(inputShape), get(weightsShape), training);
+				return cpu_multi_head_attention_get_workspace_size(get(inputShape), get(weightsShape), num_heads, training);
 			case DeviceType::CUDA:
-				return cuda_multi_head_attention_get_workspace_size(get(inputShape), get(weightsShape), training);
+				return cuda_multi_head_attention_get_workspace_size(get(inputShape), get(weightsShape), num_heads, training);
 			case DeviceType::OPENCL:
-				return opencl_multi_head_attention_get_workspace_size(get(inputShape), get(weightsShape), training);
+				return opencl_multi_head_attention_get_workspace_size(get(inputShape), get(weightsShape), num_heads, training);
 			default:
 				return 0;
 		}
 	}
-	void multiHeadAttentionForward(const Context &context, const Tensor &input, Tensor &output, const Tensor &weights, Tensor &workspace,
-			Tensor &backwardData)
+	void multiHeadAttentionForward(const Context &context, const Tensor &input, Tensor &output, const Tensor &weights, const Tensor &bias,
+			const Tensor &mask, Tensor &workspace, Tensor &backwardData, int num_heads, bool symmetric)
 	{
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
-				cpu_multi_head_attention_forward(get(context), get_shape(input), get_shape(weights), get(input.dtype()), input.data(), output.data(),
-						weights.data(), workspace.data(), backwardData.data());
+				cpu_multi_head_attention_forward(get(context), get_shape(input), get_shape(weights), get_shape(bias), get(input.dtype()),
+						input.data(), output.data(), weights.data(), bias.data(), mask.data(), workspace.data(), backwardData.data(), num_heads,
+						symmetric);
 				break;
 			case DeviceType::CUDA:
-				cuda_multi_head_attention_forward(get(context), get_shape(input), get_shape(weights), get(input.dtype()), input.data(), output.data(),
-						weights.data(), workspace.data(), backwardData.data());
+				cuda_multi_head_attention_forward(get(context), get_shape(input), get_shape(weights), get_shape(bias), get(input.dtype()),
+						input.data(), output.data(), weights.data(), bias.data(), mask.data(), workspace.data(), backwardData.data(), num_heads,
+						symmetric);
 				break;
 			case DeviceType::OPENCL:
-				opencl_multi_head_attention_forward(get(context), get_shape(input), get_shape(weights), get(input.dtype()), input.data(),
-						output.data(), weights.data(), workspace.data(), backwardData.data());
+				opencl_multi_head_attention_forward(get(context), get_shape(input), get_shape(weights), get_shape(bias), get(input.dtype()),
+						input.data(), output.data(), weights.data(), bias.data(), mask.data(), workspace.data(), backwardData.data(), num_heads,
+						symmetric);
 				break;
 		}
 	}
-	void multiHeadAttentionBackward(const Context &context, const Tensor &input, const Tensor &weights, Tensor &gradient_prev, Tensor &gradient_next,
-			Tensor &weights_update, Tensor &workspace, Tensor &backwardData)
+	void multiHeadAttentionBackward(const Context &context, const Tensor &input, const Tensor &weights, const Tensor &bias, const Tensor &mask,
+			Tensor &gradient_prev, Tensor &gradient_next, Tensor &weights_update, Tensor &bias_update, Tensor &workspace, Tensor &backwardData,
+			int num_heads, bool symmetric)
 	{
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
-				cpu_multi_head_attention_backward(get(context), get_shape(input), get_shape(weights), input.data(), weights.data(),
-						gradient_prev.data(), gradient_next.data(), weights_update.data(), workspace.data(), backwardData.data());
+				cpu_multi_head_attention_backward(get(context), get_shape(input), get_shape(weights), get_shape(bias), input.data(), weights.data(),
+						bias.data(), mask.data(), gradient_prev.data(), gradient_next.data(), weights_update.data(), bias_update.data(),
+						workspace.data(), backwardData.data(), num_heads, symmetric);
 				break;
 			case DeviceType::CUDA:
-				cuda_multi_head_attention_backward(get(context), get_shape(input), get_shape(weights), input.data(), weights.data(),
-						gradient_prev.data(), gradient_next.data(), weights_update.data(), workspace.data(), backwardData.data());
+				cuda_multi_head_attention_backward(get(context), get_shape(input), get_shape(weights), get_shape(bias), input.data(), weights.data(),
+						bias.data(), mask.data(), gradient_prev.data(), gradient_next.data(), weights_update.data(), bias_update.data(),
+						workspace.data(), backwardData.data(), num_heads, symmetric);
 				break;
 			case DeviceType::OPENCL:
-				opencl_multi_head_attention_backward(get(context), get_shape(input), get_shape(weights), input.data(), weights.data(),
-						gradient_prev.data(), gradient_next.data(), weights_update.data(), workspace.data(), backwardData.data());
+				opencl_multi_head_attention_backward(get(context), get_shape(input), get_shape(weights), get_shape(bias), input.data(),
+						weights.data(), bias.data(), mask.data(), gradient_prev.data(), gradient_next.data(), weights_update.data(),
+						bias_update.data(), workspace.data(), backwardData.data(), num_heads, symmetric);
 				break;
 		}
 	}
@@ -899,6 +906,35 @@ namespace ml
 				break;
 		}
 	}
+	float valueHeadLoss(const Context &context, const Tensor &output, const Tensor &target)
+	{
+		switch (context.device().type())
+		{
+			case DeviceType::CPU:
+				return cpu_value_head_loss(get(context), get_shape(output), output.data(), target.data());
+			case DeviceType::CUDA:
+				return cuda_value_head_loss(get(context), get_shape(output), output.data(), target.data());
+			case DeviceType::OPENCL:
+				return opencl_value_head_loss(get(context), get_shape(output), output.data(), target.data());
+		}
+		return 0.0f;
+	}
+	void valueHeadGradient(const Context &context, Tensor &gradient, const Tensor &output, const Tensor &target, float weight)
+	{
+		switch (context.device().type())
+		{
+			case DeviceType::CPU:
+				cpu_value_head_gradient(get(context), get_shape(output), gradient.data(), output.data(), target.data(), weight);
+				break;
+			case DeviceType::CUDA:
+				cuda_value_head_gradient(get(context), get_shape(output), gradient.data(), output.data(), target.data(), weight);
+				break;
+			case DeviceType::OPENCL:
+				opencl_value_head_gradient(get(context), get_shape(output), gradient.data(), output.data(), target.data(), weight);
+				break;
+		}
+	}
+
 	void radamOptimize(const Context &context, Tensor &weight, const Tensor &update, Tensor &momentum, Tensor &variance, float learning_rate,
 			float beta1, float beta2, int step)
 	{
@@ -918,6 +954,7 @@ namespace ml
 				break;
 		}
 	}
+
 	void l2Regularization(const Context &context, Tensor &gradient, const Tensor &param, float coefficient, float offset)
 	{
 		switch (context.device().type())

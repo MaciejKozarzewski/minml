@@ -1,36 +1,30 @@
 /*
- * MultiHeadAttention.hpp
+ * PositionalEncoding.hpp
  *
- *  Created on: Jun 12, 2024
+ *  Created on: Oct 31, 2024
  *      Author: Maciej Kozarzewski
  */
 
-#ifndef MINML_LAYERS_MULTIHEADATTENTION_HPP_
-#define MINML_LAYERS_MULTIHEADATTENTION_HPP_
+#ifndef MINML_LAYERS_POSITIONALENCODING_HPP_
+#define MINML_LAYERS_POSITIONALENCODING_HPP_
 
 #include <minml/layers/Layer.hpp>
 
 namespace ml
 {
 
-	class MultiHeadAttention: public Layer
+	class PositionalEncoding: public Layer
 	{
-			int m_number_of_heads = 0;
-			int m_positional_encoding_range = 0;
-			bool m_symmetric = false;
-			Tensor m_backward_data;
 		public:
-			MultiHeadAttention(int numberOfHeads, int positional_encoding_range, bool symmetric = false);
-
-			Shape getWeightsShape() const;
+			PositionalEncoding();
 
 			void setInputShape(const std::vector<Shape> &shapes);
 			Shape getOutputShape() const;
+			Shape getBiasShape() const;
 
 			std::string name() const;
 			Json getConfig() const;
 
-			int getWorkspaceSize() const noexcept;
 			std::unique_ptr<Layer> clone(const Json &config) const;
 
 			void forward(const std::vector<Tensor> &input, Tensor &output);
@@ -39,4 +33,5 @@ namespace ml
 
 } /* namespace ml */
 
-#endif /* MINML_LAYERS_MULTIHEADATTENTION_HPP_ */
+
+#endif /* MINML_LAYERS_POSITIONALENCODING_HPP_ */

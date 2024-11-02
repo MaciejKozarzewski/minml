@@ -217,6 +217,13 @@ namespace ml
 
 		opencl::runKernel(context, kernel, global, local);
 	}
+	float opencl_value_head_loss(mlContext_t context, mlShape_t shape, const void *output, const void *target)
+	{
+	}
+	void opencl_value_head_gradient(mlContext_t context, mlShape_t shape, void *gradient, const void *output, const void *target, float weight)
+	{
+	}
+
 	void opencl_radam_optimize(mlContext_t context, mlShape_t shape, void *weight, const void *update, void *momentum, void *variance,
 			float learning_rate, float beta1, float beta2, int step)
 	{
@@ -237,6 +244,7 @@ namespace ml
 
 		opencl::runKernel(context, kernel, global, local);
 	}
+
 	void opencl_l2_regularization(mlContext_t context, mlShape_t shape, void *gradient, const void *param, float coefficient, float offset)
 	{
 		const int elements = volume(shape);

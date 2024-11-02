@@ -46,9 +46,9 @@ namespace
 		return reinterpret_cast<uint8_t*>(ptr) + offsetInBytes;
 	}
 	__global__ void kernel_calculate_pointers(void *q_ptr[], void *k_ptr[], void *v_ptr[], void *input, void *qk_ptr[], void *workspace,
-			void *out_ptr[], void *output, int batch_size, int tokens, int num_heads, int head_dim, int dtype_size)
+			void *out_ptr[], void *output, int batch_size, int tokens, int num_heads, int head_dim, int dtype_size, bool symmetric)
 	{
-		const Indexer<5> input_indexer(batch_size, tokens, 3, num_heads, head_dim);
+		const Indexer<5> input_indexer(batch_size, tokens, 3 - symmetric, num_heads, head_dim);
 		const Indexer<4> workspace_indexer(batch_size, num_heads, tokens, tokens);
 		const Indexer<4> output_indexer(batch_size, tokens, num_heads, head_dim);
 
@@ -58,8 +58,11 @@ namespace
 			const int idx_h = i % num_heads;
 
 			q_ptr[i] = apply_offset(input, dtype_size * input_indexer.at(idx_b, 0, 0, idx_h, 0));
-			k_ptr[i] = apply_offset(input, dtype_size * input_indexer.at(idx_b, 0, 1, idx_h, 0));
-			v_ptr[i] = apply_offset(input, dtype_size * input_indexer.at(idx_b, 0, 2, idx_h, 0));
+			if (symmetric)
+				k_ptr[i] = q_ptr[i];
+			else
+				k_ptr[i] = apply_offset(input, dtype_size * input_indexer.at(idx_b, 0, 1, idx_h, 0));
+			v_ptr[i] = apply_offset(input, dtype_size * input_indexer.at(idx_b, 0, 2 - symmetric, idx_h, 0));
 			qk_ptr[i] = apply_offset(workspace, dtype_size * workspace_indexer.at(idx_b, idx_h, 0, 0));
 			out_ptr[i] = apply_offset(output, dtype_size * output_indexer.at(idx_b, 0, idx_h, 0));
 		}
@@ -71,15 +74,15 @@ namespace
 		store_vec(dst, load_vec<U, N>(src));
 	}
 
-	template<typename T>
+	template<typename T, bool UseBias>
 	__global__ void kernel_softmax_forward_in_place(T *input, const T *weights, int batch_size, int num_heads, int height, int width,
 			int weights_size)
 	{
 		extern __shared__ char shared_array[];
 
 		float *shared_input = reinterpret_cast<float*>(shared_array);
-		float *shared_biases = reinterpret_cast<float*>(shared_input + height * width * blockDim.y);
-		Index2D *indices = reinterpret_cast<Index2D*>(shared_biases + weights_size * round_up(weights_size, 4));
+		float *shared_biases = nullptr;
+		Index2D *indices = nullptr;
 
 		const int block_size = blockDim.x * blockDim.y;
 		const int tid = threadIdx.y * blockDim.x + threadIdx.x;
@@ -89,18 +92,22 @@ namespace
 		const int head_idx = blockIdx.z;
 		const int tokens = height * width;
 
-		for (int i = tid; i < tokens; i += block_size)
+		if (UseBias)
 		{
-			indices[i].x = i / width;
-			indices[i].y = i - indices[i].x * width;
-		}
-		{
+			shared_biases = reinterpret_cast<float*>(shared_input + tokens * blockDim.y);
+			indices = reinterpret_cast<Index2D*>(shared_biases + weights_size * round_up(weights_size, 4));
+
+			for (int i = tid; i < tokens; i += block_size)
+			{
+				indices[i].x = i / width;
+				indices[i].y = i - indices[i].x * width;
+			}
 			const int tmp = weights_size * round_up(weights_size, 4);
 			const Indexer<2> weight_indexer(num_heads, tmp);
 			for (int i = 4 * tid; i < tmp; i += 4 * block_size)
 				vector_copy<4>(shared_biases + i, weights + weight_indexer.at(head_idx, i));
+			__syncthreads();
 		}
-		__syncthreads();
 
 		const Indexer<4> input_indexer(batch_size, num_heads, tokens, tokens);
 		const int idx = input_indexer.at(batch_idx, head_idx, token_idx, 0);
@@ -131,13 +138,17 @@ namespace
 		float max_value = -1e+32f;
 		for (int j = threadIdx.x; j < tokens; j += blockDim.x)
 		{
-			const Index2D current = indices[j];
-			const int offset_x = range + clamp(current.x - origin.x, -range, range);
-			const int offset_y = range + clamp(current.y - origin.y, -range, range);
-			const int idx = threadIdx.y * tokens + j;
-			const float tmp = shared_input[idx] + shared_biases[weight_indexer.at(offset_x, offset_y)];
+			float bias = 0.0f;
+			if (UseBias)
+			{
+				const Index2D current = indices[j];
+				const int offset_x = range + clamp(current.x - origin.x, -range, range);
+				const int offset_y = range + clamp(current.y - origin.y, -range, range);
+				bias = shared_biases[weight_indexer.at(offset_x, offset_y)];
+			}
+			const float tmp = shared_input[threadIdx.y * tokens + j] + bias;
 			max_value = max(max_value, tmp);
-			shared_input[idx] = tmp;
+			shared_input[threadIdx.y * tokens + j] = tmp;
 		}
 		for (int k = 16; k >= 1; k /= 2)
 			max_value = max(max_value, __shfl_xor_sync(0xffffffff, max_value, k));
@@ -145,20 +156,16 @@ namespace
 		float partial_sum = 0.0f;
 		for (int j = threadIdx.x; j < tokens; j += blockDim.x)
 		{
-			const int idx = threadIdx.y * tokens + j;
-			const float tmp = exp(shared_input[idx] - max_value);
+			const float tmp = exp(shared_input[threadIdx.y * tokens + j] - max_value);
 			partial_sum += tmp;
-			shared_input[idx] = tmp;
+			shared_input[threadIdx.y * tokens + j] = tmp;
 		}
 		for (int k = 16; k >= 1; k /= 2)
 			partial_sum += __shfl_xor_sync(0xffffffff, partial_sum, k);
 		const float inv_sum = 1.0f / partial_sum;
 
 		for (int j = threadIdx.x; j < tokens; j += blockDim.x)
-		{
-			const int idx = threadIdx.y * tokens + j;
-			shared_input[idx] *= inv_sum;
-		}
+			shared_input[threadIdx.y * tokens + j] *= inv_sum;
 
 		__syncthreads();
 		if (idx % 4 == 0)
@@ -178,32 +185,39 @@ namespace
 				input[idx + j] = shared_input[j];
 		}
 	}
+	template<bool UseBias>
 	__global__ void kernel_softmax_backward_in_place(const float *output, float *gradient, float *weights_update, int batch_size, int num_heads,
 			int height, int width, int weights_size)
 	{
+		__shared__ cg::block_tile_memory<128> btm;
+		cg::thread_block thb = cg::this_thread_block(btm);
+		cg::thread_block_tile<128> tile = cg::tiled_partition<128>(thb);
+
 		extern __shared__ char shared_array[];
 
 		const int batch_idx = blockIdx.x;
 		const int head_idx = blockIdx.y;
 		const int tokens = height * width;
 
-		float *shared_weight_update = reinterpret_cast<float*>(shared_array);
-		float *shared_output = shared_weight_update + weights_size * round_up(weights_size, 4);
+		float *shared_output = reinterpret_cast<float*>(shared_array);
 		float *shared_gradient = shared_output + tokens;
-		Index2D *indices = reinterpret_cast<Index2D*>(shared_gradient + tokens);
+		float *shared_weight_update = nullptr;
+		Index2D *indices = nullptr;
 
-		__shared__ cg::block_tile_memory<128> btm;
-		cg::thread_block thb = cg::this_thread_block(btm);
-		cg::thread_block_tile < 128 > tile = cg::tiled_partition<128>(thb);
-
-		for (int i = threadIdx.x; i < tokens; i += blockDim.x)
+		if (UseBias)
 		{
-			indices[i].x = i / width;
-			indices[i].y = i - indices[i].x * width;
+			shared_weight_update = shared_gradient + tokens;
+			indices = reinterpret_cast<Index2D*>(shared_weight_update + weights_size * round_up(weights_size, 4));
+
+			for (int i = threadIdx.x; i < tokens; i += blockDim.x)
+			{
+				indices[i].x = i / width;
+				indices[i].y = i - indices[i].x * width;
+			}
+			for (int i = threadIdx.x; i < weights_size * round_up(weights_size, 4); i += blockDim.x)
+				shared_weight_update[i] = 0.0f;
+			__syncthreads();
 		}
-		for (int i = threadIdx.x; i < weights_size * round_up(weights_size, 4); i += blockDim.x)
-			shared_weight_update[i] = 0.0f;
-		__syncthreads();
 
 		const Indexer<4> gradient_indexer(batch_size, num_heads, tokens, tokens);
 		const Indexer<2> weight_indexer(weights_size, round_up(weights_size, 4));
@@ -226,20 +240,26 @@ namespace
 			const int range = (weights_size - 1) / 2;
 			for (int j = threadIdx.x; j < tokens; j += blockDim.x)
 			{
-				const Index2D current = indices[j];
-				const int offset_h = range + clamp(current.x - origin.x, -range, range);
-				const int offset_w = range + clamp(current.y - origin.y, -range, range);
 				const float dx = shared_output[j] * (shared_gradient[j] - local_sum);
 
-				atomicAdd(shared_weight_update + weight_indexer.at(offset_h, offset_w), dx);
+				if (UseBias)
+				{
+					const Index2D current = indices[j];
+					const int offset_h = range + clamp(current.x - origin.x, -range, range);
+					const int offset_w = range + clamp(current.y - origin.y, -range, range);
+					atomicAdd(shared_weight_update + weight_indexer.at(offset_h, offset_w), dx);
+				}
 				gradient[idx + j] = dx;
 			}
 		}
 
-		__syncthreads();
-		const Indexer<3> update_indexer(batch_size, num_heads, weights_size * round_up(weights_size, 4));
-		for (int i = threadIdx.x; i < weights_size * round_up(weights_size, 4); i += blockDim.x)
-			weights_update[update_indexer.at(batch_idx, head_idx, i)] = shared_weight_update[i];
+		if (UseBias)
+		{
+			__syncthreads();
+			const Indexer<3> update_indexer(batch_size, num_heads, weights_size * round_up(weights_size, 4));
+			for (int i = threadIdx.x; i < weights_size * round_up(weights_size, 4); i += blockDim.x)
+				weights_update[update_indexer.at(batch_idx, head_idx, i)] = shared_weight_update[i];
+		}
 	}
 	__global__ void kernel_weights_update_reduction(const float *workspace, float *update, int batch_size, int num_heads, int last_dim)
 	{
@@ -324,33 +344,46 @@ namespace
 		}
 	}
 	void run_softmax_forward(cudaStream_t stream, void *input, ml::mlShape_t input_shape, const void *weights, ml::mlShape_t weights_shape,
-			ml::mlDataType_t dtype)
+			int num_heads, ml::mlDataType_t dtype)
 	{
 		const int batch_size = input_shape.dim[0];
 		const int height = input_shape.dim[1];
 		const int width = input_shape.dim[2];
 		const int tokens = height * width;
-		const int num_heads = weights_shape.dim[0];
-		const int range = weights_shape.dim[1];
-		assert(weights_shape.dim[2] % 4 == 0);
+		const bool use_bias = weights != nullptr;
+		const int range = use_bias ? weights_shape.dim[1] : 0;
 
 		dim3 blockDim(32, 8);
 		dim3 gridDim((height * width + blockDim.y - 1) / blockDim.y, batch_size, num_heads);
+
+		int shared_mem = sizeof(float) * tokens * blockDim.y;
+		if (use_bias)
+		{
+			assert(weights_shape.rank == 3);
+			assert(weights_shape.dim[2] % 4 == 0);
+			shared_mem += sizeof(float) * weights_shape.dim[1] * weights_shape.dim[2] + sizeof(Index2D) * tokens;
+		}
 
 		switch (dtype)
 		{
 			case ml::DTYPE_FLOAT16:
 			{
-				const int shared_mem = sizeof(float) * (tokens * blockDim.y + weights_shape.dim[1] * weights_shape.dim[2]) + sizeof(Index2D) * tokens;
-				kernel_softmax_forward_in_place<<<gridDim, blockDim, shared_mem, stream>>>(ml::getPointer<half>(input), ml::getPointer<half>(weights),
-						batch_size, num_heads, height, width, range);
+				if (use_bias)
+					kernel_softmax_forward_in_place<half, true> <<<gridDim, blockDim, shared_mem, stream>>>(ml::getPointer<half>(input),
+							ml::getPointer<half>(weights), batch_size, num_heads, height, width, range);
+				else
+					kernel_softmax_forward_in_place<half, false> <<<gridDim, blockDim, shared_mem, stream>>>(ml::getPointer<half>(input), nullptr,
+							batch_size, num_heads, height, width, 0);
 				break;
 			}
 			case ml::DTYPE_FLOAT32:
 			{
-				const int shared_mem = sizeof(float) * (tokens * blockDim.y + weights_shape.dim[1] * weights_shape.dim[2]) + sizeof(Index2D) * tokens;
-				kernel_softmax_forward_in_place<<<gridDim, blockDim, shared_mem, stream>>>(ml::getPointer<float>(input),
-						ml::getPointer<float>(weights), batch_size, num_heads, height, width, range);
+				if (use_bias)
+					kernel_softmax_forward_in_place<float, true> <<<gridDim, blockDim, shared_mem, stream>>>(ml::getPointer<float>(input),
+							ml::getPointer<float>(weights), batch_size, num_heads, height, width, range);
+				else
+					kernel_softmax_forward_in_place<float, false> <<<gridDim, blockDim, shared_mem, stream>>>(ml::getPointer<float>(input), nullptr,
+							batch_size, num_heads, height, width, 0);
 				break;
 			}
 			case ml::DTYPE_FLOAT64:
@@ -370,31 +403,33 @@ namespace
 
 namespace ml
 {
-	int cuda_multi_head_attention_get_workspace_size(mlShape_t input_shape, mlShape_t weights_shape, bool training)
+	int cuda_multi_head_attention_get_workspace_size(mlShape_t input_shape, mlShape_t weights_shape, int num_heads, bool training)
 	{
 		assert(input_shape.rank == 4);
-		assert(weights_shape.rank == 3);
 		const int batch_size = input_shape.dim[0];
 		const int tokens = input_shape.dim[1] * input_shape.dim[2];
-		const int num_heads = weights_shape.dim[0];
 
 		int result = batch_size * num_heads * tokens * tokens;
 		if (training)
-			result = result * 2 + batch_size * num_heads * weights_shape.dim[1] * weights_shape.dim[2];
+		{
+			result = result * 2;
+			if (weights_shape.rank == 3)
+				result += batch_size * num_heads * weights_shape.dim[1] * weights_shape.dim[2];
+		}
 		return result;
 	}
-	void cuda_multi_head_attention_forward(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, mlDataType_t dtype, const void *input,
-			void *output, const void *weights, void *workspace, void *backward_data)
+	void cuda_multi_head_attention_forward(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, mlShape_t bias_shape,
+			mlDataType_t dtype, const void *input, void *output, const void *weights, const void *bias, const void *mask, void *workspace,
+			void *backward_data, int num_heads, bool symmetric)
 	{
 		assert(input_shape.rank == 4);
-		assert(weights_shape.rank == 3);
 		const int batch_size = input_shape.dim[0];
 		const int height = input_shape.dim[1];
 		const int width = input_shape.dim[2];
 		const int tokens = height * width;
-		const int embedding = input_shape.dim[3] / 3;
-		const int num_heads = weights_shape.dim[0];
+		const int embedding = input_shape.dim[3] / (3 - symmetric);
 		const int head_dim = embedding / num_heads;
+		const int qkv_stride = input_shape.dim[3];
 
 		const int num_pointers = batch_size * num_heads;
 		void **pointers = getPointer<void*>(cuda::Context::getWorkspace(context));
@@ -410,32 +445,31 @@ namespace ml
 		void *qk_tensor_ptr = (backward_data == nullptr) ? workspace : backward_data;
 
 		kernel_calculate_pointers<<<1, 1024, 0, stream>>>(q_ptr, k_ptr, v_ptr, const_cast<void*>(input), qk_ptr, qk_tensor_ptr, out_ptr, output,
-				batch_size, tokens, num_heads, head_dim, size_of(dtype));
+				batch_size, tokens, num_heads, head_dim, size_of(dtype), symmetric);
 		assert(cudaGetLastError() == cudaSuccess);
 
 		const float scale = 1.0f / std::sqrt(head_dim);
-		gemm_batched(context, 'n', 't', dtype, tokens, tokens, head_dim, scale, const_cast<const void**>(q_ptr), 3 * embedding,
-				const_cast<const void**>(k_ptr), 3 * embedding, 0.0f, qk_ptr, tokens, num_pointers);
+		gemm_batched(context, 'n', 't', dtype, tokens, tokens, head_dim, scale, const_cast<const void**>(q_ptr), qkv_stride,
+				const_cast<const void**>(k_ptr), qkv_stride, 0.0f, qk_ptr, tokens, num_pointers);
 
-		run_softmax_forward(stream, qk_tensor_ptr, input_shape, weights, weights_shape, dtype);
+		run_softmax_forward(stream, qk_tensor_ptr, input_shape, weights, weights_shape, num_heads, dtype);
 
 		gemm_batched(context, 'n', 'n', dtype, tokens, head_dim, tokens, 1.0f, const_cast<const void**>(qk_ptr), tokens,
-				const_cast<const void**>(v_ptr), 3 * embedding, 0.0f, out_ptr, embedding, num_pointers);
+				const_cast<const void**>(v_ptr), qkv_stride, 0.0f, out_ptr, embedding, num_pointers);
 		assert(cudaGetLastError() == cudaSuccess);
 	}
-	void cuda_multi_head_attention_backward(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, const void *input,
-			const void *weights, void *gradient_prev, void *gradient_next, void *weights_update, void *workspace, void *backward_data)
+	void cuda_multi_head_attention_backward(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, mlShape_t bias_shape,
+			const void *input, const void *weights, const void *bias, const void *mask, void *gradient_prev, void *gradient_next,
+			void *weights_update, void *bias_update, void *workspace, void *backward_data, int num_heads, bool symmetric)
 	{
 		assert(input_shape.rank == 4);
-		assert(weights_shape.rank == 3);
 		const int batch_size = input_shape.dim[0];
 		const int height = input_shape.dim[1];
 		const int width = input_shape.dim[2];
 		const int tokens = height * width;
-		const int embedding = input_shape.dim[3] / 3;
-		const int num_heads = weights_shape.dim[0];
+		const int embedding = input_shape.dim[3] / (3 - symmetric);
 		const int head_dim = embedding / num_heads;
-		assert(weights_shape.dim[2] % 4 == 0);
+		const int qkv_stride = input_shape.dim[3];
 
 		const int offset = batch_size * num_heads * tokens * tokens * size_of(DTYPE_FLOAT32);
 		void *qk_tensor_ptr = (backward_data == nullptr) ? workspace : backward_data;
@@ -461,45 +495,57 @@ namespace ml
 
 		const float scale = 1.0f / std::sqrt(head_dim);
 		kernel_calculate_pointers<<<1, 1024, 0, stream>>>(q_ptr, k_ptr, v_ptr, const_cast<void*>(input), qk_ptr, qk_tensor_ptr, out_ptr, nullptr,
-				batch_size, tokens, num_heads, head_dim, size_of(DTYPE_FLOAT32));
+				batch_size, tokens, num_heads, head_dim, size_of(DTYPE_FLOAT32), symmetric);
 		kernel_calculate_pointers<<<1, 1024, 0, stream>>>(dq_ptr, dk_ptr, dv_ptr, gradient_prev, dqk_ptr, backward_workspace, dout_ptr, gradient_next,
-				batch_size, tokens, num_heads, head_dim, size_of(DTYPE_FLOAT32));
+				batch_size, tokens, num_heads, head_dim, size_of(DTYPE_FLOAT32), symmetric);
 
 		if (backward_data == nullptr)
 		{
-			gemm_batched(context, 'n', 't', DTYPE_FLOAT32, tokens, tokens, head_dim, scale, const_cast<const void**>(q_ptr), 3 * embedding,
-					const_cast<const void**>(k_ptr), 3 * embedding, 0.0f, qk_ptr, tokens, num_pointers);
-			run_softmax_forward(stream, qk_tensor_ptr, input_shape, weights, weights_shape, DTYPE_FLOAT32);
+			gemm_batched(context, 'n', 't', DTYPE_FLOAT32, tokens, tokens, head_dim, scale, const_cast<const void**>(q_ptr), qkv_stride,
+					const_cast<const void**>(k_ptr), qkv_stride, 0.0f, qk_ptr, tokens, num_pointers);
+			run_softmax_forward(stream, qk_tensor_ptr, input_shape, weights, weights_shape, num_heads, DTYPE_FLOAT32);
 		}
 
 		// dqk = dy * V^T
 		gemm_batched(context, 'n', 't', DTYPE_FLOAT32, tokens, tokens, head_dim, 1.0f, const_cast<const void**>(dout_ptr), embedding,
-				const_cast<const void**>(v_ptr), 3 * embedding, 0.0f, dqk_ptr, tokens, num_pointers);
+				const_cast<const void**>(v_ptr), qkv_stride, 0.0f, dqk_ptr, tokens, num_pointers);
 		// dV = qk^T * dy
 		gemm_batched(context, 't', 'n', DTYPE_FLOAT32, tokens, head_dim, tokens, 1.0f, const_cast<const void**>(qk_ptr), tokens,
-				const_cast<const void**>(dout_ptr), embedding, 0.0f, dv_ptr, 3 * embedding, num_pointers);
+				const_cast<const void**>(dout_ptr), embedding, 0.0f, dv_ptr, qkv_stride, num_pointers);
 
 		dim3 blockDim(128);
 		dim3 gridDim(batch_size, num_heads);
-		const int shared_mem = sizeof(float) * (2 * tokens + weights_shape.dim[1] * weights_shape.dim[2] + 4) + sizeof(Index2D) * tokens;
-		kernel_softmax_backward_in_place<<<gridDim, blockDim, shared_mem, stream>>>(getPointer<float>(qk_tensor_ptr),
-				getPointer<float>(backward_workspace), getPointer<float>(update_workspace), batch_size, num_heads, height, width,
-				weights_shape.dim[1]);
-		assert(cudaGetLastError() == cudaSuccess);
+		if (weights != nullptr)
+		{
+			const int shared_mem = sizeof(float) * (2 * tokens + weights_shape.dim[1] * weights_shape.dim[2] + 4) + sizeof(Index2D) * tokens;
+			kernel_softmax_backward_in_place<true> <<<gridDim, blockDim, shared_mem, stream>>>(getPointer<float>(qk_tensor_ptr),
+					getPointer<float>(backward_workspace), getPointer<float>(update_workspace), batch_size, num_heads, height, width,
+					weights_shape.dim[1]);
+			assert(cudaGetLastError() == cudaSuccess);
 
-		const int last_dim = weights_shape.dim[1] * weights_shape.dim[2];
-		blockDim = dim3(32, 32);
-		gridDim = dim3((last_dim + 31) / 32, num_heads);
-		kernel_weights_update_reduction<<<gridDim, blockDim, 0, stream>>>(getPointer<float>(update_workspace), getPointer<float>(weights_update),
-				batch_size, num_heads, last_dim);
-		assert(cudaGetLastError() == cudaSuccess);
+			const int last_dim = weights_shape.dim[1] * weights_shape.dim[2];
+			blockDim = dim3(32, 32);
+			gridDim = dim3((last_dim + 31) / 32, num_heads);
+			kernel_weights_update_reduction<<<gridDim, blockDim, 0, stream>>>(getPointer<float>(update_workspace), getPointer<float>(weights_update),
+					batch_size, num_heads, last_dim);
+			assert(cudaGetLastError() == cudaSuccess);
+		}
+		else
+		{ // not using bias
+			const int shared_mem = sizeof(float) * (2 * tokens + 4);
+			kernel_softmax_backward_in_place<false> <<<gridDim, blockDim, shared_mem, stream>>>(getPointer<float>(qk_tensor_ptr),
+					getPointer<float>(backward_workspace), nullptr, batch_size, num_heads, height, width, 0);
+			assert(cudaGetLastError() == cudaSuccess);
+		}
 
 		// dQ = dqk * K
 		gemm_batched(context, 'n', 'n', DTYPE_FLOAT32, tokens, head_dim, tokens, scale, const_cast<const void**>(dqk_ptr), tokens,
-				const_cast<const void**>(k_ptr), 3 * embedding, 0.0f, dq_ptr, 3 * embedding, num_pointers);
+				const_cast<const void**>(k_ptr), qkv_stride, 0.0f, dq_ptr, qkv_stride, num_pointers);
+
+		const float beta = symmetric ? 1.0f : 0.0f;
 		// dK = dqk^T * Q
 		gemm_batched(context, 't', 'n', DTYPE_FLOAT32, tokens, head_dim, tokens, scale, const_cast<const void**>(dqk_ptr), tokens,
-				const_cast<const void**>(q_ptr), 3 * embedding, 0.0f, dk_ptr, 3 * embedding, num_pointers);
+				const_cast<const void**>(q_ptr), qkv_stride, beta, dk_ptr, qkv_stride, num_pointers);
 	}
 } /* namespace ml */
 

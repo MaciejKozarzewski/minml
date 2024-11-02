@@ -9,6 +9,7 @@
 #include <minml/backend/backend_utils.hpp>
 
 #include "utils.hpp"
+#include "common_math.hpp"
 
 #include <cmath>
 #include <cassert>
@@ -16,22 +17,8 @@
 
 namespace
 {
-	float round_small_to_zero(float x) noexcept
-	{
-		return (fabsf(x) < 1.0e-7f) ? 0.0f : x;
-	}
-	float safe_log(float x) noexcept
-	{
-		return std::log(1.0e-8f + x);
-	}
-	float cross_entropy(float output, float target) noexcept
-	{
-		return -target * safe_log(output) - (1.0f - target) * safe_log(1.0f - output);
-	}
-	float square(float x) noexcept
-	{
-		return x * x;
-	}
+	using namespace ml::cpu;
+
 	float bounded_pow(float x, float y, float min) noexcept
 	{
 		assert(0 < x && x < 1);
@@ -74,6 +61,32 @@ namespace
 			for (int i = 0; i < elements; i++)
 				dst_ptr[i] = src1_ptr[i] * src2_ptr[i];
 		}
+	}
+
+	struct float3
+	{
+			float x, y, z;
+	};
+
+	float get_expectation(const float3 &value) noexcept
+	{
+		return value.x + 0.5 * value.y;
+	}
+	float3 softmax(const float3 &value) noexcept
+	{
+		const float max_value = std::max(value.x, std::max(value.y, value.z));
+		const float x = std::exp(value.x - max_value);
+		const float y = std::exp(value.x - max_value);
+		const float z = std::exp(value.x - max_value);
+		const float inv_sum = 1.0f / (x + y + z);
+		return float3 { x * inv_sum, y * inv_sum, z * inv_sum };
+	}
+	float cross_entropy(const float3 &output, const float3 &target) noexcept
+	{
+		const float x = ml::cpu::cross_entropy(output.x, target.x);
+		const float y = ml::cpu::cross_entropy(output.y, target.y);
+		const float z = ml::cpu::cross_entropy(output.z, target.z);
+		return x + y + z;
 	}
 }
 
@@ -207,6 +220,54 @@ namespace ml
 		for (int i = 0; i < elements; i++)
 			gradient_ptr[i] = inv_batch_size * (output_ptr[i] - target_ptr[i]);
 	}
+	float cpu_value_head_loss(mlContext_t context, mlShape_t shape, const void *output, const void *target)
+	{
+		assert(output != nullptr);
+		assert(target != nullptr);
+
+		const int first_dim = get_first_dim(shape);
+		assert(get_last_dim(shape) == 2);
+
+		const float *output_ptr = getPointer<float>(output);
+		const float *target_ptr = getPointer<float>(target);
+
+		float result = 0.0f;
+		for (int i = 0; i < first_dim; i++)
+		{
+			const float mean = output_ptr[i * 2 + 0];
+			const float variance = output_ptr[i * 2 + 1];
+			const float Q = target_ptr[i];
+
+			result += std::log(variance) + square(mean - Q) / variance;
+		}
+		return result / first_dim;
+	}
+	void cpu_value_head_gradient(mlContext_t context, mlShape_t shape, void *gradient, const void *output, const void *target, float weight)
+	{
+		assert(output != nullptr);
+		assert(target != nullptr);
+		assert(gradient != nullptr);
+
+		const int first_dim = get_first_dim(shape);
+		assert(get_last_dim(shape) == 2);
+
+		float *gradient_ptr = getPointer<float>(gradient);
+		const float *output_ptr = getPointer<float>(output);
+		const float *target_ptr = getPointer<float>(target);
+
+		const float inv_batch_size = weight / first_dim;
+
+		for (int i = 0; i < first_dim; i++)
+		{
+			const float mean = output_ptr[i * 2 + 0];
+			const float variance = output_ptr[i * 2 + 1];
+			const float Q = target_ptr[i];
+
+			gradient_ptr[i * 2 + 0] = inv_batch_size * 2.0f * (mean - Q) / variance;
+			gradient_ptr[i * 2 + 1] = inv_batch_size * (variance - square(mean - Q)) / square(variance);
+		}
+	}
+
 	void cpu_radam_optimize(mlContext_t context, mlShape_t shape, void *weight, const void *update, void *momentum, void *variance,
 			float learning_rate, float beta1, float beta2, int step)
 	{
@@ -247,6 +308,7 @@ namespace ml
 			weight_ptr[i] = round_small_to_zero(weight_ptr[i]);
 		}
 	}
+
 	void cpu_l2_regularization(mlContext_t context, mlShape_t shape, void *gradient, const void *param, float coefficient, float offset)
 	{
 		assert(gradient != nullptr);

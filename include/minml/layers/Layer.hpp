@@ -35,7 +35,8 @@ namespace ml
 		TANH,
 		RELU,
 		SOFTMAX,
-		GELU
+		GELU,
+		EXP
 	};
 	std::string toString(ActivationType act);
 	ActivationType activationFromString(const std::string &str);

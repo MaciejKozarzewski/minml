@@ -29,6 +29,11 @@ namespace
 	using namespace vectors;
 	using namespace vectors2;
 
+	__device__ float sigmoid(float x)
+	{
+		return 1.0f / (1.0f + expf(-x));
+	}
+
 //	__device__ float round_small_to_zero(float x)
 //	{
 //		return (fabsf(x) < 1.0e-6f) ? 0.0f : x;
@@ -71,6 +76,18 @@ namespace
 		for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < elements; i += gridDim.x * blockDim.x)
 			gradient[i] = inv_batch_size * (output[i] - target[i]);
 	}
+	__global__ void kernel_value_head_loss_gradient(float *gradient, const float *output, const float *target, int first_dim, float inv_batch_size)
+	{
+		for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < first_dim; i += gridDim.x * blockDim.x)
+		{
+			const float mean = output[i * 2 + 0];
+			const float variance = 1.0f;//output[i * 2 + 1];
+			const float Q = target[i];
+
+			gradient[i * 2 + 0] = inv_batch_size * 2.0f * (mean - Q) / variance;
+			gradient[i * 2 + 1] = 0.0f;//inv_batch_size * (variance - square(mean - Q)) / square(variance);
+		}
+	}
 	__global__ void kernel_CE_loss_step_1(float *workspace, const float *output, const float *target, int elements)
 	{
 		assert(blockDim.x == 256);
@@ -95,6 +112,24 @@ namespace
 		float acc = 0.0f;
 		for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < elements; i += gridDim.x * blockDim.x)
 			acc += square(output[i] - target[i]);
+		const float sum = cg::reduce(tile, acc, cg::plus<float>());
+		if (threadIdx.x == 0)
+			workspace[blockIdx.x] = sum;
+	}
+	__global__ void kernel_value_head_loss_step_1(float *workspace, const float *output, const float *target, int first_dim)
+	{
+		assert(blockDim.x == 256);
+		__shared__ cg::block_tile_memory<256> btm;
+		cg::thread_block thb = cg::this_thread_block(btm);
+		cg::thread_block_tile<256> tile = cg::tiled_partition<256>(thb);
+
+		float acc = 0.0f;
+		for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < first_dim; i += gridDim.x * blockDim.x)
+		{
+			const float mean = output[i * 2 + 0];
+			const float variance = 1.0f;//output[i * 2 + 1];
+			acc += std::log(variance) + square(mean - target[i]) / variance;
+		}
 		const float sum = cg::reduce(tile, acc, cg::plus<float>());
 		if (threadIdx.x == 0)
 			workspace[blockIdx.x] = sum;
@@ -572,6 +607,55 @@ namespace ml
 				length, inv_batch_size);
 		assert(cudaGetLastError() == cudaSuccess);
 	}
+	float cuda_value_head_loss(mlContext_t context, mlShape_t shape, const void *output, const void *target)
+	{
+		assert(output != nullptr);
+		assert(target != nullptr);
+
+		const int first_dim = get_first_dim(shape);
+
+		assert(cuda::Context::getWorkspaceSize(context) >= 4096 * sizeof(float));
+
+		float *workspace = cuda::Context::getWorkspace<float>(context);
+
+		dim3 blockDim(256);
+		dim3 gridDim = cuda::gridSize<4096>(first_dim, blockDim.x);
+		cudaStream_t stream = cuda::Context::getStream(context);
+
+		kernel_value_head_loss_step_1<<<gridDim, blockDim, 0, stream>>>(workspace, getPointer<float>(output), getPointer<float>(target), first_dim);
+		assert(cudaGetLastError() == cudaSuccess);
+
+		kernel_loss_step_2<<<1, blockDim, 0, stream>>>(workspace, gridDim.x);
+		assert(cudaGetLastError() == cudaSuccess);
+
+		float result = 0.0f;
+		cudaMemcpyAsync(&result, workspace, sizeof(float), cudaMemcpyDeviceToHost, stream);
+		cudaError_t status = cudaStreamSynchronize(stream);
+		assert(status == cudaSuccess);
+		return result / get_first_dim(shape);
+	}
+	void cuda_value_head_gradient(mlContext_t context, mlShape_t shape, void *gradient, const void *output, const void *target, float weight)
+	{
+		assert(output != nullptr);
+		assert(target != nullptr);
+		assert(gradient != nullptr);
+
+		const int first_dim = get_first_dim(shape);
+		const float inv_batch_size = weight / get_first_dim(shape);
+
+		assert(cuda::Context::getWorkspaceSize(context) >= 4096 * sizeof(float));
+
+		float *workspace = cuda::Context::getWorkspace<float>(context);
+
+		dim3 blockDim(256);
+		dim3 gridDim = cuda::gridSize<1024>(first_dim, blockDim.x);
+		cudaStream_t stream = cuda::Context::getStream(context);
+
+		kernel_value_head_loss_gradient<<<gridDim, blockDim, 0, stream>>>(getPointer<float>(gradient), getPointer<float>(output),
+				getPointer<float>(target), first_dim, inv_batch_size);
+		assert(cudaGetLastError() == cudaSuccess);
+	}
+
 	void cuda_radam_optimize(mlContext_t context, mlShape_t shape, void *weight, const void *update, void *momentum, void *variance,
 			float learning_rate, float beta1, float beta2, int step)
 	{
@@ -599,6 +683,7 @@ namespace ml
 		}
 		assert(cudaGetLastError() == cudaSuccess);
 	}
+
 	void cuda_l2_regularization(mlContext_t context, mlShape_t shape, void *gradient, const void *param, float coefficient, float offset)
 	{
 		assert(gradient != nullptr);

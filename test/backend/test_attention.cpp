@@ -31,18 +31,23 @@ namespace
 		return y * ((x + y - 1) / y);
 	}
 
-	Tensor baseline_extract_qkv(char c, const Tensor &qkv)
+	Tensor baseline_extract_qkv(char c, const Tensor &qkv, bool symmetric)
 	{
+		const int matrices = 3 - symmetric;
 		assert(qkv.dtype() == DataType::FLOAT32 || qkv.dtype() == DataType::FLOAT64);
 		assert(qkv.rank() == 4);
-		assert(qkv.lastDim() % 3 == 0);
+		assert(qkv.lastDim() % matrices == 0);
 		const int B = qkv.firstDim();
 		const int T = qkv.dim(1) * qkv.dim(2);
-		const int C = qkv.lastDim() / 3;
-		const Tensor tmp = qkv.view( { B, T, 3, C });
+		const int C = qkv.lastDim() / matrices;
+		const Tensor tmp = qkv.view( { B, T, matrices, C });
 		Tensor result( { B, T, C }, qkv.dtype(), qkv.device());
 
-		const int index = (c == 'Q') ? 0 : ((c == 'K') ? 1 : 2);
+		int index;
+		if (symmetric)
+			index = (c == 'Q' or c == 'K') ? 0 : 1;
+		else
+			index = (c == 'Q') ? 0 : ((c == 'K') ? 1 : 2);
 
 		for (int b = 0; b < B; b++)
 			for (int t = 0; t < T; t++)
@@ -55,17 +60,24 @@ namespace
 				}
 		return result;
 	}
-	void baseline_insert_qkv(char c, const Tensor &x, Tensor &qkv)
+	void baseline_insert_qkv(char c, const Tensor &x, Tensor &qkv, bool symmetric)
 	{
+		const int matrices = 3 - symmetric;
 		assert(qkv.dtype() == DataType::FLOAT32 || qkv.dtype() == DataType::FLOAT64);
 		assert(qkv.rank() == 4);
-		assert(qkv.lastDim() % 3 == 0);
+		assert(qkv.lastDim() % matrices == 0);
 		const int B = qkv.firstDim();
 		const int T = qkv.dim(1) * qkv.dim(2);
-		const int C = qkv.lastDim() / 3;
-		Tensor dst = qkv.view( { B, T, 3, C });
+		const int C = qkv.lastDim() / matrices;
+		Tensor dst = qkv.view( { B, T, matrices, C });
 
-		const int index = (c == 'Q') ? 0 : ((c == 'K') ? 1 : 2);
+		int index;
+		if (symmetric)
+			index = (c == 'Q' or c == 'K') ? 0 : 1;
+		else
+			index = (c == 'Q') ? 0 : ((c == 'K') ? 1 : 2);
+
+		const float beta = (symmetric and c == 'K') ? 1.0f : 0.0f;
 
 		Tensor tmp = x.view( { B, T, C });
 		for (int b = 0; b < B; b++)
@@ -73,9 +85,9 @@ namespace
 				for (int c = 0; c < C; c++)
 				{
 					if (qkv.dtype() == DataType::FLOAT32)
-						dst.at( { b, t, index, c }) = (float) tmp.at( { b, t, c });
+						dst.at( { b, t, index, c }) = beta * (float) dst.at( { b, t, index, c }) + (float) tmp.at( { b, t, c });
 					else
-						dst.at( { b, t, index, c }) = (double) tmp.at( { b, t, c });
+						dst.at( { b, t, index, c }) = beta * (double) dst.at( { b, t, index, c }) + (double) tmp.at( { b, t, c });
 				}
 	}
 	Tensor split_heads(const Tensor &x, int num_heads)
@@ -164,17 +176,16 @@ namespace
 		return result;
 	}
 	template<typename T>
-	void baseline_softmax_forward(Tensor &qk, const Tensor &weights, const Shape &input_shape)
+	void baseline_softmax_forward(Tensor &qk, const Tensor &weights, const Shape &input_shape, int num_heads)
 	{
 		const int batch_size = input_shape[0];
 		const int height = input_shape[1];
 		const int width = input_shape[2];
-		const int num_heads = weights.firstDim();
 		assert(qk.dim(1) == num_heads);
 		assert(qk.dim(2) == height * width);
 		assert(qk.dim(3) == height * width);
 
-		const int range = (weights.dim(1) - 1) / 2;
+		const int range = weights.isEmpty() ? 0 : (weights.dim(1) - 1) / 2;
 
 		Tensor tmp_qk = qk.view( { batch_size, num_heads, height, width, height, width });
 		for (int b = 0; b < batch_size; b++)
@@ -186,9 +197,13 @@ namespace
 						for (int h2 = 0; h2 < height; h2++)
 							for (int w2 = 0; w2 < width; w2++)
 							{
-								const int offset_h = range + clamp(h2 - h1, -range, range);
-								const int offset_w = range + clamp(w2 - w1, -range, range);
-								const T bias = weights.at( { h, offset_h, offset_w });
+								T bias = 0;
+								if (not weights.isEmpty())
+								{
+									const int offset_h = range + clamp(h2 - h1, -range, range);
+									const int offset_w = range + clamp(w2 - w1, -range, range);
+									bias = weights.at( { h, offset_h, offset_w });
+								}
 								const T tmp = (T) tmp_qk.at( { b, h, h1, w1, h2, w2 }) + bias;
 								max_value = std::max(max_value, tmp);
 								tmp_qk.at( { b, h, h1, w1, h2, w2 }) = tmp;
@@ -209,15 +224,15 @@ namespace
 					}
 	}
 	template<typename T>
-	Tensor baseline_softmax_backward(const Tensor &output, const Tensor &gradient_next, Tensor &weights_update, const Shape &input_shape)
+	Tensor baseline_softmax_backward(const Tensor &output, const Tensor &gradient_next, Tensor &weights_update, const Shape &input_shape,
+			int num_heads)
 	{
 		assert(output.shape() == gradient_next.shape());
 		const int batch_size = input_shape[0];
 		const int height = input_shape[1];
 		const int width = input_shape[2];
-		const int num_heads = weights_update.firstDim();
 
-		const int range = (weights_update.dim(1) - 1) / 2;
+		const int range = weights_update.isEmpty() ? 0 : (weights_update.dim(1) - 1) / 2;
 
 		Tensor tmp_out = output.view( { batch_size, num_heads, height, width, height, width });
 		Tensor tmp_grad = gradient_next.view( { batch_size, num_heads, height, width, height, width });
@@ -238,27 +253,28 @@ namespace
 						for (int h2 = 0; h2 < height; h2++)
 							for (int w2 = 0; w2 < width; w2++)
 							{
-								const int offset_h = range + clamp(h2 - h1, -range, range);
-								const int offset_w = range + clamp(w2 - w1, -range, range);
-
 								const T y = tmp_out.at( { b, h, h1, w1, h2, w2 });
 								const T dy = tmp_grad.at( { b, h, h1, w1, h2, w2 });
 								const T dx = y * (dy - tmp);
 								result.at( { b, h, h1, w1, h2, w2 }) = dx;
 
-								weights_update.at( { h, offset_h, offset_w }) = dx + (T) weights_update.at( { h, offset_h, offset_w });
+								if (not weights_update.isEmpty())
+								{
+									const int offset_h = range + clamp(h2 - h1, -range, range);
+									const int offset_w = range + clamp(w2 - w1, -range, range);
+									weights_update.at( { h, offset_h, offset_w }) = dx + (T) weights_update.at( { h, offset_h, offset_w });
+								}
 							}
 					}
 		result.reshape(output.shape());
 		return result;
 	}
 
-	Tensor baseline_mha_forward(const Tensor &input, const Tensor &weights)
+	Tensor baseline_mha_forward(const Tensor &input, const Tensor &weights, int num_heads, bool symmetric)
 	{
-		const int num_heads = weights.firstDim();
-		Tensor Q = baseline_extract_qkv('Q', input);
-		Tensor K = baseline_extract_qkv('K', input);
-		Tensor V = baseline_extract_qkv('V', input);
+		Tensor Q = baseline_extract_qkv('Q', input, symmetric);
+		Tensor K = baseline_extract_qkv('K', input, symmetric);
+		Tensor V = baseline_extract_qkv('V', input, symmetric);
 
 		Q = split_heads(Q, num_heads);
 		K = split_heads(K, num_heads);
@@ -270,24 +286,24 @@ namespace
 		if (input.dtype() == DataType::FLOAT32)
 		{
 			Tensor QK_intermediate = baseline_batched_gemm<float>(Q, K, scale, 'n', 't');
-			baseline_softmax_forward<float>(QK_intermediate, weights, input.shape());
+			baseline_softmax_forward<float>(QK_intermediate, weights, input.shape(), num_heads);
 			output_intermediate = baseline_batched_gemm<float>(QK_intermediate, V, 1.0f, 'n', 'n');
 		}
 		else
 		{
 			Tensor QK_intermediate = baseline_batched_gemm<double>(Q, K, scale, 'n', 't');
-			baseline_softmax_forward<double>(QK_intermediate, weights, input.shape());
+			baseline_softmax_forward<double>(QK_intermediate, weights, input.shape(), num_heads);
 			output_intermediate = baseline_batched_gemm<double>(QK_intermediate, V, 1.0, 'n', 'n');
 		}
 
 		return combine_heads(output_intermediate, input.shape());
 	}
-	void baseline_mha_backward(const Tensor &input, const Tensor &weights, Tensor &gradient_prev, Tensor &gradient_next, Tensor &weights_update)
+	void baseline_mha_backward(const Tensor &input, const Tensor &weights, Tensor &gradient_prev, Tensor &gradient_next, Tensor &weights_update,
+			int num_heads, int symmetric)
 	{
-		const int num_heads = weights.firstDim();
-		Tensor Q = baseline_extract_qkv('Q', input);
-		Tensor K = baseline_extract_qkv('K', input);
-		Tensor V = baseline_extract_qkv('V', input);
+		Tensor Q = baseline_extract_qkv('Q', input, symmetric);
+		Tensor K = baseline_extract_qkv('K', input, symmetric);
+		Tensor V = baseline_extract_qkv('V', input, symmetric);
 
 		Q = split_heads(Q, num_heads);
 		K = split_heads(K, num_heads);
@@ -299,12 +315,12 @@ namespace
 		if (input.dtype() == DataType::FLOAT32)
 		{
 			QK_intermediate = baseline_batched_gemm<float>(Q, K, scale, 'n', 't');
-			baseline_softmax_forward<float>(QK_intermediate, weights, input.shape());
+			baseline_softmax_forward<float>(QK_intermediate, weights, input.shape(), num_heads);
 		}
 		else
 		{
 			QK_intermediate = baseline_batched_gemm<double>(Q, K, scale, 'n', 't');
-			baseline_softmax_forward<double>(QK_intermediate, weights, input.shape());
+			baseline_softmax_forward<double>(QK_intermediate, weights, input.shape(), num_heads);
 		}
 
 		Tensor dy = gradient_next.view( { gradient_next.dim(0), gradient_next.dim(1) * gradient_next.dim(2), gradient_next.dim(3) });
@@ -316,7 +332,7 @@ namespace
 			Tensor d_int = baseline_batched_gemm<float>(dy, V, 1.0f, 'n', 't');
 			dV = baseline_batched_gemm<float>(QK_intermediate, dy, 1.0f, 't', 'n');
 
-			const Tensor d_int2 = baseline_softmax_backward<float>(QK_intermediate, d_int, weights_update, input.shape());
+			const Tensor d_int2 = baseline_softmax_backward<float>(QK_intermediate, d_int, weights_update, input.shape(), num_heads);
 
 			dQ = baseline_batched_gemm<float>(d_int2, K, scale, 'n', 'n');
 			dK = baseline_batched_gemm<float>(d_int2, Q, scale, 't', 'n');
@@ -326,7 +342,7 @@ namespace
 			Tensor d_int = baseline_batched_gemm<double>(dy, V, 1.0, 'n', 't');
 			dV = baseline_batched_gemm<double>(QK_intermediate, dy, 1.0, 't', 'n');
 
-			const Tensor d_int2 = baseline_softmax_backward<double>(QK_intermediate, d_int, weights_update, input.shape());
+			const Tensor d_int2 = baseline_softmax_backward<double>(QK_intermediate, d_int, weights_update, input.shape(), num_heads);
 
 			dQ = baseline_batched_gemm<double>(d_int2, K, scale, 'n', 'n');
 			dK = baseline_batched_gemm<double>(d_int2, Q, scale, 't', 'n');
@@ -336,26 +352,34 @@ namespace
 		dK = combine_heads(dK, input.shape());
 		dV = combine_heads(dV, input.shape());
 
-		baseline_insert_qkv('Q', dQ, gradient_prev);
-		baseline_insert_qkv('K', dK, gradient_prev);
-		baseline_insert_qkv('V', dV, gradient_prev);
+		gradient_prev.zeroall();
+		baseline_insert_qkv('Q', dQ, gradient_prev, symmetric);
+		baseline_insert_qkv('K', dK, gradient_prev, symmetric);
+		baseline_insert_qkv('V', dV, gradient_prev, symmetric);
 	}
 
 	class BaselineMHA: public Layer
 	{
 			int m_number_of_heads = 0;
 			int m_positional_encoding_range = 0;
+			bool m_symmetric = false;
 		public:
-			BaselineMHA(int numberOfHeads, int positional_encoding_range) :
+			BaselineMHA(int numberOfHeads, int positional_encoding_range, bool symmetric) :
 					Layer(),
 					m_number_of_heads(numberOfHeads),
-					m_positional_encoding_range(positional_encoding_range)
+					m_positional_encoding_range(positional_encoding_range),
+					m_symmetric(symmetric)
 			{
 			}
 			Shape getWeightShape() const
 			{
-				const int tmp = 2 * m_positional_encoding_range - 1;
-				return Shape( { m_number_of_heads, tmp, round_up(tmp, 4) });
+				if (m_positional_encoding_range > 0)
+				{
+					const int tmp = 2 * m_positional_encoding_range - 1;
+					return Shape( { m_number_of_heads, tmp, round_up(tmp, 4) });
+				}
+				else
+					return Shape();
 			}
 			void setInputShape(const std::vector<Shape> &shapes)
 			{
@@ -366,7 +390,7 @@ namespace
 				const int batch_size = getInputShape().dim(0);
 				const int height = getInputShape().dim(1);
 				const int width = getInputShape().dim(2);
-				const int embedding = getInputShape().dim(3) / 3;
+				const int embedding = getInputShape().dim(3) / (3 - m_symmetric);
 				return Shape( { batch_size, height, width, embedding });
 			}
 			std::string name() const
@@ -378,23 +402,25 @@ namespace
 				Json result = Layer::getConfig();
 				result["number_of_heads"] = m_number_of_heads;
 				result["positional_encoding_range"] = m_positional_encoding_range;
+				result["symmetric"] = m_symmetric;
 				return result;
 			}
 			std::unique_ptr<Layer> clone(const Json &config) const
 			{
 				std::unique_ptr<BaselineMHA> result = std::make_unique<BaselineMHA>(config["number_of_heads"].getInt(),
-						config["positional_encoding_range"].getInt());
+						config["positional_encoding_range"].getInt(), config["symmetric"].getBool());
 				result->m_dtype = typeFromString(config["dtype"].getString());
 				return result;
 			}
 
 			void forward(const std::vector<Tensor> &input, Tensor &output)
 			{
-				output = baseline_mha_forward(input[0], getWeights().getParam());
+				output = baseline_mha_forward(input[0], getWeights().getParam(), m_number_of_heads, m_symmetric);
 			}
 			void backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next)
 			{
-				baseline_mha_backward(input[0], getWeights().getParam(), gradient_prev[0], gradient_next, getWeights().getGradient());
+				baseline_mha_backward(input[0], getWeights().getParam(), gradient_prev[0], gradient_next, getWeights().getGradient(),
+						m_number_of_heads, m_symmetric);
 			}
 	};
 }
@@ -403,8 +429,8 @@ namespace ml
 {
 //	TEST(TestMultiHeadAttention, baseline)
 //	{
-//		testing::GradientCheck gradcheck { BaselineMHA(1, 8) };
-//		gradcheck.setInputShape(Shape( { 3, 8, 8, 3 * 32 }));
+//		testing::GradientCheck gradcheck { BaselineMHA(2, 5, true) };
+//		gradcheck.setInputShape(Shape( { 3, 8, 8, 2 * 32 }));
 //
 //		gradcheck.check(100, 1.0e-4, "input");
 //
@@ -413,28 +439,35 @@ namespace ml
 
 	TEST(TestMultiHeadAttention, forward)
 	{
+		const bool use_bias = false;
+		const bool symmetric = true;
 		const int batch_size = 3;
 		const int height = 13;
 		const int width = 14;
 		const int embedding = 56;
 		const int num_heads = 4;
-		const int range = std::max(height, width);
+		const int range = use_bias ? std::max(height, width) : 0;
 		assert(embedding % num_heads == 0);
 
 		Context context(Device::cpu());
 
-		Tensor input( { batch_size, height, width, 3 * embedding }, "float32", context.device());
+		Tensor input( { batch_size, height, width, (3 - symmetric) * embedding }, "float32", context.device());
 		Tensor output( { batch_size, height, width, embedding }, "float32", context.device());
-		Tensor weights( { num_heads, range * 2 - 1, round_up(range * 2 - 1, 4) }, "float32", context.device());
+		Tensor weights;
+		if (use_bias)
+			weights = Tensor( { num_heads, range * 2 - 1, round_up(range * 2 - 1, 4) }, "float32", context.device());
 		Tensor backward_data;
 		testing::initForTest(input, 0.0f);
 		testing::initForTest(weights, 1.0);
 
-		const Tensor correct_output = baseline_mha_forward(input, weights);
+		Tensor bias;
+		Tensor mask;
 
-		const int workspace_size = multiHeadAttentionGetWorkspaceSize(context, input.shape(), weights.shape(), false);
+		const Tensor correct_output = baseline_mha_forward(input, weights, num_heads, symmetric);
+
+		const int workspace_size = multiHeadAttentionGetWorkspaceSize(context, input.shape(), weights.shape(), num_heads, false);
 		Tensor workspace( { workspace_size }, "float32", context.device());
-		multiHeadAttentionForward(context, input, output, weights, workspace, backward_data);
+		multiHeadAttentionForward(context, input, output, weights, bias, mask, workspace, backward_data, num_heads, symmetric);
 
 		for (int i = 0; i < correct_output.dim(0); i++)
 			for (int j = 0; j < correct_output.dim(1); j++)
@@ -455,12 +488,14 @@ namespace ml
 			input.moveTo(device);
 			output.moveTo(device);
 			weights.moveTo(device);
+			bias.moveTo(device);
+			mask.moveTo(device);
 			output.zeroall();
 
-			const int workspace_size = multiHeadAttentionGetWorkspaceSize(context, input.shape(), weights.shape(), false);
+			const int workspace_size = multiHeadAttentionGetWorkspaceSize(context, input.shape(), weights.shape(), num_heads, false);
 			Tensor workspace( { workspace_size }, "float32", context.device());
 
-			multiHeadAttentionForward(context, input, output, weights, workspace, backward_data);
+			multiHeadAttentionForward(context, input, output, weights, bias, mask, workspace, backward_data, num_heads, symmetric);
 			context.synchronize();
 
 			EXPECT_LE(testing::diffForTest(correct_output, output), 1.0e-4f);
@@ -468,35 +503,43 @@ namespace ml
 	}
 	TEST(TestMultiHeadAttention, backward)
 	{
+		const bool use_bias = false;
+		const bool symmetric = true;
 		const int batch_size = 3;
 		const int height = 13;
 		const int width = 14;
 		const int embedding = 56;
 		const int num_heads = 4;
-		const int range = std::max(height, width);
+		const int range = use_bias ? std::max(height, width) : 0;
 		assert(embedding % num_heads == 0);
 
 		Context context(Device::cpu());
 
-		Tensor input( { batch_size, height, width, 3 * embedding }, "float32", context.device());
+		Tensor input( { batch_size, height, width, (3 - symmetric) * embedding }, "float32", context.device());
 		Tensor output( { batch_size, height, width, embedding }, "float32", context.device());
-		Tensor weights( { num_heads, range * 2 - 1, round_up(range * 2 - 1, 4) }, "float32", context.device());
+		Tensor weights;
+		if (use_bias)
+			weights = Tensor( { num_heads, range * 2 - 1, round_up(range * 2 - 1, 4) }, "float32", context.device());
 		Tensor backward_data( { batch_size, num_heads, height * width, height * width }, "float32", context.device());
 		testing::initForTest(input, 0.0f);
 		testing::initForTest(weights, 1.0);
 
+		Tensor bias;
+		Tensor mask;
+
 		Tensor gradient_prev(input.shape(), input.dtype(), input.device());
 		Tensor gradient_next(output.shape(), output.dtype(), output.device());
 		Tensor weights_update(weights.shape(), "float32", context.device());
+		Tensor bias_update(bias.shape(), "float32", context.device());
 		testing::initForTest(gradient_next, 0.0f);
 		testing::initForTest(weights_update, 1.0f);
 
 		Tensor correct_gradient_prev(input.shape(), input.dtype(), input.device());
 		Tensor correct_weights_update(weights_update.shape(), weights_update.dtype(), weights_update.device());
 		testing::initForTest(correct_weights_update, 1.0f);
-		baseline_mha_backward(input, weights, correct_gradient_prev, gradient_next, correct_weights_update);
+		baseline_mha_backward(input, weights, correct_gradient_prev, gradient_next, correct_weights_update, num_heads, symmetric);
 
-		const int workspace_size = multiHeadAttentionGetWorkspaceSize(context, input.shape(), weights.shape(), true);
+		const int workspace_size = multiHeadAttentionGetWorkspaceSize(context, input.shape(), weights.shape(), num_heads, true);
 		Tensor workspace( { workspace_size }, "float32", context.device());
 
 		Tensor target(output.shape(), output.dtype(), output.device());
@@ -525,8 +568,9 @@ namespace ml
 //		std::cout << "backprop grad = " << gradient_prev.get(index) << " vs numerical = " << (loss_p - loss_m) / (2 * eps) << '\n';
 //		exit(0);
 
-		multiHeadAttentionForward(context, input, output, weights, workspace, backward_data);
-		multiHeadAttentionBackward(context, input, weights, gradient_prev, gradient_next, weights_update, workspace, backward_data);
+		multiHeadAttentionForward(context, input, output, weights, bias, mask, workspace, backward_data, num_heads, symmetric);
+		multiHeadAttentionBackward(context, input, weights, bias, mask, gradient_prev, gradient_next, weights_update, bias_update, workspace,
+				backward_data, num_heads, symmetric);
 
 		EXPECT_LE(testing::diffForTest(correct_gradient_prev, gradient_prev), 1.0e-4f);
 		EXPECT_LE(testing::diffForTest(correct_weights_update, weights_update), 1.0e-4f);
@@ -538,6 +582,8 @@ namespace ml
 			input.moveTo(device);
 			output.moveTo(device);
 			weights.moveTo(device);
+			bias.moveTo(device);
+			mask.moveTo(device);
 			gradient_prev.moveTo(device);
 			gradient_next.moveTo(device);
 			weights_update.moveTo(device);
@@ -546,10 +592,11 @@ namespace ml
 			backward_data.zeroall();
 			testing::initForTest(weights_update, 1.0f);
 
-			const int workspace_size = multiHeadAttentionGetWorkspaceSize(context, input.shape(), weights.shape(), true);
+			const int workspace_size = multiHeadAttentionGetWorkspaceSize(context, input.shape(), weights.shape(), num_heads, true);
 			Tensor workspace( { workspace_size }, "float32", context.device());
-			multiHeadAttentionForward(context, input, output, weights, workspace, backward_data);
-			multiHeadAttentionBackward(context, input, weights, gradient_prev, gradient_next, weights_update, workspace, backward_data);
+			multiHeadAttentionForward(context, input, output, weights, bias, mask, workspace, backward_data, num_heads, symmetric);
+			multiHeadAttentionBackward(context, input, weights, bias, mask, gradient_prev, gradient_next, weights_update, bias_update, workspace,
+					backward_data, num_heads, symmetric);
 
 			context.synchronize();
 //			for (int i = 0; i < weights_update.dim(0); i++)

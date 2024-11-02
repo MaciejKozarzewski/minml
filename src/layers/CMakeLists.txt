@@ -11,6 +11,7 @@ target_sources(${LibName} PRIVATE 	Add.cpp
 								MultiHeadAttention.cpp
 								Multiply.cpp
 								Parameter.cpp
+								PositionalEncoding.cpp
 								RMSNormalization.cpp
 								Softmax.cpp
 								SpaceToDepth.cpp

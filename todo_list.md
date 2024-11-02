@@ -7,12 +7,6 @@ All notable ideas will be documented in this file.
 - Implement packing of input tensor.
 - Implement custom epilogue that fuses bias and activation.
 
-### Dense layer
-
-### Pooling
-
-### SE-block
-
 ## Optimizations
 - Maybe optimize im2row? (unless implicit gemm conv is done)
 - Try optimize training on CUDA.

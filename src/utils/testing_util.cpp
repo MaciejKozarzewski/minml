@@ -154,6 +154,8 @@ namespace ml
 	{
 		void initForTest(Tensor &t, double shift, double scale)
 		{
+			if (t.isEmpty())
+				return;
 			Tensor tmp(t.shape(), t.dtype(), Device::cpu());
 			switch (tmp.dtype())
 			{
@@ -173,6 +175,8 @@ namespace ml
 		}
 		void initRandom(Tensor &t)
 		{
+			if (t.isEmpty())
+				return;
 			Tensor tmp(t.shape(), t.dtype(), Device::cpu());
 			switch (tmp.dtype())
 			{
@@ -218,6 +222,8 @@ namespace ml
 		}
 		double normForTest(const Tensor &tensor)
 		{
+			if (tensor.isEmpty())
+				return 0.0;
 			Tensor tmp(tensor.shape(), tensor.dtype(), Device::cpu());
 			tmp.copyFrom(Context(), tensor);
 			switch (tmp.dtype())
@@ -233,6 +239,8 @@ namespace ml
 		}
 		double sumForTest(const Tensor &tensor)
 		{
+			if (tensor.isEmpty())
+				return 0.0;
 			Tensor tmp(tensor.shape(), tensor.dtype(), Device::cpu());
 			tmp.copyFrom(Context(), tensor);
 			switch (tmp.dtype())
@@ -248,6 +256,8 @@ namespace ml
 		}
 		void abs(Tensor &tensor)
 		{
+			if (tensor.isEmpty())
+				return;
 			Tensor tmp(tensor.shape(), tensor.dtype(), Device::cpu());
 			tmp.copyFrom(Context(), tensor);
 			switch (tmp.dtype())

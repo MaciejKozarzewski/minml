@@ -65,7 +65,7 @@ namespace ml
 					operator int() const;
 			};
 
-			Tensor() noexcept = default;
+			Tensor() noexcept;
 			Tensor(const Shape &shape, DataType dtype, Device device);
 			Tensor(const Shape &shape, const std::string &dtype, Device device);
 			Tensor(const Json &json, const SerializedObject &binary_data);

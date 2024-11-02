@@ -21,8 +21,11 @@
 #include <minml/layers/Softmax.hpp>
 #include <minml/layers/Multiply.hpp>
 #include <minml/layers/MultiHeadAttention.hpp>
+#include <minml/layers/PositionalEncoding.hpp>
 #include <minml/layers/RMSNormalization.hpp>
 #include <minml/layers/LayerNormalization.hpp>
+#include <minml/layers/DepthToSpace.hpp>
+#include <minml/layers/SpaceToDepth.hpp>
 #include <minml/training/Optimizer.hpp>
 #include <minml/training/LossFunction.hpp>
 #include <minml/utils/random.hpp>
@@ -33,6 +36,7 @@
 #include <minml/backend/cpu_backend.h>
 #include <minml/backend/opencl_backend.h>
 
+#include <iomanip>
 #include <iostream>
 #include <chrono>
 #include <thread>
@@ -2554,15 +2558,18 @@ namespace gemm
 #include "../src/backend/cpu/fp16.hpp"
 #include "minml/utils/testing_util.hpp"
 
-void test_packing(int rows, int columns, ml::MatrixOp op)
+void test_packing(int rows, int columns, ml::MatrixOp op, mlDataType_t dtype,
+		std::function<void(Fragment&, const Matrix&, const Position2D&, MatrixOp)> kernel, bool benchmark)
 {
 	const int M = columns;
 	const int K = rows;
 
-	std::unique_ptr<uint16_t[]> src = std::make_unique<uint16_t[]>(1024 * 1024);
+	std::unique_ptr<uint8_t[]> src = std::make_unique<uint8_t[]>(4 * 1024 * 1024);
 	for (int i = 0; i < 1024 * 1024; i++)
-//		src[i] = (i / 1024) + (i % 1024) * 0.01f;
-		src[i] = float_to_half((i / 1024) + (i % 1024) * 0.01f);
+		if (dtype == DTYPE_FLOAT32)
+			reinterpret_cast<float*>(src.get())[i] = (i / 1024) + (i % 1024) * 0.01f;
+		else
+			reinterpret_cast<uint16_t*>(src.get())[i] = float_to_half((i / 1024) + (i % 1024) * 0.01f);
 
 	const size_t size_in_bytes = sizeof(float) * M * K;
 	void *dst1 = gemm::aligned_new(size_in_bytes, 4096);
@@ -2575,71 +2582,69 @@ void test_packing(int rows, int columns, ml::MatrixOp op)
 	correct.mark_as_packed_with_size( { K, M });
 	fragment.mark_as_packed_with_size( { K, M });
 
-	Matrix matrix(src.get(), DTYPE_FLOAT16, 1024, 1024, 1024);
+	Matrix matrix(src.get(), dtype, 1024, 1024, 1024);
 
-	pack_def_MxK_fp16_fp32(correct, matrix, { 0, 0 }, op);
-//	pack_avx2_fma_12xK_fp32(fragment, matrix, { 0, 0 }, op);
-//	pack_avx2_fma_12xK_fp32(fragment, matrix, { 0, 0 }, op);
-//	pack_avx_10xK_fp16_fp32(fragment, matrix, { 0, 0 }, op);
-	pack_avx512f_16xK_fp16_fp32(fragment, matrix, { 0, 0 }, op);
+	pack_def_MxK(correct, matrix, { 0, 0 }, op);
 
-//	std::cout << "Correct\n";
-//	for (int k = 0; k < K; k++)
-//	{
-//		for (int m = 0; m < M; m++)
-//			std::cout << correct.at<float>(k, m) << ' ';
-////			std::cout << half_to_float(correct.at<uint16_t>(k, m)) << ' ';
-//		std::cout << '\n';
-//	}
-//	std::cout << "-------------------------------------------\n";
-//	std::cout << "Actual\n";
-//	for (int k = 0; k < K; k++)
-//	{
-//		for (int m = 0; m < M; m++)
-//			std::cout << fragment.at<float>(k, m) << ' ';
-////			std::cout << half_to_float(fragment.at<uint16_t>(k, m)) << ' ';
-//		std::cout << '\n';
-//	}
+	kernel(fragment, matrix, { 0, 0 }, op);
 
-	double diff = 0.0;
-	double max_diff = 0.0;
-	for (int k = 0; k < K; k++)
-		for (int m = 0; m < M; m++)
-		{
-			double tmp = std::fabs(correct.at<float>(k, m) - fragment.at<float>(k, m));
-			diff += tmp;
-			max_diff = std::max(max_diff, tmp);
-		}
-//	diff += std::fabs(half_to_float(correct.at<uint16_t>(k, m)) - half_to_float(fragment.at<uint16_t>(k, m)));
-//	std::cout << "\ndiff = " << diff / (M * K) << '\n';
-	if (diff > 1.0e-3 or max_diff > 1.0e-3)
+	if (benchmark)
 	{
-		std::cout << "rows = " << rows << ", columns = " << columns << ", transpose = " << (int) op << ": FAILED\n";
-		std::cout << "diff = " << diff << '\n';
-		std::cout << "max_diff = " << max_diff << '\n';
-		exit(255);
+		const double repeats = 1.0e8;
+		const double start = getTime();
+		int i = 0;
+		for (; i < repeats; i++)
+		{
+			kernel(fragment, matrix, { 0, 0 }, op);
+			if ((getTime() - start) > 10.0)
+				break;
+		}
+		const double stop = getTime();
+		std::cout << M << "x" << K << " : " << 1.0e6 * (stop - start) / i << " us (" << i << " repeats)\n";
 	}
 	else
-		std::cout << "rows = " << rows << ", columns = " << columns << ", transpose = " << (int) op << " : OK\n";
-
-//	const double repeats = 1.0e8;
-//	const double start = getTime();
-//	int i = 0;
-//	for (; i < repeats; i++)
-//	{
-//		pack_avx_10xK_fp32(fragment, matrix, { 0, 0 }, op);
-//		if ((getTime() - start) > 10.0)
-//			break;
-//	}
-//	const double stop = getTime();
-//	std::cout << 1.0e6 * (stop - start) / i << " us (" << i << " repeats)\n";
+	{
+		double diff = 0.0;
+		double max_diff = 0.0;
+		for (int k = 0; k < K; k++)
+			for (int m = 0; m < M; m++)
+			{
+				double tmp = std::fabs(correct.at<float>(k, m) - fragment.at<float>(k, m));
+				diff += tmp;
+				max_diff = std::max(max_diff, tmp);
+			}
+		if (diff > 1.0e-3 or max_diff > 1.0e-3)
+		{
+			std::cout << "rows = " << rows << ", columns = " << columns << ", transpose = " << (int) op << ": FAILED\n";
+			std::cout << "diff = " << diff << '\n';
+			std::cout << "max_diff = " << max_diff << '\n';
+			std::cout << "Correct\n";
+			for (int k = 0; k < K; k++)
+			{
+				for (int m = 0; m < M; m++)
+					std::cout << correct.at<float>(k, m) << ' ';
+				std::cout << '\n';
+			}
+			std::cout << "-------------------------------------------\n";
+			std::cout << "Actual\n";
+			for (int k = 0; k < K; k++)
+			{
+				for (int m = 0; m < M; m++)
+					std::cout << fragment.at<float>(k, m) << ' ';
+				std::cout << '\n';
+			}
+			exit(255);
+		}
+		else
+			std::cout << "rows = " << rows << ", columns = " << columns << ", transpose = " << (int) op << " : OK\n";
+	}
 
 	gemm::aligned_free(dst1, 4096);
 	gemm::aligned_free(dst2, 4096);
 }
 
 void test_microkernel(const int M, const int N, const int K, mlDataType_t dtype,
-		std::function<void(Fragment&, const void*, const Fragment&, const Fragment&, const void*, const Fragment&, const Fragment&, bool)> kernel)
+		std::function<void(Fragment&, const Fragment&, const Fragment&, const Fragment&, const void*, const Fragment&, const Fragment&, bool)> kernel)
 {
 	std::unique_ptr<float[]> matrix_c = std::make_unique<float[]>(1024 * 1024);
 	std::unique_ptr<float[]> matrix_d = std::make_unique<float[]>(1024 * 1024);
@@ -2650,22 +2655,26 @@ void test_microkernel(const int M, const int N, const int K, mlDataType_t dtype,
 	void *lhs = gemm::aligned_new(size_in_bytes_lhs, 4096);
 	void *rhs = gemm::aligned_new(size_in_bytes_rhs, 4096);
 	void *b_ptr = gemm::aligned_new(sizeof(float) * 1024, 4096);
+	void *alpha_ptr = gemm::aligned_new(sizeof(float) * 1024, 4096);
 	std::memset(lhs, 0, size_in_bytes_lhs);
 	std::memset(rhs, 0, size_in_bytes_rhs);
 	std::memset(b_ptr, 0, sizeof(float) * 1024);
+	std::memset(alpha_ptr, 0, sizeof(float) * 1024);
 
 	Fragment fragment_a(lhs, DTYPE_FLOAT32, M);
-	Fragment fragment_b(rhs, fragment_a.dtype(), N);
+	Fragment fragment_b(rhs, DTYPE_FLOAT32, N);
 	Fragment fragment_c(matrix_c.get(), dtype, 1024);
-	Fragment fragment_d(matrix_d.get(), fragment_c.dtype(), 1024);
-	Fragment correct_fragment_d(correct_d.get(), fragment_d.dtype(), 1024);
-	Fragment fragment_bias(b_ptr, fragment_b.dtype(), N);
+	Fragment fragment_d(matrix_d.get(), dtype, 1024);
+	Fragment correct_fragment_d(correct_d.get(), dtype, 1024);
+	Fragment fragment_bias(b_ptr, DTYPE_FLOAT32, N);
+	Fragment fragment_alpha(alpha_ptr, DTYPE_FLOAT32, 1);
 	fragment_a.mark_as_packed_with_size( { K, M });
 	fragment_b.mark_as_packed_with_size( { K, N });
 	fragment_c.mark_as_packed_with_size( { M, N });
 	fragment_d.mark_as_packed_with_size( { M, N });
 	correct_fragment_d.mark_as_packed_with_size( { M, N });
-	fragment_bias.mark_as_packed_with_size( { 1, N });
+//	fragment_bias.mark_as_packed_with_size( { 1, N });
+	fragment_alpha.mark_as_packed_with_size( { M, 1 });
 
 	if (fragment_c.dtype() == DTYPE_FLOAT16)
 		for (int m = 0; m < M; m++)
@@ -2678,62 +2687,37 @@ void test_microkernel(const int M, const int N, const int K, mlDataType_t dtype,
 
 	for (int k = 0; k < K; k++)
 	{
-		if (fragment_a.dtype() == DTYPE_FLOAT16)
-			for (int m = 0; m < M; m++)
-				fragment_a.at<uint16_t>(k, m) = float_to_half(randFloat() - 0.5f);
-		else
-			for (int m = 0; m < M; m++)
-				fragment_a.at<float>(k, m) = randFloat() - 0.5f;
-
-		if (fragment_b.dtype() == DTYPE_FLOAT16)
-			for (int n = 0; n < N; n++)
-				fragment_b.at<uint16_t>(k, n) = float_to_half(randFloat() - 0.5f);
-		else
-			for (int n = 0; n < N; n++)
-				fragment_b.at<float>(k, n) = randFloat() - 0.5f;
+		for (int m = 0; m < M; m++)
+			fragment_a.at<float>(k, m) = randFloat() - 0.5f;
+		for (int n = 0; n < N; n++)
+			fragment_b.at<float>(k, n) = randFloat() - 0.5f;
 	}
 
-	if (fragment_bias.dtype() == DTYPE_FLOAT16)
-		for (int n = 0; n < N; n++)
-			fragment_bias.at<float>(0, n) = float_to_half(randFloat() - 0.5f);
+	for (int n = 0; n < N; n++)
+		fragment_bias.at<float>(0, n) = randFloat() - 0.5f;
+
+	const float alpha = 1.0f;
+	const float beta = 0.0f;
+	const bool use_relu = false;
+	if (fragment_alpha.rows() == 1)
+		fragment_alpha.at<float>(0, 0) = alpha;
 	else
-		for (int n = 0; n < N; n++)
-			fragment_bias.at<float>(0, n) = randFloat() - 0.5f;
+	{
+		for (int m = 0; m < M; m++)
+			fragment_alpha.at<float>(m, 0) = m + randFloat();
+	}
 
-	const float alpha = 1.1f;
-	const float beta = 0.1f;
-	const bool use_relu = true;
+//	if (fragment_c.dtype() == DTYPE_FLOAT32)
+//		gemm_def_MxN_fp32(correct_fragment_d, &alpha, fragment_a, fragment_b, &beta, fragment_c, fragment_bias, use_relu);
+//	if (fragment_c.dtype() == DTYPE_FLOAT16)
+//		gemm_def_MxN_fp32_fp16(correct_fragment_d, &alpha, fragment_a, fragment_b, &beta, fragment_c, fragment_bias, use_relu);
 
-	if (fragment_c.dtype() == DTYPE_FLOAT32)
-		gemm_def_MxN_fp32(correct_fragment_d, &alpha, fragment_a, fragment_b, &beta, fragment_c, fragment_bias, use_relu);
-	if (fragment_c.dtype() == DTYPE_FLOAT16)
-		gemm_def_MxN_fp32_fp16(correct_fragment_d, &alpha, fragment_a, fragment_b, &beta, fragment_c, fragment_bias, use_relu);
-
-//	std::cout << "Correct\n";
-//	for (int m = 0; m < M; m++)
-//	{
-//		for (int n = 0; n < N; n++)
-//			if (correct_fragment_d.dtype() == DTYPE_FLOAT16)
-//				std::cout << half_to_float(correct_fragment_d.at<uint16_t>(m, n)) << ' ';
-//			else
-//				std::cout << correct_fragment_d.at<float>(m, n) << ' ';
-//		std::cout << '\n';
-//	}
-//	std::cout << "-------------------------------------------\n";
-//
+//	gemm_def_MxN(correct_fragment_d, &alpha, fragment_a, fragment_b, &beta, fragment_c, fragment_bias, use_relu);
 //	kernel(fragment_d, &alpha, fragment_a, fragment_b, &beta, fragment_c, fragment_bias, use_relu);
-//
-//	std::cout << "Actual\n";
-//	for (int m = 0; m < M; m++)
-//	{
-//		for (int n = 0; n < N; n++)
-//			if (fragment_d.dtype() == DTYPE_FLOAT16)
-//				std::cout << half_to_float(fragment_d.at<uint16_t>(m, n)) << ' ';
-//			else
-//				std::cout << fragment_d.at<float>(m, n) << ' ';
-//		std::cout << '\n';
-//	}
-//
+
+	gemm_def_MxN(correct_fragment_d, fragment_alpha, fragment_a, fragment_b, &beta, fragment_c, fragment_bias, use_relu);
+	kernel(fragment_d, fragment_alpha, fragment_a, fragment_b, &beta, fragment_c, fragment_bias, use_relu);
+
 //	double diff = 0.0;
 //	for (int m = 0; m < M; m++)
 //		for (int n = 0; n < N; n++)
@@ -2741,7 +2725,145 @@ void test_microkernel(const int M, const int N, const int K, mlDataType_t dtype,
 //				diff += std::fabs(half_to_float(correct_fragment_d.at<uint16_t>(m, n)) - half_to_float(fragment_d.at<uint16_t>(m, n)));
 //			else
 //				diff += std::fabs(correct_fragment_d.at<float>(m, n) - fragment_d.at<float>(m, n));
-//	if (diff > 1.0e-3)
+//	diff /= (M * N);
+//	if (diff > 1.0e-4)
+//	{
+//		std::cout << "Correct\n";
+//		for (int m = 0; m < M; m++)
+//		{
+//			for (int n = 0; n < N; n++)
+//				if (correct_fragment_d.dtype() == DTYPE_FLOAT16)
+//					std::cout << half_to_float(correct_fragment_d.at<uint16_t>(m, n)) << ' ';
+//				else
+//					std::cout << correct_fragment_d.at<float>(m, n) << ' ';
+//			std::cout << '\n';
+//		}
+//		std::cout << "-------------------------------------------\n";
+//
+//		std::cout << "Actual\n";
+//		for (int m = 0; m < M; m++)
+//		{
+//			for (int n = 0; n < N; n++)
+//				if (fragment_d.dtype() == DTYPE_FLOAT16)
+//					std::cout << half_to_float(fragment_d.at<uint16_t>(m, n)) << ' ';
+//				else
+//					std::cout << fragment_d.at<float>(m, n) << ' ';
+//			std::cout << '\n';
+//		}
+//
+//		std::cout << "\ndiff = " << diff << '\n';
+//		exit(255);
+//	}
+//	else
+//		std::cout << "gemm kernel = " << M << "x" << N << "x" << K << " : OK\n";
+
+	const double repeats = 1.0e8;
+	const double start = getTime();
+	int i = 0;
+	for (; i < repeats; i++)
+	{
+		kernel(fragment_d, fragment_alpha, fragment_a, fragment_b, &beta, fragment_c, fragment_bias, use_relu);
+		if ((getTime() - start) > 10.0)
+			break;
+	}
+	const double stop = getTime();
+	const double flops = (double) i * (M * N * K) / (stop - start);
+	std::cout << M << "x" << N << "x" << K << " : " << flops / 1.0e9 << " GFLOPS\n";
+
+	gemm::aligned_free(lhs, 4096);
+	gemm::aligned_free(rhs, 4096);
+	gemm::aligned_free(b_ptr, 4096);
+	gemm::aligned_free(alpha_ptr, 4096);
+}
+
+void test_mha_kernel(const int M, const int N, const int K,
+		std::function<void(Fragment&, const void*, const Fragment&, const Fragment&, const Fragment&, Fragment&)> kernel)
+{
+	void *matrix_qk = gemm::aligned_new(1024 * 1024, 4096);
+	void *correct_qk = gemm::aligned_new(1024 * 1024, 4096);
+
+	const size_t size_in_bytes_lhs = sizeof(float) * M * K;
+	const size_t size_in_bytes_rhs = sizeof(float) * N * K;
+	void *lhs = gemm::aligned_new(size_in_bytes_lhs, 4096);
+	void *rhs = gemm::aligned_new(size_in_bytes_rhs, 4096);
+	void *bias_ptr = gemm::aligned_new(sizeof(float) * 1024, 4096);
+	void *softmax_ptr = gemm::aligned_new(sizeof(float) * 1024, 4096);
+	void *correct_softmax_ptr = gemm::aligned_new(sizeof(float) * 1024, 4096);
+	std::memset(lhs, 0, size_in_bytes_lhs);
+	std::memset(rhs, 0, size_in_bytes_rhs);
+	std::memset(bias_ptr, 0, sizeof(float) * 1024);
+	std::memset(softmax_ptr, 0, sizeof(float) * 1024);
+	std::memset(correct_softmax_ptr, 0, sizeof(float) * 1024);
+
+	Fragment fragment_a(lhs, DTYPE_FLOAT32, M);
+	Fragment fragment_b(rhs, DTYPE_FLOAT32, N);
+	Fragment fragment_qk(matrix_qk, DTYPE_FLOAT32, M);
+	Fragment correct_fragment_qk(correct_qk, DTYPE_FLOAT32, M);
+	Fragment fragment_bias(bias_ptr, DTYPE_FLOAT32, N);
+	Fragment fragment_softmax(softmax_ptr, DTYPE_FLOAT32, 1);
+	Fragment correct_fragment_softmax(correct_softmax_ptr, DTYPE_FLOAT32, 1);
+
+	fragment_a.mark_as_packed_with_size( { K, M });
+	fragment_b.mark_as_packed_with_size( { K, N });
+	fragment_qk.mark_as_packed_with_size( { N, M });
+	correct_fragment_qk.mark_as_packed_with_size( { N, M });
+	fragment_bias.mark_as_packed_with_size( { M, N });
+	fragment_softmax.mark_as_packed_with_size( { M, 1 });
+	correct_fragment_softmax.mark_as_packed_with_size( { M, 1 });
+
+	for (int k = 0; k < K; k++)
+	{
+		for (int m = 0; m < M; m++)
+			fragment_a.at<float>(k, m) = randFloat() - 0.5f;
+		for (int n = 0; n < N; n++)
+			fragment_b.at<float>(k, n) = randFloat() - 0.5f;
+	}
+	for (int m = 0; m < M; m++)
+	{
+		const float r = randFloat() - 0.5f;
+		fragment_softmax.at<float>(0, m) = r;
+		correct_fragment_softmax.at<float>(0, m) = r;
+		for (int n = 0; n < N; n++)
+			fragment_bias.at<float>(m, n) = randFloat() - 0.5f;
+	}
+
+	const float alpha = 1.0f / std::sqrt(K);
+
+	mha_qk_def_MxN(correct_fragment_qk, &alpha, fragment_a, fragment_b, fragment_bias, correct_fragment_softmax);
+
+	kernel(fragment_qk, &alpha, fragment_a, fragment_b, fragment_bias, fragment_softmax);
+
+//	std::cout << "Correct\n";
+//	for (int n = 0; n < N; n++)
+//	{
+//		for (int m = 0; m < M; m++)
+//			std::cout << correct_fragment_qk.at<float>(n, m) << ' ';
+//		std::cout << '\n';
+//	}
+//	std::cout << "-------------------------------------------\n";
+//
+//	std::cout << "Actual\n";
+//	for (int n = 0; n < N; n++)
+//	{
+//		for (int m = 0; m < M; m++)
+//			std::cout << fragment_qk.at<float>(n, m) << ' ';
+//		std::cout << '\n';
+//	}
+//
+//	std::cout << "\nCorrect softmax sum\n";
+//	for (int m = 0; m < M; m++)
+//		std::cout << correct_fragment_softmax.at<float>(m, 0) << ' ';
+//	std::cout << "\n-------------------------------------------\n";
+//	std::cout << "Actual softmax sum\n";
+//	for (int m = 0; m < M; m++)
+//		std::cout << fragment_softmax.at<float>(m, 0) << ' ';
+//	std::cout << '\n';
+//
+//	double diff = 0.0;
+//	for (int n = 0; n < N; n++)
+//		for (int m = 0; m < M; m++)
+//			diff += std::fabs(correct_fragment_qk.at<float>(n, m) - fragment_qk.at<float>(n, m));
+//	if (diff / (M * K) > 1.0e-3)
 //		std::cout << "\ndiff = " << diff / (M * K) << '\n';
 
 	const double repeats = 1.0e8;
@@ -2749,7 +2871,7 @@ void test_microkernel(const int M, const int N, const int K, mlDataType_t dtype,
 	int i = 0;
 	for (; i < repeats; i++)
 	{
-		kernel(fragment_d, &alpha, fragment_a, fragment_b, &beta, fragment_c, fragment_bias, use_relu);
+		kernel(fragment_qk, &alpha, fragment_a, fragment_b, fragment_bias, fragment_softmax);
 		if ((getTime() - start) > 10.0)
 			break;
 	}
@@ -2758,394 +2880,565 @@ void test_microkernel(const int M, const int N, const int K, mlDataType_t dtype,
 	const double flops = (double) i * (M * N * K) / (stop - start);
 	std::cout << M << "x" << N << "x" << K << " : " << flops / 1.0e9 << " GFLOPS\n";
 
+	gemm::aligned_free(matrix_qk, 4096);
+	gemm::aligned_free(correct_qk, 4096);
 	gemm::aligned_free(lhs, 4096);
 	gemm::aligned_free(rhs, 4096);
+	gemm::aligned_free(bias_ptr, 4096);
+	gemm::aligned_free(softmax_ptr, 4096);
+	gemm::aligned_free(correct_softmax_ptr, 4096);
 }
 
-template<typename DT, typename CT, int KernelSize, int TileSize>
-void kernel_transform_input(void *__restrict__ matrices, const void *__restrict__ input, int batch_size, int height, int width, int input_filters,
-		void *__restrict__ workspace)
+//__m128 BetterFastExpSse(__m128 x) noexcept
+//{
+//	const __m128 a = _mm_set1_ps((1 << 22) / float(M_LN2));
+//	const __m128i b = _mm_set1_epi32(127 * (1 << 23) - 139157);
+//	__m128i r = _mm_cvtps_epi32(_mm_mul_ps(a, x));
+//	__m128i s = _mm_add_epi32(b, r);
+//	__m128i t = _mm_sub_epi32(b, r);
+//	return _mm_div_ps(_mm_castsi128_ps(s), _mm_castsi128_ps(t));
+//}
+//__m256 BetterFastExpAvx(__m256 x) noexcept
+//{
+//	const __m256 a = _mm256_set1_ps((1 << 22) / float(M_LN2));
+//	const __m256i b = _mm256_set1_epi32(127 * (1 << 23) - 139160);
+//	__m256i r = _mm256_cvtps_epi32(_mm256_mul_ps(a, x));
+//	__m256i s = _mm256_add_epi32(b, r);
+//	__m256i t = _mm256_sub_epi32(b, r);
+//	return _mm256_div_ps(_mm256_castsi256_ps(s), _mm256_castsi256_ps(t));
+//}
+//__m256 fast_tanh_avx(__m256 x) noexcept
+//{
+//	const __m256 a = _mm256_set1_ps((1 << 22) / float(M_LN2));  // to get exp(x/2)
+//	const __m256i b = _mm256_set1_epi32(127 * (1 << 23));       // NB: zero shift!
+//
+//	const __m256i r = _mm256_cvtps_epi32(_mm256_mul_ps(a, x));
+//	const __m256 s = _mm256_castsi256_ps(_mm256_add_epi32(b, r));
+//	const __m256 t = _mm256_castsi256_ps(_mm256_sub_epi32(b, r));
+//
+//	return _mm256_div_ps(_mm256_sub_ps(s, t), _mm256_add_ps(s, t));
+//}
+//__m256 fast_sigmoid_avx(__m256 x) noexcept
+//{
+//	const __m256 a = _mm256_set1_ps((1 << 22) / float(M_LN2));
+//	const __m256i b = _mm256_set1_epi32(127 * (1 << 23) - 139002);
+//	__m256i r = _mm256_cvtps_epi32(_mm256_mul_ps(a, x));
+//	__m256 s = _mm256_castsi256_ps(_mm256_add_epi32(b, r));
+//	__m256 t = _mm256_castsi256_ps(_mm256_sub_epi32(b, r));
+//	return _mm256_div_ps(s, _mm256_add_ps(s, t));
+//}
+//__m256 fast_gelu_avx(__m256 x) noexcept
+//{
+//	const __m256 a = _mm256_set1_ps((1 << 22) * (1.6849f / float(M_LN2)));
+//	const __m256i b = _mm256_set1_epi32(127 * (1 << 23) - 329698);
+//	__m256i r = _mm256_cvtps_epi32(_mm256_mul_ps(a, x));
+//	__m256 s = _mm256_castsi256_ps(_mm256_add_epi32(b, r));
+//	__m256 t = _mm256_castsi256_ps(_mm256_sub_epi32(b, r));
+//	return _mm256_div_ps(_mm256_mul_ps(x, s), _mm256_add_ps(s, t));
+//}
+//
+//__m128 fast_exp_sse(__m128 x) noexcept
+//{
+//	__m128 f, p, r;
+//	__m128i t, j;
+//	const __m128 a = _mm_set1_ps(12102203.0f); /* (1 << 23) / log(2) */
+//	const __m128i m = _mm_set1_epi32(0xff800000); /* mask for integer bits */
+//	const __m128 ttm23 = _mm_set1_ps(1.1920929e-7f); /* exp2(-23) */
+//	const __m128 c0 = _mm_set1_ps(0.3371894346f);
+//	const __m128 c1 = _mm_set1_ps(0.657636276f);
+//	const __m128 c2 = _mm_set1_ps(1.00172476f);
+//
+//	t = _mm_cvtps_epi32(_mm_mul_ps(a, x));
+//	j = _mm_and_si128(t, m); /* j = (int)(floor (x/log(2))) << 23 */
+//	t = _mm_sub_epi32(t, j);
+//	f = _mm_mul_ps(ttm23, _mm_cvtepi32_ps(t)); /* f = (x/log(2)) - floor (x/log(2)) */
+//	p = c0; /* c0 */
+//	p = _mm_mul_ps(p, f); /* c0 * f */
+//	p = _mm_add_ps(p, c1); /* c0 * f + c1 */
+//	p = _mm_mul_ps(p, f); /* (c0 * f + c1) * f */
+//	p = _mm_add_ps(p, c2); /* p = (c0 * f + c1) * f + c2 ~= 2^f */
+//	r = _mm_castsi128_ps(_mm_add_epi32(j, _mm_castps_si128(p))); /* r = p * 2^i*/
+//	return r;
+//}
+
+int32_t to_int(float x) noexcept
 {
-	constexpr int Padding = KernelSize / 2;
-	constexpr int TransformSize = TileSize + KernelSize - 1;
+	return reinterpret_cast<const int32_t*>(&x)[0];
+}
+float to_float(int32_t x) noexcept
+{
+	return reinterpret_cast<const float*>(&x)[0];
+}
+float best_expf(float x, int32_t shift = -139160) noexcept
+{
+	// maximum relative error = 0.628981%
+	const float a = (1 << 22) / float(M_LN2);
+	const int32_t b = 127 * (1 << 23) + shift;
 
-	const int tiles_h = (height + TileSize - 1) / TileSize;
-	const int tiles_w = (width + TileSize - 1) / TileSize;
-	const int tiles_per_image = tiles_h * tiles_w;
-	const int nb_of_tiles = batch_size * tiles_per_image;
-	const Indexer<3> matrices_indexer(TransformSize * TransformSize, nb_of_tiles, input_filters);
-	const Indexer<4> input_indexer(batch_size, height, width, input_filters);
+	std::stringstream stream;
+	stream << std::hex << to_int(a) << " " << b;
+	std::string result(stream.str());
+	std::cout << result << '\n';
+	exit(0);
 
-	const DT *input_ptr = getPointer<DT>(input);
-	DT *matrices_ptr = getPointer<DT>(matrices);
+	const int32_t r = static_cast<int32_t>(a * x);
+	const float s = to_float(b + r);
+	const float t = to_float(b - r);
+	return s / t;
+}
+float best_sigmf(float x, int32_t shift = -139002) noexcept
+{
+	// maximum relative error = 0.628656%
+	const float a = (1 << 22) / float(M_LN2);
+	const int32_t b = 127 * (1 << 23) + -139002;
+	const int32_t r = static_cast<int32_t>(a * x);
+	const float s = to_float(b + r);
+	const float t = to_float(b - r);
+	return s / (s + t);
+}
+float best_tanhf(float x, int32_t shift = 0) noexcept
+{
+	// maximum relative error = 4.049%
+	if (std::fabs(x) < 0.347f)
+//		return 0.9805f * x;
+		return x * (1.0f - 0.0924f * x);
+	const float a = (1 << 23) / float(M_LN2);
+	const int32_t b = 127 * (1 << 23);
+	const int32_t r = static_cast<int32_t>(a * x);
+	const float s = to_float(b + r);
+	const float t = to_float(b - r);
+	return (s - t) / (s + t);
+}
+float best_geluf(float x, int32_t shift = -329698, float scale = 1.6849f) noexcept
+{
+	// maximum relative error =
+	const float a = (1 << 22) * (scale / float(M_LN2)); // reg0
+	const int32_t b = 127 * (1 << 23) + shift; // reg1
+	const int32_t r = static_cast<int32_t>(a * x); // reg2
+	const float s = to_float(b + r); // reg3
+	const float t = to_float(b - r); // reg2
+	return (s * x) / (s + t);
+}
 
-	DT *zero_line = getPointer<DT>(workspace);
-	std::memset(zero_line, 0, sizeof(DT) * input_filters);
-
-//#pragma omp parallel
+float fastExp3(float x) noexcept
+{
+	union
 	{
-		const void *ptr_in[TransformSize * TransformSize];
-		void *ptr_out[TransformSize * TransformSize];
-		alignas(64) CT storage[16 * TransformSize * TransformSize];
-//#pragma omp for
-		for (int tile_idx = 0; tile_idx < nb_of_tiles; tile_idx++)
+			float f;
+			int32_t i;
+	} reinterpreter;
+
+	reinterpreter.i = (int32_t) (12102203.0f * x) + 127 * (1 << 23);
+	int32_t m = (reinterpreter.i >> 7) & 0xFFFF;  // copy mantissa
+	// empirical values for small maximum relative error (8.34e-5):
+//	reinterpreter.i += ((((((((1277 * m) >> 14) + 14825) * m) >> 14) - 79749) * m) >> 11) - 626;
+	const float p0 = 1277.0f / (16384.0f * 16384.0f * 2048.0f);
+	const float p1 = 14825.0f / (16384.0f * 2048.0f);
+	const float p2 = -79749.0f / 2048.0f;
+
+//	reinterpreter.i += (p0 * m * m * m + p1 * m * m + p2 * m) - 626;
+	reinterpreter.i += m * 0;
+	return reinterpreter.f;
+}
+
+float test_accuracy(int32_t shift, bool print = false)
+{
+	float max_error = 0.0f;
+	float avg_error = 0.0f;
+
+	const int samples = 1600000;
+	for (int i = 0; i < samples; i++)
+	{
+		const float x = -80.0 + 160.0f * i / samples;
+//		const float target = 0.5f * x * (1.0f + std::erf(x / std::sqrt(2.0f)));
+//		const float target = std::tanh(x);
+//		const float target = 1.0f / (1.0f + std::exp(-x));
+		const float target = std::exp(x);
+		const float pred = fastExp3(x);
+		const float relative_error = std::fabs(pred - target) / (1.0e-8f + std::fabs(target));
+		const float absolute_error = std::fabs(pred - target);
+		if (relative_error > max_error)
+//		if (pred > target)
 		{
-			int batch = tile_idx / tiles_per_image;
-			int tile_x = ((tile_idx % tiles_per_image) / tiles_w);
-			int tile_y = ((tile_idx % tiles_per_image) % tiles_w);
-
-			int matrix_idx = 0;
-			for (int i = 0; i < TransformSize; i++)
-				for (int j = 0; j < TransformSize; j++, matrix_idx++)
-				{
-					const int x = TileSize * tile_x + i - Padding;
-					const int y = TileSize * tile_y + j - Padding;
-					ptr_out[matrix_idx] = matrices_ptr + matrices_indexer.at(matrix_idx, tile_idx, 0);
-					if (x >= 0 and x < height and y >= 0 and y < width)
-						ptr_in[matrix_idx] = input_ptr + input_indexer.at(batch, x, y, 0);
-					else
-						ptr_in[matrix_idx] = zero_line;
-				}
-			if constexpr (std::is_same<DT, float>::value and std::is_same<CT, float>::value)
-			{
-				if constexpr (TileSize == 5)
-					winograd_input_transform_5x5_3x3_avx2_fma_fp32(ptr_in, ptr_out, storage, input_filters);
-				if constexpr (TileSize == 4)
-					winograd_input_transform_4x4_3x3_avx2_fma_fp32(ptr_in, ptr_out, storage, input_filters);
-			}
-			if constexpr (std::is_same<DT, ml::cpu::float16>::value and std::is_same<CT, float>::value)
-			{
-				if constexpr (TileSize == 5)
-					winograd_input_transform_5x5_3x3_avx2_fma_fp16(ptr_in, ptr_out, storage, input_filters);
-				if constexpr (TileSize == 4)
-					winograd_input_transform_4x4_3x3_avx2_fma_fp16(ptr_in, ptr_out, storage, input_filters);
-			}
+//			std::cout << x << " : " << pred << " vs " << target << ", error = " << 100 * relative_error << "%\n";
+//			exit(0);
 		}
+		max_error = std::max(max_error, relative_error);
+		avg_error += relative_error;
 	}
-}
-template<typename DT, typename CT, int KernelSize, int TileSize>
-void kernel_transform_output(const void *__restrict__ matrices, void *__restrict__ output, const void *__restrict__ ext,
-		const void *__restrict__ bias, int batch_size, int height, int width, int output_filters, void *__restrict__ workspace, bool use_relu)
-{
-	constexpr int TransformSize = TileSize + KernelSize - 1;
-
-	const int tiles_h = (height + TileSize - 1) / TileSize;
-	const int tiles_w = (width + TileSize - 1) / TileSize;
-	const int tiles_per_image = tiles_h * tiles_w;
-	const int nb_of_tiles = batch_size * tiles_per_image;
-	const Indexer<3> matrices_indexer(TransformSize * TransformSize, nb_of_tiles, output_filters);
-	const Indexer<4> output_indexer(batch_size, height, width, output_filters);
-
-	DT *output_ptr = getPointer<DT>(output);
-	const DT *matrices_ptr = getPointer<DT>(matrices);
-	const DT *ext_ptr = getPointer<DT>(ext);
-
-	DT *zero_line = getPointer<DT>(workspace);
-	DT *fake_storage = getPointer<DT>(workspace) + output_filters + 1024;
-	std::memset(zero_line, 0, sizeof(DT) * output_filters);
-
-//#pragma omp parallel
+	if (print)
 	{
-		const void *ptr_in[TransformSize * TransformSize];
-		const void *ptr_ext[TileSize * TileSize];
-		void *ptr_out[TileSize * TileSize];
-//#pragma omp for
-		for (int tile_idx = 0; tile_idx < nb_of_tiles; tile_idx++)
-		{
-			int batch = tile_idx / tiles_per_image;
-			int tile_x = ((tile_idx % tiles_per_image) / tiles_w);
-			int tile_y = ((tile_idx % tiles_per_image) % tiles_w);
-
-			for (int i = 0; i < TransformSize * TransformSize; i++)
-				ptr_in[i] = matrices_ptr + matrices_indexer.at(i, tile_idx, 0);
-
-			int matrix_idx = 0;
-			for (int i = 0; i < TileSize; i++)
-				for (int j = 0; j < TileSize; j++, matrix_idx++)
-				{
-					const int x = TileSize * tile_x + i;
-					const int y = TileSize * tile_y + j;
-					if (x < height and y < width)
-					{
-						ptr_out[matrix_idx] = output_ptr + output_indexer.at(batch, x, y, 0);
-						ptr_ext[matrix_idx] = ext_ptr + output_indexer.at(batch, x, y, 0);
-					}
-					else
-					{
-						ptr_out[matrix_idx] = fake_storage;
-						ptr_ext[matrix_idx] = zero_line;
-					}
-				}
-
-			if constexpr (std::is_same<DT, float>::value and std::is_same<CT, float>::value)
-			{
-				if constexpr (TileSize == 5)
-					winograd_output_transform_5x5_3x3_avx512f_fp32(ptr_in, ptr_out, workspace, output_filters, ptr_ext, bias, use_relu);
-				if constexpr (TileSize == 4)
-					winograd_output_transform_4x4_3x3_avx512f_fp32(ptr_in, ptr_out, workspace, output_filters, ptr_ext, bias, use_relu);
-			}
-			if constexpr (std::is_same<DT, ml::cpu::float16>::value and std::is_same<CT, float>::value)
-			{
-				if constexpr (TileSize == 5)
-					winograd_output_transform_5x5_3x3_avx512f_fp16(ptr_in, ptr_out, workspace, output_filters, ptr_ext, bias, use_relu);
-				if constexpr (TileSize == 4)
-					winograd_output_transform_4x4_3x3_avx512f_fp16(ptr_in, ptr_out, workspace, output_filters, ptr_ext, bias, use_relu);
-			}
-		}
+		std::cout << "max error = " << 100 * max_error << "%\n";
+		std::cout << "avg error = " << 100 * avg_error / samples << "%\n";
 	}
-}
-
-void test_winograd_transform()
-{
-	std::unique_ptr<float[]> src = std::make_unique<float[]>(1024 * 1024);
-	std::unique_ptr<float[]> dst = std::make_unique<float[]>(1024 * 1024);
-
-	void *workspace = gemm::aligned_new(1024 * 1024, 4096);
-	std::memset(workspace, 0, 1024 * 1024);
-
-	const void *src_ptrs[49];
-	void *dst_ptrs[49];
-	for (int i = 0; i < 49; i++)
-	{
-		src_ptrs[i] = src.get() + i * 1024;
-		dst_ptrs[i] = dst.get() + i * 1024;
-		for (int j = 0; j < 1024; j++)
-		{
-			reinterpret_cast<float*>(src.get() + i * 1024)[j] = randFloat(); //i + 0.01f * j;
-//			reinterpret_cast<float*>(dst_ptrs[i])[j] = i + 0.01f * j;
-		}
-	}
-
-	winograd_input_transform_5x5_3x3_avx2_fma_fp32(src_ptrs, dst_ptrs, workspace, 8);
-
-	for (int i = 0; i < 7; i++)
-	{
-		for (int j = 0; j < 7; j++)
-			std::cout << reinterpret_cast<const float*>(src_ptrs[(i * 7 + j)])[0] << ' ';
-		std::cout << '\n';
-	}
-	std::cout << '\n';
-
-	for (int i = 0; i < 7; i++)
-	{
-		for (int j = 0; j < 7; j++)
-			std::cout << reinterpret_cast<float*>(workspace)[(i * 7 + j) * 8 + 0] << ' ';
-		std::cout << '\n';
-	}
-
-	std::cout << '\n';
-	for (int i = 0; i < 7; i++)
-	{
-		for (int j = 0; j < 7; j++)
-			std::cout << reinterpret_cast<float*>(dst_ptrs[(i * 7 + j)])[0] << ' ';
-		std::cout << '\n';
-	}
-
-	gemm::aligned_free(workspace, 4096);
-}
-
-void benchmark_winograd_transform(int filters)
-{
-	Context context;
-	const Shape weight_shape( { filters, 3, 3, filters });
-	Tensor input( { 16, 15, 15, filters }, "float16", Device::cpu());
-	Tensor matrices( { 49, input.firstDim() * 3 * 3, filters }, "float16", Device::cpu());
-
-	testing::initForTest(input, 0.0, 1.0);
-
-	void *workspace = gemm::aligned_new(1024 * 1024, 4096);
-
-	const double repeats = 1.0e8;
-	const double start = getTime();
-	int i = 0;
-	for (; i < repeats; i++)
-	{
-		kernel_transform_input<ml::cpu::float16, float, 3, 5>(matrices.data(), input.data(), input.dim(0), input.dim(1), input.dim(2), input.dim(3),
-				workspace);
-		if ((getTime() - start) > 10.0)
-			break;
-	}
-	const double stop = getTime();
-
-	const double gigabytes = (double) i * input.volume() * sizeOf(input.dtype()) / (1024.0 * 1024.0 * 1024.0);
-//	std::cout << i << " repeats " << 1.0e3 * (stop - start) / i << " ms " << gigabytes / (stop - start) << " GB/s\n";
-	std::cout << filters << " " << gigabytes / (stop - start) << '\n';
-
-	gemm::aligned_free(workspace, 4096);
-}
-
-template<size_t Alignment>
-size_t round_up_to_multiple_of(size_t x) noexcept
-{
-	const size_t remainder = x % Alignment;
-	const size_t shift = (remainder == 0) ? 0 : (Alignment - remainder);
-	return x + shift;
-}
-template<size_t Alignment, typename T>
-T* align_pointer_to(T *ptr) noexcept
-{
-	const size_t remainder = reinterpret_cast<std::uintptr_t>(ptr) % Alignment;
-	const size_t shift = (remainder == 0) ? 0 : (Alignment - remainder);
-	return reinterpret_cast<uint8_t*>(ptr) + shift;
-}
-
-void kernel_transform_input_v2(void *__restrict__ matrices, const void *__restrict__ input, int batch_size, int height, int width, int input_filters,
-		void *__restrict__ workspace, int kernel_size, int tile_size, DataType dtype)
-{
-	constexpr size_t StorageAlignment = 64;
-	const int simd_size = 512 / 8;
-
-	const int Padding = kernel_size / 2;
-	const int TransformSize = tile_size + kernel_size - 1;
-
-	const int tiles_h = (height + tile_size - 1) / tile_size;
-	const int tiles_w = (width + tile_size - 1) / tile_size;
-	const int tiles_per_image = tiles_h * tiles_w;
-	const int nb_of_tiles = batch_size * tiles_per_image;
-	const Indexer<3> matrices_indexer(TransformSize * TransformSize, nb_of_tiles, input_filters * sizeOf(dtype));
-	const Indexer<4> input_indexer(batch_size, height, width, input_filters * sizeOf(dtype));
-
-	const size_t zero_line_size = round_up_to_multiple_of<64>(sizeOf(dtype) * input_filters);
-	const size_t ptr_in_size = round_up_to_multiple_of<64>(sizeof(void*) * TransformSize * TransformSize);
-	const size_t ptr_out_size = round_up_to_multiple_of<64>(sizeof(void*) * TransformSize * TransformSize);
-	const size_t storage_size = round_up_to_multiple_of<64>(simd_size * TransformSize * TransformSize + StorageAlignment);
-
-	void *zero_line = workspace;
-	std::memset(zero_line, 0, zero_line_size);
-
-#pragma omp parallel
-	{
-		uint8_t *local_workspace = reinterpret_cast<uint8_t*>(workspace) + zero_line_size
-				+ omp_get_thread_num() * (ptr_in_size + ptr_out_size + storage_size);
-		const void **ptr_in = reinterpret_cast<const void**>(local_workspace);
-		local_workspace += ptr_in_size;
-
-		void **ptr_out = reinterpret_cast<void**>(local_workspace);
-		local_workspace += ptr_out_size;
-
-		void *storage = align_pointer_to<StorageAlignment>(local_workspace);
-
-#pragma omp for
-		for (int tile_idx = 0; tile_idx < nb_of_tiles; tile_idx++)
-		{
-			const int batch = tile_idx / tiles_per_image;
-			const int tile_x = ((tile_idx % tiles_per_image) / tiles_w);
-			const int tile_y = ((tile_idx % tiles_per_image) % tiles_w);
-
-			int matrix_idx = 0;
-			for (int i = 0; i < TransformSize; i++)
-				for (int j = 0; j < TransformSize; j++, matrix_idx++)
-				{
-					const int x = tile_size * tile_x + i - Padding;
-					const int y = tile_size * tile_y + j - Padding;
-					ptr_out[matrix_idx] = getPointer<uint8_t>(matrices) + matrices_indexer.at(matrix_idx, tile_idx, 0);
-					if (x >= 0 and x < height and y >= 0 and y < width)
-						ptr_in[matrix_idx] = getPointer<uint8_t>(input) + input_indexer.at(batch, x, y, 0);
-					else
-						ptr_in[matrix_idx] = zero_line;
-				}
-//			if constexpr (std::is_same<DT, float>::value and std::is_same<CT, float>::value)
-//			{
-//				if (tile_size == 5)
-//					winograd_input_transform_5x5_3x3_avx2_fma_fp32(ptr_in, ptr_out, storage, input_filters);
-//				if (tile_size == 4)
-//					winograd_input_transform_4x4_3x3_avx2_fma_fp32(ptr_in, ptr_out, storage, input_filters);
-//			}
-//			if constexpr (std::is_same<DT, float16>::value and std::is_same<CT, float>::value)
-//			{
-//				if (tile_size == 5)
-			winograd_input_transform_5x5_3x3_avx2_fma_fp16(ptr_in, ptr_out, storage, input_filters);
-//				if (tile_size == 4)
-//					winograd_input_transform_4x4_3x3_avx2_fma_fp16(ptr_in, ptr_out, storage, input_filters);
-//			}
-		}
-	}
+	return max_error;
 }
 
 int main()
 {
 	std::cout << "BEGIN" << std::endl;
 	std::cout << ml::Device::hardwareInfo();
+	{
+//		Graph graph;
+//		FileLoader fl("/home/maciek/alphagomoku/new_runs_2024/supervised/conv_pvum_8x128_v2/network_opt.bin", false);
+//		graph.load(fl.getJson()["model"], fl.getBinaryData());
+//		graph.setInputShape( { 1, 15, 15, 32 });
+//		graph.moveTo(Device::cpu());
+////		graph.init();
+//		graph.convertTo(DataType::FLOAT16);
+//		graph.print();
+//
+//		Tensor input(graph.getInputShape(), graph.dtype(), Device::cpu());
+//		input.zeroall();
+//		for (int i = 0; i < input.shape().volumeWithoutLastDim(); i++)
+//		{
+//			if (input.dtype() == DataType::FLOAT32)
+//			{
+//				float *ptr = reinterpret_cast<float*>(input.data()) + i * 32;
+//				ptr[0] = 1.0f;
+//				ptr[3] = 1.0f;
+//				ptr[4] = 1.0f;
+//			}
+//			if (input.dtype() == DataType::FLOAT16)
+//			{
+//				uint16_t *ptr = reinterpret_cast<uint16_t*>(input.data()) + i * 32;
+//				ptr[0] = 0x3c00;
+//				ptr[3] = 0x3c00;
+//				ptr[4] = 0x3c00;
+//			}
+//		}
+//
+//		graph.getInput().copyFrom(graph.context(), input);
+//		graph.forward(1);
+//		graph.context().synchronize();
+//
+//		std::cout << "value = " << graph.getOutput(1).get( { 0, 0 }) << '\n';
+//		std::cout << "uncertainty = " << graph.getOutput(2).get( { 0, 0 }) << '\n';
+//
+//		for (int i = 0; i < 50; i++)
+//			std::cout << graph.getOutput(3).get( { 0, i }) << ' ';
+//		std::cout << '\n';
+//
+//		for (int i = 0; i < 15; i++)
+//		{
+//			for (int j = 0; j < 15; j++)
+//				std::cout << graph.getOutput(0).get( { 0, i * 15 + j }) << ' ';
+//			std::cout << '\n';
+//		}
+//
+//		return 0;
 
-	test_mnist();
-	return 0;
+//		best_expf(0.0f);
+		const mlDataType_t dtype = DTYPE_FLOAT16;
+//		for (int i = 1; i <= 256; i++)
+//			test_packing(i, 6, ml::MatrixOp::TRANSPOSE, dtype, pack_avx2_6xK, false);
+//		for (int i = 1; i <= 256; i *= 2)
+//			test_packing(i, 8, ml::MatrixOp::NORMAL, dtype, pack_avx_8xK, true);
+//		for (int i = 1; i <= 128; i++)
+//			test_packing(i, 24, ml::MatrixOp::TRANSPOSE, dtype, pack_avx512f_24xK, false);
+//		for (int i = 1; i <= 128; i++)
+//			test_packing(i, 16, ml::MatrixOp::NORMAL, dtype, pack_avx512f_16xK, false);
+//		for (int i = 1; i <= 128; i++)
+//			test_packing(i, 16, ml::MatrixOp::TRANSPOSE, dtype, pack_avx512f_16xK, false);
 
-	if (false)
+//		test_packing(256, 12, ml::MatrixOp::TRANSPOSE, DTYPE_FLOAT32, pack_avx2_fma_12xK, true);
+//		std::cout << "MHA fused softmax(QK)\n";
+//		for (int i = 1; i <= 512; i *= 2)
+//			test_mha_kernel(12, 8, i, mha_qk_avx2_12x8);
+//		std::cout << "Base GEMM\n";
+//		for (int i = 1; i <= 512; i *= 2)
+//			test_microkernel(12, 8, i, dtype, gemm_avx2_12x8);
+//		for (int i = 1; i <= 512; i *= 2)
+//			test_microkernel(6, 16, i, dtype, gemm_avx2_6x16);
+//		return 0;
+
+//		int32_t center = 0;
+//		int32_t range = 0;
+//		int32_t step = 1;
+//		float best_accuracy = 1.0f;
+//		int best_shift = 0;
+//		for (int i = center - range; i <= center + range; i += step)
+//		{
+//			const float acc = test_accuracy(i);
+//
+//			if (acc < best_accuracy)
+//			{
+//				best_accuracy = acc;
+//				best_shift = i;
+//				std::cout << i << " : " << 100 * acc << "%\n";
+//			}
+//		}
+//		std::cout << "\nbest shift : best accuracy\n";
+//		std::cout << best_shift << " : " << 100 * best_accuracy << "%\n";
+//		test_accuracy(0, true);
+//		test_accuracy(best_shift, true);
+//		for (int i = 0; i < 30; i++)
+//		{
+//			const float x = i * 1.0e-1f;
+//			std::cout << x << " " << best_tanhf(x) << " " << std::tanh(x) << '\n';
+//		}
+	}
+//	return 0;
+
+//	{
+//		float input[8] = { -2.0f, -1.5f, -1.0f, -0.5f, 0.0f, 0.5f, 1.0f, 1.5f };
+//		__m256 x = _mm256_loadu_ps(input);
+//		volatile __m256 y = BetterFastExpAvx(x);
+//		float output[8] = { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
+//		_mm256_storeu_ps(output, y);
+//		for (int i = 0; i < 8; i++)
+//			std::cout << output[i] << " vs " << std::exp(input[i]) << '\n';
+//
+//		double t0 = getTime();
+//		for (int i = 0; i < 1000000000; i++)
+//		{
+//			y = BetterFastExpAvx(x);
+//			y = BetterFastExpAvx(x);
+//			y = BetterFastExpAvx(x);
+//			y = BetterFastExpAvx(x);
+//		}
+//		double t1 = getTime();
+//		std::cout << "sse exp " << (t1 - t0) / 4 << "ns\n";
+//
+//		__m256 x_avx = _mm256_loadu_ps(input);
+//		volatile __m256 y_avx = fast_gelu_avx(x_avx);
+//		_mm256_storeu_ps(output, y_avx);
+//		for (int i = 0; i < 8; i++)
+//			std::cout << output[i] << " vs " << input[i] / (1.0f + std::exp(-1.702f * input[i])) << '\n';
+//		t0 = getTime();
+//		for (int i = 0; i < 1000000000; i++)
+//		{
+//			y_avx = fast_gelu_avx(x_avx);
+//			y_avx = fast_gelu_avx(x_avx);
+//			y_avx = fast_gelu_avx(x_avx);
+//			y_avx = fast_gelu_avx(x_avx);
+//		}
+//		t1 = getTime();
+//		std::cout << "avx sigm " << (t1 - t0) / 4 << "ns\n";
+//
+//		const double t2 = getTime();
+//		volatile float stdx = 1.0f, stdy = 0.0f;
+//		for (int i = 0; i < 100000000; i++)
+//		{
+//			stdy = std::tanh(stdx);
+//			stdy = std::tanh(stdx);
+//			stdy = std::tanh(stdx);
+//			stdy = std::tanh(stdx);
+//		}
+//		const double t3 = getTime();
+//		std::cout << "std::tanh " << 10 * (t3 - t2) / 4 << "ns\n";
+//		std::cout << stdy << '\n';
+//
+//	}
+//	return 0;
+
+//	test_mnist();
+//	return 0;
+
+	if (true)
 	{
 		Graph graph;
+		const bool symmetric = false;
 		const int batch_size = 8;
-		const int embedding = 512;
+		const int board_size = 15;
+		int embedding = 64;
+		const int patch_size = 1;
+		const int head_dim = 32;
+		const int pos_encoding_range = (board_size + patch_size - 1) / patch_size;
 
-		auto x = graph.addInput( { batch_size, 15, 15, 32 });
+		auto x = graph.addInput( { batch_size, board_size, board_size, 32 });
+		x = graph.add(Conv2D(embedding / (patch_size * patch_size), 5, "relu"), x);
+//		x = graph.add(ml::SpaceToDepth(patch_size), x);
 
-		x = graph.add(Conv2D(embedding, 5), x);
+//		const int size_2 = (board_size + 1) / 2;
+//
+//		x = graph.add(ml::Conv2D(embedding, 3, "relu"), x);
+//		x = graph.add(ml::Conv2D(embedding, 3, "relu"), x);
+//		auto level0 = graph.add(ml::Conv2D(embedding, 3, "relu"), x);
+//		x = graph.add(ml::SpaceToDepth(2), level0);
+//
+//		x = graph.add(ml::Conv2D(embedding * 2, 3, "relu"), x);
+//		x = graph.add(ml::Conv2D(embedding * 2, 3, "relu"), x);
+//		auto level1 = graph.add(ml::Conv2D(embedding * 2, 3, "relu"), x);
+//		x = graph.add(ml::SpaceToDepth(2), level1);
+//
+//		x = graph.add(ml::Conv2D(embedding * 4, 3, "relu"), x);
+//		x = graph.add(ml::Conv2D(embedding * 4, 3, "relu"), x);
+//		x = graph.add(ml::Conv2D(embedding * 4, 3, "relu"), x);
+//		x = graph.add(ml::Conv2D(embedding * 4, 3, "relu"), x);
+//
+//		x = graph.add(ml::DepthToSpace(2, { size_2, size_2 }), x);
+//		x = graph.add(ml::Conv2D(embedding * 2, 1, "linear"), x);
+//		x = graph.add(ml::Add(), { x, level1 });
+//		x = graph.add(ml::Conv2D(embedding * 2, 3, "relu"), x);
+//		x = graph.add(ml::Conv2D(embedding * 2, 3, "relu"), x);
+//		x = graph.add(ml::Conv2D(embedding * 2, 3, "relu"), x);
+//
+//		x = graph.add(ml::DepthToSpace(2, { board_size, board_size }), x);
+//		x = graph.add(ml::Conv2D(embedding, 1, "linear"), x);
+//		x = graph.add(ml::Add(), { x, level0 });
+//		x = graph.add(ml::Conv2D(embedding, 3, "relu"), x);
+//		x = graph.add(ml::Conv2D(embedding, 3, "relu"), x);
+//		x = graph.add(ml::Conv2D(embedding, 3, "relu"), x);
 
-		for (int i = 0; i < 8; i++)
+		for (int i = 0; i < 5; i++)
 		{
-			if (i % 4 == 0)
-			{
-				auto y = graph.add(ml::LayerNormalization(), x);
-				y = graph.add(ml::Conv2D(3 * embedding, 1).useBias(false), y);
-				y = graph.add(ml::MultiHeadAttention(embedding / 16, 15), y);
-				y = graph.add(ml::Conv2D(embedding, 1).useBias(false), y);
-				x = graph.add(ml::Add(), { x, y });
-			}
+			auto y = graph.add(ml::Conv2D(embedding, 3, "relu"), x);
+			y = graph.add(ml::Conv2D(embedding, 3, "linear"), y);
+			x = graph.add(ml::Add("relu"), { x, y });
+		}
+		embedding *= 2;
+		x = graph.add(ml::Conv2D(embedding, 1, "relu"), x);
 
-			auto y = graph.add(Conv2D(embedding / 2, 1, "relu"), x);
-			y = graph.add(Conv2D(embedding / 2, 3, "relu"), y);
-			x = graph.add(Conv2D(embedding, 3, "relu"), { y, x });
+//		for (int i = 0; i < 4; i++)
+//		{
+//			auto y = graph.add(ml::Conv2D(embedding, 3, "relu"), x);
+//			y = graph.add(ml::Conv2D(embedding, 3, "linear"), y);
+//			x = graph.add(ml::Add("relu"), { x, y });
+//		}
+//		embedding *= 2;
+//		x = graph.add(ml::Conv2D(embedding, 1, "relu"), x);
+
+		for (int i = 0; i < 5; i++)
+		{
+			auto y = graph.add(ml::Conv2D(embedding / 2, 3, "relu"), x);
+			y = graph.add(ml::Conv2D(embedding / 2, 3, "relu"), y);
+			y = graph.add(ml::Conv2D(embedding, 3, "linear"), y);
+			x = graph.add(ml::Add("relu"), { x, y });
+
+//			auto y = graph.add(ml::Conv2D(embedding, 3, "relu"), x);
+//			y = graph.add(ml::Conv2D(embedding, 3, "linear"), y);
+//			x = graph.add(ml::Add("relu"), { x, y });
+
+//			auto y = graph.add(ml::RMSNormalization(), x);
+//			y = graph.add(ml::PositionalEncoding(), y);
+//			y = graph.add(ml::Conv2D((3 - symmetric) * embedding, 1).useBias(false), y);
+//			y = graph.add(ml::MultiHeadAttention(embedding / head_dim, pos_encoding_range, symmetric), y);
+//			y = graph.add(ml::Conv2D(embedding, 1).useBias(false), y);
+//			x = graph.add(ml::Add(), { x, y });
+
+//			y = graph.add(ml::RMSNormalization(), x);
+//			y = graph.add(ml::Conv2D(embedding, 1, "relu"), y);
+//			y = graph.add(ml::Conv2D(embedding, 1), y);
+//			x = graph.add(ml::Add(), { x, y });
 		}
 
+		// policy head
 		auto p = graph.add(ml::Conv2D(embedding, 3, "relu"), x);
 		p = graph.add(ml::Conv2D(1, 1, "linear"), p);
 		p = graph.add(ml::Softmax( { 1, 2, 3 }), p);
-		graph.addOutput(p);
+		graph.addOutput(p, ml::CrossEntropyLoss(1.0f));
+//		auto p = graph.add(ml::RMSNormalization(), x);
+//		p = graph.add(ml::Conv2D(3 * embedding, 1).useBias(false), p);
+//		p = graph.add(ml::MultiHeadAttention(embedding / head_dim, pos_encoding_range), p);
+//		p = graph.add(ml::Conv2D(1, 1), p);
+//		p = graph.add(ml::Softmax( { 1, 2, 3 }), p);
+//		graph.addOutput(p);
 
-		auto v = graph.add(ml::Conv2D(4, 1, "relu"), x);
-		v = graph.add(ml::Dense(256, "relu"), v);
-		v = graph.add(ml::Dense(3, "linear"), v);
+		auto common = graph.add(ml::GlobalPooling(), x);
+//		common = graph.add(ml::Dense(256, "relu"), common);
+
+		// value head
+		auto v = graph.add(ml::Dense(256, "relu"), common);
+		v = graph.add(ml::Dense(3), v);
 		v = graph.add(ml::Softmax( { 1 }), v);
-		graph.addOutput(v);
+		graph.addOutput(v, ml::CrossEntropyLoss(1.0f));
 
-		graph.print();
+		// uncertainty head
+//		auto unc = graph.add(ml::Dense(128, "relu"), common);
+//		unc = graph.add(ml::Dense(1, "sigmoid"), unc);
+//		graph.addOutput(unc, ml::MeanSquaredLoss(1.0f));
+
+		// moves left head
+//		auto mlh = graph.add(ml::Dense(128, "relu"), common);
+//		mlh = graph.add(ml::Dense(50), mlh);
+//		mlh = graph.add(ml::Softmax( { 1 }), mlh);
+//		graph.addOutput(mlh, ml::CrossEntropyLoss(0.1f));
+
+//		auto p = graph.add(ml::RMSNormalization(), x);
+////		auto p = graph.add(ml::Conv2D(embedding, 3, "relu"), x);
+////		p = graph.add(ml::Conv2D(1, 3, "linear"), p);
+//		p = graph.add(ml::Conv2D(3 * embedding, 1).useBias(false), p);
+//		p = graph.add(ml::MultiHeadAttention(embedding / head_dim, pos_encoding_range), p);
+//		p = graph.add(ml::Conv2D(patch_size * patch_size, 1), p);
+////		p = graph.add(ml::DepthToSpace(patch_size, { board_size, board_size }), p);
+//		p = graph.add(ml::Softmax( { 1, 2, 3 }), p);
+//		graph.addOutput(p);
+//
+////		auto v = graph.add(ml::Conv2D(4, 1, "relu"), x);
+////		v = graph.add(ml::Dense(std::min(256, 2 * embedding), "relu"), v);
+////		v = graph.add(ml::Dense(3, "linear"), v);
+////		v = graph.add(ml::Softmax( { 1 }), v);
+//
+//		auto v = graph.add(ml::GlobalPooling(), x);
+//		v = graph.add(ml::Dense(embedding, "relu"), v);
+//		v = graph.add(ml::Dense(embedding, "relu"), v);
+//		v = graph.add(ml::Dense(3), v);
+//		v = graph.add(ml::Softmax( { 1 }), v);
+//		graph.addOutput(v);
+
+//		auto p = graph.add(ml::Conv2D(embedding, 1, "relu"), x);
+//		p = graph.add(ml::DepthToSpace(patch_size, { board_size, board_size }), p);
+//		p = graph.add(ml::Conv2D(1, 1), p);
+//		p = graph.add(ml::Softmax( { 1, 2, 3 }), p);
+//		graph.addOutput(p);
+//
+//		// value head
+//		auto v = graph.add(ml::GlobalPooling(), x);
+//		v = graph.add(ml::Dense(embedding, "relu"), v);
+//		v = graph.add(ml::Dense(3), v);
+//		v = graph.add(ml::Softmax( { 1 }), v);
+//		graph.addOutput(v);
+
+//		graph.print();
 
 		graph.init();
+//		graph.moveTo(Device::cuda(0));
 		graph.moveTo(Device::cpu());
+		graph.convertTo(DataType::FLOAT16);
 
 		Tensor input(graph.getInputShape(), graph.dtype(), Device::cpu());
 		for (int i = 0; i < input.shape().volumeWithoutLastDim(); i++)
 		{
 			if (input.dtype() == DataType::FLOAT32)
 			{
-				float *ptr = reinterpret_cast<float*>(input.data()) + i * 8;
+				float *ptr = reinterpret_cast<float*>(input.data()) + i * graph.getInputShape().lastDim();
 				ptr[0] = 1.0f;
 				ptr[3] = 1.0f;
 				ptr[4] = 1.0f;
 			}
 			if (input.dtype() == DataType::FLOAT16)
 			{
-				uint16_t *ptr = reinterpret_cast<uint16_t*>(input.data()) + i * 8;
+				uint16_t *ptr = reinterpret_cast<uint16_t*>(input.data()) + i * graph.getInputShape().lastDim();
 				ptr[0] = 0x3c00;
 				ptr[3] = 0x3c00;
 				ptr[4] = 0x3c00;
 			}
 		}
 		graph.getInput().copyFrom(graph.context(), input);
-		graph.forward(1);
-		graph.context().synchronize();
-//		graph.backward(1);
+//		graph.forward(batch_size);
+//		graph.context().synchronize();
+//		graph.backward(batch_size);
 //		graph.learn();
 //		graph.context().synchronize();
-
-		std::this_thread::sleep_for(std::chrono::milliseconds(200));
-
-		graph.forward(batch_size);
-		graph.context().synchronize();
-		std::this_thread::sleep_for(std::chrono::milliseconds(100));
+//
+//		std::this_thread::sleep_for(std::chrono::milliseconds(200));
+//
+//		graph.forward(batch_size);
+//		graph.context().synchronize();
+//		std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
 //		graph.backward(batch_size);
 //		graph.learn();
 //		graph.context().synchronize();
+
+		graph.makeNonTrainable();
+		ml::FoldAdd().optimize(graph);
+		graph.print();
+		std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+		graph.forward(batch_size);
+		graph.context().synchronize();
 
 		std::cout << "starting benchmark\n";
 		const double start = getTime();
@@ -3477,37 +3770,6 @@ int main()
 ////		test_winograd_transform();
 //	std::cout << "END" << std::endl;
 //	return 0;
-
-//	for (int i = 1; i <= 1024; i++)
-//	int i = 8;
-//	{
-//		test_packing(i, 10, ml::MatrixOp::NORMAL);
-//		test_packing(i, 10, ml::MatrixOp::TRANSPOSE);
-//	}
-	std::cout << "FP32 kernels\n";
-//	std::cout << "SSE2\n";
-//	for (int i = 1; i <= 1024; i *= 2)
-//		test_microkernel(4, 8, i, DTYPE_FLOAT32, gemm_sse2_4x8_fp32);
-//	std::cout << "AVX\n";
-//	for (int i = 1; i <= 1024; i *= 2)
-//		test_microkernel(10, 8, i, DTYPE_FLOAT32, gemm_avx_10x8_fp32);
-	std::cout << "AVX2\n";
-	for (int i = 1; i <= 1024; i *= 2)
-		test_microkernel(12, 8, i, DTYPE_FLOAT32, gemm_avx2_fma_12x8_fp32);
-//	std::cout << "AVX512\n";
-//	for (int i = 1; i <= 1024; i *= 2)
-//		test_microkernel(24, 16, i, DTYPE_FLOAT32, gemm_avx512f_24x16_fp32);
-
-//	std::cout << "FP16 kernels\n";
-//	std::cout << "AVX\n";
-//	for (int i = 1; i <= 1024; i *= 2)
-//		test_microkernel(10, 8, i, DTYPE_FLOAT16, gemm_avx_10x8_fp32_fp16);
-//	std::cout << "AVX2\n";
-//	for (int i = 1; i <= 1024; i *= 2)
-//		test_microkernel(12, 8, i, DTYPE_FLOAT16, gemm_avx2_fma_12x8_fp32_fp16);
-//	std::cout << "AVX512\n";
-//	for (int i = 1; i <= 1024; i *= 2)
-//		test_microkernel(24, 16, i, DTYPE_FLOAT16, gemm_avx512f_24x16_fp32_fp16);
 
 	return 0;
 

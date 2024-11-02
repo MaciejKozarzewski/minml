@@ -84,28 +84,30 @@ namespace
 
 namespace ml
 {
-	int opencl_multi_head_attention_get_workspace_size(mlShape_t input_shape, mlShape_t weights_shape, bool training)
+	int opencl_multi_head_attention_get_workspace_size(mlShape_t input_shape, mlShape_t weights_shape, int num_heads, bool training)
 	{
 		assert(input_shape.rank == 4);
-		assert(weights_shape.rank == 3);
 		const int batch_size = input_shape.dim[0];
 		const int tokens = input_shape.dim[1] * input_shape.dim[2];
-		const int num_heads = weights_shape.dim[0];
 
 		int result = batch_size * num_heads * tokens * tokens;
 		if (training)
-			result = result * 2 + batch_size * num_heads * weights_shape.dim[1] * weights_shape.dim[2];
+		{
+			result = result * 2;
+			if (weights_shape.rank == 3)
+				result += batch_size * num_heads * weights_shape.dim[1] * weights_shape.dim[2];
+		}
 		return result;
 	}
-	void opencl_multi_head_attention_forward(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, mlDataType_t dtype,
-			const void *input, void *output, const void *weights, void *workspace, void *backward_data)
+	void opencl_multi_head_attention_forward(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, mlShape_t bias_shape,
+			mlDataType_t dtype, const void *input, void *output, const void *weights, const void *bias, const void *mask, void *workspace,
+			void *backward_data, int num_heads, bool symmetric)
 	{
 		assert(input_shape.rank == 3);
 		assert(weights_shape.rank == 3);
 		const int batch_size = input_shape.dim[0];
 		const int tokens = input_shape.dim[1];
 		const int embedding = input_shape.dim[2] / 3;
-		const int num_heads = weights_shape.dim[0];
 		const int head_dim = embedding / num_heads;
 
 		const int num_pointers = batch_size * num_heads;
@@ -127,15 +129,15 @@ namespace ml
 		gemm_batched(context, 'n', 'n', dtype, tokens, head_dim, tokens, 1.0f, workspace, qk_offsets, tokens, input, v_offsets, 3 * embedding, 0.0f,
 				output, out_offsets, embedding, num_pointers);
 	}
-	void opencl_multi_head_attention_backward(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, const void *input,
-			const void *weights, void *gradient_prev, void *gradient_next, void *weights_update, void *workspace, void *backward_data)
+	void opencl_multi_head_attention_backward(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, mlShape_t bias_shape,
+			const void *input, const void *weights, const void *bias, const void *mask, void *gradient_prev, void *gradient_next,
+			void *weights_update, void *bias_update, void *workspace, void *backward_data, int num_heads, bool symmetric)
 	{
 		assert(input_shape.rank == 3);
 		assert(weights_shape.rank == 3);
 		const int batch_size = input_shape.dim[0];
 		const int tokens = input_shape.dim[1];
 		const int embedding = input_shape.dim[2] / 3;
-		const int num_heads = weights_shape.dim[0];
 		const int head_dim = embedding / num_heads;
 
 		const int num_pointers = batch_size * num_heads;

@@ -54,7 +54,8 @@ namespace ml
 			ACTIVATION_TANH,
 			ACTIVATION_RELU,
 			ACTIVATION_SOFTMAX,
-			ACTIVATION_GELU
+			ACTIVATION_GELU,
+			ACTIVATION_EXP
 		} mlActivationType_t;
 
 		typedef void *mlContext_t;

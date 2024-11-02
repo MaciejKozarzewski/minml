@@ -2062,7 +2062,6 @@ namespace ml
 		assert(temp.is_fp32());
 		assert(Q.is_fp32());
 		assert(K.is_fp32());
-		assert(bias.is_fp32());
 		assert(Q.rows() == K.rows());
 		assert(Q.stride() == 12);
 		assert(K.stride() == 8);
@@ -2073,12 +2072,16 @@ namespace ml
 		assert(alpha_ptr != nullptr);
 		assert(cpu::is_aligned(Q.data(), 32));
 		assert(cpu::is_aligned(K.data(), 32));
-		assert(cpu::is_aligned(bias.data(), 32));
 
 		const float *Q_ptr = Q.data<float>();
 		const float *K_ptr = K.data<float>();
 		float *temp_ptr = temp.data<float>();
-		const float *bias_ptr = bias.data<float>();
+		const float *bias_ptr = bias.is_packed() ? bias.data<float>() : nullptr;
+		if (bias.is_packed())
+		{
+			assert(bias.is_fp32());
+			assert(cpu::is_aligned(bias.data(), 16));
+		}
 		float *softmax_ptr = softmax_sum.is_packed() ? softmax_sum.data<float>() : nullptr;
 		if (softmax_sum.is_packed())
 		{
@@ -2133,6 +2136,8 @@ namespace ml
 		PERMUTE_AND_SCALE_4x8xFP32(ymm12, ymm13, ymm14, ymm15)
 
 		movq(var(bias_ptr), rbx)// load address of bias pointer
+		test(rbx, rbx)
+		je(AFTER_BIAS)
 		movq(var(bias_stride), r14)// load address of bias stride into r14
 		movq(r14, r13)
 		sal(imm(1), r13)// r13 = stride * 2
@@ -2142,6 +2147,7 @@ namespace ml
 		ADD_BIAS_4x8xFP32(ymm4, ymm5, ymm6, ymm7)
 		ADD_BIAS_4x8xFP32(ymm8, ymm9, ymm10, ymm11)
 		ADD_BIAS_4x8xFP32(ymm12, ymm13, ymm14, ymm15)
+		label(AFTER_BIAS)
 
 		EXP_FIRST_STAGE_12x8xFP32()
 		EXP_SECOND_STAGE_3x8xFP32(ymm4, ymm5, ymm6)

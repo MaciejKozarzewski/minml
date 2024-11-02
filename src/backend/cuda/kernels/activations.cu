@@ -139,6 +139,22 @@ namespace
 	}
 
 	template<typename T>
+	__global__ void kernel_exp_forward(T *output, const T *input, int length)
+	{
+		for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < length; i += gridDim.x * blockDim.x)
+		{
+			Vector<T> tmp(input + i, length - i);
+			tmp = exp(tmp);
+			tmp.store(output + i, length - i);
+		}
+	}
+	__global__ void kernel_exp_backward(float *gradient_prev, const float *gradient_next, const float *output, int length)
+	{
+		for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < length; i += gridDim.x * blockDim.x)
+			gradient_prev[i] = gradient_next[i] * output[i];
+	}
+
+	template<typename T>
 	__global__ void kernel_add_to_last_dim(T *output, const T *input, const T *bias, int first_dim, int last_dim, ml::mlActivationType_t act)
 	{
 		ConstTensorWrapper<1, T> bias_wrapper(bias, last_dim);
@@ -300,6 +316,26 @@ namespace ml
 				}
 				break;
 			}
+			case ACTIVATION_GELU:
+			{
+				break;
+			}
+			case ACTIVATION_EXP:
+			{
+				dim3 blockDim(256);
+				dim3 gridDim = cuda::gridSize<1024>(volume(shape), 256);
+				switch (dtype)
+				{
+					case DTYPE_FLOAT16:
+						kernel_exp_forward<<<gridDim, blockDim, 0, stream>>>(getPointer<half>(output), getPointer<half>(input), volume(shape));
+						break;
+					case DTYPE_FLOAT32:
+						kernel_exp_forward<<<gridDim, blockDim, 0, stream>>>(getPointer<float>(output), getPointer<float>(input), volume(shape));
+						break;
+				}
+
+				break;
+			}
 		}
 
 		assert(cudaGetLastError() == cudaSuccess);
@@ -346,6 +382,18 @@ namespace ml
 			}
 			case ACTIVATION_SOFTMAX:
 				break;
+			case ACTIVATION_GELU:
+			{
+				break;
+			}
+			case ACTIVATION_EXP:
+			{
+				dim3 blockDim(256);
+				dim3 gridDim = cuda::gridSize<1024>(volume(shape), 256);
+				kernel_exp_backward<<<gridDim, blockDim, 0, stream>>>(getPointer<float>(gradient_prev), getPointer<float>(gradient_next),
+						getPointer<float>(output), volume(shape));
+				break;
+			}
 		}
 		assert(cudaGetLastError() == cudaSuccess);
 	}

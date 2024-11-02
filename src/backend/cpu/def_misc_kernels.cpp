@@ -10,6 +10,7 @@
 #include <minml/backend/cpu_backend.h>
 
 #include "misc_kernels.hpp"
+#include "common_math.hpp"
 #include "fp16.hpp"
 
 #include <cstddef>
@@ -21,15 +22,6 @@
 namespace
 {
 	using namespace ml::cpu;
-
-	float sigmoid(float x) noexcept
-	{
-		return 1.0f / (1.0f + std::exp(-x));
-	}
-	float relu(float x) noexcept
-	{
-		return std::max(0.0f, x);
-	}
 
 	template<typename SrcT, typename DstT>
 	DstT convert(SrcT x) noexcept
@@ -55,6 +47,50 @@ namespace
 	double convert(float16 x) noexcept
 	{
 		return static_cast<double>(convert_fp16_to_fp32(x));
+	}
+
+	template<int ACT, typename T>
+	T activation_forward(T x) noexcept
+	{
+		switch (ACT)
+		{
+			default:
+			case ml::ACTIVATION_LINEAR:
+				return x;
+			case ml::ACTIVATION_SIGMOID:
+				return sigmoid(x);
+			case ml::ACTIVATION_TANH:
+				return std::tanh(x);
+			case ml::ACTIVATION_RELU:
+				return relu(x);
+			case ml::ACTIVATION_GELU:
+				return approx_gelu(x);
+			case ml::ACTIVATION_EXP:
+				return std::exp(x);
+		}
+	}
+	template<int ACT, typename T>
+	T activation_backward(T gradient, T input, T output) noexcept
+	{
+		switch (ACT)
+		{
+			default:
+			case ml::ACTIVATION_LINEAR:
+				return gradient;
+			case ml::ACTIVATION_SIGMOID:
+				return gradient * output * (1.0f - output);
+			case ml::ACTIVATION_TANH:
+				return gradient * (1.0f - square(output));
+			case ml::ACTIVATION_RELU:
+				return (output > 0.0f) ? gradient : 0.0f;
+			case ml::ACTIVATION_GELU:
+			{
+				const T tmp = std::exp(1.6849f * input);
+				return tmp * (1 + 1.6849f * input + tmp) / square(1 + tmp);
+			}
+			case ml::ACTIVATION_EXP:
+				return gradient * output;
+		}
 	}
 
 	template<typename T>
@@ -127,19 +163,23 @@ namespace
 		{
 			case ml::ACTIVATION_LINEAR:
 				if (dst != src)
-					std::memcpy(dst, src, sizeof(float) * elements);
+					std::memcpy(dst, src, sizeof(T) * elements);
 				break;
 			case ml::ACTIVATION_SIGMOID:
 				for (size_t i = 0; i < elements; i++)
-					dst_ptr[i] = convert<float, T>(sigmoid(convert<T, float>(src_ptr[i])));
+					dst_ptr[i] = convert<float, T>(activation_forward<ml::ACTIVATION_SIGMOID>(convert<T, float>(src_ptr[i])));
 				break;
 			case ml::ACTIVATION_TANH:
 				for (size_t i = 0; i < elements; i++)
-					dst_ptr[i] = convert<float, T>(std::tanh(convert<T, float>(src_ptr[i])));
+					dst_ptr[i] = convert<float, T>(activation_forward<ml::ACTIVATION_TANH>(convert<T, float>(src_ptr[i])));
 				break;
 			case ml::ACTIVATION_RELU:
 				for (size_t i = 0; i < elements; i++)
-					dst_ptr[i] = convert<float, T>(relu(convert<T, float>(src_ptr[i])));
+					dst_ptr[i] = convert<float, T>(activation_forward<ml::ACTIVATION_RELU>(convert<T, float>(src_ptr[i])));
+				break;
+			case ml::ACTIVATION_EXP:
+				for (size_t i = 0; i < elements; i++)
+					dst_ptr[i] = convert<float, T>(activation_forward<ml::ACTIVATION_EXP>(convert<T, float>(src_ptr[i])));
 				break;
 			default:
 				break;
@@ -157,23 +197,8 @@ namespace
 		{
 			for (int j = 0; j < last_dim; j++)
 			{
-				float tmp = convert<T, float>(input_ptr[j]) + convert<T, float>(bias_ptr[j]);
-				switch (ACT)
-				{
-					default:
-					case ml::ACTIVATION_LINEAR:
-						break;
-					case ml::ACTIVATION_SIGMOID:
-						tmp = sigmoid(tmp);
-						break;
-					case ml::ACTIVATION_TANH:
-						tmp = std::tanh(tmp);
-						break;
-					case ml::ACTIVATION_RELU:
-						tmp = relu(tmp);
-						break;
-				}
-				output_ptr[j] = convert<float, T>(tmp);
+				const float tmp = convert<T, float>(input_ptr[j]) + convert<T, float>(bias_ptr[j]);
+				output_ptr[j] = convert<float, T>(activation_forward<ACT, T>(tmp));
 			}
 			output_ptr += last_dim;
 			input_ptr += last_dim;
@@ -197,23 +222,8 @@ namespace
 			{
 				for (int k = 0; k < channels; k++)
 				{
-					float tmp = input_ptr[k] + bias_ptr[k];
-					switch (ACT)
-					{
-						default:
-						case ml::ACTIVATION_LINEAR:
-							break;
-						case ml::ACTIVATION_SIGMOID:
-							tmp = sigmoid(tmp);
-							break;
-						case ml::ACTIVATION_TANH:
-							tmp = std::tanh(tmp);
-							break;
-						case ml::ACTIVATION_RELU:
-							tmp = relu(tmp);
-							break;
-					}
-					output_ptr[k] = tmp;
+					const float tmp = input_ptr[k] + bias_ptr[k];
+					output_ptr[k] = activation_forward<ACT, float>(tmp);
 				}
 				input_ptr += channels;
 				output_ptr += channels;
@@ -301,6 +311,12 @@ namespace ml
 					if (gradient_prev != gradient_next)
 						std::memcpy(gradient_prev, gradient_next, sizeof(float) * elements);
 					break;
+				case ACTIVATION_GELU:
+					break;
+				case ACTIVATION_EXP:
+					for (size_t i = 0; i < elements; i++)
+						prev_ptr[i] = out_ptr[i] * next_ptr[i];
+					break;
 				default:
 					break;
 			}
@@ -322,6 +338,12 @@ namespace ml
 					break;
 				case ACTIVATION_RELU:
 					kernel_add_bias_act<float, ACTIVATION_RELU>(output, input, bias, first_dim, last_dim);
+					break;
+				case ACTIVATION_GELU:
+					kernel_add_bias_act<float, ACTIVATION_GELU>(output, input, bias, first_dim, last_dim);
+					break;
+				case ACTIVATION_EXP:
+					kernel_add_bias_act<float, ACTIVATION_EXP>(output, input, bias, first_dim, last_dim);
 					break;
 			}
 		}

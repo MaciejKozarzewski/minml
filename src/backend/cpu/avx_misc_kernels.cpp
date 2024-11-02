@@ -10,6 +10,7 @@
 
 #include "utils.hpp"
 #include "misc_kernels.hpp"
+#include "common_math.hpp"
 #include "fp16.hpp"
 
 #include <cstddef>
@@ -22,14 +23,7 @@
 
 namespace
 {
-	float sigmoid(float x) noexcept
-	{
-		return 1.0f / (1.0f + std::exp(-x));
-	}
-	float relu(float x) noexcept
-	{
-		return std::max(0.0f, x);
-	}
+	using namespace ml::cpu;
 
 	template<typename DstT, typename SrcT>
 	DstT convert_to(SrcT x) noexcept
@@ -139,6 +133,14 @@ namespace
 				for (size_t i = 0; i < elements; i++)
 					dst_ptr[i] = convert_to<T>(relu(convert_to<float>(src_ptr[i])));
 				break;
+			case ml::ACTIVATION_GELU:
+				for (size_t i = 0; i < elements; i++)
+					dst_ptr[i] = convert_to<T>(approx_gelu(convert_to<float>(src_ptr[i])));
+				break;
+			case ml::ACTIVATION_EXP:
+				for (size_t i = 0; i < elements; i++)
+					dst_ptr[i] = convert_to<T>(std::exp(convert_to<float>(src_ptr[i])));
+				break;
 			default:
 				break;
 		}
@@ -169,6 +171,12 @@ namespace
 						break;
 					case ml::ACTIVATION_RELU:
 						tmp = relu(tmp);
+						break;
+					case ml::ACTIVATION_GELU:
+						tmp = approx_gelu(tmp);
+						break;
+					case ml::ACTIVATION_EXP:
+						tmp = std::exp(tmp);
 						break;
 				}
 				output_ptr[j] = convert_to<T>(tmp);
@@ -636,6 +644,12 @@ namespace ml
 					break;
 				case ACTIVATION_RELU:
 					kernel_add_bias_act<float16, ACTIVATION_RELU>(output, input, bias, first_dim, last_dim);
+					break;
+				case ACTIVATION_GELU:
+					kernel_add_bias_act<float16, ACTIVATION_GELU>(output, input, bias, first_dim, last_dim);
+					break;
+				case ACTIVATION_EXP:
+					kernel_add_bias_act<float16, ACTIVATION_EXP>(output, input, bias, first_dim, last_dim);
 					break;
 			}
 		}

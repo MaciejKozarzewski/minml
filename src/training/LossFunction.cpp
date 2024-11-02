@@ -65,5 +65,31 @@ namespace ml
 		return std::make_unique<MeanSquaredLoss>(m_weight);
 	}
 
+	ValueHeadLoss::ValueHeadLoss(float weight) :
+			m_weight(weight)
+	{
+	}
+	float ValueHeadLoss::getLoss(const Context &context, const Tensor &output, const Tensor &target) const
+	{
+		return m_weight * valueHeadLoss(context, output, target);
+	}
+	void ValueHeadLoss::getGradient(const Context &context, Tensor &gradient, const Tensor &output, const Tensor &target) const
+	{
+		valueHeadGradient(context, gradient, output, target, m_weight);
+	}
+	Json ValueHeadLoss::serialize(SerializedObject &binary_data) const
+	{
+		return Json( { { "name", "ValueHeadLoss" }, { "weight", m_weight } });
+	}
+	void ValueHeadLoss::unserialize(const Json &json, const SerializedObject &binary_data)
+	{
+		assert(json["name"].getString() == "ValueHeadLoss");
+		m_weight = json["weight"].getDouble();
+	}
+	std::unique_ptr<LossFunction> ValueHeadLoss::clone() const
+	{
+		return std::make_unique<ValueHeadLoss>(m_weight);
+	}
+
 } /* namespace ml */
 

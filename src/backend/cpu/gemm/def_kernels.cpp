@@ -429,7 +429,7 @@ namespace
 			float sum = softmax_sum.is_packed() ? softmax_sum.at<CT>(m, 0) : 0.0f;
 			for (int n = 0; n < N; n++)
 			{
-				const float b = convert<BT, float>(bias.at<BT>(m, n));
+				const float b = bias.is_packed() ? convert<BT, float>(bias.at<BT>(m, n)) : 0.0f;
 				const float tmp = fast_exp(acc[m * N + n] * alpha + b);
 				temp.at<CT>(n, m) = convert<float, CT>(tmp);
 				sum += tmp;
@@ -528,7 +528,6 @@ namespace ml
 			else
 				kernel_unpack<float16, float16>(dst, dst_pos.row, dst_pos.column, src);
 		}
-		kernel_unpack<float, float>(dst, dst_pos.row, dst_pos.column, src);
 	}
 	// multi-head attention kernel
 	void mha_qk_def_MxN(Fragment &temp, const void *alpha_ptr, const Fragment &Q, const Fragment &K, const Fragment &bias,

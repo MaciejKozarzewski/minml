@@ -51,6 +51,7 @@ namespace ml
 			int bias_range = 0;
 			int tokens = 0;
 			int head_dim = 0;
+			bool symmetric = false;
 
 		public:
 			using packing_function = std::function<void(Fragment&, const Matrix&, const Position2D&, MatrixOp)>;
@@ -77,14 +78,17 @@ namespace ml
 			{
 				return perf_estimator( { tokens, tokens, head_dim }, inner_tile);
 			}
-			void setInput(const void *ptr, mlShape_t shape, mlDataType_t dtype)
+			void setInput(const void *ptr, mlShape_t shape, mlDataType_t dtype, int num_heads, bool symmetric)
 			{
 				assert(shape.rank == 4);
+				this->num_heads = num_heads;
 				batch_size = shape.dim[0];
 				height = shape.dim[1];
 				width = shape.dim[2];
-				assert(shape.dim[3] % 3 == 0);
-				embedding = shape.dim[3] / 3;
+				assert(shape.dim[3] % (3 - symmetric) == 0);
+				embedding = shape.dim[3] / (3 - symmetric);
+				assert(embedding % num_heads == 0);
+				this->symmetric = symmetric;
 				matrix_QKV = BatchedMatrix(ptr, dtype, shape.dim[0], shape.dim[1] * shape.dim[2], shape.dim[3], shape.dim[3]);
 			}
 			void setOutput(void *ptr, mlShape_t shape, mlDataType_t dtype)
@@ -94,11 +98,16 @@ namespace ml
 			}
 			void setBias(const void *ptr, mlShape_t shape, mlDataType_t dtype)
 			{
-				assert(shape.rank == 3);
-				num_heads = shape.dim[0];
-				assert(embedding % num_heads == 0);
-				bias_range = (shape.dim[1] - 1) / 2;
-				matrix_bias = BatchedMatrix(ptr, dtype, shape.dim[0], shape.dim[1], shape.dim[2], shape.dim[2]);
+				if (ptr != nullptr and shape.rank == 3)
+				{
+					bias_range = (shape.dim[1] - 1) / 2;
+					matrix_bias = BatchedMatrix(ptr, dtype, shape.dim[0], shape.dim[1], shape.dim[2], shape.dim[2]);
+				}
+				else
+				{
+					bias_range = 0;
+					matrix_bias = BatchedMatrix();
+				}
 			}
 			void setup(mlContext_t context);
 			void run();

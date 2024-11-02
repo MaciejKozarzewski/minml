@@ -693,7 +693,7 @@ namespace ml
 		assert(Q.is_fp32());
 		assert(K.is_fp32());
 		assert(temp.is_fp32());
-		assert(bias.is_fp32());
+
 		assert(Q.rows() == K.rows());
 		assert(Q.stride() == 4);
 		assert(K.stride() == 8);
@@ -704,12 +704,16 @@ namespace ml
 		assert(alpha_ptr != nullptr);
 		assert(cpu::is_aligned(Q.data(), 16));
 		assert(cpu::is_aligned(K.data(), 16));
-		assert(cpu::is_aligned(bias.data(), 16));
 
 		const float *Q_ptr = Q.data<float>();
 		const float *K_ptr = K.data<float>();
 		float *temp_ptr = temp.data<float>();
-		const float *bias_ptr = bias.data<float>();
+		const float *bias_ptr = bias.is_packed() ? bias.data<float>() : nullptr;
+		if (bias.is_packed())
+		{
+			assert(bias.is_fp32());
+			assert(cpu::is_aligned(bias.data(), 16));
+		}
 		float *softmax_ptr = softmax_sum.is_packed() ? softmax_sum.data<float>() : nullptr;
 		if (softmax_sum.is_packed())
 		{

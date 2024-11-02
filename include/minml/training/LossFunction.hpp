@@ -55,6 +55,18 @@ namespace ml
 			std::unique_ptr<LossFunction> clone() const;
 	};
 
+	class ValueHeadLoss: public LossFunction
+	{
+			float m_weight;
+		public:
+			ValueHeadLoss(float weight = 1.0f);
+			float getLoss(const Context &context, const Tensor &output, const Tensor &target) const;
+			void getGradient(const Context &context, Tensor &gradient, const Tensor &output, const Tensor &target) const;
+			Json serialize(SerializedObject &binary_data) const;
+			void unserialize(const Json &json, const SerializedObject &binary_data);
+			std::unique_ptr<LossFunction> clone() const;
+	};
+
 } /* namespace ml */
 
 #endif /* MINML_TRAINING_LOSSFUNCTION_HPP_ */

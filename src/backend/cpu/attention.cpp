@@ -85,9 +85,9 @@ namespace
 		return reinterpret_cast<uint8_t*>(ptr) + offsetInBytes;
 	}
 	void calculate_pointers(const void *input, void *workspace, const void *output, PointerPack &pack, int batch_size, int tokens, int num_heads,
-			int head_dim, int dtype_size) noexcept
+			int head_dim, int dtype_size, bool symmetric) noexcept
 	{
-		const Indexer<5> input_indexer(batch_size, tokens, 3, num_heads, head_dim);
+		const Indexer<5> input_indexer(batch_size, tokens, 3 - symmetric, num_heads, head_dim);
 		const Indexer<4> workspace_indexer(batch_size, num_heads, tokens, tokens);
 		const Indexer<4> output_indexer(batch_size, tokens, num_heads, head_dim);
 
@@ -96,15 +96,18 @@ namespace
 			for (int h = 0; h < num_heads; h++, idx++)
 			{
 				pack.q[idx] = apply_offset(const_cast<void*>(input), dtype_size * input_indexer.at(b, 0, 0, h, 0));
-				pack.k[idx] = apply_offset(const_cast<void*>(input), dtype_size * input_indexer.at(b, 0, 1, h, 0));
-				pack.v[idx] = apply_offset(const_cast<void*>(input), dtype_size * input_indexer.at(b, 0, 2, h, 0));
+				if (symmetric)
+					pack.k[idx] = pack.q[idx];
+				else
+					pack.k[idx] = apply_offset(const_cast<void*>(input), dtype_size * input_indexer.at(b, 0, 1, h, 0));
+				pack.v[idx] = apply_offset(const_cast<void*>(input), dtype_size * input_indexer.at(b, 0, 2 - symmetric, h, 0));
 				pack.qk[idx] = apply_offset(workspace, dtype_size * workspace_indexer.at(b, h, 0, 0));
 				pack.out[idx] = apply_offset(const_cast<void*>(output), dtype_size * output_indexer.at(b, 0, h, 0));
 			}
 	}
 
 	void gemm_batched(mlContext_t context, char opA, char opB, mlDataType_t dtype, int M, int N, int K, float alpha, std::vector<void*> &A, int lda,
-			std::vector<void*> &B, int ldb, std::vector<void*> &C, int ldc, int batch_count)
+			std::vector<void*> &B, int ldb, float beta, std::vector<void*> &C, int ldc, int batch_count)
 	{
 		GemmRuntime rt = get_gemm_runtime(context, dtype, opA, opB, M, N, K);
 
@@ -121,13 +124,13 @@ namespace
 			rt.setMatrixD(matrix_c);
 			if (i == 0)
 			{
-				rt.setScalingFactors(alpha, 0.0f);
+				rt.setScalingFactors(alpha, beta);
 				rt.setup(context);
 			}
 			rt.run();
 		}
 	}
-	template<typename T>
+	template<typename T, bool UseBias>
 	void softmax_forward_in_place(void *input, const void *weights, int batch_size, int num_heads, int height, int width, int weights_size,
 			void *workspace)
 	{
@@ -141,8 +144,11 @@ namespace
 
 		for (int h = 0; h < num_heads; h++)
 		{
-			for (int i = 0; i < weights_size * round_up(weights_size, 4); i++)
-				weights_cache_ptr[i] = convert<float>(weights_ptr[i]);
+			if (UseBias)
+			{
+				for (int i = 0; i < weights_size * round_up(weights_size, 4); i++)
+					weights_cache_ptr[i] = convert<float>(weights_ptr[i]);
+			}
 
 			for (int b = 0; b < batch_size; b++)
 			{
@@ -156,9 +162,13 @@ namespace
 						for (int h2 = 0; h2 < height; h2++)
 							for (int w2 = 0; w2 < width; w2++)
 							{
-								const int offset_h = range + clamp(h2 - h1, -range, range);
-								const int offset_w = range + clamp(w2 - w1, -range, range);
-								const float bias = weights_cache_ptr[weight_indexer.at(offset_h, offset_w)];
+								float bias = 0.0f;
+								if (UseBias)
+								{
+									const int offset_h = range + clamp(h2 - h1, -range, range);
+									const int offset_w = range + clamp(w2 - w1, -range, range);
+									bias = weights_cache_ptr[weight_indexer.at(offset_h, offset_w)];
+								}
 								const float tmp = convert<float>(input_ptr[idx]) + bias;
 								max_value = std::max(max_value, tmp);
 								input_cache_ptr[idx] = tmp;
@@ -184,6 +194,7 @@ namespace
 			weights_ptr += weights_size * round_up(weights_size, 4);
 		}
 	}
+	template<bool UseBias>
 	void softmax_backward_in_place(void *gradient, void *weights_update, const void *output, int batch_size, int num_heads, int height, int width,
 			int weights_size)
 	{
@@ -208,13 +219,14 @@ namespace
 						for (int h2 = 0; h2 < height; h2++)
 							for (int w2 = 0; w2 < width; w2++)
 							{
-								const int offset_h = range + clamp(h2 - h1, -range, range);
-								const int offset_w = range + clamp(w2 - w1, -range, range);
-
 								const float dx = output_ptr[idx] * (gradient_ptr[idx] - tmp);
 								gradient_ptr[idx] = dx;
-
-								weights_update_ptr[weight_indexer.at(h, offset_h, offset_w)] += dx;
+								if (UseBias)
+								{
+									const int offset_h = range + clamp(h2 - h1, -range, range);
+									const int offset_w = range + clamp(w2 - w1, -range, range);
+									weights_update_ptr[weight_indexer.at(h, offset_h, offset_w)] += dx;
+								}
 								idx++;
 							}
 						output_ptr += height * width;
@@ -224,20 +236,18 @@ namespace
 	}
 
 	void fused_mha_forward(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, mlDataType_t dtype, const void *input, void *output,
-			const void *weights, void *workspace, void *backward_data)
+			const void *weights, void *workspace, void *backward_data, int num_heads, bool symmetric)
 	{
 		assert(input_shape.rank == 4);
-		assert(weights_shape.rank == 3);
 		const int batch_size = input_shape.dim[0];
 		const int height = input_shape.dim[1];
 		const int width = input_shape.dim[2];
 		const int tokens = height * width;
-		const int embedding = input_shape.dim[3] / 3;
-		const int num_heads = weights_shape.dim[0];
+		const int embedding = input_shape.dim[3] / (3 - symmetric);
 		const int head_dim = embedding / num_heads;
 
 		MhaRuntime rt = get_mha_runtime(context, dtype, tokens, head_dim);
-		rt.setInput(input, input_shape, dtype);
+		rt.setInput(input, input_shape, dtype, num_heads, symmetric);
 		rt.setOutput(output, make_shape( { batch_size, height, width, embedding }), dtype);
 		rt.setBias(weights, weights_shape, dtype);
 		rt.setup(context);
@@ -247,13 +257,11 @@ namespace
 
 namespace ml
 {
-	int cpu_multi_head_attention_get_workspace_size(mlShape_t input_shape, mlShape_t weights_shape, bool training)
+	int cpu_multi_head_attention_get_workspace_size(mlShape_t input_shape, mlShape_t weights_shape, int num_heads, bool training)
 	{
 		assert(input_shape.rank == 4);
-		assert(weights_shape.rank == 3);
 		const int batch_size = input_shape.dim[0];
 		const int tokens = input_shape.dim[1] * input_shape.dim[2];
-		const int num_heads = weights_shape.dim[0];
 
 		int result = batch_size * num_heads * tokens * tokens;
 		if (training)
@@ -261,25 +269,27 @@ namespace ml
 		return result;
 	}
 
-	void cpu_multi_head_attention_forward(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, mlDataType_t dtype, const void *input,
-			void *output, const void *weights, void *workspace, void *backward_data)
+	void cpu_multi_head_attention_forward(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, mlShape_t bias_shape,
+			mlDataType_t dtype, const void *input, void *output, const void *weights, const void *bias, const void *mask, void *workspace,
+			void *backward_data, int num_heads, bool symmetric)
 	{
 		if (backward_data == nullptr)
 		{
-			fused_mha_forward(context, input_shape, weights_shape, dtype, input, output, weights, workspace, backward_data);
+			fused_mha_forward(context, input_shape, weights_shape, dtype, input, output, weights, workspace, backward_data, num_heads, symmetric);
 			return;
 		}
 
 		assert(input_shape.rank == 4);
-		assert(weights_shape.rank == 3);
 		const int batch_size = input_shape.dim[0];
 		const int height = input_shape.dim[1];
 		const int width = input_shape.dim[2];
 		const int tokens = height * width;
-		const int embedding = input_shape.dim[3] / 3;
-		const int num_heads = weights_shape.dim[0];
+		const int embedding = input_shape.dim[3] / (3 - symmetric);
 		const int head_dim = embedding / num_heads;
-		const int range = weights_shape.dim[1];
+		const bool use_bias = weights != nullptr;
+		const int range = use_bias ? weights_shape.dim[1] : 0;
+
+		const int qkv_stride = input_shape.dim[3];
 
 		const int num_pointers = batch_size * num_heads;
 		void *local_workspace = ml::cpu::Context::getWorkspace(context);
@@ -287,30 +297,34 @@ namespace ml
 		PointerPack pack(num_pointers);
 
 		void *qk_tensor_ptr = (backward_data == nullptr) ? workspace : backward_data;
-		calculate_pointers(input, qk_tensor_ptr, output, pack, batch_size, tokens, num_heads, head_dim, size_of(dtype));
+		calculate_pointers(input, qk_tensor_ptr, output, pack, batch_size, tokens, num_heads, head_dim, size_of(dtype), symmetric);
 
 		const float scale = 1.0f / std::sqrt(head_dim);
-		gemm_batched(context, 'n', 't', dtype, tokens, tokens, head_dim, scale, pack.q, 3 * embedding, pack.k, 3 * embedding, pack.qk, tokens,
+		gemm_batched(context, 'n', 't', dtype, tokens, tokens, head_dim, scale, pack.q, qkv_stride, pack.k, qkv_stride, 0.0f, pack.qk, tokens,
 				num_pointers);
 
-		softmax_forward_in_place<float>(qk_tensor_ptr, weights, batch_size, num_heads, height, width, range, local_workspace);
+		if (use_bias)
+			softmax_forward_in_place<float, true>(qk_tensor_ptr, weights, batch_size, num_heads, height, width, range, local_workspace);
+		else
+			softmax_forward_in_place<float, false>(qk_tensor_ptr, nullptr, batch_size, num_heads, height, width, 0, local_workspace);
 
-		gemm_batched(context, 'n', 'n', dtype, tokens, head_dim, tokens, 1.0f, pack.qk, tokens, pack.v, 3 * embedding, pack.out, embedding,
+		gemm_batched(context, 'n', 'n', dtype, tokens, head_dim, tokens, 1.0f, pack.qk, tokens, pack.v, qkv_stride, 0.0f, pack.out, embedding,
 				num_pointers);
 	}
-	void cpu_multi_head_attention_backward(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, const void *input,
-			const void *weights, void *gradient_prev, void *gradient_next, void *weights_update, void *workspace, void *backward_data)
+	void cpu_multi_head_attention_backward(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, mlShape_t bias_shape,
+			const void *input, const void *weights, const void *bias, const void *mask, void *gradient_prev, void *gradient_next,
+			void *weights_update, void *bias_update, void *workspace, void *backward_data, int num_heads, bool symmetric)
 	{
 		assert(input_shape.rank == 4);
-		assert(weights_shape.rank == 3);
 		const int batch_size = input_shape.dim[0];
 		const int height = input_shape.dim[1];
 		const int width = input_shape.dim[2];
 		const int tokens = height * width;
-		const int embedding = input_shape.dim[3] / 3;
-		const int num_heads = weights_shape.dim[0];
+		const int embedding = input_shape.dim[3] / (3 - symmetric);
 		const int head_dim = embedding / num_heads;
-		const int range = weights_shape.dim[1];
+		const bool use_bias = weights != nullptr;
+		const int range = use_bias ? weights_shape.dim[1] : 0;
+		const int qkv_stride = input_shape.dim[3];
 
 		const int offset = batch_size * num_heads * tokens * tokens * size_of(DTYPE_FLOAT32);
 		void *qk_tensor_ptr = (backward_data == nullptr) ? workspace : backward_data;
@@ -323,31 +337,42 @@ namespace ml
 		PointerPack backward_pack(num_pointers);
 
 		const float scale = 1.0f / std::sqrt(head_dim);
-		calculate_pointers(input, qk_tensor_ptr, nullptr, forward_pack, batch_size, tokens, num_heads, head_dim, size_of(DTYPE_FLOAT32));
+		calculate_pointers(input, qk_tensor_ptr, nullptr, forward_pack, batch_size, tokens, num_heads, head_dim, size_of(DTYPE_FLOAT32), symmetric);
 		calculate_pointers(gradient_prev, dqk_tensor_ptr, gradient_next, backward_pack, batch_size, tokens, num_heads, head_dim,
-				size_of(DTYPE_FLOAT32));
+				size_of(DTYPE_FLOAT32), symmetric);
 
 		if (backward_data == nullptr)
 		{
-			gemm_batched(context, 'n', 't', DTYPE_FLOAT32, tokens, tokens, head_dim, scale, forward_pack.q, 3 * embedding, forward_pack.k,
-					3 * embedding, forward_pack.qk, tokens, num_pointers);
-			softmax_forward_in_place<float>(qk_tensor_ptr, weights, batch_size, num_heads, height, width, range, local_workspace);
+			gemm_batched(context, 'n', 't', DTYPE_FLOAT32, tokens, tokens, head_dim, scale, forward_pack.q, qkv_stride, forward_pack.k, qkv_stride,
+					0.0f, forward_pack.qk, tokens, num_pointers);
+			if (use_bias)
+				softmax_forward_in_place<float, true>(qk_tensor_ptr, weights, batch_size, num_heads, height, width, range, local_workspace);
+			else
+				softmax_forward_in_place<float, false>(qk_tensor_ptr, nullptr, batch_size, num_heads, height, width, 0, local_workspace);
 		}
 
 		// dqk = dy * V^T
-		gemm_batched(context, 'n', 't', DTYPE_FLOAT32, tokens, tokens, head_dim, 1.0f, backward_pack.out, embedding, forward_pack.v, 3 * embedding,
+		gemm_batched(context, 'n', 't', DTYPE_FLOAT32, tokens, tokens, head_dim, 1.0f, backward_pack.out, embedding, forward_pack.v, qkv_stride, 0.0f,
 				backward_pack.qk, tokens, num_pointers);
 		// dV = qk^T * dy
-		gemm_batched(context, 't', 'n', DTYPE_FLOAT32, tokens, head_dim, tokens, 1.0f, forward_pack.qk, tokens, backward_pack.out, embedding,
-				backward_pack.v, 3 * embedding, num_pointers);
+		gemm_batched(context, 't', 'n', DTYPE_FLOAT32, tokens, head_dim, tokens, 1.0f, forward_pack.qk, tokens, backward_pack.out, embedding, 0.0f,
+				backward_pack.v, qkv_stride, num_pointers);
 
-		softmax_backward_in_place(dqk_tensor_ptr, weights_update, qk_tensor_ptr, batch_size, num_heads, height, width, range);
+		if (use_bias)
+		{
+			assert(weights_shape.rank == 3);
+			softmax_backward_in_place<true>(dqk_tensor_ptr, weights_update, qk_tensor_ptr, batch_size, num_heads, height, width, range);
+		}
+		else
+			softmax_backward_in_place<false>(dqk_tensor_ptr, nullptr, qk_tensor_ptr, batch_size, num_heads, height, width, 0);
 
 		// dQ = dqk * K
-		gemm_batched(context, 'n', 'n', DTYPE_FLOAT32, tokens, head_dim, tokens, scale, backward_pack.qk, tokens, forward_pack.k, 3 * embedding,
-				backward_pack.q, 3 * embedding, num_pointers);
+		gemm_batched(context, 'n', 'n', DTYPE_FLOAT32, tokens, head_dim, tokens, scale, backward_pack.qk, tokens, forward_pack.k, qkv_stride, 0.0f,
+				backward_pack.q, qkv_stride, num_pointers);
+
+		const float beta = symmetric ? 1.0f : 0.0f;
 		// dK = dqk^T * Q
-		gemm_batched(context, 't', 'n', DTYPE_FLOAT32, tokens, head_dim, tokens, scale, backward_pack.qk, tokens, forward_pack.q, 3 * embedding,
-				backward_pack.k, 3 * embedding, num_pointers);
+		gemm_batched(context, 't', 'n', DTYPE_FLOAT32, tokens, head_dim, tokens, scale, backward_pack.qk, tokens, forward_pack.q, qkv_stride, beta,
+				backward_pack.k, qkv_stride, num_pointers);
 	}
 } /* namespace ml */

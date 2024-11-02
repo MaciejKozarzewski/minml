@@ -229,6 +229,10 @@ namespace ml
 		return load<int>(&m_data, m_dtype);
 	}
 
+	Tensor::Tensor() noexcept
+	{
+		std::memset(m_stride, 0, sizeof(m_stride));
+	}
 	Tensor::Tensor(const Shape &shape, DataType dtype, Device device) :
 			m_device(device),
 			m_shape(shape),

@@ -218,11 +218,15 @@ namespace
 
 	Fragment get_subfragment(Fragment &frag, Position2D pos, Size2D size) noexcept
 	{
-		assert(frag.is_packed());
-		void *shifted_ptr = frag.data<uint8_t>() + size_of(frag.dtype()) * frag.offset_at(pos.row, pos.column);
-		Fragment result(shifted_ptr, frag.dtype(), frag.stride());
-		result.mark_as_packed_with_size(size);
-		return result;
+		if (frag.is_packed())
+		{
+			void *shifted_ptr = frag.data<uint8_t>() + size_of(frag.dtype()) * frag.offset_at(pos.row, pos.column);
+			Fragment result(shifted_ptr, frag.dtype(), frag.stride());
+			result.mark_as_packed_with_size(size);
+			return result;
+		}
+		else
+			return Fragment();
 	}
 	void edge_softmax_sum(Fragment &softmax_sum, const Fragment &edge_qk) noexcept
 	{
@@ -253,12 +257,18 @@ namespace ml
 
 		for (int h = 0; h < num_heads; h++)
 		{
-			pack_fragment_bias(h);
+			if (bias_range > 0)
+				pack_fragment_bias(h);
 			for (int b = 0; b < batch_size; b++)
 			{
-				Matrix Q(matrix_QKV.pointer_at(b, 0, 0 * embedding + h * head_dim), matrix_QKV.dtype(), tokens, head_dim, 3 * embedding);
-				Matrix K(matrix_QKV.pointer_at(b, 0, 1 * embedding + h * head_dim), matrix_QKV.dtype(), tokens, head_dim, 3 * embedding);
-				Matrix V(matrix_QKV.pointer_at(b, 0, 2 * embedding + h * head_dim), matrix_QKV.dtype(), tokens, head_dim, 3 * embedding);
+				const int offset_q = 0;
+				const int offset_k = symmetric ? 0 : 1;
+				const int offset_v = symmetric ? 1 : 2;
+				const int stride_qkv = (3 - symmetric) * embedding;
+
+				Matrix Q(matrix_QKV.pointer_at(b, 0, offset_q * embedding + h * head_dim), matrix_QKV.dtype(), tokens, head_dim, stride_qkv);
+				Matrix K(matrix_QKV.pointer_at(b, 0, offset_k * embedding + h * head_dim), matrix_QKV.dtype(), tokens, head_dim, stride_qkv);
+				Matrix V(matrix_QKV.pointer_at(b, 0, offset_v * embedding + h * head_dim), matrix_QKV.dtype(), tokens, head_dim, stride_qkv);
 				Matrix out(matrix_output.pointer_at(b, 0, h * head_dim), matrix_output.dtype(), tokens, head_dim, embedding);
 
 				K_fragments.reset();
@@ -318,7 +328,7 @@ namespace ml
 	}
 	void MhaRuntime::create_fragments(mlContext_t context)
 	{
-		assert(matrix_QKV.data() != nullptr && matrix_output.data() != nullptr && matrix_bias.data() != nullptr); // all matrices have been set
+		assert(matrix_QKV.data() != nullptr && matrix_output.data() != nullptr); // all matrices have been set
 		head_dim = embedding / num_heads;
 		tokens = height * width;
 		assert(inner_tile.M != 0 && inner_tile.N != 0); // tile sizes have been set
@@ -337,11 +347,14 @@ namespace ml
 		const int qk_rows = round_to_multiple_of(tokens, inner_tile.N);
 		temp_qk_fragment = Fragment(workspace_allocator.get(size_of(DTYPE_FLOAT32) * inner_tile.M * qk_rows, 4096), DTYPE_FLOAT32, inner_tile.M);
 
-		const int bias_rows = round_to_multiple_of(tokens, inner_tile.M);
-		const int bias_columns = round_to_multiple_of(tokens, 64 / sizeof(float));
-		bias_fragment = Fragment(workspace_allocator.get(size_of(DTYPE_FLOAT32) * bias_rows * bias_columns, 4096), DTYPE_FLOAT32, bias_columns);
-		bias_fragment.mark_as_packed_with_size(Size2D(tokens, tokens));
-		bias_fragment.setall(0.0f);
+		if (matrix_bias.data() != nullptr)
+		{
+			const int bias_rows = round_to_multiple_of(tokens, inner_tile.M);
+			const int bias_columns = round_to_multiple_of(tokens, 64 / sizeof(float));
+			bias_fragment = Fragment(workspace_allocator.get(size_of(DTYPE_FLOAT32) * bias_rows * bias_columns, 4096), DTYPE_FLOAT32, bias_columns);
+			bias_fragment.mark_as_packed_with_size(Size2D(tokens, tokens));
+			bias_fragment.setall(0.0f);
+		}
 
 		softmax_sum_fragment = Fragment(workspace_allocator.get(size_of(DTYPE_FLOAT32) * inner_tile.M, 64), DTYPE_FLOAT32, 1);
 		softmax_sum_fragment.mark_as_packed_with_size(Size2D(inner_tile.M, 1));

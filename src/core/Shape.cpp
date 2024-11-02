@@ -150,6 +150,16 @@ namespace ml
 		}
 	}
 
+	void Shape::removeDim(int index) noexcept
+	{
+		if (index < 0 or index >= m_rank)
+			throw IndexOutOfBounds(METHOD_NAME, "index", index, m_rank);
+
+		for (int i = index; i < rank() - 1; i++)
+			m_dim[i] = m_dim[i + 1];
+		m_rank--;
+	}
+
 	bool operator==(const Shape &lhs, const Shape &rhs) noexcept
 	{
 		if (lhs.m_rank != rhs.m_rank)

@@ -81,11 +81,12 @@ namespace ml
 	/*
 	 * attention
 	 */
-	int multiHeadAttentionGetWorkspaceSize(const Context &context, const Shape &inputShape, const Shape &weightsShape, bool training);
-	void multiHeadAttentionForward(const Context &context, const Tensor &input, Tensor &output, const Tensor &weights, Tensor &workspace,
-			Tensor &backwardData);
-	void multiHeadAttentionBackward(const Context &context, const Tensor &input, const Tensor &weights, Tensor &gradient_prev, Tensor &gradient_next,
-			Tensor &weights_update, Tensor &workspace, Tensor &backwardData);
+	int multiHeadAttentionGetWorkspaceSize(const Context &context, const Shape &inputShape, const Shape &weightsShape, int num_heads, bool training);
+	void multiHeadAttentionForward(const Context &context, const Tensor &input, Tensor &output, const Tensor &weights, const Tensor &bias,
+			const Tensor &mask, Tensor &workspace, Tensor &backwardData, int num_heads, bool symmetric);
+	void multiHeadAttentionBackward(const Context &context, const Tensor &input, const Tensor &weights, const Tensor &bias, const Tensor &mask,
+			Tensor &gradient_prev, Tensor &gradient_next, Tensor &weights_update, Tensor &bias_update, Tensor &workspace, Tensor &backwardData,
+			int num_heads, bool symmetric);
 
 	void activationForward(const Context &context, Tensor &output, const Tensor &input, ActivationType act);
 	void activationBackward(const Context &context, Tensor &gradient_prev, const Tensor &gradient_next, const Tensor &output, ActivationType act);
@@ -94,12 +95,17 @@ namespace ml
 	void sumOverFirstDim(const Context &context, Tensor &dst, const Tensor &src, float beta);
 	void multiplyTensors(const Context &context, Tensor &dst, const Tensor &lhs, const Tensor &rhs);
 	void addTensors(const Context &context, Tensor &dst, const Tensor &src1, const Tensor &src2);
+
 	float meanSquaredLoss(const Context &context, const Tensor &output, const Tensor &target);
 	void meanSquaredGradient(const Context &context, Tensor &gradient, const Tensor &output, const Tensor &target, float weight = 1.0f);
 	float crossEntropyLoss(const Context &context, const Tensor &output, const Tensor &target);
 	void crossEntropyGradient(const Context &context, Tensor &gradient, const Tensor &output, const Tensor &target, float weight = 1.0f);
+	float valueHeadLoss(const Context &context, const Tensor &output, const Tensor &target);
+	void valueHeadGradient(const Context &context, Tensor &gradient, const Tensor &output, const Tensor &target, float weight = 1.0f);
+
 	void radamOptimize(const Context &context, Tensor &weight, const Tensor &update, Tensor &momentum, Tensor &variance, float learning_rate,
 			float beta1, float beta2, int step);
+
 	void l2Regularization(const Context &context, Tensor &gradient, const Tensor &param, float coefficient, float offset);
 
 } /* namespace ml */
