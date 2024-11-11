@@ -66,9 +66,19 @@ namespace ml
 			{
 				const float _alpha = alpha;
 				const float _beta = beta;
-				cublasStatus_t status = cublasSgemm(handle, op_B, op_A, M, N, K, &_alpha, getPointer<float>(B), LDB, getPointer<float>(A), LDA,
-						&_beta, getPointer<float>(C), LDC);
-				assert(status == CUBLAS_STATUS_SUCCESS);
+				if (ml::cuda::Context::allowsTF32(context))
+				{
+					cublasStatus_t status = cublasGemmEx(handle, op_B, op_A, M, N, K, &_alpha, getPointer<void>(B), CUDA_R_32F, LDB,
+							getPointer<void>(A), CUDA_R_32F, LDA, &_beta, getPointer<void>(C), CUDA_R_32F, LDC, CUBLAS_COMPUTE_32F_FAST_TF32,
+							CUBLAS_GEMM_DEFAULT);
+					assert(status == CUBLAS_STATUS_SUCCESS);
+				}
+				else
+				{
+					cublasStatus_t status = cublasSgemm(handle, op_B, op_A, M, N, K, &_alpha, getPointer<float>(B), LDB, getPointer<float>(A), LDA,
+							&_beta, getPointer<float>(C), LDC);
+					assert(status == CUBLAS_STATUS_SUCCESS);
+				}
 				break;
 			}
 			case DTYPE_FLOAT64: // ABC [float64]
@@ -134,9 +144,19 @@ namespace ml
 			{
 				const float _alpha = alpha;
 				const float _beta = beta;
-				cublasStatus_t status = cublasSgemmStridedBatched(handle, op_B, op_A, M, N, K, &_alpha, getPointer<float>(B), LDB, strideB,
-						getPointer<float>(A), LDA, strideA, &_beta, getPointer<float>(C), LDC, strideC, batch);
-				assert(status == CUBLAS_STATUS_SUCCESS);
+				if (ml::cuda::Context::allowsTF32(context))
+				{
+					cublasStatus_t status = cublasGemmStridedBatchedEx(handle, op_B, op_A, M, N, K, &_alpha, getPointer<void>(B), CUDA_R_32F, LDB,
+							strideB, getPointer<void>(A), CUDA_R_32F, LDA, strideA, &_beta, getPointer<void>(C), CUDA_R_32F, LDC, strideC, batch,
+							CUBLAS_COMPUTE_32F_FAST_TF32, CUBLAS_GEMM_DEFAULT);
+					assert(status == CUBLAS_STATUS_SUCCESS);
+				}
+				else
+				{
+					cublasStatus_t status = cublasSgemmStridedBatched(handle, op_B, op_A, M, N, K, &_alpha, getPointer<float>(B), LDB, strideB,
+							getPointer<float>(A), LDA, strideA, &_beta, getPointer<float>(C), LDC, strideC, batch);
+					assert(status == CUBLAS_STATUS_SUCCESS);
+				}
 				break;
 			}
 			case DTYPE_FLOAT64:

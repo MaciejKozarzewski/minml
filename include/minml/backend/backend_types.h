@@ -33,13 +33,6 @@ namespace ml
 
 		typedef enum
 		{
-			DEVICE_UNKNOWN,
-			DEVICE_CPU,
-			DEVICE_CUDA
-		} mlDeviceType_t;
-
-		typedef enum
-		{
 			DTYPE_UNKNOWN,
 			DTYPE_FLOAT16,
 			DTYPE_FLOAT32,
@@ -53,7 +46,6 @@ namespace ml
 			ACTIVATION_SIGMOID,
 			ACTIVATION_TANH,
 			ACTIVATION_RELU,
-			ACTIVATION_SOFTMAX,
 			ACTIVATION_GELU,
 			ACTIVATION_EXP
 		} mlActivationType_t;

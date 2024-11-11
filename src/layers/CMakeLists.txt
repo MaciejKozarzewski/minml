@@ -3,6 +3,7 @@ target_sources(${LibName} PRIVATE 	Add.cpp
 								Conv2D.cpp
 								Dense.cpp
 								DepthToSpace.cpp
+								Gelu.cpp
 								GlobalBroadcastHW.cpp
 								GlobalPooling.cpp
 								Input.cpp
@@ -15,4 +16,6 @@ target_sources(${LibName} PRIVATE 	Add.cpp
 								RMSNormalization.cpp
 								Softmax.cpp
 								SpaceToDepth.cpp
-								SqueezeAndExcitation.cpp)
+								SqueezeAndExcitation.cpp
+								WindowMerging.cpp
+								WindowPartitioning.cpp)

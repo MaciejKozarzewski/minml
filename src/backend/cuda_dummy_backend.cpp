@@ -19,6 +19,9 @@ namespace ml
 	{
 		return 0;
 	}
+	void cuda_enable_tf32(mlContext_t context, bool b)
+	{
+	}
 	/*
 	 * \brief In MB.
 	 */
@@ -134,13 +137,11 @@ namespace ml
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
-	void cuda_space_to_depth(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, const void *input, mlShape_t output_shape,
-			void *output)
+	void cuda_space_to_depth(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, const void *input, mlShape_t output_shape, void *output)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
-	void cuda_depth_to_space(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, const void *input, mlShape_t output_shape,
-			void *output)
+	void cuda_depth_to_space(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, const void *input, mlShape_t output_shape, void *output)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
@@ -219,9 +220,8 @@ namespace ml
 		throw NotImplemented(METHOD_NAME);
 	}
 
-	void cuda_gemm_ex(mlContext_t context, mlDataType_t dtype, mlShape_t shape_D, void *D, float alpha, char opA, mlShape_t shape_A,
-					const void *A, char opB, mlShape_t shape_B, const void *B, float beta, mlShape_t shape_C, const void *C, const void *bias,
-					mlActivationType_t act)
+	void cuda_gemm_ex(mlContext_t context, mlDataType_t dtype, mlShape_t shape_D, void *D, float alpha, char opA, mlShape_t shape_A, const void *A,
+			char opB, mlShape_t shape_B, const void *B, float beta, mlShape_t shape_C, const void *C, const void *bias, mlActivationType_t act)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
@@ -263,8 +263,8 @@ namespace ml
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
-	void cuda_layernorm_backward(mlContext_t context, mlShape_t shape, const void *input, void *gradient_prev,
-			void *gradient_next, const void *weights, void *weights_update, void *bias_update)
+	void cuda_layernorm_backward(mlContext_t context, mlShape_t shape, const void *input, void *gradient_prev, void *gradient_next,
+			const void *weights, void *weights_update, void *bias_update)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
@@ -274,8 +274,8 @@ namespace ml
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
-	void cuda_rmsnorm_backward(mlContext_t context, mlShape_t shape, const void *input, void *gradient_prev,
-			void *gradient_next, const void *weights, void *weights_update)
+	void cuda_rmsnorm_backward(mlContext_t context, mlShape_t shape, const void *input, void *gradient_prev, void *gradient_next, const void *weights,
+			void *weights_update)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
@@ -285,15 +285,26 @@ namespace ml
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
-	void cuda_multi_head_attention_forward(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, mlShape_t bias_shape, mlDataType_t dtype,
-			const void *input, void *output, const void *weights, const void *bias, const void *mask, void *workspace, void *backward_data,
-			int num_heads, bool symmetric)
+	void cuda_multi_head_attention_forward(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, mlShape_t bias_shape,
+			mlDataType_t dtype, const void *input, void *output, const void *weights, const void *bias, const void *mask, void *workspace,
+			void *backward_data, int num_heads, bool symmetric)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
-	void cuda_multi_head_attention_backward(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, mlShape_t bias_shape, const void *input,
-			const void *weights, const void *bias, const void *mask, void *gradient_prev, void *gradient_next, void *weights_update,
-			void *bias_update, void *workspace, void *backward_data, int num_heads, bool symmetric)
+	void cuda_multi_head_attention_backward(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, mlShape_t bias_shape,
+			const void *input, const void *weights, const void *bias, const void *mask, void *gradient_prev, void *gradient_next,
+			void *weights_update, void *bias_update, void *mask_update, void *workspace, void *backward_data, int num_heads, bool symmetric)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+
+	void cuda_window_partitioning(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, mlShape_t output_shape,
+					const void *input, void *output, mlShape_t offset)
+	{
+			throw NotImplemented(METHOD_NAME);
+	}
+	void cuda_window_merging(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, mlShape_t output_shape,
+			const void *input, void *output, mlShape_t offset)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
@@ -304,6 +315,14 @@ namespace ml
 	}
 	void cuda_activation_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next, const void *output,
 			mlActivationType_t act)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+	void cuda_softmax_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+	void cuda_gelu_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next, const void *input)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}

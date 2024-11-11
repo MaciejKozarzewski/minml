@@ -85,8 +85,8 @@ namespace
 				return (output > 0.0f) ? gradient : 0.0f;
 			case ml::ACTIVATION_GELU:
 			{
-				const T tmp = std::exp(1.6849f * input);
-				return tmp * (1 + 1.6849f * input + tmp) / square(1 + tmp);
+				const T tmp = sigmoid(1.6849f * input);
+				return tmp + 1.6849f * input * tmp * (1.0f - tmp);
 			}
 			case ml::ACTIVATION_EXP:
 				return gradient * output;
@@ -154,6 +154,7 @@ namespace
 			dst_ptr += last_dim;
 		}
 	}
+
 	template<typename T>
 	void kernel_activation_forward(void *dst, const void *src, size_t elements, ml::mlActivationType_t activation)
 	{
@@ -177,10 +178,15 @@ namespace
 				for (size_t i = 0; i < elements; i++)
 					dst_ptr[i] = convert<float, T>(activation_forward<ml::ACTIVATION_RELU>(convert<T, float>(src_ptr[i])));
 				break;
+			case ml::ACTIVATION_GELU:
+				for (size_t i = 0; i < elements; i++)
+					dst_ptr[i] = convert<float, T>(activation_forward<ml::ACTIVATION_GELU>(convert<T, float>(src_ptr[i])));
+				break;
 			case ml::ACTIVATION_EXP:
 				for (size_t i = 0; i < elements; i++)
 					dst_ptr[i] = convert<float, T>(activation_forward<ml::ACTIVATION_EXP>(convert<T, float>(src_ptr[i])));
 				break;
+
 			default:
 				break;
 		}
@@ -283,11 +289,12 @@ namespace ml
 			kernel_activation_forward<float>(dst, src, elements, activation);
 		}
 
-		void def_kernel_activation_backward_fp32(void *gradient_prev, const void *gradient_next, const void *output, size_t elements,
-				mlActivationType_t activation)
+		void def_kernel_activation_backward_fp32(void *gradient_prev, const void *gradient_next, const void *input, const void *output,
+				size_t elements, mlActivationType_t activation)
 		{
 			float *prev_ptr = reinterpret_cast<float*>(gradient_prev);
 			const float *next_ptr = reinterpret_cast<const float*>(gradient_next);
+			const float *in_ptr = reinterpret_cast<const float*>(input);
 			const float *out_ptr = reinterpret_cast<const float*>(output);
 			switch (activation)
 			{
@@ -307,11 +314,12 @@ namespace ml
 					for (size_t i = 0; i < elements; i++)
 						prev_ptr[i] = (out_ptr[i] == 0.0f) ? 0.0f : next_ptr[i];
 					break;
-				case ACTIVATION_SOFTMAX:
-					if (gradient_prev != gradient_next)
-						std::memcpy(gradient_prev, gradient_next, sizeof(float) * elements);
-					break;
 				case ACTIVATION_GELU:
+					for (size_t i = 0; i < elements; i++)
+					{
+						const float tmp = sigmoid(1.6849f * in_ptr[i]);
+						prev_ptr[i] = next_ptr[i] * (tmp + 1.6849f * in_ptr[i] * tmp * (1.0f - tmp));
+					}
 					break;
 				case ACTIVATION_EXP:
 					for (size_t i = 0; i < elements; i++)

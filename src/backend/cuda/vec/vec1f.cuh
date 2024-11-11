@@ -102,6 +102,34 @@ namespace vectors2
 		return vec1f(lhs.x0 / rhs.x0);
 	}
 
+	/*
+	 * comparison operators
+	 */
+	DEVICE_INLINE vec1f operator==(const vec1f &lhs, const vec1f &rhs)
+	{
+		return to_mask<float>(lhs.x0 == rhs.x0);
+	}
+	DEVICE_INLINE vec1f operator!=(const vec1f &lhs, const vec1f &rhs)
+	{
+		return to_mask<float>(lhs.x0 != rhs.x0);
+	}
+	DEVICE_INLINE vec1f operator>(const vec1f &lhs, const vec1f &rhs)
+	{
+		return to_mask<float>(lhs.x0 > rhs.x0);
+	}
+	DEVICE_INLINE vec1f operator>=(const vec1f &lhs, const vec1f &rhs)
+	{
+		return to_mask<float>(lhs.x0 >= rhs.x0);
+	}
+	DEVICE_INLINE vec1f operator<(const vec1f &lhs, const vec1f &rhs)
+	{
+		return to_mask<float>(lhs.x0 < rhs.x0);
+	}
+	DEVICE_INLINE vec1f operator<=(const vec1f &lhs, const vec1f &rhs)
+	{
+		return to_mask<float>(lhs.x0 < rhs.x0);
+	}
+
 	DEVICE_INLINE vec1f abs(const vec1f &a)
 	{
 		return vec1f(fabsf(a.x0));
@@ -166,6 +194,10 @@ namespace vectors2
 	{
 		return vec1f(tanf(a.x0));
 	}
+	DEVICE_INLINE vec1f erf(const vec1f &a)
+	{
+		return vec1f(erff(a.x0));
+	}
 
 	DEVICE_INLINE float horizontal_add(const vec1f &a)
 	{
@@ -178,6 +210,11 @@ namespace vectors2
 	DEVICE_INLINE float horizontal_min(const vec1f &a)
 	{
 		return a.x0;
+	}
+
+	DEVICE_INLINE vec1f select(const vec1f &cond, const vec1f &a, const vec1f &b)
+	{
+		return vec1f(is_true(cond.x0) ? a.x0 : b.x0);
 	}
 
 	DEVICE_INLINE void atomic_add(float *address, const vec1f &value)

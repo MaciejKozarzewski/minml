@@ -31,7 +31,25 @@ namespace vectors2
 	{
 		return x * x;
 	}
+	template<typename T, int N>
+	DEVICE_INLINE vec<T, N> cube(const vec<T, N> &x)
+	{
+		return x * x * x;
+	}
 
+	/*
+	 * arithmetic operations
+	 */
+	template<typename T, int N>
+	DEVICE_INLINE vec<T, N> operator+(const vec<T, N> &a)
+	{
+		return a;
+	}
+	template<typename T, int N>
+	DEVICE_INLINE vec<T, N> operator-(const vec<T, N> &a)
+	{
+		return -a;
+	}
 	template<typename T, int N>
 	DEVICE_INLINE vec<T, N> operator+(const vec<T, N> &lhs, T rhs)
 	{
@@ -146,6 +164,94 @@ namespace vectors2
 	}
 
 	template<typename T, int N>
+	DEVICE_INLINE vec<T, N> operator|(const vec<T, N> &lhs, T rhs)
+	{
+		return lhs | vec<T, N>(rhs);
+	}
+	template<typename T, int N>
+	DEVICE_INLINE vec<T, N> operator|(T lhs, const vec<T, N> &rhs)
+	{
+		return vec<T, N>(lhs) | rhs;
+	}
+	template<typename T, int N>
+	DEVICE_INLINE vec<T, N> operator&(const vec<T, N> &lhs, T rhs)
+	{
+		return lhs | vec<T, N>(rhs);
+	}
+	template<typename T, int N>
+	DEVICE_INLINE vec<T, N> operator&(T lhs, const vec<T, N> &rhs)
+	{
+		return vec<T, N>(lhs) | rhs;
+	}
+
+	/*
+	 * comparison operators
+	 */
+	template<typename T, int N>
+	DEVICE_INLINE vec<T, N> operator>(const vec<T, N> &lhs, T rhs)
+	{
+		return lhs > vec<T, N>(rhs);
+	}
+	template<typename T, int N>
+	DEVICE_INLINE vec<T, N> operator>(T lhs, const vec<T, N> &rhs)
+	{
+		return vec<T, N>(lhs) > rhs;
+	}
+	template<typename T, int N>
+	DEVICE_INLINE vec<T, N> operator>=(const vec<T, N> &lhs, T rhs)
+	{
+		return lhs >= vec<T, N>(rhs);
+	}
+	template<typename T, int N>
+	DEVICE_INLINE vec<T, N> operator>=(T lhs, const vec<T, N> &rhs)
+	{
+		return vec<T, N>(lhs) >= rhs;
+	}
+	template<typename T, int N>
+	DEVICE_INLINE vec<T, N> operator<(const vec<T, N> &lhs, T rhs)
+	{
+		return rhs >= lhs;
+	}
+	template<typename T, int N>
+	DEVICE_INLINE vec<T, N> operator<(T lhs, const vec<T, N> &rhs)
+	{
+		return rhs >= lhs;
+	}
+	template<typename T, int N>
+	DEVICE_INLINE vec<T, N> operator<=(const vec<T, N> &lhs, T rhs)
+	{
+		return rhs > lhs;
+	}
+	template<typename T, int N>
+	DEVICE_INLINE vec<T, N> operator<=(T lhs, const vec<T, N> &rhs)
+	{
+		return rhs > lhs;
+	}
+	template<typename T, int N>
+	DEVICE_INLINE vec<T, N> operator==(const vec<T, N> &lhs, T rhs)
+	{
+		return lhs == vec<T, N>(rhs);
+	}
+	template<typename T, int N>
+	DEVICE_INLINE vec<T, N> operator==(T lhs, const vec<T, N> &rhs)
+	{
+		return vec<T, N>(lhs) == rhs;
+	}
+	template<typename T, int N>
+	DEVICE_INLINE vec<T, N> operator!=(const vec<T, N> &lhs, T rhs)
+	{
+		return lhs != vec<T, N>(rhs);
+	}
+	template<typename T, int N>
+	DEVICE_INLINE vec<T, N> operator!=(T lhs, const vec<T, N> &rhs)
+	{
+		return vec<T, N>(lhs) != rhs;
+	}
+
+	/*
+	 * mathematical functions
+	 */
+	template<typename T, int N>
 	DEVICE_INLINE vec<T, N> abs(const vec<T, N> &a)
 	{
 		return vec<T, N> { };
@@ -226,6 +332,15 @@ namespace vectors2
 		return vec<T, N> { };
 	}
 
+	template<typename T, int N>
+	DEVICE_INLINE vec<T, N> select(const vec<T, N> &cond, const vec<T, N> &a, const vec<T, N> &b)
+	{
+		return vec<T, N> { };
+	}
+
+	/*
+	 * reductions
+	 */
 	template<typename T, int N>
 	DEVICE_INLINE T horizontal_add(const vec<T, N> &a)
 	{

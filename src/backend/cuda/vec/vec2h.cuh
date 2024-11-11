@@ -120,6 +120,10 @@ namespace vectors2
 	{
 		return vec2h(h2cos(a.x0));
 	}
+	DEVICE_INLINE vec2h erf(const vec2h &a)
+	{
+		return tanh(vec2h(0.797884561f) * a * (vec2h(1.0f) + vec2h(0.044715f) * square(a)));
+	}
 
 	DEVICE_INLINE half horizontal_add(vec2h a)
 	{
@@ -132,6 +136,11 @@ namespace vectors2
 	DEVICE_INLINE half horizontal_min(vec2h a)
 	{
 		return __hmin(a.x0.x, a.x0.y);
+	}
+
+	DEVICE_INLINE vec2h select(const vec2h &cond, const vec2h &a, const vec2h &b)
+	{
+		return vec2h(is_true(cond.x0.x) ? a.x0.x : b.x0.x, is_true(cond.x0.y) ? a.x0.y : b.x0.y);
 	}
 #endif
 } /* namespace vectors */

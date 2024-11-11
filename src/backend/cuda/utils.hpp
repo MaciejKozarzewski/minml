@@ -27,7 +27,7 @@ namespace ml
 	{
 		class Context
 		{
-				static constexpr size_t default_workspace_size = 8 * 1024 * 1024; // 8MB
+				static constexpr size_t default_workspace_size = 32 * 1024 * 1024; // 32MB
 
 				void *m_workspace = nullptr;
 				size_t m_workspace_size = default_workspace_size;
@@ -38,6 +38,7 @@ namespace ml
 				cublasLtHandle_t m_cublas_lt_handle = nullptr;
 #endif
 				int m_device_index = 0;
+				bool m_allows_tf32 = false;
 			public:
 				Context(int device_index);
 				~Context();
@@ -53,6 +54,8 @@ namespace ml
 				static void use(mlContext_t context);
 				static cudaStream_t getStream(mlContext_t context);
 				static cublasHandle_t getHandle(mlContext_t context);
+				static void enableTF32(mlContext_t context, bool b);
+				static bool allowsTF32(mlContext_t context);
 #ifdef USE_CUDNN
 				static cudnnHandle_t getCudnnHandle(mlContext_t context);
 				static cublasLtHandle_t getCublasLtHandle(mlContext_t context);
@@ -69,6 +72,7 @@ namespace ml
 
 		bool has_fp16_math(mlContext_t context);
 		bool has_tensor_cores(mlContext_t context);
+		bool allows_tf32(mlContext_t context);
 
 		int get_cuda_arch(int device_index);
 

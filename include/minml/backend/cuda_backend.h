@@ -20,6 +20,7 @@ namespace ml
 
 		// implemented in 'cuda_properties.cpp'
 		DLL_PUBLIC int cuda_get_number_of_devices();
+		DLL_PUBLIC void cuda_enable_tf32(mlContext_t context, bool b);
 		/*
 		 * \brief In MB.
 		 */
@@ -143,13 +144,23 @@ namespace ml
 				void *backward_data, int num_heads, bool symmetric);
 		DLL_PUBLIC void cuda_multi_head_attention_backward(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, mlShape_t bias_shape,
 				const void *input, const void *weights, const void *bias, const void *mask, void *gradient_prev, void *gradient_next,
-				void *weights_update, void *bias_update, void *workspace, void *backward_data, int num_heads, bool symmetric);
+				void *weights_update, void *bias_update, void *mask_update, void *workspace, void *backward_data, int num_heads, bool symmetric);
+
+		/*
+		 * window processing
+		 */
+		DLL_PUBLIC void cuda_window_partitioning(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, mlShape_t output_shape,
+				const void *input, void *output, mlShape_t offset);
+		DLL_PUBLIC void cuda_window_merging(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, mlShape_t output_shape, const void *input,
+				void *output, mlShape_t offset);
 
 		// activations
 		DLL_PUBLIC void cuda_activation_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input,
 				mlActivationType_t act);
 		DLL_PUBLIC void cuda_activation_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next,
 				const void *output, mlActivationType_t act);
+		DLL_PUBLIC void cuda_softmax_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input);
+		DLL_PUBLIC void cuda_gelu_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next, const void *input);
 
 		// implemented in 'training.cu'
 		DLL_PUBLIC void cuda_emulate_low_precision(mlContext_t context, mlShape_t shape, void *dst, const void *src);

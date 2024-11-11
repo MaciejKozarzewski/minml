@@ -75,46 +75,25 @@ namespace ml
 //						kernel = program_cache.getKernel(context, "relu_forward_fp16");
 //						break;
 					case DTYPE_FLOAT32:
-						kernel = program_cache.getKernel(context, "relu_forward_fp16");
+						kernel = program_cache.getKernel(context, "relu_forward_fp32");
 						break;
 					default:
 						break;
 				}
 				break;
 			}
-			case ACTIVATION_SOFTMAX:
+			case ACTIVATION_GELU:
 			{
-				assert(shape.rank == 2);
-				if (last_dim == 3)
+				switch (dtype)
 				{
-					global = opencl::get_nd_range(first_dim);
-					switch (dtype)
-					{
-//						case DTYPE_FLOAT16:
-//							kernel = program_cache.getKernel(context, "softmax_3_channels_fp16");
-//							break;
-						case DTYPE_FLOAT32:
-							kernel = program_cache.getKernel(context, "softmax_3_channels_fp32");
-							break;
-						default:
-							break;
-					}
-				}
-				else
-				{
-					global = opencl::get_nd_range<1024 * 128>(first_dim * 128);
-					local = 128;
-					switch (dtype)
-					{
-//						case DTYPE_FLOAT16:
-//							kernel = program_cache.getKernel(context, "softmax_generic_fp16");
-//							break;
-						case DTYPE_FLOAT32:
-							kernel = program_cache.getKernel(context, "softmax_generic_fp32");
-							break;
-						default:
-							break;
-					}
+//					case DTYPE_FLOAT16:
+//						kernel = program_cache.getKernel(context, "relu_forward_fp16");
+//						break;
+					case DTYPE_FLOAT32:
+						kernel = program_cache.getKernel(context, "gelu_forward_fp32");
+						break;
+					default:
+						break;
 				}
 				break;
 			}
@@ -154,12 +133,79 @@ namespace ml
 			case ACTIVATION_RELU:
 				kernel = program_cache.getKernel(context, "relu_backward_fp32");
 				break;
-			case ACTIVATION_SOFTMAX:
-				break;
 		}
 		kernel.setArg(0, opencl::getMemoryObject(gradient_prev).buffer());
 		kernel.setArg(1, opencl::getMemoryObject(gradient_next).buffer());
 		kernel.setArg(2, opencl::getMemoryObject(output).buffer());
+		kernel.setArg(3, volume(shape));
+
+		opencl::runKernel(context, kernel, global, local);
+	}
+	void opencl_softmax_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input)
+	{
+		static const ml::opencl::ProgramCache program_cache("activations_forward",
+				ml::opencl::kernels::common + ml::opencl::kernels::reductions + ml::opencl::kernels::activations_forward, "");
+
+		const int first_dim = volume_without_last_dim(shape);
+		const int last_dim = get_last_dim(shape);
+
+		cl::Kernel kernel;
+		cl::NDRange global = opencl::get_nd_range<65536>(volume(shape));
+		cl::NDRange local = cl::NullRange;
+
+		assert(shape.rank == 2);
+		if (last_dim == 3)
+		{
+			global = opencl::get_nd_range(first_dim);
+			switch (dtype)
+			{
+//				case DTYPE_FLOAT16:
+//					kernel = program_cache.getKernel(context, "softmax_3_channels_fp16");
+//					break;
+				case DTYPE_FLOAT32:
+					kernel = program_cache.getKernel(context, "softmax_3_channels_fp32");
+					break;
+				default:
+					break;
+			}
+		}
+		else
+		{
+			global = opencl::get_nd_range<1024 * 128>(first_dim * 128);
+			local = 128;
+			switch (dtype)
+			{
+//				case DTYPE_FLOAT16:
+//					kernel = program_cache.getKernel(context, "softmax_generic_fp16");
+//					break;
+				case DTYPE_FLOAT32:
+					kernel = program_cache.getKernel(context, "softmax_generic_fp32");
+					break;
+				default:
+					break;
+			}
+		}
+
+		kernel.setArg(0, opencl::getMemoryObject(output).buffer());
+		kernel.setArg(1, opencl::getMemoryObject(input).buffer());
+		kernel.setArg(2, first_dim);
+		kernel.setArg(3, last_dim);
+
+		opencl::runKernel(context, kernel, global, local);
+	}
+	void opencl_gelu_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next, const void *input)
+	{
+		static const ml::opencl::ProgramCache program_cache("activations_backward",
+				ml::opencl::kernels::common + ml::opencl::kernels::activations_backward, "");
+
+		cl::Kernel kernel;
+		cl::NDRange global = opencl::get_nd_range<65536>(volume(shape));
+		cl::NDRange local = cl::NullRange;
+
+		kernel = program_cache.getKernel(context, "gelu_backward_fp32");
+		kernel.setArg(0, opencl::getMemoryObject(gradient_prev).buffer());
+		kernel.setArg(1, opencl::getMemoryObject(gradient_next).buffer());
+		kernel.setArg(2, opencl::getMemoryObject(input).buffer());
 		kernel.setArg(3, volume(shape));
 
 		opencl::runKernel(context, kernel, global, local);

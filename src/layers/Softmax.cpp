@@ -26,11 +26,6 @@ namespace ml
 	{
 		if (axis.size() == 0)
 			throw LogicError(METHOD_NAME, "axis list must not be empty");
-		m_activation = ActivationType::SOFTMAX;
-	}
-
-	void Softmax::setActivationType(ActivationType act) noexcept
-	{
 	}
 
 	void Softmax::setInputShape(const std::vector<Shape> &shapes)
@@ -77,7 +72,7 @@ namespace ml
 		assert(input.size() == 1);
 
 		const Tensor in = input[0].view(output.shape());
-		activationForward(context(), output, in, ActivationType::SOFTMAX);
+		softmaxForward(context(), output, in);
 	}
 	void Softmax::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next)
 	{

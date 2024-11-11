@@ -30,6 +30,11 @@ namespace vectors2
 		return (reinterpret_cast<std::uintptr_t>(ptr) % N) == 0;
 	}
 
+	HOST_DEVICE_INLINE uint64_t as_uint(double x)
+	{
+		assert(sizeof(x) == sizeof(uint64_t));
+		return reinterpret_cast<uint64_t*>(&x)[0];
+	}
 	HOST_DEVICE_INLINE uint32_t as_uint(float x)
 	{
 		assert(sizeof(x) == sizeof(uint32_t));
@@ -44,6 +49,12 @@ namespace vectors2
 	{
 		assert(sizeof(x) == sizeof(uint16_t));
 		return reinterpret_cast<uint16_t*>(&x)[0];
+	}
+
+	HOST_DEVICE_INLINE double as_double(uint64_t x)
+	{
+		assert(sizeof(x) == sizeof(double));
+		return reinterpret_cast<double*>(&x)[0];
 	}
 	HOST_DEVICE_INLINE float as_float(uint32_t x)
 	{
@@ -61,6 +72,10 @@ namespace vectors2
 		return reinterpret_cast<half*>(&x)[0];
 	}
 
+	HOST_DEVICE_INLINE double bit_invert(double x)
+	{
+		return as_double(~as_uint(x));
+	}
 	HOST_DEVICE_INLINE float bit_invert(float x)
 	{
 		return as_float(~as_uint(x));
@@ -74,6 +89,108 @@ namespace vectors2
 		return as_half(~as_uint(x));
 	}
 
-} /* namespace vectors2 */
+	template<typename T>
+	HOST_DEVICE_INLINE T to_mask(bool b);
+
+	template<>
+	HOST_DEVICE_INLINE half to_mask(bool b)
+	{
+		return b ? as_half(0xFFFFu) : as_half(0x0000u);
+	}
+	template<>
+	HOST_DEVICE_INLINE float to_mask(bool b)
+	{
+		return b ? as_float(0xFFFFFFFFu) : as_float(0x00000000u);
+	}
+	template<>
+	HOST_DEVICE_INLINE double to_mask(bool b)
+	{
+		return b ? as_double(0xFFFFFFFFFFFFFFFFu) : as_double(0x0000000000000000u);
+	}
+
+	template<typename T>
+	HOST_DEVICE_INLINE T logical_or(T lhs, T rhs);
+	template<typename T>
+	HOST_DEVICE_INLINE T logical_and(T lhs, T rhs);
+	template<typename T>
+	HOST_DEVICE_INLINE T logical_xor(T lhs, T rhs);
+
+	template<>
+	HOST_DEVICE_INLINE half logical_or(half lhs, half rhs)
+	{
+		return as_half(as_uint(lhs) | as_uint(rhs));
+	}
+	template<>
+	HOST_DEVICE_INLINE half logical_and(half lhs, half rhs)
+	{
+		return as_half(as_uint(lhs) & as_uint(rhs));
+	}
+	template<>
+	HOST_DEVICE_INLINE half logical_xor(half lhs, half rhs)
+	{
+		return as_half(as_uint(lhs) ^ as_uint(rhs));
+	}
+
+	template<>
+	HOST_DEVICE_INLINE half2 logical_or(half2 lhs, half2 rhs)
+	{
+		return as_half2(as_uint(lhs) | as_uint(rhs));
+	}
+	template<>
+	HOST_DEVICE_INLINE half2 logical_and(half2 lhs, half2 rhs)
+	{
+		return as_half2(as_uint(lhs) & as_uint(rhs));
+	}
+	template<>
+	HOST_DEVICE_INLINE half2 logical_xor(half2 lhs, half2 rhs)
+	{
+		return as_half2(as_uint(lhs) ^ as_uint(rhs));
+	}
+
+	template<>
+	HOST_DEVICE_INLINE float logical_or(float lhs, float rhs)
+	{
+		return as_float(as_uint(lhs) | as_uint(rhs));
+	}
+	template<>
+	HOST_DEVICE_INLINE float logical_and(float lhs, float rhs)
+	{
+		return as_float(as_uint(lhs) & as_uint(rhs));
+	}
+	template<>
+	HOST_DEVICE_INLINE float logical_xor(float lhs, float rhs)
+	{
+		return as_float(as_uint(lhs) ^ as_uint(rhs));
+	}
+
+	template<>
+	HOST_DEVICE_INLINE double logical_or(double lhs, double rhs)
+	{
+		return as_double(as_uint(lhs) | as_uint(rhs));
+	}
+	template<>
+	HOST_DEVICE_INLINE double logical_and(double lhs, double rhs)
+	{
+		return as_double(as_uint(lhs) & as_uint(rhs));
+	}
+	template<>
+	HOST_DEVICE_INLINE double logical_xor(double lhs, double rhs)
+	{
+		return as_double(as_uint(lhs) ^ as_uint(rhs));
+	}
+
+	template<typename T>
+	HOST_DEVICE_INLINE bool is_true(T b)
+	{
+		return as_uint(b) != 0;
+	}
+	template<typename T>
+	HOST_DEVICE_INLINE bool is_false(T b)
+	{
+		return as_uint(b) == 0;
+	}
+
+}
+/* namespace vectors2 */
 
 #endif /* BACKEND_CUDA_VEC_UTILS_CUH_ */

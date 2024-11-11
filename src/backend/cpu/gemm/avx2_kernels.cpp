@@ -2212,5 +2212,108 @@ namespace ml
 				"%ymm8", "%ymm9", "%ymm10", "%ymm11", "%ymm12", "%ymm13", "%ymm14", "%ymm15",
 				"%rax", "%rbx", "%rcx", "%r12", "%r13", "%r14", "%r15")
 	}
+	void mha_softmax_avx2_12x8(Fragment &temp, Fragment &softmax_sum) noexcept
+	{
+		assert(temp.is_fp32());
+		assert(temp.columns() == 12);
+		assert(temp.rows() == 8);
+		assert(temp.stride() == 12);
+		assert(cpu::is_aligned(temp.data(), 32));
+
+		float *temp_ptr = temp.data<float>();
+		float *softmax_ptr = softmax_sum.is_packed() ? softmax_sum.data<float>() : nullptr;
+		if (softmax_sum.is_packed())
+		{
+			assert(softmax_sum.is_fp32());
+			assert(softmax_sum.rows() >= temp.columns());
+			assert(cpu::is_aligned(softmax_sum.data(), 32));
+		}
+
+		begin_asm()
+		movq(var(temp_ptr), rcx) // temp pointer is in rbx
+		vmovaps(mem(rcx, 8*4*0), ymm4)
+		vmovaps(mem(rcx, 8*4*1), ymm5)
+		vmovaps(mem(rcx, 8*4*2), ymm6)
+		vmovaps(mem(rcx, 8*4*3), ymm7)
+		vmovaps(mem(rcx, 8*4*4), ymm8)
+		vmovaps(mem(rcx, 8*4*5), ymm9)
+		vmovaps(mem(rcx, 8*4*6), ymm10)
+		vmovaps(mem(rcx, 8*4*7), ymm11)
+		vmovaps(mem(rcx, 8*4*8), ymm12)
+		vmovaps(mem(rcx, 8*4*9), ymm13)
+		vmovaps(mem(rcx, 8*4*10), ymm14)
+		vmovaps(mem(rcx, 8*4*11), ymm15)
+
+		EXP_FIRST_STAGE_12x8xFP32()
+		EXP_SECOND_STAGE_3x8xFP32(ymm4, ymm5, ymm6)
+		EXP_SECOND_STAGE_3x8xFP32(ymm7, ymm8, ymm9)
+		EXP_SECOND_STAGE_3x8xFP32(ymm10, ymm11, ymm12)
+		EXP_SECOND_STAGE_3x8xFP32(ymm13, ymm14, ymm15)
+
+		vmovaps(ymm4, mem(rcx, 8*4*0))
+		vmovaps(ymm5, mem(rcx, 8*4*1))
+		vmovaps(ymm6, mem(rcx, 8*4*2))
+		vmovaps(ymm7, mem(rcx, 8*4*3))
+		vmovaps(ymm8, mem(rcx, 8*4*4))
+		vmovaps(ymm9, mem(rcx, 8*4*5))
+		vmovaps(ymm10, mem(rcx, 8*4*6))
+		vmovaps(ymm11, mem(rcx, 8*4*7))
+		vmovaps(ymm12, mem(rcx, 8*4*8))
+		vmovaps(ymm13, mem(rcx, 8*4*9))
+		vmovaps(ymm14, mem(rcx, 8*4*10))
+		vmovaps(ymm15, mem(rcx, 8*4*11))
+
+		movq(var(softmax_ptr), rcx)// softmax sum pointer is in rcx
+		test(rcx, rcx)
+		je(SKIP_REDUCTION)
+		vxorps(ymm0, ymm0, ymm0)
+		vxorps(ymm1, ymm1, ymm1)
+		vxorps(ymm2, ymm2, ymm2)
+
+		vaddps(ymm4, ymm0, ymm0)
+		vaddps(ymm5, ymm1, ymm1)
+		vaddps(ymm6, ymm2, ymm2)
+		vaddps(ymm7, ymm0, ymm0)
+		vaddps(ymm8, ymm1, ymm1)
+		vaddps(ymm9, ymm2, ymm2)
+		vaddps(ymm10, ymm0, ymm0)
+		vaddps(ymm11, ymm1, ymm1)
+		vaddps(ymm12, ymm2, ymm2)
+		vaddps(ymm13, ymm0, ymm0)
+		vaddps(ymm14, ymm1, ymm1)
+		vaddps(ymm15, ymm2, ymm2)
+
+		vmovaps(mem(rcx, 4*4*0), xmm13)// load previous sum
+		vmovaps(mem(rcx, 4*4*1), xmm14)// load previous sum
+		vmovaps(mem(rcx, 4*4*2), xmm15)// load previous sum
+
+		vextractf128(imm(0x1), ymm0, xmm3)
+		vextractf128(imm(0x1), ymm1, xmm4)
+		vextractf128(imm(0x1), ymm2, xmm5)
+
+		vaddps(xmm13, xmm0, xmm13)
+		vaddps(xmm14, xmm3, xmm14)
+		vaddps(xmm15, xmm1, xmm15)
+
+		vaddps(xmm13, xmm4, xmm13)
+		vaddps(xmm14, xmm2, xmm14)
+		vaddps(xmm15, xmm5, xmm15)
+
+		vmovaps(xmm13, mem(rcx, 4*4*0))
+		vmovaps(xmm14, mem(rcx, 4*4*1))
+		vmovaps(xmm15, mem(rcx, 4*4*2))
+		label(SKIP_REDUCTION)
+
+		vzeroupper()
+
+		end_asm(:// outputs
+				:// inputs
+				[temp_ptr] "m"(temp_ptr),
+				[softmax_ptr] "m"(softmax_ptr)
+				:// clobbers
+				"cc", "memory", "%ymm0", "%ymm1", "%ymm2", "%ymm3", "%ymm4", "%ymm5", "%ymm6", "%ymm7",
+				"%ymm8", "%ymm9", "%ymm10", "%ymm11", "%ymm12", "%ymm13", "%ymm14", "%ymm15",
+				"%rcx", "r14")
+	}
 } /* namespace ml */
 

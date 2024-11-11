@@ -29,6 +29,12 @@ namespace
 			int8_t y = 0;
 	};
 
+	__device__ float bitwise_and(float x, float mask)
+	{
+		uint32_t result = (reinterpret_cast<uint32_t*>(&x)[0]) & (reinterpret_cast<uint32_t*>(&mask)[0]);
+		return reinterpret_cast<float*>(&result)[0];
+	}
+
 	template<typename T>
 	__host__ __device__ T clamp(T x, T lower, T upper)
 	{
@@ -76,7 +82,7 @@ namespace
 
 	template<typename T, bool UseBias>
 	__global__ void kernel_softmax_forward_in_place(T *input, const T *weights, int batch_size, int num_heads, int height, int width,
-			int weights_size)
+			int weights_size, const float *mask)
 	{
 		extern __shared__ char shared_array[];
 
@@ -138,15 +144,21 @@ namespace
 		float max_value = -1e+32f;
 		for (int j = threadIdx.x; j < tokens; j += blockDim.x)
 		{
-			float bias = 0.0f;
+			float tmp = shared_input[threadIdx.y * tokens + j];
 			if (UseBias)
 			{
 				const Index2D current = indices[j];
 				const int offset_x = range + clamp(current.x - origin.x, -range, range);
 				const int offset_y = range + clamp(current.y - origin.y, -range, range);
-				bias = shared_biases[weight_indexer.at(offset_x, offset_y)];
+				tmp += shared_biases[weight_indexer.at(offset_x, offset_y)];
 			}
-			const float tmp = shared_input[threadIdx.y * tokens + j] + bias;
+
+			if (mask != nullptr)
+			{
+				const Indexer<4> mask_indexer(batch_size, num_heads, tokens, tokens);
+				tmp += mask[mask_indexer.at(batch_idx, head_idx, token_idx + threadIdx.y, j)];
+			}
+
 			max_value = max(max_value, tmp);
 			shared_input[threadIdx.y * tokens + j] = tmp;
 		}
@@ -156,7 +168,12 @@ namespace
 		float partial_sum = 0.0f;
 		for (int j = threadIdx.x; j < tokens; j += blockDim.x)
 		{
-			const float tmp = exp(shared_input[threadIdx.y * tokens + j] - max_value);
+			float tmp = exp(shared_input[threadIdx.y * tokens + j] - max_value);
+//			if (mask != nullptr)
+//			{
+//				const float m = mask[batch_idx * tokens * tokens + (token_idx + threadIdx.y) * tokens + threadIdx.x];
+//				tmp = bitwise_and(tmp, m);
+//			}
 			partial_sum += tmp;
 			shared_input[threadIdx.y * tokens + j] = tmp;
 		}
@@ -187,7 +204,7 @@ namespace
 	}
 	template<bool UseBias>
 	__global__ void kernel_softmax_backward_in_place(const float *output, float *gradient, float *weights_update, int batch_size, int num_heads,
-			int height, int width, int weights_size)
+			int height, int width, int weights_size, float *mask_update)
 	{
 		__shared__ cg::block_tile_memory<128> btm;
 		cg::thread_block thb = cg::this_thread_block(btm);
@@ -249,6 +266,11 @@ namespace
 					const int offset_w = range + clamp(current.y - origin.y, -range, range);
 					atomicAdd(shared_weight_update + weight_indexer.at(offset_h, offset_w), dx);
 				}
+				if (mask_update != nullptr)
+				{
+					const Indexer<4> mask_indexer(batch_size, num_heads, tokens, tokens);
+					mask_update[mask_indexer.at(batch_idx, head_idx, i, j)] += dx;
+				}
 				gradient[idx + j] = dx;
 			}
 		}
@@ -290,6 +312,86 @@ namespace
 			update[update_indexer.at(blockIdx.y, tid)] += storage[threadIdx.x];
 	}
 
+//	template<typename T>
+//	__global__ void kernel_normalize_qk_forward(void *input[], int first_dim, int last_dim, int stride, float *workspace)
+//	{
+//		extern __shared__ char shared_array[];
+//		float *shared_input = reinterpret_cast<float*>(shared_array);
+//
+//		T *input_ptr = reinterpret_cast<T*>(input[blockIdx.x]);
+//
+//		__shared__ cg::block_tile_memory<256> btm;
+//		cg::thread_block thb = cg::this_thread_block(btm);
+//		cg::thread_block_tile<32> tile = cg::tiled_partition<32>(thb);
+//
+//		for (int i = threadIdx.y; i < first_dim; i += blockDim.y)
+//		{
+//			float sum_squares = 0.0f;
+//			for (int j = threadIdx.x; j < last_dim; j += blockDim.x)
+//			{
+//				const float in = static_cast<float>(input_ptr[i * stride + j]);
+//				sum_squares += in * in;
+//				shared_input[threadIdx.y * last_dim + j] = in;
+//			}
+//			sum_squares = cg::reduce(tile, sum_squares, cg::plus<float>());
+//			const float rms = std::sqrt(sum_squares / last_dim);
+//			const float inv_rms = 1.0f / (1.0e-6f + rms);
+//
+//			for (int j = threadIdx.x; j < last_dim; j += blockDim.x)
+//				input_ptr[i * stride + j] = shared_input[threadIdx.y * last_dim + j] * inv_rms;
+//
+//			if (threadIdx.x == 0 and workspace != nullptr)
+//				workspace[blockIdx.x * first_dim + i] = rms;
+//		}
+//	}
+//	__global__ void kernel_normalize_qk_backward(void *gradient[], void *output[], int first_dim, int last_dim, int stride, const float *workspace)
+//	{
+//		assert(blockDim.x == 32);
+//
+//		extern __shared__ char shared_array[];
+//		float *shared_input = reinterpret_cast<float*>(shared_array);
+//		float *shared_gradient = shared_input + blockDim.y * last_dim;
+//
+//		float *output_ptr = reinterpret_cast<float*>(output[blockIdx.x]);
+//		float *gradient_ptr = reinterpret_cast<float*>(gradient[blockIdx.x]);
+//
+//		__shared__ cg::block_tile_memory<256> btm;
+//		cg::thread_block thb = cg::this_thread_block(btm);
+//		cg::thread_block_tile<32> tile = cg::tiled_partition<32>(thb);
+//
+//		for (int i = threadIdx.y; i < first_dim; i += blockDim.y)
+//		{
+//			const float rms = workspace[blockIdx.x * first_dim + i];
+//
+//			float sum_squares = 0.0f;
+//			float sum = 0.0f;
+//			for (int j = threadIdx.x; j < last_dim; j += blockDim.x)
+//			{
+//				const float in = output_ptr[i * stride + j] * (1.0e-6f + rms);
+//				const float grad = gradient_ptr[i * stride + j];
+//				sum_squares += in * in;
+//				sum += in * grad;
+//
+//				shared_input[threadIdx.y * last_dim + j] = in;
+//				shared_gradient[threadIdx.y * last_dim + j] = grad;
+//			}
+//
+//			sum_squares = cg::reduce(tile, sum_squares, cg::plus<float>());
+//			sum = cg::reduce(tile, sum, cg::plus<float>());
+//
+//			const float mult = 1.0f / (last_dim * rms * rms * rms);
+//			sum_squares *= mult;
+//			sum *= mult;
+//			for (int j = threadIdx.x; j < last_dim; j += blockDim.x)
+//			{
+//				const float in = shared_input[threadIdx.y * last_dim + j];
+//				const float grad = shared_gradient[threadIdx.y * last_dim + j];
+//
+//				gradient_ptr[i * stride + j] = grad * sum_squares - in * sum;
+//			}
+//		}
+//	}
+
 	void gemm_batched(ml::mlContext_t context, char opA, char opB, ml::mlDataType_t dtype, int M, int N, int K, float alpha, const void *A[], int lda,
 			const void *B[], int ldb, float beta, void *C[], int ldc, int batch_count)
 	{
@@ -327,9 +429,19 @@ namespace
 			{
 				const float _alpha = alpha;
 				const float _beta = beta;
-				cublasStatus_t status = cublasSgemmBatched(handle, transb, transa, N, M, K, &_alpha, ml::getPointer<float*>(B), ldb,
-						ml::getPointer<float*>(A), lda, &_beta, ml::getPointer<float*>(C), ldc, batch_count);
-				assert(status == CUBLAS_STATUS_SUCCESS);
+				if (ml::cuda::Context::allowsTF32(context))
+				{
+					cublasStatus_t status = cublasGemmBatchedEx(handle, transb, transa, N, M, K, &_alpha, ml::getPointer<void*>(B), CUDA_R_32F, ldb,
+							ml::getPointer<void*>(A), CUDA_R_32F, lda, &_beta, ml::getPointer<void*>(C), CUDA_R_32F, ldc, batch_count,
+							CUBLAS_COMPUTE_32F_FAST_TF32, CUBLAS_GEMM_DEFAULT);
+					assert(status == CUBLAS_STATUS_SUCCESS);
+				}
+				else
+				{
+					cublasStatus_t status = cublasSgemmBatched(handle, transb, transa, N, M, K, &_alpha, ml::getPointer<float*>(B), ldb,
+							ml::getPointer<float*>(A), lda, &_beta, ml::getPointer<float*>(C), ldc, batch_count);
+					assert(status == CUBLAS_STATUS_SUCCESS);
+				}
 				break;
 			}
 			case ml::DTYPE_FLOAT64:
@@ -344,7 +456,7 @@ namespace
 		}
 	}
 	void run_softmax_forward(cudaStream_t stream, void *input, ml::mlShape_t input_shape, const void *weights, ml::mlShape_t weights_shape,
-			int num_heads, ml::mlDataType_t dtype)
+			int num_heads, ml::mlDataType_t dtype, const void *mask)
 	{
 		const int batch_size = input_shape.dim[0];
 		const int height = input_shape.dim[1];
@@ -370,20 +482,20 @@ namespace
 			{
 				if (use_bias)
 					kernel_softmax_forward_in_place<half, true> <<<gridDim, blockDim, shared_mem, stream>>>(ml::getPointer<half>(input),
-							ml::getPointer<half>(weights), batch_size, num_heads, height, width, range);
+							ml::getPointer<half>(weights), batch_size, num_heads, height, width, range, ml::getPointer<float>(mask));
 				else
 					kernel_softmax_forward_in_place<half, false> <<<gridDim, blockDim, shared_mem, stream>>>(ml::getPointer<half>(input), nullptr,
-							batch_size, num_heads, height, width, 0);
+							batch_size, num_heads, height, width, 0, ml::getPointer<float>(mask));
 				break;
 			}
 			case ml::DTYPE_FLOAT32:
 			{
 				if (use_bias)
 					kernel_softmax_forward_in_place<float, true> <<<gridDim, blockDim, shared_mem, stream>>>(ml::getPointer<float>(input),
-							ml::getPointer<float>(weights), batch_size, num_heads, height, width, range);
+							ml::getPointer<float>(weights), batch_size, num_heads, height, width, range, ml::getPointer<float>(mask));
 				else
 					kernel_softmax_forward_in_place<float, false> <<<gridDim, blockDim, shared_mem, stream>>>(ml::getPointer<float>(input), nullptr,
-							batch_size, num_heads, height, width, 0);
+							batch_size, num_heads, height, width, 0, ml::getPointer<float>(mask));
 				break;
 			}
 			case ml::DTYPE_FLOAT64:
@@ -448,11 +560,31 @@ namespace ml
 				batch_size, tokens, num_heads, head_dim, size_of(dtype), symmetric);
 		assert(cudaGetLastError() == cudaSuccess);
 
+//		{
+//			dim3 blockDim(32, 8);
+//			dim3 gridDim(num_pointers);
+//			const int shared_mem = size_of(dtype) * blockDim.y * head_dim;
+//
+//			switch (dtype)
+//			{
+//				case DTYPE_FLOAT32:
+//					kernel_normalize_qk_forward<float> <<<gridDim, blockDim, shared_mem, stream>>>(q_ptr, tokens, head_dim, qkv_stride, nullptr);
+//					if (not symmetric)
+//						kernel_normalize_qk_forward<float> <<<gridDim, blockDim, shared_mem, stream>>>(k_ptr, tokens, head_dim, qkv_stride, nullptr);
+//					break;
+//				case DTYPE_FLOAT16:
+//					kernel_normalize_qk_forward<half> <<<gridDim, blockDim, shared_mem, stream>>>(q_ptr, tokens, head_dim, qkv_stride, nullptr);
+//					if (not symmetric)
+//						kernel_normalize_qk_forward<half> <<<gridDim, blockDim, shared_mem, stream>>>(k_ptr, tokens, head_dim, qkv_stride, nullptr);
+//					break;
+//			}
+//		}
+
 		const float scale = 1.0f / std::sqrt(head_dim);
 		gemm_batched(context, 'n', 't', dtype, tokens, tokens, head_dim, scale, const_cast<const void**>(q_ptr), qkv_stride,
 				const_cast<const void**>(k_ptr), qkv_stride, 0.0f, qk_ptr, tokens, num_pointers);
 
-		run_softmax_forward(stream, qk_tensor_ptr, input_shape, weights, weights_shape, num_heads, dtype);
+		run_softmax_forward(stream, qk_tensor_ptr, input_shape, weights, weights_shape, num_heads, dtype, mask);
 
 		gemm_batched(context, 'n', 'n', dtype, tokens, head_dim, tokens, 1.0f, const_cast<const void**>(qk_ptr), tokens,
 				const_cast<const void**>(v_ptr), qkv_stride, 0.0f, out_ptr, embedding, num_pointers);
@@ -460,7 +592,7 @@ namespace ml
 	}
 	void cuda_multi_head_attention_backward(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, mlShape_t bias_shape,
 			const void *input, const void *weights, const void *bias, const void *mask, void *gradient_prev, void *gradient_next,
-			void *weights_update, void *bias_update, void *workspace, void *backward_data, int num_heads, bool symmetric)
+			void *weights_update, void *bias_update, void *mask_update, void *workspace, void *backward_data, int num_heads, bool symmetric)
 	{
 		assert(input_shape.rank == 4);
 		const int batch_size = input_shape.dim[0];
@@ -491,6 +623,9 @@ namespace ml
 		void **dqk_ptr = pointers + 8 * num_pointers;
 		void **dout_ptr = pointers + 9 * num_pointers;
 
+//		float *q_rms_workspace = reinterpret_cast<float*>(pointers + 10 * num_pointers);
+//		float *k_rms_workspace = q_rms_workspace + num_pointers * tokens;
+
 		cudaStream_t stream = cuda::Context::getStream(context);
 
 		const float scale = 1.0f / std::sqrt(head_dim);
@@ -499,11 +634,21 @@ namespace ml
 		kernel_calculate_pointers<<<1, 1024, 0, stream>>>(dq_ptr, dk_ptr, dv_ptr, gradient_prev, dqk_ptr, backward_workspace, dout_ptr, gradient_next,
 				batch_size, tokens, num_heads, head_dim, size_of(DTYPE_FLOAT32), symmetric);
 
+//		{
+//			dim3 blockDim(32, 8);
+//			dim3 gridDim(num_pointers);
+//			const int shared_mem = sizeof(float) * blockDim.y * head_dim;
+//
+//			kernel_normalize_qk_forward<float> <<<gridDim, blockDim, shared_mem, stream>>>(q_ptr, tokens, head_dim, qkv_stride, q_rms_workspace);
+//			if (not symmetric)
+//				kernel_normalize_qk_forward<float> <<<gridDim, blockDim, shared_mem, stream>>>(k_ptr, tokens, head_dim, qkv_stride, k_rms_workspace);
+//		}
+
 		if (backward_data == nullptr)
 		{
 			gemm_batched(context, 'n', 't', DTYPE_FLOAT32, tokens, tokens, head_dim, scale, const_cast<const void**>(q_ptr), qkv_stride,
 					const_cast<const void**>(k_ptr), qkv_stride, 0.0f, qk_ptr, tokens, num_pointers);
-			run_softmax_forward(stream, qk_tensor_ptr, input_shape, weights, weights_shape, num_heads, DTYPE_FLOAT32);
+			run_softmax_forward(stream, qk_tensor_ptr, input_shape, weights, weights_shape, num_heads, DTYPE_FLOAT32, mask);
 		}
 
 		// dqk = dy * V^T
@@ -520,7 +665,7 @@ namespace ml
 			const int shared_mem = sizeof(float) * (2 * tokens + weights_shape.dim[1] * weights_shape.dim[2] + 4) + sizeof(Index2D) * tokens;
 			kernel_softmax_backward_in_place<true> <<<gridDim, blockDim, shared_mem, stream>>>(getPointer<float>(qk_tensor_ptr),
 					getPointer<float>(backward_workspace), getPointer<float>(update_workspace), batch_size, num_heads, height, width,
-					weights_shape.dim[1]);
+					weights_shape.dim[1], getPointer<float>(mask_update));
 			assert(cudaGetLastError() == cudaSuccess);
 
 			const int last_dim = weights_shape.dim[1] * weights_shape.dim[2];
@@ -534,7 +679,7 @@ namespace ml
 		{ // not using bias
 			const int shared_mem = sizeof(float) * (2 * tokens + 4);
 			kernel_softmax_backward_in_place<false> <<<gridDim, blockDim, shared_mem, stream>>>(getPointer<float>(qk_tensor_ptr),
-					getPointer<float>(backward_workspace), nullptr, batch_size, num_heads, height, width, 0);
+					getPointer<float>(backward_workspace), nullptr, batch_size, num_heads, height, width, 0, getPointer<float>(mask_update));
 			assert(cudaGetLastError() == cudaSuccess);
 		}
 
@@ -546,6 +691,16 @@ namespace ml
 		// dK = dqk^T * Q
 		gemm_batched(context, 't', 'n', DTYPE_FLOAT32, tokens, head_dim, tokens, scale, const_cast<const void**>(dqk_ptr), tokens,
 				const_cast<const void**>(q_ptr), qkv_stride, beta, dk_ptr, qkv_stride, num_pointers);
+
+//		{
+//			dim3 blockDim(32, 8);
+//			dim3 gridDim(num_pointers);
+//			const int shared_mem = sizeof(float) * blockDim.y * head_dim * 2;
+//
+//			kernel_normalize_qk_backward<<<gridDim, blockDim, shared_mem, stream>>>(dq_ptr, q_ptr, tokens, head_dim, qkv_stride, q_rms_workspace);
+//			if (not symmetric)
+//				kernel_normalize_qk_backward<<<gridDim, blockDim, shared_mem, stream>>>(dk_ptr, k_ptr, tokens, head_dim, qkv_stride, k_rms_workspace);
+//		}
 	}
 } /* namespace ml */
 

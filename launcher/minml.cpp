@@ -15,6 +15,7 @@
 #include <minml/layers/Dense.hpp>
 #include <minml/layers/Conv2D.hpp>
 #include <minml/layers/BatchNormalization.hpp>
+#include <minml/layers/Gelu.hpp>
 #include <minml/layers/GlobalBroadcastHW.hpp>
 #include <minml/layers/GlobalPooling.hpp>
 #include <minml/layers/Add.hpp>
@@ -2769,6 +2770,7 @@ void test_microkernel(const int M, const int N, const int K, mlDataType_t dtype,
 	const double stop = getTime();
 	const double flops = (double) i * (M * N * K) / (stop - start);
 	std::cout << M << "x" << N << "x" << K << " : " << flops / 1.0e9 << " GFLOPS\n";
+	std::cout << "time = " << (stop - start) / (i / 1.0e6) << "us\n";
 
 	gemm::aligned_free(lhs, 4096);
 	gemm::aligned_free(rhs, 4096);
@@ -2975,11 +2977,11 @@ float best_expf(float x, int32_t shift = -139160) noexcept
 	const float a = (1 << 22) / float(M_LN2);
 	const int32_t b = 127 * (1 << 23) + shift;
 
-	std::stringstream stream;
-	stream << std::hex << to_int(a) << " " << b;
-	std::string result(stream.str());
-	std::cout << result << '\n';
-	exit(0);
+//	std::stringstream stream;
+//	stream << std::hex << to_int(a) << " " << b;
+//	std::string result(stream.str());
+//	std::cout << result << '\n';
+//	exit(0);
 
 	const int32_t r = static_cast<int32_t>(a * x);
 	const float s = to_float(b + r);
@@ -3079,6 +3081,55 @@ int main()
 	std::cout << "BEGIN" << std::endl;
 	std::cout << ml::Device::hardwareInfo();
 	{
+		Tensor input( { 100, 15, 15, 100 }, "float32", Device::cpu());
+		for (int i = 0; i < input.dim(1); i++)
+			for (int j = 0; j < input.dim(2); j++)
+				input.at( { 0, i, j, 0 }) = (i + 0.01f * j);
+
+		for (int j = 0; j < input.dim(1); j++)
+		{
+			for (int k = 0; k < input.dim(2); k++)
+				std::cout << (float) input.at( { 0, j, k, 0 }) << ' ';
+			std::cout << "\n";
+		}
+
+		Context context(Device::cuda(0));
+		input.moveTo(context.device());
+
+		Tensor output( { 100, 15, 15, 100 }, "float32", context.device());
+
+		windowPartitioning(context, input, output, { 2, 2 });
+		context.synchronize();
+
+//		for (int i = 0; i < output.dim(0); i++)
+//		{
+//			std::cout << "\n---Window " << i << "---\n";
+//			for (int j = 0; j < output.dim(1); j++)
+//			{
+//				for (int k = 0; k < output.dim(2); k++)
+//					std::cout << (float) output.at( { i, j, k, 0 }) << ' ';
+//				std::cout << "\n";
+//			}
+//		}
+
+		Tensor recovered = zeros_like(input);
+		windowMerging(context, output, recovered, { 2, 2 });
+		context.synchronize();
+
+		std::cout << "\n\n\n";
+		for (int j = 0; j < recovered.dim(1); j++)
+		{
+			for (int k = 0; k < recovered.dim(2); k++)
+				std::cout << (float) recovered.at( { 0, j, k, 0 }) << ' ';
+			std::cout << "\n";
+		}
+
+		std::cout << "\ndiff = " << testing::diffForTest(recovered, input) << '\n';
+		return 0;
+	}
+
+//	return 0;
+	{
 //		Graph graph;
 //		FileLoader fl("/home/maciek/alphagomoku/new_runs_2024/supervised/conv_pvum_8x128_v2/network_opt.bin", false);
 //		graph.load(fl.getJson()["model"], fl.getBinaryData());
@@ -3129,7 +3180,7 @@ int main()
 //		return 0;
 
 //		best_expf(0.0f);
-		const mlDataType_t dtype = DTYPE_FLOAT16;
+		const mlDataType_t dtype = DTYPE_FLOAT32;
 //		for (int i = 1; i <= 256; i++)
 //			test_packing(i, 6, ml::MatrixOp::TRANSPOSE, dtype, pack_avx2_6xK, false);
 //		for (int i = 1; i <= 256; i *= 2)
@@ -3241,13 +3292,15 @@ int main()
 		const bool symmetric = false;
 		const int batch_size = 8;
 		const int board_size = 15;
-		int embedding = 64;
+		int embedding = 128;
 		const int patch_size = 1;
 		const int head_dim = 32;
 		const int pos_encoding_range = (board_size + patch_size - 1) / patch_size;
 
 		auto x = graph.addInput( { batch_size, board_size, board_size, 32 });
 		x = graph.add(Conv2D(embedding / (patch_size * patch_size), 5, "relu"), x);
+//		x = graph.add(Conv2D(embedding / (patch_size * patch_size), 5).useBias(false), x);
+//		x = graph.add(BatchNormalization("relu").useGamma(false), x);
 //		x = graph.add(ml::SpaceToDepth(patch_size), x);
 
 //		const int size_2 = (board_size + 1) / 2;
@@ -3281,14 +3334,46 @@ int main()
 //		x = graph.add(ml::Conv2D(embedding, 3, "relu"), x);
 //		x = graph.add(ml::Conv2D(embedding, 3, "relu"), x);
 
-		for (int i = 0; i < 5; i++)
+		for (int i = 0; i < 0; i++)
 		{
-			auto y = graph.add(ml::Conv2D(embedding, 3, "relu"), x);
-			y = graph.add(ml::Conv2D(embedding, 3, "linear"), y);
-			x = graph.add(ml::Add("relu"), { x, y });
+//			auto y = graph.add(ml::RMSNormalization(), x);
+//			y = graph.add(ml::Conv2D((3 - symmetric) * embedding, 1).useBias(false), y);
+//			y = graph.add(ml::MultiHeadAttention(embedding / head_dim, pos_encoding_range, symmetric), y);
+//			y = graph.add(ml::Conv2D(embedding, 1).useBias(false), y);
+//			x = graph.add(ml::Add(), { x, y });
+//
+//			y = graph.add(ml::RMSNormalization(), x);
+//			y = graph.add(ml::Conv2D(embedding, 1, "relu"), y);
+//			y = graph.add(ml::Conv2D(embedding, 1), y);
+//			x = graph.add(ml::Add(), { x, y });
+
+//			auto y = graph.add(ml::Conv2D(embedding, 3, "relu"), x);
+//			y = graph.add(ml::Conv2D(embedding, 3, "linear"), y);
+//			x = graph.add(ml::Add("relu"), { x, y });
 		}
-		embedding *= 2;
-		x = graph.add(ml::Conv2D(embedding, 1, "relu"), x);
+//		embedding *= 2;
+//		x = graph.add(ml::Conv2D(embedding, 1, "relu"), x);
+
+		for (int i = 0; i < 8; i++)
+		{
+			auto y = graph.add(ml::RMSNormalization(false), x);
+			y = graph.add(ml::Conv2D((3 - symmetric) * embedding, 1).useBias(false), y);
+			y = graph.add(ml::MultiHeadAttention(embedding / head_dim, pos_encoding_range, symmetric), y);
+			y = graph.add(ml::Conv2D(embedding, 1).useBias(false), y);
+			x = graph.add(ml::Add(), { x, y });
+
+			y = graph.add(ml::RMSNormalization(false), x);
+			y = graph.add(ml::Conv2D(embedding, 1, "relu"), y);
+			y = graph.add(ml::Conv2D(embedding, 1), y);
+			x = graph.add(ml::Add(), { x, y });
+
+//			auto y = graph.add(ml::Conv2D(embedding / 2, 1, "relu"), x);
+//			y = graph.add(ml::Conv2D(embedding / 2, 3, "linear"), y);
+//			y = graph.add(ml::Conv2D(embedding, 3, "linear"), y);
+//			x = graph.add(ml::Add("relu"), { x, y });
+		}
+//		embedding *= 2;
+//		x = graph.add(ml::Conv2D(embedding, 1, "relu"), x);
 
 //		for (int i = 0; i < 4; i++)
 //		{
@@ -3299,12 +3384,18 @@ int main()
 //		embedding *= 2;
 //		x = graph.add(ml::Conv2D(embedding, 1, "relu"), x);
 
-		for (int i = 0; i < 5; i++)
-		{
-			auto y = graph.add(ml::Conv2D(embedding / 2, 3, "relu"), x);
-			y = graph.add(ml::Conv2D(embedding / 2, 3, "relu"), y);
-			y = graph.add(ml::Conv2D(embedding, 3, "linear"), y);
-			x = graph.add(ml::Add("relu"), { x, y });
+//		for (int i = 0; i < 2; i++)
+//		{
+//			auto y = graph.add(ml::RMSNormalization(), x);
+//			y = graph.add(ml::Conv2D((3 - symmetric) * embedding, 1).useBias(false), y);
+//			y = graph.add(ml::MultiHeadAttention(embedding / head_dim, pos_encoding_range, symmetric), y);
+//			y = graph.add(ml::Conv2D(embedding, 1).useBias(false), y);
+//			x = graph.add(ml::Add(), { x, y });
+
+//			auto y = graph.add(ml::Conv2D(embedding / 2, 1, "relu"), x);
+//			y = graph.add(ml::Conv2D(embedding / 2, 3, "relu"), y);
+//			y = graph.add(ml::Conv2D(embedding, 3, "linear"), y);
+//			x = graph.add(ml::Add("relu"), { x, y });
 
 //			auto y = graph.add(ml::Conv2D(embedding, 3, "relu"), x);
 //			y = graph.add(ml::Conv2D(embedding, 3, "linear"), y);
@@ -3321,10 +3412,12 @@ int main()
 //			y = graph.add(ml::Conv2D(embedding, 1, "relu"), y);
 //			y = graph.add(ml::Conv2D(embedding, 1), y);
 //			x = graph.add(ml::Add(), { x, y });
-		}
+//		}
 
 		// policy head
 		auto p = graph.add(ml::Conv2D(embedding, 3, "relu"), x);
+//		auto p = graph.add(ml::Conv2D(embedding, 3).useBias(false), x);
+//		p = graph.add(BatchNormalization("relu").useGamma(false), p);
 		p = graph.add(ml::Conv2D(1, 1, "linear"), p);
 		p = graph.add(ml::Softmax( { 1, 2, 3 }), p);
 		graph.addOutput(p, ml::CrossEntropyLoss(1.0f));
@@ -3340,6 +3433,8 @@ int main()
 
 		// value head
 		auto v = graph.add(ml::Dense(256, "relu"), common);
+//		auto v = graph.add(ml::Dense(256).useBias(false), common);
+//		v = graph.add(BatchNormalization("relu").useGamma(false), v);
 		v = graph.add(ml::Dense(3), v);
 		v = graph.add(ml::Softmax( { 1 }), v);
 		graph.addOutput(v, ml::CrossEntropyLoss(1.0f));
@@ -3393,9 +3488,9 @@ int main()
 //		graph.print();
 
 		graph.init();
-//		graph.moveTo(Device::cuda(0));
 		graph.moveTo(Device::cpu());
-		graph.convertTo(DataType::FLOAT16);
+//		graph.moveTo(Device::cuda(0));
+//		graph.convertTo(DataType::FLOAT16);
 
 		Tensor input(graph.getInputShape(), graph.dtype(), Device::cpu());
 		for (int i = 0; i < input.shape().volumeWithoutLastDim(); i++)
@@ -3427,16 +3522,16 @@ int main()
 //		graph.forward(batch_size);
 //		graph.context().synchronize();
 //		std::this_thread::sleep_for(std::chrono::milliseconds(100));
-
+//
 //		graph.backward(batch_size);
 //		graph.learn();
 //		graph.context().synchronize();
-
+//
 		graph.makeNonTrainable();
 		ml::FoldAdd().optimize(graph);
 		graph.print();
 		std::this_thread::sleep_for(std::chrono::milliseconds(100));
-
+//
 		graph.forward(batch_size);
 		graph.context().synchronize();
 
@@ -3525,7 +3620,7 @@ int main()
 			const double t0 = getTime();
 			for (int j = 0; j < 1000; j++)
 			{
-				activationForward(context, output, input, ActivationType::SOFTMAX);
+				softmaxForward(context, output, input);
 				context.synchronize();
 			}
 			const double t1 = getTime();

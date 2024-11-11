@@ -1,12 +1,12 @@
 /*
- * Softmax.hpp
+ * WindowMerging.hpp
  *
- *  Created on: Jan 21, 2023
- *      Author: Maciej Kozarzewski
+ *  Created on: Nov 10, 2024
+ *      Author: maciek
  */
 
-#ifndef MINML_LAYERS_SOFTMAX_HPP_
-#define MINML_LAYERS_SOFTMAX_HPP_
+#ifndef MINML_LAYERS_WINDOWMERGING_HPP_
+#define MINML_LAYERS_WINDOWMERGING_HPP_
 
 #include <minml/layers/Layer.hpp>
 
@@ -15,11 +15,12 @@
 namespace ml
 {
 
-	class Softmax: public Layer
+	class WindowMerging: public Layer
 	{
-			std::vector<int> m_axis;
+			Shape m_dst_shape;
+			int m_window_shift = 0;
 		public:
-			Softmax(const std::vector<int> &axis);
+			WindowMerging(const Shape &shape, int shift);
 
 			void setInputShape(const std::vector<Shape> &shapes);
 			Shape getOutputShape() const;
@@ -35,4 +36,4 @@ namespace ml
 
 } /* namespace ml */
 
-#endif /* MINML_LAYERS_SOFTMAX_HPP_ */
+#endif /* MINML_LAYERS_WINDOWMERGING_HPP_ */

@@ -192,6 +192,10 @@ namespace vectors2
 	{
 		return vec2f(tanf(a.x0), tanf(a.x1));
 	}
+	DEVICE_INLINE vec2f erf(const vec2f &a)
+	{
+		return vec2f(erff(a.x0), erff(a.x1));
+	}
 
 	DEVICE_INLINE float horizontal_add(const vec2f &a)
 	{
@@ -204,6 +208,11 @@ namespace vectors2
 	DEVICE_INLINE float horizontal_min(const vec2f &a)
 	{
 		return fmin(a.x0, a.x1);
+	}
+
+	DEVICE_INLINE vec2f select(const vec2f &cond, const vec2f &a, const vec2f &b)
+	{
+		return vec2f(is_true(cond.x0) ? a.x0 : b.x0, is_true(cond.x1) ? a.x1 : b.x1);
 	}
 
 	DEVICE_INLINE void atomic_add(float *address, const vec2f &value)

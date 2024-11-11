@@ -438,7 +438,6 @@ namespace ml
 	{
 		assert(input != nullptr);
 		assert(output != nullptr);
-		assert(weights != nullptr);
 
 		const int first_dim = volume_without_last_dim(shape);
 		const int last_dim = get_last_dim(shape);
@@ -455,10 +454,15 @@ namespace ml
 			const float rms = std::sqrt(sum_square / last_dim);
 
 			const float inv_rms = 1.0f / (epsilon + rms);
-			for (int j = 0; j < last_dim; j++)
+			if (weights_ptr == nullptr)
 			{
-				const float gamma = weights_ptr[j];
-				output_ptr[i * last_dim + j] = gamma * input_ptr[i * last_dim + j] * inv_rms;
+				for (int j = 0; j < last_dim; j++)
+					output_ptr[i * last_dim + j] = input_ptr[i * last_dim + j] * inv_rms;
+			}
+			else
+			{
+				for (int j = 0; j < last_dim; j++)
+					output_ptr[i * last_dim + j] = weights_ptr[j] * input_ptr[i * last_dim + j] * inv_rms;
 			}
 		}
 	}
@@ -468,7 +472,6 @@ namespace ml
 		assert(input != nullptr);
 		assert(gradient_prev != nullptr);
 		assert(gradient_next != nullptr);
-		assert(weights_update != nullptr);
 
 		const int first_dim = volume_without_last_dim(shape);
 		const int last_dim = get_last_dim(shape);
@@ -486,7 +489,7 @@ namespace ml
 			for (int j = 0; j < last_dim; j++)
 			{
 				const int idx = i * last_dim + j;
-				const float gamma = weights_ptr[j];
+				const float gamma = (weights_ptr == nullptr) ? 1.0f : weights_ptr[j];
 				sum_square += square(input_ptr[idx]);
 				sum += input_ptr[idx] * gradient_next_ptr[idx] * gamma;
 			}
@@ -496,12 +499,13 @@ namespace ml
 			for (int j = 0; j < last_dim; j++)
 			{
 				const int idx = i * last_dim + j;
-				const float gamma = weights_ptr[j];
+				const float gamma = (weights_ptr == nullptr) ? 1.0f : weights_ptr[j];
 				const float in = input_ptr[idx];
 				const float out = in * inv_rms;
 
-				weights_update_ptr[j] += gradient_next_ptr[idx] * out;
 				gradient_prev_ptr[idx] = (gradient_next_ptr[idx] * gamma * sum_square - in * sum) / (last_dim * cube(rms));
+				if (weights_update_ptr != nullptr)
+					weights_update_ptr[j] += gradient_next_ptr[idx] * out;
 			}
 		}
 	}

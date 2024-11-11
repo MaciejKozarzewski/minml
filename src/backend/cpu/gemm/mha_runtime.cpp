@@ -228,13 +228,13 @@ namespace
 		else
 			return Fragment();
 	}
-	void edge_softmax_sum(Fragment &softmax_sum, const Fragment &edge_qk) noexcept
+	void edge_softmax(Fragment &temp_qk, Fragment &softmax_sum) noexcept
 	{
-		for (int m = 0; m < edge_qk.columns(); m++)
+		for (int m = 0; m < temp_qk.columns(); m++)
 		{
 			float tmp = softmax_sum.at<float>(m, 0);
-			for (int n = 0; n < edge_qk.rows(); n++)
-				tmp += edge_qk.at<float>(n, m);
+			for (int n = 0; n < temp_qk.rows(); n++)
+				tmp += temp_qk.at<float>(n, m);
 			softmax_sum.at<float>(m, 0) = tmp;
 		}
 	}
@@ -295,12 +295,17 @@ namespace ml
 						Fragment temp_qk_subfragment = get_subfragment(temp_qk_fragment, Position2D(inner_n, 0), Size2D(n_left, m_left));
 						Fragment bias_subfragment = get_subfragment(bias_fragment, Position2D(inner_m, inner_n), Size2D(m_left, n_left));
 
+//						if (m_left == inner_tile.M and n_left == inner_tile.N)
 						if (n_left == inner_tile.N)
+						{
 							softmax_qk_kernel(temp_qk_subfragment, &scale, Q_fragment, *K_frag_iter, bias_subfragment, softmax_sum_fragment);
+//							mha_softmax_avx2_12x8(temp_qk_subfragment, softmax_sum_fragment);
+						}
 						else
 						{
 							softmax_qk_kernel(temp_qk_subfragment, &scale, Q_fragment, *K_frag_iter, bias_subfragment, null_fragment);
-							edge_softmax_sum(softmax_sum_fragment, temp_qk_subfragment);
+//							mha_softmax_def_MxN(temp_qk_subfragment, softmax_sum_fragment);
+							edge_softmax(temp_qk_subfragment, softmax_sum_fragment);
 						}
 						K_frag_iter.advance();
 					}

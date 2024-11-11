@@ -323,7 +323,7 @@ namespace ml
 				std::cout << "  Allocated output tensor=" << output_3.info() << std::endl;
 
 				std::cout << "  Running softmax with 3 channels" << std::endl;
-				activationForward(context, output_3, input_3, ActivationType::SOFTMAX);
+				softmaxForward(context, output_3, input_3);
 				std::cout << "    WORKS" << std::endl;
 
 				const Tensor input_N = create_test_tensor(shape_N, device, *dt);
@@ -332,7 +332,7 @@ namespace ml
 				std::cout << "  Allocated output tensor=" << output_N.info() << std::endl;
 
 				std::cout << "  Running softmax with multiple channels" << std::endl;
-				activationForward(context, output_N, input_N, ActivationType::SOFTMAX);
+				softmaxForward(context, output_N, input_N);
 				std::cout << "    WORKS" << std::endl;
 			}
 

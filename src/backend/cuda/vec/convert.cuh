@@ -9,6 +9,7 @@
 #define BACKEND_CUDA_VEC_CONVERT_CUH_
 
 #include "utils.cuh"
+#include "vec1d.cuh"
 #include "vec1f.cuh"
 #include "vec2f.cuh"
 #include "vec4f.cuh"
@@ -26,6 +27,18 @@ namespace vectors2
 	template<typename T, typename U, int N>
 	DEVICE_INLINE vec<T, N> convert(const vec<U, N> &a);
 
+	/*
+	 * fp64 -> fp64
+	 */
+	template<>
+	DEVICE_INLINE vec<double, 1> convert(const vec<double, 1> &a)
+	{
+		return a;
+	}
+
+	/*
+	 * fp32 -> fp32
+	 */
 	template<>
 	DEVICE_INLINE vec<float, 1> convert(const vec<float, 1> &a)
 	{
@@ -41,6 +54,10 @@ namespace vectors2
 	{
 		return a;
 	}
+
+	/*
+	 * fp16 -> fp16
+	 */
 	template<>
 	DEVICE_INLINE vec<half, 1> convert(const vec<half, 1> &a)
 	{

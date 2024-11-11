@@ -15,8 +15,10 @@ namespace ml
 	class Context;
 	class Shape;
 	class Tensor;
-	enum class DataType;
-	enum class ActivationType;
+	enum class DataType
+	;
+	enum class ActivationType
+	;
 }
 
 namespace ml
@@ -85,11 +87,16 @@ namespace ml
 	void multiHeadAttentionForward(const Context &context, const Tensor &input, Tensor &output, const Tensor &weights, const Tensor &bias,
 			const Tensor &mask, Tensor &workspace, Tensor &backwardData, int num_heads, bool symmetric);
 	void multiHeadAttentionBackward(const Context &context, const Tensor &input, const Tensor &weights, const Tensor &bias, const Tensor &mask,
-			Tensor &gradient_prev, Tensor &gradient_next, Tensor &weights_update, Tensor &bias_update, Tensor &workspace, Tensor &backwardData,
-			int num_heads, bool symmetric);
+			Tensor &gradient_prev, Tensor &gradient_next, Tensor &weights_update, Tensor &bias_update, Tensor &mask_update, Tensor &workspace,
+			Tensor &backwardData, int num_heads, bool symmetric);
+
+	void windowPartitioning(const Context &context, const Tensor &input, Tensor &output, const Shape &offset);
+	void windowMerging(const Context &context, const Tensor &input, Tensor &output, const Shape &offset);
 
 	void activationForward(const Context &context, Tensor &output, const Tensor &input, ActivationType act);
 	void activationBackward(const Context &context, Tensor &gradient_prev, const Tensor &gradient_next, const Tensor &output, ActivationType act);
+	void softmaxForward(const Context &context, Tensor &output, const Tensor &input);
+	void geluBackward(const Context &context, Tensor &gradient_prev, const Tensor &gradient_next, const Tensor &input);
 
 	void emulateLowPrecision(const Context &context, Tensor &dst, const Tensor &src);
 	void sumOverFirstDim(const Context &context, Tensor &dst, const Tensor &src, float beta);

@@ -147,6 +147,10 @@ namespace vectors2
 	{
 		return vec4h(h2cos(a.x0), h2cos(a.x1));
 	}
+	DEVICE_INLINE vec4h erf(const vec4h &a)
+	{
+		return tanh(vec4h(0.797884561f) * a * (vec4h(1.0f) + vec4h(0.044715f) * square(a)));
+	}
 
 	DEVICE_INLINE half horizontal_add(vec4h a)
 	{
@@ -162,6 +166,12 @@ namespace vectors2
 	{
 		const half2 tmp = __hmin2(a.x0, a.x1);
 		return __hmin(tmp.x, tmp.y);
+	}
+
+	DEVICE_INLINE vec4h select(const vec4h &cond, const vec4h &a, const vec4h &b)
+	{
+		return vec4h(is_true(cond.x0.x) ? a.x0.x : b.x0.x, is_true(cond.x0.y) ? a.x0.y : b.x0.y,
+				is_true(cond.x1.x) ? a.x1.x : b.x1.x, is_true(cond.x1.y) ? a.x1.y : b.x1.y);
 	}
 #endif
 } /* namespace vectors */

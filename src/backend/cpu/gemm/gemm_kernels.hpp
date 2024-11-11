@@ -32,6 +32,7 @@ namespace ml
 	// multi-head attention (MHA) kernel
 	void mha_qk_def_MxN(Fragment &temp, const void *alpha_ptr, const Fragment &Q, const Fragment &K, const Fragment &bias,
 			Fragment &softmax_sum) noexcept;
+	void mha_softmax_def_MxN(Fragment &temp, Fragment &softmax_sum) noexcept;
 	void mha_pack_bias_def(Fragment &dst, const BatchedMatrix &src, int head, int height, int width, int range) noexcept;
 
 	/*
@@ -71,6 +72,7 @@ namespace ml
 	// multi-head attention (MHA) kernel
 	void mha_qk_avx2_12x8(Fragment &temp, const void *alpha_ptr, const Fragment &Q, const Fragment &K, const Fragment &bias,
 			Fragment &softmax_sum) noexcept;
+	void mha_softmax_avx2_12x8(Fragment &temp, Fragment &softmax_sum) noexcept;
 
 	/*
 	 * AVX512 kernels

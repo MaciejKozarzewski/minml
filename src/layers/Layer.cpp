@@ -26,6 +26,7 @@
 #include <minml/layers/Add.hpp>
 #include <minml/layers/BatchNormalization.hpp>
 #include <minml/layers/LayerNormalization.hpp>
+#include <minml/layers/Gelu.hpp>
 #include <minml/layers/GlobalBroadcastHW.hpp>
 #include <minml/layers/GlobalPooling.hpp>
 #include <minml/layers/MultiHeadAttention.hpp>
@@ -34,6 +35,8 @@
 #include <minml/layers/Softmax.hpp>
 #include <minml/layers/SpaceToDepth.hpp>
 #include <minml/layers/SqueezeAndExcitation.hpp>
+#include <minml/layers/WindowPartitioning.hpp>
+#include <minml/layers/WindowMerging.hpp>
 #include <unordered_map>
 #include <cmath>
 #include <mutex>
@@ -53,8 +56,6 @@ namespace ml
 				return "tanh";
 			case ActivationType::RELU:
 				return "relu";
-			case ActivationType::SOFTMAX:
-				return "softmax";
 			case ActivationType::GELU:
 				return "gelu";
 			case ActivationType::EXP:
@@ -71,8 +72,6 @@ namespace ml
 			return ActivationType::TANH;
 		if (str == "relu")
 			return ActivationType::RELU;
-		if (str == "softmax")
-			return ActivationType::SOFTMAX;
 		if (str == "gelu")
 			return ActivationType::GELU;
 		if (str == "exp")
@@ -84,8 +83,6 @@ namespace ml
 			m_dtype(dtype),
 			m_activation(activationFromString(activation))
 	{
-		if (m_activation == ActivationType::SOFTMAX)
-			throw LogicError(METHOD_NAME, "softmax cannot be used as a layer activation function");
 	}
 
 	bool Layer::isTrainable() const noexcept
@@ -251,6 +248,7 @@ namespace ml
 		static const Conv2D conv2d(0, 0);
 		static const Dense dense(0);
 		static const DepthToSpace depth_to_space(0, { 0, 0 });
+		static const Gelu gelu;
 		static const GlobalBroadcastHW global_broadcast;
 		static const GlobalPooling global_pooling;
 		static const LayerNormalization layernorm;
@@ -261,6 +259,8 @@ namespace ml
 		static const Softmax softmax( { 0 });
 		static const SpaceToDepth space_to_depth(0);
 		static const SqueezeAndExcitation se;
+		static const WindowPartitioning window_partitioning(0, 0);
+		static const WindowMerging window_merging(Shape(), 0);
 
 		const std::string name = json["name"];
 		std::unique_ptr<Layer> result;
@@ -275,6 +275,8 @@ namespace ml
 			result = dense.clone(json);
 		if (name == depth_to_space.name())
 			result = depth_to_space.clone(json);
+		if (name == gelu.name())
+			result = gelu.clone(json);
 		if (name == global_broadcast.name())
 			result = global_broadcast.clone(json);
 		if (name == global_pooling.name())
@@ -295,6 +297,10 @@ namespace ml
 			result = space_to_depth.clone(json);
 		if (name == se.name())
 			result = se.clone(json);
+		if (name == window_partitioning.name())
+			result = window_partitioning.clone(json);
+		if (name == window_merging.name())
+			result = window_merging.clone(json);
 
 		if (result == nullptr)
 			throw LogicError(METHOD_NAME, "unknown layer '" + static_cast<std::string>(json["name"]) + "'");

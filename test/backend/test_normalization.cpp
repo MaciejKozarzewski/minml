@@ -309,6 +309,7 @@ namespace
 	template<typename T>
 	void baseline_rmsnorm_forward(const Tensor &input, Tensor &output, const Tensor &weights, T epsilon = 0.0e-6)
 	{
+		const bool use_gamma = not weights.isEmpty();
 		const int first_dim = input.shape().volumeWithoutLastDim();
 		const int last_dim = input.lastDim();
 
@@ -325,7 +326,7 @@ namespace
 			const T inv_rms = static_cast<T>(1) / (epsilon + rms);
 			for (int j = 0; j < last_dim; j++)
 			{
-				const T gamma = weights.at( { j });
+				const T gamma = use_gamma ? weights.at( { j }) : 1.0f;
 				const T in = input.at( { i, j });
 				output.at( { i, j }) = (gamma * in * inv_rms);
 			}
@@ -335,6 +336,7 @@ namespace
 	void baseline_rmsnorm_backward(const Tensor &input, Tensor &gradient_prev, Tensor &gradient_next, const Tensor &weights, Tensor &weights_update,
 			T epsilon = 0.0e-6)
 	{
+		const bool use_gamma = not weights.isEmpty();
 		const int first_dim = input.shape().volumeWithoutLastDim();
 		const int last_dim = input.lastDim();
 
@@ -345,7 +347,7 @@ namespace
 			{
 				const T in = input.at( { i, j });
 				const T grad = gradient_next.at( { i, j });
-				const T gamma = weights.at( { j });
+				const T gamma = use_gamma ? weights.at( { j }) : 1.0f;
 				sum_square += in * in;
 				sum += in * grad * gamma;
 			}
@@ -354,14 +356,16 @@ namespace
 			const T inv_rms = static_cast<T>(1) / (epsilon + rms);
 			for (int j = 0; j < last_dim; j++)
 			{
-				const T gamma = weights.at( { j });
+				const T gamma = use_gamma ? weights.at( { j }) : 1.0f;
 				const T in = input.at( { i, j });
 				const T out = in * inv_rms;
-
 				const T grad = gradient_next.at( { i, j });
-				const T wu = weights_update.at( { j });
 
-				weights_update.at( { j }) = wu + grad * out;
+				if (use_gamma)
+				{
+					const T wu = weights_update.at( { j });
+					weights_update.at( { j }) = wu + grad * out;
+				}
 				gradient_prev.at( { i, j }) = (gamma * grad * sum_square - in * sum) / (last_dim * rms * rms * rms);
 			}
 		}
@@ -870,6 +874,87 @@ namespace ml
 
 			EXPECT_LE(testing::diffForTest(correct_prev, gradient_prev), 1.0e-4f);
 			EXPECT_LE(testing::diffForTest(correct_weight_update, weight_update), 1.0e-4f);
+		}
+	}
+
+	TEST(TestRMSNorm, forward_no_gamma)
+	{
+		const int batch_size = 123;
+		const int filters = 43;
+		Context context;
+
+		Tensor input( { batch_size, filters }, "float32", Device::cpu());
+		Tensor output(input.shape(), "float32", Device::cpu());
+		Tensor weight;
+
+		Tensor correct(input.shape(), "float32", Device::cpu());
+
+		testing::initForTest(input, 0.0f);
+		baseline_rmsnorm_forward<float>(input, correct, weight, 1.0e-6f);
+
+		rmsnormForward(context, input, output, weight);
+		EXPECT_LE(testing::diffForTest(correct, output), 1.0e-4f);
+
+		if (testing::has_device_supporting(DataType::FLOAT32))
+		{
+			const Device device = testing::get_device_for_test();
+			Context context(device);
+			input.moveTo(device);
+			output.moveTo(device);
+			output.zeroall();
+			weight.moveTo(device);
+
+			testing::initForTest(input, 0.0f);
+			rmsnormForward(context, input, output, weight);
+			context.synchronize();
+
+			EXPECT_LE(testing::diffForTest(correct, output), 1.0e-4f);
+		}
+	}
+	TEST(TestRMSNorm, backward_no_gamma)
+	{
+		const int batch_size = 123;
+		const int filters = 43;
+		Context context;
+
+		Tensor input( { batch_size, filters }, "float32", Device::cpu());
+		Tensor gradient_prev(input.shape(), "float32", Device::cpu());
+		Tensor gradient_next(input.shape(), "float32", Device::cpu());
+
+		Tensor weight, weight_update;
+
+		testing::initForTest(input, 0.0f);
+		testing::initForTest(gradient_next, 1.57f);
+
+		Tensor correct_prev(input.shape(), "float32", Device::cpu());
+		Tensor correct_weight_update( { filters }, "float32", Device::cpu());
+		correct_weight_update.copyFrom(Context(), weight_update);
+
+		baseline_rmsnorm_backward<float>(input, correct_prev, gradient_next, weight, correct_weight_update, 1.0e-6f);
+
+		testing::initForTest(gradient_next, 1.57f);
+		rmsnormBackward(context, input, gradient_prev, gradient_next, weight, weight_update);
+		EXPECT_LE(testing::diffForTest(correct_prev, gradient_prev), 1.0e-4f);
+
+		if (testing::has_device_supporting(DataType::FLOAT32))
+		{
+			const Device device = testing::get_device_for_test();
+			Context context(device);
+			testing::initForTest(gradient_next, 1.57f);
+
+			input.moveTo(device);
+			gradient_prev.moveTo(device);
+			gradient_next.moveTo(device);
+			weight.moveTo(device);
+
+			weight_update.moveTo(device);
+
+			gradient_prev.zeroall();
+
+			rmsnormBackward(context, input, gradient_prev, gradient_next, weight, weight_update);
+			context.synchronize();
+
+			EXPECT_LE(testing::diffForTest(correct_prev, gradient_prev), 1.0e-4f);
 		}
 	}
 

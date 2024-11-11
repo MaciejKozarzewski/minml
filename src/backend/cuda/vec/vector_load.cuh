@@ -9,6 +9,7 @@
 #define BACKEND_CUDA_VEC_VECTOR_LOAD_CUH_
 
 #include "convert.cuh"
+#include "vec1d.cuh"
 #include "vec4f.cuh"
 #include "vec2f.cuh"
 #include "vec1f.cuh"

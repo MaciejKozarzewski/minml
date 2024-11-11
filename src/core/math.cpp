@@ -56,7 +56,7 @@ namespace
 							unit = 'm';
 						}
 					}
-					std::cout << m_name << " : " << time << " " << unit << "s (" << m_count << ")\n";
+					std::cout << m_name << " : " << m_total_time << "s : " << time << " " << unit << "s (" << m_count << ")\n";
 				}
 			}
 			void start() noexcept
@@ -511,9 +511,7 @@ namespace ml
 				opencl_gemm_ex(get(context), get(C.dtype()), get_shape(D), D.data(), alpha, opA, get_shape(A), A.data(), opB, get_shape(B), B.data(),
 						beta, get_shape(C), C.data(), bias.data(), get(act));
 				break;
-		}
-
-		SYNC();
+		}SYNC();
 	}
 
 	void addBiasAct(const Context &context, Tensor &output, const Tensor &input, const Tensor &bias, ActivationType act)
@@ -623,6 +621,8 @@ namespace ml
 
 	void layernormForward(const Context &context, const Tensor &input, Tensor &output, const Tensor &weights, const Tensor &bias, const Tensor &ext)
 	{
+		static Timer timer("layernormForward");
+		TimerGuard tg(timer);
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
@@ -637,7 +637,7 @@ namespace ml
 				opencl_layernorm_forward(get(context), get_shape(input), get(input.dtype()), input.data(), output.data(), weights.data(), bias.data(),
 						ext.data());
 				break;
-		}
+		}SYNC();
 	}
 	void layernormBackward(const Context &context, const Tensor &input, Tensor &gradient_prev, Tensor &gradient_next, const Tensor &weights,
 			Tensor &weights_update, Tensor &bias_update)
@@ -661,6 +661,8 @@ namespace ml
 
 	void rmsnormForward(const Context &context, const Tensor &input, Tensor &output, const Tensor &weights)
 	{
+		static Timer timer("rmsnormForward");
+		TimerGuard tg(timer);
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
@@ -672,7 +674,7 @@ namespace ml
 			case DeviceType::OPENCL:
 				opencl_rmsnorm_forward(get(context), get_shape(input), get(input.dtype()), input.data(), output.data(), weights.data());
 				break;
-		}
+		}SYNC();
 	}
 	void rmsnormBackward(const Context &context, const Tensor &input, Tensor &gradient_prev, Tensor &gradient_next, const Tensor &weights,
 			Tensor &weights_update)
@@ -711,6 +713,8 @@ namespace ml
 	void multiHeadAttentionForward(const Context &context, const Tensor &input, Tensor &output, const Tensor &weights, const Tensor &bias,
 			const Tensor &mask, Tensor &workspace, Tensor &backwardData, int num_heads, bool symmetric)
 	{
+		static Timer timer("multiHeadAttentionForward");
+		TimerGuard tg(timer);
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
@@ -728,11 +732,11 @@ namespace ml
 						input.data(), output.data(), weights.data(), bias.data(), mask.data(), workspace.data(), backwardData.data(), num_heads,
 						symmetric);
 				break;
-		}
+		}SYNC();
 	}
 	void multiHeadAttentionBackward(const Context &context, const Tensor &input, const Tensor &weights, const Tensor &bias, const Tensor &mask,
-			Tensor &gradient_prev, Tensor &gradient_next, Tensor &weights_update, Tensor &bias_update, Tensor &workspace, Tensor &backwardData,
-			int num_heads, bool symmetric)
+			Tensor &gradient_prev, Tensor &gradient_next, Tensor &weights_update, Tensor &bias_update, Tensor &mask_update, Tensor &workspace,
+			Tensor &backwardData, int num_heads, bool symmetric)
 	{
 		switch (context.device().type())
 		{
@@ -744,7 +748,7 @@ namespace ml
 			case DeviceType::CUDA:
 				cuda_multi_head_attention_backward(get(context), get_shape(input), get_shape(weights), get_shape(bias), input.data(), weights.data(),
 						bias.data(), mask.data(), gradient_prev.data(), gradient_next.data(), weights_update.data(), bias_update.data(),
-						workspace.data(), backwardData.data(), num_heads, symmetric);
+						mask_update.data(), workspace.data(), backwardData.data(), num_heads, symmetric);
 				break;
 			case DeviceType::OPENCL:
 				opencl_multi_head_attention_backward(get(context), get_shape(input), get_shape(weights), get_shape(bias), input.data(),
@@ -752,6 +756,46 @@ namespace ml
 						bias_update.data(), workspace.data(), backwardData.data(), num_heads, symmetric);
 				break;
 		}
+	}
+
+	void windowPartitioning(const Context &context, const Tensor &input, Tensor &output, const Shape &offset)
+	{
+		static Timer timer("windowPartitioning");
+		TimerGuard tg(timer);
+		switch (context.device().type())
+		{
+			case DeviceType::CPU:
+//				cpu_window_partitioning(get(context), get(input.dtype()), get_shape(input), get_shape(output), input.data(), output.data(),
+//						get(offset));
+				break;
+			case DeviceType::CUDA:
+				cuda_window_partitioning(get(context), get(input.dtype()), get_shape(input), get_shape(output), input.data(), output.data(),
+						get(offset));
+				break;
+			case DeviceType::OPENCL:
+//				opencl_window_partitioning(get(context), get(input.dtype()), get_shape(input), get_shape(output), input.data(), output.data(),
+//										get(offset));
+				break;
+		}SYNC();
+	}
+	void windowMerging(const Context &context, const Tensor &input, Tensor &output, const Shape &offset)
+	{
+		static Timer timer("windowMerging");
+		TimerGuard tg(timer);
+		switch (context.device().type())
+		{
+			case DeviceType::CPU:
+//				cpu_window_merging(get(context), get(input.dtype()), get_shape(input), get_shape(output), input.data(), output.data(),
+//						get(offset));
+				break;
+			case DeviceType::CUDA:
+				cuda_window_merging(get(context), get(input.dtype()), get_shape(input), get_shape(output), input.data(), output.data(), get(offset));
+				break;
+			case DeviceType::OPENCL:
+//				opencl_window_merging(get(context), get(input.dtype()), get_shape(input), get_shape(output), input.data(), output.data(),
+//										get(offset));
+				break;
+		}SYNC();
 	}
 
 	void activationForward(const Context &context, Tensor &output, const Tensor &input, ActivationType act)
@@ -784,6 +828,38 @@ namespace ml
 			case DeviceType::OPENCL:
 				opencl_activation_backward(get(context), get_shape(gradient_prev), gradient_prev.data(), gradient_next.data(), output.data(),
 						get(act));
+				break;
+		}
+	}
+	void softmaxForward(const Context &context, Tensor &output, const Tensor &input)
+	{
+		static Timer timer("softmaxForward");
+		TimerGuard tg(timer);
+		switch (context.device().type())
+		{
+			case DeviceType::CPU:
+				cpu_softmax_forward(get(context), get(input.dtype()), get_shape(input), output.data(), input.data());
+				break;
+			case DeviceType::CUDA:
+				cuda_softmax_forward(get(context), get(input.dtype()), get_shape(input), output.data(), input.data());
+				break;
+			case DeviceType::OPENCL:
+				opencl_softmax_forward(get(context), get(input.dtype()), get_shape(input), output.data(), input.data());
+				break;
+		}SYNC();
+	}
+	void geluBackward(const Context &context, Tensor &gradient_prev, const Tensor &gradient_next, const Tensor &input)
+	{
+		switch (context.device().type())
+		{
+			case DeviceType::CPU:
+				cpu_gelu_backward(get(context), get_shape(gradient_prev), gradient_prev.data(), gradient_next.data(), input.data());
+				break;
+			case DeviceType::CUDA:
+				cuda_gelu_backward(get(context), get_shape(gradient_prev), gradient_prev.data(), gradient_next.data(), input.data());
+				break;
+			case DeviceType::OPENCL:
+				opencl_gelu_backward(get(context), get_shape(gradient_prev), gradient_prev.data(), gradient_next.data(), input.data());
 				break;
 		}
 	}

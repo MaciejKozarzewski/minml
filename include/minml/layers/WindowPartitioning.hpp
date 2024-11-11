@@ -1,12 +1,12 @@
 /*
- * Softmax.hpp
+ * WindowPartitioning.hpp
  *
- *  Created on: Jan 21, 2023
+ *  Created on: Nov 9, 2024
  *      Author: Maciej Kozarzewski
  */
 
-#ifndef MINML_LAYERS_SOFTMAX_HPP_
-#define MINML_LAYERS_SOFTMAX_HPP_
+#ifndef MINML_LAYERS_WINDOWPARTITIONING_HPP_
+#define MINML_LAYERS_WINDOWPARTITIONING_HPP_
 
 #include <minml/layers/Layer.hpp>
 
@@ -15,11 +15,12 @@
 namespace ml
 {
 
-	class Softmax: public Layer
+	class WindowPartitioning: public Layer
 	{
-			std::vector<int> m_axis;
+			int m_window_size = 0;
+			int m_window_shift = 0;
 		public:
-			Softmax(const std::vector<int> &axis);
+			WindowPartitioning(int window_size, int window_shift);
 
 			void setInputShape(const std::vector<Shape> &shapes);
 			Shape getOutputShape() const;
@@ -35,4 +36,4 @@ namespace ml
 
 } /* namespace ml */
 
-#endif /* MINML_LAYERS_SOFTMAX_HPP_ */
+#endif /* MINML_LAYERS_WINDOWPARTITIONING_HPP_ */

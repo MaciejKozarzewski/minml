@@ -50,7 +50,7 @@ namespace ml
 		template<typename T>
 		T approx_gelu(T x) noexcept
 		{
-			return x * sigmoid(1.6849 * x);
+			return x / (1.0f + std::exp(-static_cast<T>(1.6849) * x));
 		}
 	}
 }

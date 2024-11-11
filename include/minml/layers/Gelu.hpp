@@ -1,12 +1,12 @@
 /*
- * Softmax.hpp
+ * Gelu.hpp
  *
- *  Created on: Jan 21, 2023
+ *  Created on: Nov 3, 2024
  *      Author: Maciej Kozarzewski
  */
 
-#ifndef MINML_LAYERS_SOFTMAX_HPP_
-#define MINML_LAYERS_SOFTMAX_HPP_
+#ifndef MINML_LAYERS_GELU_HPP_
+#define MINML_LAYERS_GELU_HPP_
 
 #include <minml/layers/Layer.hpp>
 
@@ -15,17 +15,15 @@
 namespace ml
 {
 
-	class Softmax: public Layer
+	class Gelu: public Layer
 	{
-			std::vector<int> m_axis;
 		public:
-			Softmax(const std::vector<int> &axis);
+			Gelu();
 
 			void setInputShape(const std::vector<Shape> &shapes);
 			Shape getOutputShape() const;
 
 			std::string name() const;
-			Json getConfig() const;
 
 			std::unique_ptr<Layer> clone(const Json &config) const;
 
@@ -35,4 +33,4 @@ namespace ml
 
 } /* namespace ml */
 
-#endif /* MINML_LAYERS_SOFTMAX_HPP_ */
+#endif /* MINML_LAYERS_GELU_HPP_ */

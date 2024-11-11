@@ -35,6 +35,8 @@ namespace ml
 			bool isReady() const;
 			void* backend() const noexcept;
 			Event createEvent() const;
+
+			void enableTF32(bool b) noexcept;
 	};
 
 	class ContextError: public std::logic_error

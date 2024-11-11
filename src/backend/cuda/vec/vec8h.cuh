@@ -137,6 +137,10 @@ namespace vectors2
 	{
 		return vec8h(h2cos(a.x0), h2cos(a.x1), h2cos(a.x2), h2cos(a.x3));
 	}
+	DEVICE_INLINE vec8h erf(const vec8h &a)
+	{
+		return tanh(vec8h(0.797884561f) * a * (vec8h(1.0f) + vec8h(0.044715f) * square(a)));
+	}
 
 	DEVICE_INLINE half horizontal_add(vec8h a)
 	{
@@ -152,6 +156,14 @@ namespace vectors2
 	{
 		const half2 tmp = __hmin2(__hmin2(a.x0, a.x1), __hmin2(a.x2, a.x3));
 		return __hmin(tmp.x, tmp.y);
+	}
+
+	DEVICE_INLINE vec8h select(const vec8h &cond, const vec8h &a, const vec8h &b)
+	{
+		return vec8h(half2{is_true(cond.x0.x) ? a.x0.x : b.x0.x, is_true(cond.x0.y) ? a.x0.y : b.x0.y},
+					half2{is_true(cond.x1.x) ? a.x1.x : b.x1.x, is_true(cond.x1.y) ? a.x1.y : b.x1.y},
+					half2{is_true(cond.x2.x) ? a.x2.x : b.x2.x, is_true(cond.x2.y) ? a.x2.y : b.x2.y},
+					half2{is_true(cond.x3.x) ? a.x3.x : b.x3.x, is_true(cond.x3.y) ? a.x3.y : b.x3.y});
 	}
 #endif
 } /* namespace vectors */

@@ -10,6 +10,7 @@
 #include <minml/core/Tensor.hpp>
 #include <minml/layers/Layer.hpp>
 #include <minml/utils/testing_util.hpp>
+#include <minml/utils/json.hpp>
 
 #include <gtest/gtest.h>
 #include <cmath>
@@ -52,10 +53,201 @@ namespace
 		for (int i = 0; i < dst.volume(); i++)
 			reinterpret_cast<float*>(dst.data())[i] = reinterpret_cast<const float*>(src1.data())[i] + reinterpret_cast<const float*>(src2.data())[i];
 	}
+
+	Tensor window_partition(const Tensor &src, const Shape &window_size, const Shape &offset)
+	{
+		assert(src.rank() == 4);
+
+		const int batch_size = src.dim(0);
+		const int height = src.dim(1);
+		const int width = src.dim(2);
+		const int channels = src.dim(3);
+		const int num_windows_h = (height + window_size[0] - 1) / window_size[0];
+		const int num_windows_w = (width + window_size[1] - 1) / window_size[1];
+
+		Tensor result( { batch_size, num_windows_h, num_windows_w, window_size[0], window_size[1], channels }, src.dtype(), src.device());
+
+		const uint8_t *src_ptr = reinterpret_cast<const uint8_t*>(src.data());
+		uint8_t *dst_ptr = reinterpret_cast<uint8_t*>(result.data());
+		const size_t block_size = channels * sizeOf(src.dtype());
+
+		for (int b = 0; b < batch_size; b++)
+			for (int h = 0; h < height; h++)
+				for (int w = 0; w < width; w++)
+				{
+					const int x = (h + offset[0] + height) % height;
+					const int y = (w + offset[1] + width) % width;
+
+					const int window_idx_h = x / window_size[0];
+					const int window_idx_w = y / window_size[1];
+
+					const int idx_h = x % window_size[0];
+					const int idx_w = y % window_size[1];
+
+					std::memcpy(dst_ptr + sizeOf(src.dtype()) * result.getIndexOf( { b, window_idx_h, window_idx_w, idx_h, idx_w, 0 }),
+							src_ptr + sizeOf(src.dtype()) * src.getIndexOf( { b, h, w, 0 }), block_size);
+				}
+		result.reshape( { batch_size * num_windows_h * num_windows_w, window_size[0], window_size[1], channels });
+		return result;
+	}
+	Tensor window_merging(const Tensor &src, const Shape &dst_shape, const Shape &offset)
+	{
+		assert(src.rank() == 4);
+		assert(dst_shape.rank() == 4);
+
+		const int batch_size = dst_shape.dim(0);
+		const int height = dst_shape.dim(1);
+		const int width = dst_shape.dim(2);
+		const int channels = dst_shape.dim(3);
+
+		const int window_height = src.dim(1);
+		const int window_width = src.dim(2);
+
+		const int num_windows_h = (height + window_height - 1) / window_height;
+		const int num_windows_w = (width + window_width - 1) / window_width;
+
+		Tensor result(dst_shape, src.dtype(), src.device());
+
+		const uint8_t *src_ptr = reinterpret_cast<const uint8_t*>(src.data());
+		uint8_t *dst_ptr = reinterpret_cast<uint8_t*>(result.data());
+		const size_t block_size = channels * sizeOf(src.dtype());
+
+		for (int b = 0; b < batch_size; b++)
+			for (int h = 0; h < height; h++)
+				for (int w = 0; w < width; w++)
+				{
+					const int x = (h + offset[0] + height) % height;
+					const int y = (w + offset[1] + width) % width;
+
+					const int window_idx_h = x / window_height;
+					const int window_idx_w = y / window_width;
+
+					const int idx_h = x % window_height;
+					const int idx_w = y % window_width;
+
+					const int idx_b = b * num_windows_h * num_windows_w + window_idx_h * num_windows_w + window_idx_w * 1;
+
+					std::memcpy(dst_ptr + sizeOf(src.dtype()) * result.getIndexOf( { b, h, w, 0 }), src_ptr + sizeOf(src.dtype()) * src.getIndexOf( {
+							idx_b, idx_h, idx_w, 0 }), block_size);
+				}
+
+		return result;
+	}
+
+	class BaselineWindowPartition: public Layer
+	{
+			int m_window_size = 0;
+			int m_window_shift = 0;
+		public:
+			BaselineWindowPartition(int window_size, int window_shift) :
+					Layer(),
+					m_window_size(window_size),
+					m_window_shift(window_shift)
+			{
+			}
+			void setInputShape(const std::vector<Shape> &shapes)
+			{
+				m_input_shapes = shapes;
+			}
+			Shape getOutputShape() const
+			{
+				const int batch_size = getInputShape().dim(0);
+				const int num_windows_h = (getInputShape().dim(1) + m_window_size - 1) / m_window_size;
+				const int num_windows_w = (getInputShape().dim(2) + m_window_size - 1) / m_window_size;
+				const int channels = getInputShape().dim(3);
+				return Shape( { batch_size * num_windows_h * num_windows_w, m_window_size, m_window_size, channels });
+			}
+			std::string name() const
+			{
+				return "BaselineWindowPartition";
+			}
+			Json getConfig() const
+			{
+				Json result = Layer::getConfig();
+				result["window_size"] = m_window_size;
+				result["window_shift"] = m_window_shift;
+				return result;
+			}
+			std::unique_ptr<Layer> clone(const Json &config) const
+			{
+				std::unique_ptr<BaselineWindowPartition> result = std::make_unique<BaselineWindowPartition>(config["window_size"].getInt(),
+						config["window_shift"].getInt());
+				result->m_dtype = typeFromString(config["dtype"].getString());
+				return result;
+			}
+			void forward(const std::vector<Tensor> &input, Tensor &output)
+			{
+				output = window_partition(input[0], { m_window_size, m_window_size }, { m_window_shift, m_window_shift });
+			}
+			void backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next)
+			{
+				gradient_prev[0] = window_merging(gradient_next, getInputShape(), { m_window_shift, m_window_shift });
+			}
+	};
+	class BaselineWindowMerging: public Layer
+	{
+			Shape m_dst_shape;
+			int m_window_shift = 0;
+		public:
+			BaselineWindowMerging(const Shape &dst_shape, int window_shift) :
+					Layer(),
+					m_dst_shape(dst_shape),
+					m_window_shift(window_shift)
+			{
+			}
+			void setInputShape(const std::vector<Shape> &shapes)
+			{
+				m_input_shapes = shapes;
+			}
+			Shape getOutputShape() const
+			{
+				return m_dst_shape;
+			}
+			std::string name() const
+			{
+				return "BaselineWindowMerging";
+			}
+			Json getConfig() const
+			{
+				Json result = Layer::getConfig();
+				result["dst_shape"] = m_dst_shape.serialize();
+				result["window_shift"] = m_window_shift;
+				return result;
+			}
+			std::unique_ptr<Layer> clone(const Json &config) const
+			{
+				std::unique_ptr<BaselineWindowMerging> result = std::make_unique<BaselineWindowMerging>(Shape(config["dst_shape"]),
+						config["window_shift"].getInt());
+				result->m_dtype = typeFromString(config["dtype"].getString());
+				return result;
+			}
+			void forward(const std::vector<Tensor> &input, Tensor &output)
+			{
+				output = window_merging(input[0], getOutputShape(), { m_window_shift, m_window_shift });
+			}
+			void backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next)
+			{
+				const Shape window_size( { getInputShape().dim(1), getInputShape().dim(2) });
+				gradient_prev[0] = window_partition(gradient_next, window_size, { m_window_shift, m_window_shift });
+			}
+	};
 }
 
 namespace ml
 {
+//	TEST(TestTensorOp, baseline)
+//	{
+////		testing::GradientCheck gradcheck { BaselineWindowPartition(5, 2) };
+////		gradcheck.setInputShape(Shape( { 10, 15, 15, 32 }));
+//
+//		testing::GradientCheck gradcheck { BaselineWindowMerging(Shape( { 10, 15, 15, 32 }), 2) };
+//		gradcheck.setInputShape(Shape( { 90, 5, 5, 32 }));
+//
+//		gradcheck.check(1000, 1.0e-2, "input");
+//
+//		exit(0);
+//	}
+
 	TEST(TestTensorOp, setall_cpu)
 	{
 		Tensor t( { 123 }, "float32", Device::cpu());
@@ -203,5 +395,61 @@ namespace ml
 		}
 	}
 
-} /* namespace ml */
+	TEST(TestTensorOp, window_partition)
+	{
+		const Shape window_size( { 3, 4 });
+		const Shape window_offset( { 1, 2 });
+
+		Context context;
+		Tensor input( { 12, 13, 14, 15 }, DataType::FLOAT32, Device::cpu());
+		testing::initForTest(input, 0.0);
+		Tensor correct_output = window_partition(input, window_size, window_offset);
+
+		Tensor output = zeros_like(correct_output);
+
+//		EXPECT_EQ(testing::diffForTest(correct_output, output), 0.0);
+
+		if (testing::has_device_supporting(DataType::FLOAT32))
+		{
+			const Device device = testing::get_device_for_test();
+			Context context(device);
+			input.moveTo(device);
+			output.moveTo(device);
+			output.zeroall();
+
+			windowPartitioning(context, input, output, window_offset);
+			context.synchronize();
+			EXPECT_EQ(testing::diffForTest(correct_output, output), 0.0);
+		}
+	}
+	TEST(TestTensorOp, window_merging)
+	{
+		const Shape window_size( { 3, 4 });
+		const Shape window_offset( { -1, -2 });
+
+		Context context;
+		Tensor input( { 12 * 5 * 4, 3, 4, 15 }, DataType::FLOAT32, Device::cpu());
+		testing::initForTest(input, 0.0);
+		Tensor correct_output = window_merging(input, Shape( { 12, 13, 14, 15 }), window_offset);
+
+		Tensor output = zeros_like(correct_output);
+
+//		EXPECT_EQ(testing::diffForTest(correct_output, output), 0.0);
+
+		if (testing::has_device_supporting(DataType::FLOAT32))
+		{
+			const Device device = testing::get_device_for_test();
+			Context context(device);
+			input.moveTo(device);
+			output.moveTo(device);
+			output.zeroall();
+
+			windowMerging(context, input, output, window_offset);
+			context.synchronize();
+			EXPECT_EQ(testing::diffForTest(correct_output, output), 0.0);
+		}
+	}
+
+}
+/* namespace ml */
 

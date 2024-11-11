@@ -44,8 +44,8 @@ namespace ml
 	}
 	void MultiHeadAttention::setInputShape(const std::vector<Shape> &shapes)
 	{
-		if (shapes.size() != 1)
-			throw IllegalArgument(METHOD_NAME, "MultiHeadAttention layer expects single input shape");
+//		if (shapes.size() != 1)
+//			throw IllegalArgument(METHOD_NAME, "MultiHeadAttention layer expects single input shape");
 		if (shapes[0].rank() != 4)
 			throw IllegalArgument(METHOD_NAME, "MultiHeadAttention layer expects 4D input shape");
 		const int tmp = 3 - m_symmetric;
@@ -96,7 +96,9 @@ namespace ml
 		if (isTrainable() and m_backward_data.volume() < tmp)
 			m_backward_data = Tensor( { tmp }, dtype(), device());
 
-		const Tensor mask;
+		Tensor mask;
+		if (input.size() == 2)
+			mask = input[1].view();
 
 		multiHeadAttentionForward(context(), input.at(0), output, getWeights().getParam(), getBias().getParam(), mask, *m_workspace.lock(),
 				m_backward_data, m_number_of_heads, m_symmetric);
@@ -107,10 +109,16 @@ namespace ml
 		assert(input.size() == 1);
 		assert(gradient_prev.size() == 1);
 
-		const Tensor mask;
+		Tensor mask, mask_gradient;
+		if (input.size() == 2)
+		{
+			mask = input[1].view();
+			mask_gradient = gradient_prev[1].view();
+		}
 
 		multiHeadAttentionBackward(context(), input.at(0), getWeights().getParam(), getBias().getParam(), mask, gradient_prev.at(0), gradient_next,
-				getWeights().getGradient(), getBias().getGradient(), *m_workspace.lock(), m_backward_data, m_number_of_heads, m_symmetric);
+				getWeights().getGradient(), getBias().getGradient(), mask_gradient, *m_workspace.lock(), m_backward_data, m_number_of_heads,
+				m_symmetric);
 	}
 
 } /* namespace ml */

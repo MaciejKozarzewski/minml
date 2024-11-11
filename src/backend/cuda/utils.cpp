@@ -131,6 +131,18 @@ namespace ml
 				return get(context)->m_cublas_handle;
 			}
 		}
+		void Context::enableTF32(mlContext_t context, bool b)
+		{
+			if (context != nullptr)
+				get(context)->m_allows_tf32 = b;
+		}
+		bool Context::allowsTF32(mlContext_t context)
+		{
+			if (context == nullptr)
+				return false;
+			else
+				return get(context)->m_allows_tf32;
+		}
 #ifdef USE_CUDNN
 		cudnnHandle_t Context::getCudnnHandle(mlContext_t context)
 		{

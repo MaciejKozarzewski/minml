@@ -218,6 +218,10 @@ namespace vectors2
 	{
 		return vec4f(tanf(a.x0), tanf(a.x1), tanf(a.x2), tanf(a.x3));
 	}
+	DEVICE_INLINE vec4f erf(const vec4f &a)
+	{
+		return vec4f(erff(a.x0), erff(a.x1), erff(a.x2), erff(a.x3));
+	}
 
 	DEVICE_INLINE float horizontal_add(const vec4f &a)
 	{
@@ -230,6 +234,11 @@ namespace vectors2
 	DEVICE_INLINE float horizontal_min(const vec4f &a)
 	{
 		return fmin(fmin(a.x0, a.x1), fmin(a.x2, a.x3));
+	}
+
+	DEVICE_INLINE vec4f select(const vec4f &cond, const vec4f &a, const vec4f &b)
+	{
+		return vec4f(is_true(cond.x0) ? a.x0 : b.x0, is_true(cond.x1) ? a.x1 : b.x1, is_true(cond.x2) ? a.x2 : b.x2, is_true(cond.x3) ? a.x3 : b.x3);
 	}
 
 	DEVICE_INLINE void atomic_add(float *address, const vec4f &value)

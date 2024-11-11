@@ -438,6 +438,27 @@ namespace
 				softmax_sum.at<CT>(m, 0) = sum;
 		}
 	}
+	template<typename T>
+	void kernel_softmax(Fragment &temp, Fragment &softmax_sum) noexcept
+	{
+		if (softmax_sum.is_packed())
+		{
+			for (int n = 0; n < temp.rows(); n++)
+			for (int m = 0; m < temp.columns(); m++)
+			{
+				softmax_sum.data<T>()[m] += temp.data<T>()[n*temp.columns()+m];
+//				T sum = softmax_sum.at<T>(m, 0);
+
+				{
+//					const T t = fast_exp(temp.at<T>(n, m));
+//					temp.at<T>(n, m) = t;
+//					sum += t;
+//					sum += temp.at<T>(n, m);
+				}
+//				softmax_sum.at<T>(m, 0) = sum;
+			}
+		}
+	}
 }
 
 namespace ml
@@ -534,6 +555,15 @@ namespace ml
 			Fragment &softmax_sum) noexcept
 	{
 		kernel_mha<float, float, float>(temp, alpha_ptr, Q, K, bias, softmax_sum);
+	}
+	void mha_softmax_def_MxN(Fragment &temp, Fragment &softmax_sum) noexcept
+	{
+		assert(temp.is_fp32());
+		if (softmax_sum.is_packed())
+		{
+			assert(softmax_sum.is_fp32());
+		}
+		kernel_softmax<float>(temp, softmax_sum);
 	}
 
 } /* namespace ml */

@@ -141,6 +141,8 @@ namespace ml
 				mlActivationType_t act);
 		void opencl_activation_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next, const void *output,
 				mlActivationType_t act);
+		void opencl_softmax_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input);
+		void opencl_gelu_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next, const void *input);
 
 		// implemented in 'training.cpp'
 		void opencl_emulate_low_precision(mlContext_t context, mlShape_t shape, void *dst, const void *src);

@@ -39,7 +39,10 @@ namespace ml
 	}
 	Shape RMSNormalization::getWeightShape() const
 	{
-		return Shape( { getInputShape().lastDim() });
+		if (m_use_gamma)
+			return Shape( { getInputShape().lastDim() });
+		else
+			return Shape();
 	}
 
 	std::string RMSNormalization::name() const

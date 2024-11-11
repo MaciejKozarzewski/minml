@@ -261,6 +261,10 @@ namespace ml
 		else
 			return nullptr;
 	}
+	void cuda_enable_tf32(mlContext_t context, bool b)
+	{
+		ml::cuda::Context::enableTF32(context, b);
+	}
 
 	namespace cuda
 	{
@@ -292,6 +296,10 @@ namespace ml
 			else
 				return false;
 
+		}
+		bool allows_tf32(mlContext_t context)
+		{
+			return cuda::Context::allowsTF32(context);
 		}
 
 	}

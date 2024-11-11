@@ -66,6 +66,34 @@ namespace vectors2
 		return vec1h(lhs.x0 / rhs.x0);
 	}
 
+	/*
+	 * comparison operators
+	 */
+	DEVICE_INLINE vec1h operator==(const vec1h &lhs, const vec1h &rhs)
+	{
+		return to_mask<half>(lhs.x0 == rhs.x0);
+	}
+	DEVICE_INLINE vec1h operator!=(const vec1h &lhs, const vec1h &rhs)
+	{
+		return to_mask<half>(lhs.x0 != rhs.x0);
+	}
+	DEVICE_INLINE vec1h operator>(const vec1h &lhs, const vec1h &rhs)
+	{
+		return to_mask<half>(lhs.x0 > rhs.x0);
+	}
+	DEVICE_INLINE vec1h operator>=(const vec1h &lhs, const vec1h &rhs)
+	{
+		return to_mask<half>(lhs.x0 >= rhs.x0);
+	}
+	DEVICE_INLINE vec1h operator<(const vec1h &lhs, const vec1h &rhs)
+	{
+		return to_mask<half>(lhs.x0 < rhs.x0);
+	}
+	DEVICE_INLINE vec1h operator<=(const vec1h &lhs, const vec1h &rhs)
+	{
+		return to_mask<half>(lhs.x0 < rhs.x0);
+	}
+
 	DEVICE_INLINE vec1h abs(vec1h a)
 	{
 		return vec1h(__habs(a.x0));
@@ -112,6 +140,10 @@ namespace vectors2
 	{
 		return vec1h(hcos(a.x0));
 	}
+	DEVICE_INLINE vec1h erf(const vec1h &a)
+	{
+		return tanh(vec1h(0.797884561f) * a * (vec1h(1.0f) + vec1h(0.044715f) * square(a)));
+	}
 
 	DEVICE_INLINE half horizontal_add(vec1h a)
 	{
@@ -124,6 +156,11 @@ namespace vectors2
 	DEVICE_INLINE half horizontal_min(vec1h a)
 	{
 		return a.x0;
+	}
+
+	DEVICE_INLINE vec1h select(const vec1h &cond, const vec1h &a, const vec1h &b)
+	{
+		return vec1h(is_true(cond.x0) ? a.x0 : b.x0);
 	}
 #endif
 

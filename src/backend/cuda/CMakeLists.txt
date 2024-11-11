@@ -10,6 +10,8 @@ else()
 		kernels/conversion.cu
 		kernels/global_pooling.cu
 		kernels/normalization.cu
+		kernels/softmax.cu
+		kernels/tensor_op.cu
 		kernels/training.cu
 		kernels/winograd_nonfused.cu
 		cuda_context.cpp

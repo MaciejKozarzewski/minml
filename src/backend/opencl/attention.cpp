@@ -124,7 +124,7 @@ namespace ml
 				0.0f, workspace, qk_offsets, tokens, num_pointers);
 
 		const mlShape_t qk_shape = make_shape( { batch_size * num_heads * tokens, tokens });
-		opencl_activation_forward(context, dtype, qk_shape, workspace, workspace, ACTIVATION_SOFTMAX);
+		opencl_softmax_forward(context, dtype, qk_shape, workspace, workspace);
 
 		gemm_batched(context, 'n', 'n', dtype, tokens, head_dim, tokens, 1.0f, workspace, qk_offsets, tokens, input, v_offsets, 3 * embedding, 0.0f,
 				output, out_offsets, embedding, num_pointers);
@@ -159,7 +159,7 @@ namespace ml
 				3 * embedding, 0.0f, workspace, qk_offsets, tokens, num_pointers);
 
 		const mlShape_t qk_shape = make_shape( { batch_size * num_heads * tokens, tokens });
-		opencl_activation_forward(context, DTYPE_FLOAT32, qk_shape, workspace, workspace, ACTIVATION_SOFTMAX);
+		opencl_softmax_forward(context, DTYPE_FLOAT32, qk_shape, workspace, workspace);
 
 		// dqk = dy * V^T
 		gemm_batched(context, 'n', 't', DTYPE_FLOAT32, tokens, tokens, head_dim, 1.0f, gradient_next, out_offsets, embedding, input, v_offsets,

@@ -13,6 +13,7 @@
 #include <minml/layers/Input.hpp>
 #include <minml/layers/Add.hpp>
 #include <minml/layers/BatchNormalization.hpp>
+#include <minml/layers/Gelu.hpp>
 #include <minml/layers/GlobalBroadcastHW.hpp>
 #include <minml/layers/Parameter.hpp>
 #include <minml/core/Shape.hpp>
@@ -88,6 +89,44 @@ namespace ml
 		bool has_anything_changed = false;
 		for (int i = 0; i < graph.numberOfNodes(); i++)
 			if (graph.getNode(i).getLayer().name() == add_layer.name() and graph.getNode(i).numberOfInputs() == 2)
+			{
+				GraphNode *next = &(graph.getNode(i));
+				GraphNodeID input_index = -1;
+				if (next->getInputNode(0)->getLayer().name() == conv2d.name() or next->getInputNode(0)->getLayer().name() == dense.name())
+					input_index = std::max(input_index, graph.getNodeID(next->getInputNode(0)));
+				if (next->getInputNode(1)->getLayer().name() == conv2d.name() or next->getInputNode(1)->getLayer().name() == dense.name())
+					input_index = std::max(input_index, graph.getNodeID(next->getInputNode(1)));
+
+				if (next->getInputNode(0)->getLayer().name() == broadcast.name() or next->getInputNode(1)->getLayer().name() == broadcast.name())
+					input_index = -1;
+
+				if (input_index != -1 and not next->isOutputNode())
+				{
+					GraphNode *prev = &(graph.getNode(input_index));
+					if (can_merge_activations(prev, next))
+					{
+						prev->getLayer().setActivationType(next->getLayer().getActivationType());
+						GraphNode::removeLink(prev, next);
+						GraphNode::link(prev, next->getOutputs());
+						GraphNode::link(next->getInputNode(0), prev); // only one input of Add is left now
+						graph.remove_node(next);
+						has_anything_changed = true;
+					}
+				}
+			}
+		return has_anything_changed;
+	}
+
+	bool FoldGelu::optimize(Graph &graph) const
+	{
+		static Conv2D conv2d(0, 0);
+		static Dense dense(0);
+		static Gelu gelu_layer;
+		static GlobalBroadcastHW broadcast;
+
+		bool has_anything_changed = false;
+		for (int i = 0; i < graph.numberOfNodes(); i++)
+			if (graph.getNode(i).getLayer().name() == gelu_layer.name())
 			{
 				GraphNode *next = &(graph.getNode(i));
 				GraphNodeID input_index = -1;

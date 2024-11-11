@@ -117,6 +117,12 @@ namespace ml
 		return Event(*this);
 	}
 
+	void Context::enableTF32(bool b) noexcept
+	{
+		if (device().isCUDA())
+			cuda_enable_tf32(backend(), b);
+	}
+
 	ContextError::ContextError(const char *function) :
 			std::logic_error(function)
 	{

@@ -317,60 +317,61 @@ namespace ml
 
 	void cpu_activation_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input, mlActivationType_t act)
 	{
-		if (act == ACTIVATION_SOFTMAX)
+		switch (dtype)
 		{
-			const int first_dim = get_first_dim(shape);
-			const int last_dim = get_last_dim(shape);
-
-			assert(cpu::Context::getWorkspaceSize(context) >= sizeof(float) * last_dim);
-			float *workspace = cpu::Context::getWorkspace<float>(context);
-
-			switch (dtype)
+			case DTYPE_FLOAT16:
 			{
-				case DTYPE_FLOAT16:
-				{
-					assert(cpu_supports_type(DTYPE_FLOAT16));
-					if (last_dim == 3)
-						cpu::avx_kernel_softmax_3_channels_fp16(output, input, first_dim);
-					else
-						cpu::avx_kernel_softmax_fp16(output, input, first_dim, last_dim, workspace);
-					break;
-				}
-				case DTYPE_FLOAT32:
-				{
-					if (last_dim == 3)
-						cpu::def_kernel_softmax_3_channels_fp32(output, input, first_dim);
-					else
-						cpu::def_kernel_softmax_fp32(output, input, first_dim, last_dim, workspace);
-					break;
-				}
-				default:
-					break;
+				assert(cpu_supports_type(DTYPE_FLOAT16));
+				cpu::avx_kernel_activation_forward_fp16(output, input, volume(shape), act);
+				break;
 			}
-		}
-		else
-		{
-			switch (dtype)
-			{
-				case DTYPE_FLOAT16:
-				{
-					assert(cpu_supports_type(DTYPE_FLOAT16));
-					cpu::avx_kernel_activation_forward_fp16(output, input, volume(shape), act);
-					break;
-				}
-				case DTYPE_FLOAT32:
-					cpu::def_kernel_activation_forward_fp32(output, input, volume(shape), act);
-					break;
-				default:
-					break;
-			}
+			case DTYPE_FLOAT32:
+				cpu::def_kernel_activation_forward_fp32(output, input, volume(shape), act);
+				break;
+			default:
+				break;
 		}
 	}
 	void cpu_activation_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next, const void *output,
 			mlActivationType_t act)
 	{
-		cpu::def_kernel_activation_backward_fp32(gradient_prev, gradient_next, output, volume(shape), act);
+		assert(act != ACTIVATION_GELU);
+		cpu::def_kernel_activation_backward_fp32(gradient_prev, gradient_next, nullptr, output, volume(shape), act);
 	}
+	void cpu_softmax_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input)
+	{
+		const int first_dim = get_first_dim(shape);
+		const int last_dim = get_last_dim(shape);
 
+		assert(cpu::Context::getWorkspaceSize(context) >= sizeof(float) * last_dim);
+		float *workspace = cpu::Context::getWorkspace<float>(context);
+
+		switch (dtype)
+		{
+			case DTYPE_FLOAT16:
+			{
+				assert(cpu_supports_type(DTYPE_FLOAT16));
+				if (last_dim == 3)
+					cpu::avx_kernel_softmax_3_channels_fp16(output, input, first_dim);
+				else
+					cpu::avx_kernel_softmax_fp16(output, input, first_dim, last_dim, workspace);
+				break;
+			}
+			case DTYPE_FLOAT32:
+			{
+				if (last_dim == 3)
+					cpu::def_kernel_softmax_3_channels_fp32(output, input, first_dim);
+				else
+					cpu::def_kernel_softmax_fp32(output, input, first_dim, last_dim, workspace);
+				break;
+			}
+			default:
+				break;
+		}
+	}
+	void cpu_gelu_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next, const void *input)
+	{
+		cpu::def_kernel_activation_backward_fp32(gradient_prev, gradient_next, input, nullptr, volume(shape), ACTIVATION_GELU);
+	}
 } /* namespace avocado */
 

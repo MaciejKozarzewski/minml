@@ -26,7 +26,7 @@ namespace ml
 		Tensor correct_output = toTensor( { { 0.11162444f, 0.04106433f, 0.74630924f, 0.10100197f }, { 0.29114823f, 0.07934714f, 0.43434212f,
 				0.19516249f } });
 
-		activationForward(context, input, input, ActivationType::SOFTMAX);
+		softmaxForward(context, input, input);
 		EXPECT_LE(testing::diffForTest(input, correct_output), 1.0e-4f);
 	}
 	TEST(TestSoftmax, ForwardOnCPU_fp16)
@@ -41,7 +41,7 @@ namespace ml
 		input.convertTo(context, DataType::FLOAT16);
 		correct_output.convertTo(context, DataType::FLOAT16);
 
-		activationForward(Context(), input, input, ActivationType::SOFTMAX);
+		softmaxForward(Context(), input, input);
 		EXPECT_LE(testing::diffForTest(input, correct_output), 1.0e-3f);
 	}
 
@@ -56,7 +56,7 @@ namespace ml
 
 		input.moveTo(context.device());
 
-		activationForward(context, input, input, ActivationType::SOFTMAX);
+		softmaxForward(context, input, input);
 		context.synchronize();
 		EXPECT_LE(testing::diffForTest(input, correct_output), 1.0e-4f);
 	}
@@ -73,7 +73,7 @@ namespace ml
 		input.convertTo(context, DataType::FLOAT16);
 		correct_output.convertTo(Context(), DataType::FLOAT16);
 
-		activationForward(context, input, input, ActivationType::SOFTMAX);
+		softmaxForward(context, input, input);
 		context.synchronize();
 		EXPECT_LE(testing::diffForTest(input, correct_output), 1.0e-3f);
 	}
@@ -90,7 +90,7 @@ namespace ml
 
 		input.moveTo(context.device());
 
-		activationForward(context, input, input, ActivationType::SOFTMAX);
+		softmaxForward(context, input, input);
 		context.synchronize();
 		EXPECT_LE(testing::diffForTest(input, correct_output), 1.0e-4f);
 	}
@@ -108,7 +108,7 @@ namespace ml
 		input.convertTo(context, DataType::FLOAT16);
 		correct_output.convertTo(Context(), DataType::FLOAT16);
 
-		activationForward(context, input, input, ActivationType::SOFTMAX);
+		softmaxForward(context, input, input);
 		context.synchronize();
 		EXPECT_LE(testing::diffForTest(input, correct_output), 1.0e-3f);
 	}

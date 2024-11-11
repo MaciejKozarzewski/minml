@@ -27,6 +27,12 @@ namespace ml
 			bool optimize(Graph &graph) const;
 	};
 
+	class FoldGelu
+	{
+		public:
+			bool optimize(Graph &graph) const;
+	};
+
 } /* namespace ml */
 
 #endif /* LIBML_GRAPH_OPTIMIZATION_GRAPH_OPTIMIZERS_HPP_ */
