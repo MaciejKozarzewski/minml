@@ -78,6 +78,10 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME AND BUILD_TESTING)
 	target_link_libraries(${LibName} PUBLIC pthread)
 endif()
 
+if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME AND NOT (BUILD_WITH_CUDA OR BUILD_WITH_OPENCL))
+	target_compile_options(${LibName} PUBLIC -fPIC)
+endif()
+
 add_executable(${LauncherName} "launcher/minml.cpp")
 set_target_properties(${LauncherName} PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED YES CXX_EXTENSIONS NO)
 target_link_libraries(${LauncherName} PUBLIC ${LibName})

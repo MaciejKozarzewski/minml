@@ -117,7 +117,7 @@ namespace ml
 		return Event(*this);
 	}
 
-	void Context::enableTF32(bool b) noexcept
+	void Context::enableTF32(bool b) const noexcept
 	{
 		if (device().isCUDA())
 			cuda_enable_tf32(backend(), b);

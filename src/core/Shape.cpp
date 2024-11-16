@@ -150,7 +150,7 @@ namespace ml
 		}
 	}
 
-	void Shape::removeDim(int index) noexcept
+	void Shape::removeDim(int index)
 	{
 		if (index < 0 or index >= m_rank)
 			throw IndexOutOfBounds(METHOD_NAME, "index", index, m_rank);

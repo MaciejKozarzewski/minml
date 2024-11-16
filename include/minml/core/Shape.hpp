@@ -48,7 +48,7 @@ namespace ml
 			int volumeWithoutLastDim() const noexcept;
 			int volume(const std::vector<int> &dims) const;
 
-			void removeDim(int index) noexcept;
+			void removeDim(int index);
 
 			friend bool operator==(const Shape &lhs, const Shape &rhs) noexcept;
 			friend bool operator!=(const Shape &lhs, const Shape &rhs) noexcept;
