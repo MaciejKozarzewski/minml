@@ -50,6 +50,7 @@ namespace ml
 			Json getConfig() const;
 
 			std::unique_ptr<Layer> clone(const Json &config) const;
+			void init();
 
 			int getWorkspaceSize() const noexcept;
 			void changeContext(std::shared_ptr<Context> &context);

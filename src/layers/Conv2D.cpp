@@ -15,6 +15,8 @@
 #include <minml/utils/string_util.hpp>
 #include <minml/utils/time_util.hpp>
 
+#include <cmath>
+
 namespace
 {
 	using namespace ml;
@@ -113,6 +115,11 @@ namespace ml
 		result->m_input_filters = config["input_filters"];
 		result->m_dtype = typeFromString(config["dtype"].getString());
 		return result;
+	}
+	void Conv2D::init()
+	{
+		m_initializer.init_weights(context(), getWeights(), std::sqrt(2.0f / (m_input_filters + m_output_filters)), 0.0f);
+		m_initializer.init_bias(context(), getBias(), 0.1f, 0.0f);
 	}
 
 	int Conv2D::getWorkspaceSize() const noexcept
