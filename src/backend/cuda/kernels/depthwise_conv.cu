@@ -260,69 +260,69 @@ namespace
 						+ input.x8 * filter.x5 + input.x9 * filter.x6;
 			}
 	};
-//	template<typename T>
-//	struct Convolution1D<4, 7, T>
-//	{
-//			__device__ Line<T, 7> set(T x) const
-//			{
-//				Line<T, 7> result;
-//				result.x0 = x;
-//				result.x1 = x;
-//				result.x2 = x;
-//				result.x3 = x;
-//				result.x4 = x;
-//				result.x5 = x;
-//				result.x6 = x;
-//				return result;
-//			}
-//			__device__ Line<T, 10> load_input(const T *src, int row) const
-//			{
-//				const int tid = (row * 10 + 0) * 32 + threadIdx.x;
-//				Line<T, 10> result;
-//				result.x0 = src[tid + 0 * 32];
-//				result.x1 = src[tid + 1 * 32];
-//				result.x2 = src[tid + 2 * 32];
-//				result.x3 = src[tid + 3 * 32];
-//				result.x4 = src[tid + 4 * 32];
-//				result.x5 = src[tid + 5 * 32];
-//				result.x6 = src[tid + 6 * 32];
-//				result.x7 = src[tid + 7 * 32];
-//				result.x8 = src[tid + 8 * 32];
-//				result.x9 = src[tid + 9 * 32];
-//				return result;
-//			}
-//			__device__ Line<T, 4> load_filter(const T *src, int row) const
-//			{
-//				const int tid = (row * 4 + 0) * 32 + threadIdx.x;
-//				Line<T, 4> result;
-//				result.x0 = src[tid + 0 * 32];
-//				result.x1 = src[tid + 1 * 32];
-//				result.x2 = src[tid + 2 * 32];
-//				result.x3 = src[tid + 3 * 32];
-//				return result;
-//			}
-//			__device__ void store_output(T *dst, int row, const Line<T, 7> &acc) const
-//			{
-//				const int tid = (row * 7 + 0) * 32 + threadIdx.x;
-//				dst[tid + 0 * 32] = acc.x0;
-//				dst[tid + 1 * 32] = acc.x1;
-//				dst[tid + 2 * 32] = acc.x2;
-//				dst[tid + 3 * 32] = acc.x3;
-//				dst[tid + 4 * 32] = acc.x4;
-//				dst[tid + 5 * 32] = acc.x5;
-//				dst[tid + 6 * 32] = acc.x6;
-//			}
-//			__device__ void accumulate(Line<T, 7> &acc, const Line<T, 10> &input, const Line<T, 4> &filter) const
-//			{
-//				acc.x0 += input.x0 * filter.x0 + input.x1 * filter.x1 + input.x2 * filter.x2 + input.x3 * filter.x3;
-//				acc.x1 += input.x1 * filter.x0 + input.x2 * filter.x1 + input.x3 * filter.x2 + input.x4 * filter.x3;
-//				acc.x2 += input.x2 * filter.x0 + input.x3 * filter.x1 + input.x4 * filter.x2 + input.x5 * filter.x3;
-//				acc.x3 += input.x3 * filter.x0 + input.x4 * filter.x1 + input.x5 * filter.x2 + input.x6 * filter.x3;
-//				acc.x4 += input.x4 * filter.x0 + input.x5 * filter.x1 + input.x6 * filter.x2 + input.x7 * filter.x3;
-//				acc.x5 += input.x5 * filter.x0 + input.x6 * filter.x1 + input.x7 * filter.x2 + input.x8 * filter.x3;
-//				acc.x6 += input.x6 * filter.x0 + input.x7 * filter.x1 + input.x8 * filter.x2 + input.x9 * filter.x3;
-//			}
-//	};
+	template<typename T>
+	struct Convolution1D<4, 7, T>
+	{
+			__device__ Line<T, 7> set(T x) const
+			{
+				Line<T, 7> result;
+				result.x0 = x;
+				result.x1 = x;
+				result.x2 = x;
+				result.x3 = x;
+				result.x4 = x;
+				result.x5 = x;
+				result.x6 = x;
+				return result;
+			}
+			__device__ Line<T, 10> load_input(const T *src, int row) const
+			{
+				const int tid = (row * 10 + 0) * 32 + threadIdx.x;
+				Line<T, 10> result;
+				result.x0 = src[tid + 0 * 32];
+				result.x1 = src[tid + 1 * 32];
+				result.x2 = src[tid + 2 * 32];
+				result.x3 = src[tid + 3 * 32];
+				result.x4 = src[tid + 4 * 32];
+				result.x5 = src[tid + 5 * 32];
+				result.x6 = src[tid + 6 * 32];
+				result.x7 = src[tid + 7 * 32];
+				result.x8 = src[tid + 8 * 32];
+				result.x9 = src[tid + 9 * 32];
+				return result;
+			}
+			__device__ Line<T, 4> load_filter(const T *src, int row) const
+			{
+				const int tid = (row * 4 + 0) * 32 + threadIdx.x;
+				Line<T, 4> result;
+				result.x0 = src[tid + 0 * 32];
+				result.x1 = src[tid + 1 * 32];
+				result.x2 = src[tid + 2 * 32];
+				result.x3 = src[tid + 3 * 32];
+				return result;
+			}
+			__device__ void store_output(T *dst, int row, const Line<T, 7> &acc) const
+			{
+				const int tid = (row * 7 + 0) * 32 + threadIdx.x;
+				dst[tid + 0 * 32] = acc.x0;
+				dst[tid + 1 * 32] = acc.x1;
+				dst[tid + 2 * 32] = acc.x2;
+				dst[tid + 3 * 32] = acc.x3;
+				dst[tid + 4 * 32] = acc.x4;
+				dst[tid + 5 * 32] = acc.x5;
+				dst[tid + 6 * 32] = acc.x6;
+			}
+			__device__ void accumulate(Line<T, 7> &acc, const Line<T, 10> &input, const Line<T, 4> &filter) const
+			{
+				acc.x0 += input.x0 * filter.x0 + input.x1 * filter.x1 + input.x2 * filter.x2 + input.x3 * filter.x3;
+				acc.x1 += input.x1 * filter.x0 + input.x2 * filter.x1 + input.x3 * filter.x2 + input.x4 * filter.x3;
+				acc.x2 += input.x2 * filter.x0 + input.x3 * filter.x1 + input.x4 * filter.x2 + input.x5 * filter.x3;
+				acc.x3 += input.x3 * filter.x0 + input.x4 * filter.x1 + input.x5 * filter.x2 + input.x6 * filter.x3;
+				acc.x4 += input.x4 * filter.x0 + input.x5 * filter.x1 + input.x6 * filter.x2 + input.x7 * filter.x3;
+				acc.x5 += input.x5 * filter.x0 + input.x6 * filter.x1 + input.x7 * filter.x2 + input.x8 * filter.x3;
+				acc.x6 += input.x6 * filter.x0 + input.x7 * filter.x1 + input.x8 * filter.x2 + input.x9 * filter.x3;
+			}
+	};
 
 	template<int TileSize, int KernelSize, typename T>
 	__global__ void kernel_depthwise_conv_forward(T *output, const T *input, const T *weights, const T *bias, int height, int width, int channels,
@@ -532,16 +532,16 @@ namespace ml
 			switch (filter_size)
 			{
 				case 3:
-					kernel_depthwise_conv_forward<TileSize, 3, float> <<<gridDim, blockDim, 0, stream>>>(getPointer<float>(output),
-							getPointer<float>(input), getPointer<float>(weights), getPointer<float>(bias), height, width, channels, false);
+					kernel_depthwise_conv_forward<TileSize, 3> <<<gridDim, blockDim, 0, stream>>>(getPointer<float>(output), getPointer<float>(input),
+							getPointer<float>(weights), getPointer<float>(bias), height, width, channels, false);
 					break;
 				case 5:
-					kernel_depthwise_conv_forward<TileSize, 5, float> <<<gridDim, blockDim, 0, stream>>>(getPointer<float>(output),
-							getPointer<float>(input), getPointer<float>(weights), getPointer<float>(bias), height, width, channels, false);
+					kernel_depthwise_conv_forward<TileSize, 5> <<<gridDim, blockDim, 0, stream>>>(getPointer<float>(output), getPointer<float>(input),
+							getPointer<float>(weights), getPointer<float>(bias), height, width, channels, false);
 					break;
 				case 7:
-					kernel_depthwise_conv_forward<TileSize, 7, float> <<<gridDim, blockDim, 0, stream>>>(getPointer<float>(output),
-							getPointer<float>(input), getPointer<float>(weights), getPointer<float>(bias), height, width, channels, false);
+					kernel_depthwise_conv_forward<TileSize, 7> <<<gridDim, blockDim, 0, stream>>>(getPointer<float>(output), getPointer<float>(input),
+							getPointer<float>(weights), getPointer<float>(bias), height, width, channels, false);
 					break;
 				default:
 					break;
@@ -549,20 +549,20 @@ namespace ml
 		}
 		if (dtype == DTYPE_FLOAT16)
 		{
-			assert(channels %2 == 0);
+			assert(channels % 2 == 0);
 			switch (filter_size)
 			{
 				case 3:
-					kernel_depthwise_conv_forward<TileSize, 3, half2> <<<gridDim, blockDim, 0, stream>>>(getPointer<half2>(output),
-							getPointer<half2>(input), getPointer<half2>(weights), getPointer<half2>(bias), height, width, channels / 2, false);
+					kernel_depthwise_conv_forward<TileSize, 3> <<<gridDim, blockDim, 0, stream>>>(getPointer<half2>(output), getPointer<half2>(input),
+							getPointer<half2>(weights), getPointer<half2>(bias), height, width, channels / 2, false);
 					break;
 				case 5:
-					kernel_depthwise_conv_forward<TileSize, 5, half2> <<<gridDim, blockDim, 0, stream>>>(getPointer<half2>(output),
-							getPointer<half2>(input), getPointer<half2>(weights), getPointer<half2>(bias), height, width, channels / 2, false);
+					kernel_depthwise_conv_forward<TileSize, 5> <<<gridDim, blockDim, 0, stream>>>(getPointer<half2>(output), getPointer<half2>(input),
+							getPointer<half2>(weights), getPointer<half2>(bias), height, width, channels / 2, false);
 					break;
 				case 7:
-					kernel_depthwise_conv_forward<TileSize, 7, half2> <<<gridDim, blockDim, 0, stream>>>(getPointer<half2>(output),
-							getPointer<half2>(input), getPointer<half2>(weights), getPointer<half2>(bias), height, width, channels / 2, false);
+					kernel_depthwise_conv_forward<TileSize, 7> <<<gridDim, blockDim, 0, stream>>>(getPointer<half2>(output), getPointer<half2>(input),
+							getPointer<half2>(weights), getPointer<half2>(bias), height, width, channels / 2, false);
 					break;
 				default:
 					break;
