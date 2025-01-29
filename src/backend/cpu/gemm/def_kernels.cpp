@@ -444,20 +444,64 @@ namespace
 		if (softmax_sum.is_packed())
 		{
 			for (int n = 0; n < temp.rows(); n++)
-			for (int m = 0; m < temp.columns(); m++)
-			{
-				softmax_sum.data<T>()[m] += temp.data<T>()[n*temp.columns()+m];
+				for (int m = 0; m < temp.columns(); m++)
+				{
+					softmax_sum.data<T>()[m] += temp.data<T>()[n * temp.columns() + m];
 //				T sum = softmax_sum.at<T>(m, 0);
 
-				{
+					{
 //					const T t = fast_exp(temp.at<T>(n, m));
 //					temp.at<T>(n, m) = t;
 //					sum += t;
 //					sum += temp.at<T>(n, m);
-				}
+					}
 //				softmax_sum.at<T>(m, 0) = sum;
-			}
+				}
 		}
+	}
+
+	template<typename AT, typename BT, typename CT>
+	void kernel_depthwise_conv(Fragment &C, const Fragment &alpha, const Fragment &A, const Fragment &B) noexcept
+	{
+		assert(A.is_packed() && A.data() != nullptr);
+		assert(B.is_packed() && B.data() != nullptr);
+		assert(A.rows() == B.rows());
+
+		const int N = B.columns();
+		assert(A.columns() % N ==0);
+		const int M = A.columns() / N;
+		const int K = A.rows();
+
+		std::unique_ptr<float[]> acc = std::make_unique<float[]>(M * N);
+		for (int i = 0; i < M * N; i++)
+			acc[i] = 0.0f;
+
+		for (int k = 0; k < K; k++)
+			for (int m = 0; m < M; m++)
+			{
+				for (int n = 0; n < N; n++)
+					acc[m * N + n] += convert<AT, float>(A.at<AT>(k, m * N + n)) * convert<BT, float>(B.at<BT>(k, n));
+			}
+
+		assert(alpha.is_packed());
+		assert(alpha.is_fp32());
+		if (alpha.rows() == 1 and alpha.columns() == 1)
+		{
+			for (int i = 0; i < M * N; i++)
+				acc[i] *= alpha.at<float>(0, 0);
+		}
+		if (alpha.rows() == 1 and alpha.columns() == N)
+		{
+			for (int m = 0; m < M; m++)
+				for (int n = 0; n < N; n++)
+					acc[m * N + n] *= alpha.at<float>(0, n);
+		}
+
+		assert(C.rows() == M);
+		assert(C.columns() == N);
+		for (int m = 0; m < M; m++)
+			for (int n = 0; n < N; n++)
+				C.at<CT>(m, n) = convert<float, CT>(acc[m * N + n]);
 	}
 }
 
@@ -565,6 +609,16 @@ namespace ml
 		}
 		kernel_softmax<float>(temp, softmax_sum);
 	}
-
+	// batched depthwise convolution kernel
+	void depthwise_conv_def_MxN(Fragment &C, const Fragment &alpha, const Fragment &A, const Fragment &B) noexcept
+	{
+		assert(A.is_fp32());
+		assert(B.is_fp32());
+		assert(C.is_fp32() || C.is_fp16());
+		if (C.is_fp32())
+			kernel_depthwise_conv<float, float, float>(C, alpha, A, B);
+		else
+			kernel_depthwise_conv<float, float, float16>(C, alpha, A, B);
+	}
 } /* namespace ml */
 

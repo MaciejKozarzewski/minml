@@ -1590,5 +1590,10 @@ namespace ml
 				"cc", "memory", "%ymm0", "%ymm1", "%ymm2", "%ymm3", "%ymm4", "%ymm5", "%ymm6", "%ymm7",
 				"%ymm8", "%ymm9", "%ymm10", "%ymm11", "%ymm12", "%ymm13", "%ymm14", "%ymm15", "%rax", "%rbx", "%rcx", "%r13", "%r14", "%r15")
 	}
+
+	// batched depthwise convolution kernel
+	void depthwise_conv_avx_10x8(Fragment &C, const Fragment &alpha, const Fragment &A, const Fragment &B) noexcept
+	{
+	}
 } /* namespace ml */
 

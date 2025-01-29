@@ -50,6 +50,21 @@ namespace internal
 			T x0, x1, x2, x3, x4, x5;
 	};
 	template<typename T>
+	struct Storage<T, 7>
+	{
+			T x0, x1, x2, x3, x4, x5, x6;
+	};
+	template<typename T>
+	struct Storage<T, 9>
+	{
+			T x0, x1, x2, x3, x4, x5, x6, x7, x8;
+	};
+	template<typename T>
+	struct Storage<T, 10>
+	{
+			T x0, x1, x2, x3, x4, x5, x6, x7, x8, x9;
+	};
+	template<typename T>
 	struct __builtin_align__(4 * sizeof(T)) Storage<T, 8>
 	{
 			T x0, x1, x2, x3, x4, x5, x6, x7;

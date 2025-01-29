@@ -15,10 +15,8 @@ namespace ml
 	class Context;
 	class Shape;
 	class Tensor;
-	enum class DataType
-	;
-	enum class ActivationType
-	;
+	enum class DataType;
+	enum class ActivationType;
 }
 
 namespace ml
@@ -40,6 +38,10 @@ namespace ml
 
 	void convolutionImplicitGemmForward(const Context &context, const Tensor &input, const Tensor &weights, Tensor &output, const Tensor &bias,
 			const Tensor &add, ActivationType act);
+
+	void depthwiseConvForward(const Context &context, const Tensor &input, const Tensor &weights, Tensor &output, const Tensor &bias);
+	void depthwiseConvBackward(const Context &context, const Tensor &gradient_next, const Tensor &weights, Tensor &gradient_prev);
+	void depthwiseConvUpdate(const Context &context, const Tensor &input, const Tensor &gradient_next, Tensor &weights_update);
 
 	void globalAvgAndMaxPoolingForward(const Context &context, const Tensor &input, Tensor &output);
 	void globalAvgAndMaxPoolingBackward(const Context &context, Tensor &gradient_prev, const Tensor &gradient_next, const Tensor &input,

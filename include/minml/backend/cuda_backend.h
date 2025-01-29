@@ -81,6 +81,14 @@ namespace ml
 				mlShape_t weights_shape, const void *input, const void *weights, void *output, const void *bias, const void *add,
 				mlActivationType_t act);
 
+		// depthwise convolution
+		void cuda_depthwise_conv_forward(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, mlShape_t weights_shape, const void *input,
+				const void *weights, const void *bias, void *output);
+		void cuda_depthwise_conv_backward(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, const void *gradient_next,
+				const void *weights, void *gradient_prev);
+		void cuda_depthwise_conv_update(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, const void *input,
+				const void *gradient_next, void *weights_update);
+
 		// implemented in 'global_pooling.cu'
 		DLL_PUBLIC void cuda_global_avg_and_max_pooling_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output,
 				const void *input);

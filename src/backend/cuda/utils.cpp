@@ -70,7 +70,10 @@ namespace ml
 			else
 			{
 				if (get(context)->m_workspace == nullptr)
+				{
+					cuda_synchronize_with_context(context);
 					get(context)->m_workspace = cuda_malloc(get(context)->m_device_index, default_workspace_size);
+				}
 				return get(context)->m_workspace;
 			}
 		}
@@ -85,6 +88,7 @@ namespace ml
 		{
 			if (context != nullptr && bytes > get(context)->m_workspace_size)
 			{
+				cuda_synchronize_with_context(context);
 				cuda_free(get(context)->m_workspace);
 				get(context)->m_workspace = cuda_malloc(get(context)->m_device_index, bytes);
 				get(context)->m_workspace_size = bytes;

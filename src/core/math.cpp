@@ -377,6 +377,58 @@ namespace ml
 		}
 	}
 
+	void depthwiseConvForward(const Context &context, const Tensor &input, const Tensor &weights, Tensor &output, const Tensor &bias)
+	{
+		switch (context.device().type())
+		{
+			case DeviceType::CPU:
+				cpu_depthwise_conv_forward(get(context), get(input.dtype()), get_shape(input), get_shape(weights), input.data(), weights.data(),
+						bias.data(), output.data());
+				break;
+			case DeviceType::CUDA:
+				cuda_depthwise_conv_forward(get(context), get(input.dtype()), get_shape(input), get_shape(weights), input.data(), weights.data(),
+						bias.data(), output.data());
+				break;
+			case DeviceType::OPENCL:
+				// TODO
+				break;
+		}
+	}
+	void depthwiseConvBackward(const Context &context, const Tensor &gradient_next, const Tensor &weights, Tensor &gradient_prev)
+	{
+		switch (context.device().type())
+		{
+			case DeviceType::CPU:
+				cpu_depthwise_conv_backward(get(context), get_shape(gradient_prev), get_shape(weights), gradient_next.data(), weights.data(),
+						gradient_prev.data());
+				break;
+			case DeviceType::CUDA:
+				cuda_depthwise_conv_backward(get(context), get_shape(gradient_prev), get_shape(weights), gradient_next.data(), weights.data(),
+						gradient_prev.data());
+				break;
+			case DeviceType::OPENCL:
+				// TODO
+				break;
+		}
+	}
+	void depthwiseConvUpdate(const Context &context, const Tensor &input, const Tensor &gradient_next, Tensor &weights_update)
+	{
+		switch (context.device().type())
+		{
+			case DeviceType::CPU:
+				cpu_depthwise_conv_update(get(context), get_shape(input), get_shape(weights_update), input.data(), gradient_next.data(),
+						weights_update.data());
+				break;
+			case DeviceType::CUDA:
+				cuda_depthwise_conv_update(get(context), get_shape(input), get_shape(weights_update), input.data(), gradient_next.data(),
+						weights_update.data());
+				break;
+			case DeviceType::OPENCL:
+				// TODO
+				break;
+		}
+	}
+
 	void globalAvgAndMaxPoolingForward(const Context &context, const Tensor &input, Tensor &output)
 	{
 		static Timer timer("global_pooling");

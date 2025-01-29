@@ -180,6 +180,22 @@ namespace ml
 		throw NotImplemented(METHOD_NAME);
 	}
 
+	void cuda_depthwise_conv_forward(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, mlShape_t weights_shape, const void *input,
+			const void *weights, const void *bias, void *output)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+	void cuda_depthwise_conv_backward(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, const void *gradient_next,
+			const void *weights, void *gradient_prev)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+	void cuda_depthwise_conv_update(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, const void *input, const void *gradient_next,
+			void *weights_update)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+
 	// implemented in 'winograd_fused.cu'
 	void cuda_convolution_fused_winograd_forward(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, mlShape_t weights_shape,
 			const void *input, const void *weights, void *output, const void *bias, const void *add, mlActivationType_t act)

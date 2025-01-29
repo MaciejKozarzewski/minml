@@ -3,6 +3,7 @@ target_sources(${LibName} PRIVATE 	Add.cpp
 								Conv2D.cpp
 								Dense.cpp
 								DepthToSpace.cpp
+								DepthwiseConv2D.cpp
 								Gelu.cpp
 								GlobalBroadcastHW.cpp
 								GlobalPooling.cpp

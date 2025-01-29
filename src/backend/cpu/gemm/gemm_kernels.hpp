@@ -16,7 +16,8 @@ namespace ml
 	class Matrix;
 	class BatchedMatrix;
 	struct Position2D;
-	enum class MatrixOp;
+	enum class MatrixOp
+	;
 	class GemmRuntime;
 }
 
@@ -34,6 +35,8 @@ namespace ml
 			Fragment &softmax_sum) noexcept;
 	void mha_softmax_def_MxN(Fragment &temp, Fragment &softmax_sum) noexcept;
 	void mha_pack_bias_def(Fragment &dst, const BatchedMatrix &src, int head, int height, int width, int range) noexcept;
+	// batched depthwise convolution kernel
+	void depthwise_conv_def_MxN(Fragment &C, const Fragment &alpha, const Fragment &A, const Fragment &B) noexcept;
 
 	/*
 	 * SSE2 kernels
@@ -46,6 +49,8 @@ namespace ml
 	void mha_qk_sse2_4x8(Fragment &temp, const void *alpha_ptr, const Fragment &Q, const Fragment &K, const Fragment &bias,
 			Fragment &softmax_sum) noexcept;
 	void mha_pack_bias_sse2(Fragment &dst, const BatchedMatrix &src, int head, int height, int width, int range) noexcept;
+	// batched depthwise convolution kernel
+	void depthwise_conv_sse2_4x8(Fragment &C, const Fragment &alpha, const Fragment &A, const Fragment &B) noexcept;
 
 	/*
 	 * AVX kernels
@@ -58,10 +63,13 @@ namespace ml
 	void mha_qk_avx_10x8(Fragment &temp, const void *alpha_ptr, const Fragment &Q, const Fragment &K, const Fragment &bias,
 			Fragment &softmax_sum) noexcept;
 	void mha_pack_bias_avx(Fragment &dst, const BatchedMatrix &src, int head, int height, int width, int range) noexcept;
+	// batched depthwise convolution kernel
+	void depthwise_conv_avx_10x8(Fragment &C, const Fragment &alpha, const Fragment &A, const Fragment &B) noexcept;
 
 	/*
 	 * AVX2 kernels
 	 */
+
 	void gemm_avx2_12x8(Fragment &D, const Fragment &alpha, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,
 			const Fragment &bias, bool use_relu) noexcept;
 	void gemm_avx2_6x16(Fragment &D, const Fragment &alpha, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,
@@ -73,6 +81,8 @@ namespace ml
 	void mha_qk_avx2_12x8(Fragment &temp, const void *alpha_ptr, const Fragment &Q, const Fragment &K, const Fragment &bias,
 			Fragment &softmax_sum) noexcept;
 	void mha_softmax_avx2_12x8(Fragment &temp, Fragment &softmax_sum) noexcept;
+	// batched depthwise convolution kernel
+	void depthwise_conv_avx2_12x8(Fragment &C, const Fragment &alpha, const Fragment &A, const Fragment &B) noexcept;
 
 	/*
 	 * AVX512 kernels
@@ -85,6 +95,8 @@ namespace ml
 	void mha_qk_avx512f_24x16(Fragment &temp, const void *alpha_ptr, const Fragment &Q, const Fragment &K, const Fragment &bias,
 			Fragment &softmax_sum) noexcept;
 	void mha_pack_bias_avx512(Fragment &dst, const BatchedMatrix &src, int head, int height, int width, int range) noexcept;
+	// batched depthwise convolution kernel
+	void depthwise_conv_avx512f_24x16(Fragment &C, const Fragment &alpha, const Fragment &A, const Fragment &B) noexcept;
 
 } /* namespace ml */
 

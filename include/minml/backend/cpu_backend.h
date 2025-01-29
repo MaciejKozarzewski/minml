@@ -73,6 +73,14 @@ namespace ml
 		void cpu_convolution_implicit_gemm_forward(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, mlShape_t weights_shape,
 				const void *input, const void *weights, void *output, const void *bias, const void *add, mlActivationType_t act);
 
+		// depthwise convolution
+		void cpu_depthwise_conv_forward(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, mlShape_t weights_shape, const void *input,
+				const void *weights, const void *bias, void *output);
+		void cpu_depthwise_conv_backward(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, const void *gradient_next,
+				const void *weights, void *gradient_prev);
+		void cpu_depthwise_conv_update(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, const void *input,
+				const void *gradient_next, void *weights_update);
+
 		void cpu_gemm(mlContext_t context, mlDataType_t dtype, mlShape_t shape_C, void *C, mlShape_t shape_A, const void *A, mlShape_t shape_B,
 				const void *B, char opA, char opB, float alpha, float beta);
 		void cpu_gemm_batched(mlContext_t context, mlDataType_t dtype, mlShape_t shape_C, void *C, mlShape_t shape_A, const void *A,

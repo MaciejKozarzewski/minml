@@ -8,6 +8,7 @@ else()
 	set(codesrc 	kernels/activations.cu
 		kernels/attention.cu
 		kernels/conversion.cu
+		kernels/depthwise_conv.cu
 		kernels/global_pooling.cu
 		kernels/normalization.cu
 		kernels/softmax.cu

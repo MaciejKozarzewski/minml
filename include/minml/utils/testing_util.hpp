@@ -28,6 +28,7 @@ namespace ml
 		void initForTest(Tensor &t, double shift, double scale = 1.0);
 		void initRandom(Tensor &t);
 		double diffForTest(const Tensor &lhs, const Tensor &rhs);
+		double maxAbsDiff(const Tensor &lhs, const Tensor &rhs);
 		double normForTest(const Tensor &tensor);
 		double sumForTest(const Tensor &tensor);
 		void abs(Tensor &tensor);
@@ -44,7 +45,7 @@ namespace ml
 				GradientCheck(const Layer &layer);
 				void setInputShape(const Shape &shape);
 				void setInputShape(const std::vector<Shape> &shapes);
-				double check(int n, double epsilon, const std::string &mode);
+				double check(int n, double epsilon, const std::string &mode, bool verbose = false);
 			private:
 				double compute_gradient(Tensor &t, int idx, double epsilon);
 		};

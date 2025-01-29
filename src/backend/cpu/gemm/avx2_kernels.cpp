@@ -162,20 +162,19 @@
 	vblendps(imm(0xAA), reg4, ymm3, reg5) \
 	vblendps(imm(0x55), reg4, ymm3, reg4)
 
-#define SCALE_ACCUMULATORS_1x1() \
-	vbroadcastss(mem(rax), ymm0) \
-	vmulps(ymm0, ymm4, ymm4) \
-	vmulps(ymm0, ymm5, ymm5) \
-	vmulps(ymm0, ymm6, ymm6) \
-	vmulps(ymm0, ymm7, ymm7) \
-	vmulps(ymm0, ymm8, ymm8) \
-	vmulps(ymm0, ymm9, ymm9) \
-	vmulps(ymm0, ymm10, ymm10) \
-	vmulps(ymm0, ymm11, ymm11) \
-	vmulps(ymm0, ymm12, ymm12) \
-	vmulps(ymm0, ymm13, ymm13) \
-	vmulps(ymm0, ymm14, ymm14) \
-	vmulps(ymm0, ymm15, ymm15)
+#define SCALE_ACCUMULATORS_1xN(scale) \
+	vmulps(scale, ymm4, ymm4) \
+	vmulps(scale, ymm5, ymm5) \
+	vmulps(scale, ymm6, ymm6) \
+	vmulps(scale, ymm7, ymm7) \
+	vmulps(scale, ymm8, ymm8) \
+	vmulps(scale, ymm9, ymm9) \
+	vmulps(scale, ymm10, ymm10) \
+	vmulps(scale, ymm11, ymm11) \
+	vmulps(scale, ymm12, ymm12) \
+	vmulps(scale, ymm13, ymm13) \
+	vmulps(scale, ymm14, ymm14) \
+	vmulps(scale, ymm15, ymm15)
 #define SCALE_ACCUMULATORS_12x1() \
 	vbroadcastss(mem(rax, 0*4), ymm0) \
 	vbroadcastss(mem(rax, 1*4), ymm1) \
@@ -605,6 +604,36 @@
 	vaddps(ymm3, ymm2, ymm2) \
 	vaddps(ymm2, ymm0, ymm0)
 
+/*
+ * Depthwise conv helper
+ */
+#define SUB_KERNEL_GEMV(n) \
+	vmovaps(mem(rbx, n*8*4), ymm0)\
+	vmovaps(mem(rax, (12*n+0)*8*4), ymm1)\
+	vmovaps(mem(rax, (12*n+1)*8*4), ymm2)\
+	vfmadd231ps(ymm0, ymm1, ymm4)\
+	vfmadd231ps(ymm0, ymm2, ymm5)\
+	vmovaps(mem(rax, (12*n+2)*8*4), ymm3)\
+	vmovaps(mem(rax, (12*n+3)*8*4), ymm1)\
+	vfmadd231ps(ymm0, ymm3, ymm6)\
+	vfmadd231ps(ymm0, ymm1, ymm7)\
+	vmovaps(mem(rax, (12*n+4)*8*4), ymm2)\
+	vmovaps(mem(rax, (12*n+5)*8*4), ymm3)\
+	vfmadd231ps(ymm0, ymm2, ymm8)\
+	vfmadd231ps(ymm0, ymm3, ymm9)\
+	vmovaps(mem(rax, (12*n+6)*8*4), ymm1)\
+	vmovaps(mem(rax, (12*n+7)*8*4), ymm2)\
+	vfmadd231ps(ymm0, ymm1, ymm10)\
+	vfmadd231ps(ymm0, ymm2, ymm11)\
+	vmovaps(mem(rax, (12*n+8)*8*4), ymm3)\
+	vmovaps(mem(rax, (12*n+9)*8*4), ymm1)\
+	vfmadd231ps(ymm0, ymm3, ymm12)\
+	vfmadd231ps(ymm0, ymm1, ymm13)\
+	vmovaps(mem(rax, (12*n+10)*8*4), ymm2)\
+	vmovaps(mem(rax, (12*n+11)*8*4), ymm3)\
+	vfmadd231ps(ymm0, ymm2, ymm14)\
+	vfmadd231ps(ymm0, ymm3, ymm15)
+
 namespace ml
 {
 	using namespace ml::cpu;
@@ -689,7 +718,8 @@ namespace ml
 		movq(var(scalar_alpha), r14)
 		test(r14, r14)
 		je(COLUMN_ALPHA)
-		SCALE_ACCUMULATORS_1x1()
+		vbroadcastss(mem(rax), ymm0)
+		SCALE_ACCUMULATORS_1xN(ymm0)
 		jmp(AFTER_ALPHA_SCALING)
 
 		label(COLUMN_ALPHA)
@@ -862,7 +892,8 @@ namespace ml
 		movq(var(scalar_alpha), r14)
 		test(r14, r14)
 		je(COLUMN_ALPHA)
-		SCALE_ACCUMULATORS_1x1()
+		vbroadcastss(mem(rax), ymm0)
+		SCALE_ACCUMULATORS_1xN(ymm0)
 		jmp(AFTER_ALPHA_SCALING)
 
 		label(COLUMN_ALPHA)
@@ -2314,6 +2345,124 @@ namespace ml
 				"cc", "memory", "%ymm0", "%ymm1", "%ymm2", "%ymm3", "%ymm4", "%ymm5", "%ymm6", "%ymm7",
 				"%ymm8", "%ymm9", "%ymm10", "%ymm11", "%ymm12", "%ymm13", "%ymm14", "%ymm15",
 				"%rcx", "r14")
+	}
+
+	// batched depthwise convolution kernel
+	void depthwise_conv_avx2_12x8(Fragment &C, const Fragment &alpha, const Fragment &A, const Fragment &B) noexcept
+	{
+		assert(A.is_fp32());
+		assert(B.is_fp32());
+		assert(C.is_fp32() || C.is_fp16());
+		assert(A.rows() == B.rows());
+		assert(A.stride() == 12 * 8);
+		assert(B.stride() == 8);
+		assert(C.rows() == A.columns());
+		assert(C.columns() == B.columns());
+
+		assert(alpha.is_packed());
+		assert(alpha.is_fp32());
+		assert(cpu::is_aligned(A.data(), 32));
+		assert(cpu::is_aligned(B.data(), 32));
+
+		const void *A_ptr = A.data();
+		const void *B_ptr = B.data();
+		void *C_ptr = C.data();
+		const void *alpha_ptr = alpha.data();
+
+		const int K = A.rows();
+		uint64_t k_iter = K / 4;
+		uint64_t k_left = K % 4;
+		const uint64_t C_stride = C.stride_in_bytes();
+		const uint64_t c_in_fp16 = C.is_fp16();
+		const uint64_t scalar_alpha = alpha.columns() == 1;
+
+		begin_asm()
+		movq(var(A_ptr), rax)
+		movq(var(B_ptr), rbx)
+		ZERO_ACCUMULATORS()
+
+		movq(var(k_iter), r14) // load the number of 4-unrolled iterations
+		test(r14, r14)
+		je(FINALLOOP)
+
+		label(UNROLLED_x4)
+		SUB_KERNEL_GEMV(0)
+		SUB_KERNEL_GEMV(1)
+		SUB_KERNEL_GEMV(2)
+		SUB_KERNEL_GEMV(3)
+
+		add(imm(4*12*8*4), rax)// 4 iterations x 12*8 elements x 4 bytes
+		add(imm(4*8*4), rbx)// 4 iterations x 8 elements x 4 bytes
+		dec(r14)
+		jne(UNROLLED_x4)
+
+		label(FINALLOOP)
+		movq(var(k_left), r14)// load the number of 1-unrolled iterations
+		test(r14, r14)
+		je(EPILOGUE)
+
+		label(UNROLLED_x1)
+		SUB_KERNEL_GEMV(0)
+		add(imm(1*12*8*4), rax)// 1 iteration x 12*8 elements x 4 bytes
+		add(imm(1*8*4), rbx)// 1 iteration x 8 elements x 4 bytes
+		dec(r14)
+		jne(UNROLLED_x1)
+
+		label(EPILOGUE)
+
+		movq(var(alpha_ptr), rax)// load address of alpha
+		movq(var(scalar_alpha), r14)
+		test(r14, r14)
+		je(COLUMN_ALPHA)
+		vbroadcastss(mem(rax), ymm0)// scalar alpha
+		jmp(AFTER_ALPHA_LOADING)
+
+		label(COLUMN_ALPHA)
+		vmovups(mem(rax), ymm0)
+		label(AFTER_ALPHA_LOADING)
+		SCALE_ACCUMULATORS_1xN(ymm0)
+
+		movq(var(C_stride), r14)// C stride is r14
+		movq(var(C_ptr), rcx)// C pointer is in rcx
+		movq(r14, r13)// r13 = r14
+		sal(imm(1), r13)// r13 = 2 * r14 (2 * stride)
+		add(r14, r13)// r13 = 2 * r14 + r14 = 3 * r14 (3*D_stride)
+		movq(r14, r15)// r15 = r14
+		sal(imm(2), r15)// r15 = 4 * r14 (4 * stride)
+
+		movq(var(c_in_fp16), r11)// load fp16 flags
+		and_(imm(0x1), r11)// if set
+		test(r11, r11)
+		je(C_IN_FP32)
+		CONVERT_ACCUMULATORS_TO_FP16()
+		STORE_4x8xFP16(xmm4, xmm5, xmm6, xmm7)
+		STORE_4x8xFP16(xmm8, xmm9, xmm10, xmm11)
+		STORE_4x8xFP16(xmm12, xmm13, xmm14, xmm15)
+		jmp(END)
+
+		label(C_IN_FP32)
+		STORE_4x8xFP32(ymm4, ymm5, ymm6, ymm7)
+		STORE_4x8xFP32(ymm8, ymm9, ymm10, ymm11)
+		STORE_4x8xFP32(ymm12, ymm13, ymm14, ymm15)
+
+		label(END)
+		vzeroupper()
+
+		end_asm(
+				:// outputs
+				:// inputs
+				[A_ptr] "m"(A_ptr),
+				[B_ptr] "m"(B_ptr),
+				[C_ptr] "m"(C_ptr),
+				[k_iter] "m"(k_iter),
+				[k_left] "m"(k_left),
+				[C_stride] "m"(C_stride),
+				[alpha_ptr] "m"(alpha_ptr),
+				[c_in_fp16] "m"(c_in_fp16),
+				[scalar_alpha] "m"(scalar_alpha)
+				:// clobbers
+				"cc", "memory", "%ymm0", "%ymm1", "%ymm2", "%ymm3", "%ymm4", "%ymm5", "%ymm6", "%ymm7", "%ymm8", "%ymm9", "%ymm10", "%ymm11", "%ymm12",
+				"%ymm13", "%ymm14", "%ymm15", "%rax", "%rbx", "%rcx", "%r11", "%r13", "%r14", "%r15")
 	}
 } /* namespace ml */
 

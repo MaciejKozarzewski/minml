@@ -22,6 +22,7 @@
 #include <minml/layers/Conv2D.hpp>
 #include <minml/layers/Dense.hpp>
 #include <minml/layers/DepthToSpace.hpp>
+#include <minml/layers/DepthwiseConv2D.hpp>
 #include <minml/layers/Input.hpp>
 #include <minml/layers/Add.hpp>
 #include <minml/layers/BatchNormalization.hpp>
@@ -248,6 +249,7 @@ namespace ml
 		static const Conv2D conv2d(0, 0);
 		static const Dense dense(0);
 		static const DepthToSpace depth_to_space(0, { 0, 0 });
+		static const DepthwiseConv2D depthwise_conv2d(0, 0);
 		static const Gelu gelu;
 		static const GlobalBroadcastHW global_broadcast;
 		static const GlobalPooling global_pooling;
@@ -275,6 +277,8 @@ namespace ml
 			result = dense.clone(json);
 		if (name == depth_to_space.name())
 			result = depth_to_space.clone(json);
+		if (name == depthwise_conv2d.name())
+			result = depthwise_conv2d.clone(json);
 		if (name == gelu.name())
 			result = gelu.clone(json);
 		if (name == global_broadcast.name())

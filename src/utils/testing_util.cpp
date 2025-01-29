@@ -81,6 +81,28 @@ namespace
 		return result / length;
 	}
 
+	double max_abs_diff_fp64(const double *ptr1, const double *ptr2, size_t length)
+	{
+		double result = 0.0;
+		for (size_t i = 0; i < length; i++)
+			result = std::max(result, (double) std::abs(ptr1[i] - ptr2[i]));
+		return result;
+	}
+	double max_abs_diff_fp32(const float *ptr1, const float *ptr2, size_t length)
+	{
+		double result = 0.0;
+		for (size_t i = 0; i < length; i++)
+			result = std::max(result, (double) std::abs(ptr1[i] - ptr2[i]));
+		return result;
+	}
+	double max_abs_diff_fp16(const uint16_t *ptr1, const uint16_t *ptr2, size_t length)
+	{
+		double result = 0.0;
+		for (size_t i = 0; i < length; i++)
+			result = std::max(result, (double) std::abs(convert_fp16_to_fp32(ptr1[i]) - convert_fp16_to_fp32(ptr2[i])));
+		return result;
+	}
+
 	double norm_for_test_fp32(const float *ptr, size_t length)
 	{
 		double result = 0.0;
@@ -220,6 +242,32 @@ namespace ml
 			}
 			return 0.0;
 		}
+		double maxAbsDiff(const Tensor &lhs, const Tensor &rhs)
+		{
+			assert(lhs.shape() == rhs.shape());
+			assert(lhs.dtype() == rhs.dtype());
+
+			if (lhs.volume() == 0)
+				return 0.0;
+
+			Tensor tmp_lhs(lhs.shape(), lhs.dtype(), Device::cpu());
+			Tensor tmp_rhs(rhs.shape(), rhs.dtype(), Device::cpu());
+			tmp_lhs.copyFrom(Context(), lhs);
+			tmp_rhs.copyFrom(Context(), rhs);
+			switch (lhs.dtype())
+			{
+				case DataType::FLOAT16:
+					return max_abs_diff_fp16(reinterpret_cast<uint16_t*>(tmp_lhs.data()), reinterpret_cast<uint16_t*>(tmp_rhs.data()),
+							tmp_lhs.volume());
+				case DataType::FLOAT32:
+					return max_abs_diff_fp32(reinterpret_cast<float*>(tmp_lhs.data()), reinterpret_cast<float*>(tmp_rhs.data()), tmp_lhs.volume());
+				case DataType::FLOAT64:
+					return max_abs_diff_fp64(reinterpret_cast<double*>(tmp_lhs.data()), reinterpret_cast<double*>(tmp_rhs.data()), tmp_lhs.volume());
+				default:
+					throw DataTypeNotSupported(METHOD_NAME, lhs.dtype());
+			}
+			return 0.0;
+		}
 		double normForTest(const Tensor &tensor)
 		{
 			if (tensor.isEmpty())
@@ -301,7 +349,7 @@ namespace ml
 		{
 			m_layer->setInputShape(shapes);
 		}
-		double GradientCheck::check(int n, double epsilon, const std::string &mode)
+		double GradientCheck::check(int n, double epsilon, const std::string &mode, bool verbose)
 		{
 			std::shared_ptr<Context> context = std::make_shared<Context>();
 
@@ -337,7 +385,8 @@ namespace ml
 						const int r = (n >= input[i].volume()) ? j : randInt(input[i].volume());
 						const double grad = compute_gradient(input[i], r, epsilon);
 						max_diff = std::max(max_diff, std::abs(grad - reinterpret_cast<const double*>(gradient_prev[i].data())[r]));
-//						std::cout << r << " : " << grad << " vs " << reinterpret_cast<const double*>(gradient_prev[i].data())[r] << '\n';
+						if (verbose)
+							std::cout << r << " : " << grad << " vs " << reinterpret_cast<const double*>(gradient_prev[i].data())[r] << '\n';
 					}
 				}
 
@@ -347,8 +396,9 @@ namespace ml
 					const int r = (n >= m_layer->getWeights().getParam().volume()) ? j : randInt(m_layer->getWeights().getParam().volume());
 					const double grad = compute_gradient(m_layer->getWeights().getParam(), r, epsilon);
 					max_diff = std::max(max_diff, std::abs(grad - reinterpret_cast<const double*>(m_layer->getWeights().getGradient().data())[r]));
-//					std::cout << r << " : " << grad << " vs " << reinterpret_cast<const double*>(m_layer->getWeights().getGradient().data())[r]
-//							<< '\n';
+					if (verbose)
+						std::cout << r << " : " << grad << " vs " << reinterpret_cast<const double*>(m_layer->getWeights().getGradient().data())[r]
+								<< '\n';
 				}
 
 			if (mode == "bias" or mode == "all")
@@ -358,7 +408,9 @@ namespace ml
 
 					const double grad = compute_gradient(m_layer->getBias().getParam(), r, epsilon);
 					max_diff = std::max(max_diff, std::abs(grad - reinterpret_cast<const double*>(m_layer->getBias().getGradient().data())[r]));
-//					std::cout << r << " : " << grad << " vs " << reinterpret_cast<const double*>(m_layer->getBias().getGradient().data())[r] << '\n';
+					if (verbose)
+						std::cout << r << " : " << grad << " vs " << reinterpret_cast<const double*>(m_layer->getBias().getGradient().data())[r]
+								<< '\n';
 				}
 			std::cout << max_diff << '\n';
 			return max_diff;
