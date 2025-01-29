@@ -343,7 +343,7 @@ namespace
 		}
 	}
 
-	__global__ void kernel_fold_batchnorm(int first_dim, int last_dim, float *layer_weights, float *layer_bias, const float *batchnorm_weights)
+	__global__ void kernel_fold_batchnorm_4D(int first_dim, int last_dim, float *layer_weights, float *layer_bias, const float *batchnorm_weights)
 	{
 		const float mean = get_mean(batchnorm_weights, blockIdx.x, first_dim);
 		const float stddev = get_stddev(batchnorm_weights, blockIdx.x, first_dim);
@@ -357,6 +357,26 @@ namespace
 
 		if (threadIdx.x == 0)
 			layer_bias[blockIdx.x] = layer_bias[blockIdx.x] * scale + shift;
+	}
+
+	__global__ void kernel_fold_batchnorm_3D(int first_dim, int last_dim, float *layer_weights, float *layer_bias, const float *batchnorm_weights)
+	{
+		for (int i = blockIdx.x; i < first_dim; i += gridDim.x)
+			for (int j = threadIdx.x; j < last_dim; j += blockDim.x)
+			{
+				const float stddev = get_stddev(batchnorm_weights, j, last_dim);
+				const float gamma = get_gamma(batchnorm_weights, j, last_dim);
+				const float scale = gamma / stddev;
+				layer_weights[i * last_dim + j] *= scale;
+
+				if (i == 0)
+				{
+					const float mean = get_mean(batchnorm_weights, j, last_dim);
+					const float beta = get_beta(batchnorm_weights, j, last_dim);
+					const float shift = -mean * scale + beta;
+					layer_bias[j] = layer_bias[j] * scale + shift;
+				}
+			}
 	}
 
 	template<typename T, int N>
@@ -1132,14 +1152,29 @@ namespace ml
 	}
 	void cuda_fold_batchnorm(mlContext_t context, mlShape_t shape, void *layer_weights, void *layer_bias, const void *batchnorm_weights)
 	{
-		const int first_dim = get_first_dim(shape);
-		const int last_dim = volume_without_first_dim(shape);
-		dim3 blockDim(256);
-		dim3 gridDim(first_dim);
+		cudaStream_t stream = cuda::Context::getStream(context);
+		if (shape.rank == 4)
+		{
+			const int first_dim = get_first_dim(shape);
+			const int last_dim = volume_without_first_dim(shape);
+			dim3 blockDim(256);
+			dim3 gridDim(first_dim);
 
-		kernel_fold_batchnorm<<<gridDim, blockDim, 0, cuda::Context::getStream(context)>>>(first_dim, last_dim, getPointer<float>(layer_weights),
-				getPointer<float>(layer_bias), getPointer<float>(batchnorm_weights));
-		assert(cudaGetLastError() == cudaSuccess);
+			kernel_fold_batchnorm_4D<<<gridDim, blockDim, 0, stream>>>(first_dim, last_dim, getPointer<float>(layer_weights),
+					getPointer<float>(layer_bias), getPointer<float>(batchnorm_weights));
+			assert(cudaGetLastError() == cudaSuccess);
+		}
+		if (shape.rank == 3)
+		{
+			const int first_dim = volume_without_last_dim(shape);
+			const int last_dim = get_last_dim(shape);
+			dim3 blockDim(256);
+			dim3 gridDim(first_dim);
+
+			kernel_fold_batchnorm_3D<<<gridDim, blockDim, 0, stream>>>(first_dim, last_dim, getPointer<float>(layer_weights),
+					getPointer<float>(layer_bias), getPointer<float>(batchnorm_weights));
+			assert(cudaGetLastError() == cudaSuccess);
+		}
 	}
 
 	void cuda_layernorm_forward(mlContext_t context, mlShape_t shape, mlDataType_t dtype, const void *input, void *output, const void *weights,

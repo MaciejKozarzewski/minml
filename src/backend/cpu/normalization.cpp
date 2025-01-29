@@ -306,25 +306,50 @@ namespace ml
 		assert(layer_bias != nullptr);
 		assert(batchnorm_weights != nullptr);
 
-		const int channels = get_first_dim(shape);
-		const int last_dim = volume_without_first_dim(shape);
-
-		/* weights rows are:
+		/* batchnorm_weights rows are:
 		 * mean
 		 * variance
 		 * gamma
 		 * beta
 		 */
-		const float *bn_ptr = getPointer<float>(batchnorm_weights);
-
-		for (int i = 0; i < channels; i++)
+		if (shape.rank == 4)
 		{
-			const float scale = get_gamma(bn_ptr, i, channels) / get_stddev(bn_ptr, i, channels); // gamma / sqrt(variance + epsilon)
-			const float shift = -get_mean(bn_ptr, i, channels) * scale + get_beta(bn_ptr, i, channels); // -mean * scale + beta
+			const int channels = get_first_dim(shape);
+			const int last_dim = volume_without_first_dim(shape);
 
-			getPointer<float>(layer_bias)[i] = getPointer<float>(layer_bias)[i] * scale + shift;
-			for (int j = 0; j < last_dim; j++)
-				getPointer<float>(layer_weights)[i * last_dim + j] *= scale;
+			const float *bn_ptr = getPointer<float>(batchnorm_weights);
+
+			for (int i = 0; i < channels; i++)
+			{
+				const float scale = get_gamma(bn_ptr, i, channels) / get_stddev(bn_ptr, i, channels); // gamma / sqrt(variance + epsilon)
+				const float shift = -get_mean(bn_ptr, i, channels) * scale + get_beta(bn_ptr, i, channels); // -mean * scale + beta
+
+				getPointer<float>(layer_bias)[i] = getPointer<float>(layer_bias)[i] * scale + shift;
+				for (int j = 0; j < last_dim; j++)
+					getPointer<float>(layer_weights)[i * last_dim + j] *= scale;
+			}
+		}
+		if (shape.rank == 3)
+		{
+			const int channels = get_last_dim(shape);
+			const int first_dim = volume_without_last_dim(shape);
+
+			const float *bn_ptr = getPointer<float>(batchnorm_weights);
+
+			for (int j = 0; j < channels; j++)
+			{
+				const float scale = get_gamma(bn_ptr, j, channels) / get_stddev(bn_ptr, j, channels); // gamma / sqrt(variance + epsilon)
+				const float shift = -get_mean(bn_ptr, j, channels) * scale + get_beta(bn_ptr, j, channels); // -mean * scale + beta
+				getPointer<float>(layer_bias)[j] = getPointer<float>(layer_bias)[j] * scale + shift;
+			}
+
+			for (int i = 0; i < first_dim; i++)
+				for (int j = 0; j < channels; j++)
+				{
+					const float scale = get_gamma(bn_ptr, j, channels) / get_stddev(bn_ptr, j, channels); // gamma / sqrt(variance + epsilon)
+					const float shift = -get_mean(bn_ptr, j, channels) * scale + get_beta(bn_ptr, j, channels); // -mean * scale + beta
+					getPointer<float>(layer_weights)[i * channels + j] *= scale;
+				}
 		}
 	}
 

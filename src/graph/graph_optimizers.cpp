@@ -9,6 +9,7 @@
 #include <minml/graph/GraphNode.hpp>
 #include <minml/graph/graph_optimizers.hpp>
 #include <minml/layers/Conv2D.hpp>
+#include <minml/layers/DepthwiseConv2D.hpp>
 #include <minml/layers/Dense.hpp>
 #include <minml/layers/Input.hpp>
 #include <minml/layers/Add.hpp>
@@ -40,6 +41,7 @@ namespace ml
 	{
 		static BatchNormalization batchnorm;
 		static Conv2D conv2d(0, 0);
+		static DepthwiseConv2D depthwise_conv2d(0, 0);
 		static Dense dense(0);
 
 		bool has_anything_changed = false;
@@ -55,11 +57,14 @@ namespace ml
 						static_cast<Conv2D&>(prev->getLayer()).useBias(true);
 						static_cast<Conv2D&>(prev->getLayer()).invalidateWeightsCache();
 					}
+					if (prev->getLayer().name() == depthwise_conv2d.name())
+						static_cast<DepthwiseConv2D&>(prev->getLayer()).useBias(true);
 					if (prev->getLayer().name() == dense.name())
 						static_cast<Dense&>(prev->getLayer()).useBias(true);
 					prev->getLayer().getBias().setTrainable(false);
 
-					if (prev->getLayer().name() == conv2d.name() or prev->getLayer().name() == dense.name())
+					if (prev->getLayer().name() == conv2d.name() or prev->getLayer().name() == depthwise_conv2d.name()
+							or prev->getLayer().name() == dense.name())
 					{
 						const Tensor &batchnorm_weights = next->getLayer().getWeights().getParam();
 
