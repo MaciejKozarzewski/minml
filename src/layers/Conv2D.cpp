@@ -118,7 +118,7 @@ namespace ml
 	}
 	void Conv2D::init()
 	{
-		m_initializer.init_weights(context(), getWeights(), std::sqrt(2.0f / (m_input_filters + m_output_filters)), 0.0f);
+		m_initializer.init_weights(context(), getWeights(), 0.1f * std::sqrt(2.0f / (m_input_filters + m_output_filters)), 0.0f);
 		m_initializer.init_bias(context(), getBias(), 0.1f, 0.0f);
 	}
 

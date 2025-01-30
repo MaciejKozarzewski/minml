@@ -312,25 +312,8 @@ namespace ml
 		 * gamma
 		 * beta
 		 */
-		if (shape.rank == 4)
-		{
-			const int channels = get_first_dim(shape);
-			const int last_dim = volume_without_first_dim(shape);
-
-			const float *bn_ptr = getPointer<float>(batchnorm_weights);
-
-			for (int i = 0; i < channels; i++)
-			{
-				const float scale = get_gamma(bn_ptr, i, channels) / get_stddev(bn_ptr, i, channels); // gamma / sqrt(variance + epsilon)
-				const float shift = -get_mean(bn_ptr, i, channels) * scale + get_beta(bn_ptr, i, channels); // -mean * scale + beta
-
-				getPointer<float>(layer_bias)[i] = getPointer<float>(layer_bias)[i] * scale + shift;
-				for (int j = 0; j < last_dim; j++)
-					getPointer<float>(layer_weights)[i * last_dim + j] *= scale;
-			}
-		}
 		if (shape.rank == 3)
-		{
+		{ // depthwise conv2D
 			const int channels = get_last_dim(shape);
 			const int first_dim = volume_without_last_dim(shape);
 
@@ -351,6 +334,24 @@ namespace ml
 					getPointer<float>(layer_weights)[i * channels + j] *= scale;
 				}
 		}
+		else
+		{
+			const int channels = get_first_dim(shape);
+			const int last_dim = volume_without_first_dim(shape);
+
+			const float *bn_ptr = getPointer<float>(batchnorm_weights);
+
+			for (int i = 0; i < channels; i++)
+			{
+				const float scale = get_gamma(bn_ptr, i, channels) / get_stddev(bn_ptr, i, channels); // gamma / sqrt(variance + epsilon)
+				const float shift = -get_mean(bn_ptr, i, channels) * scale + get_beta(bn_ptr, i, channels); // -mean * scale + beta
+
+				getPointer<float>(layer_bias)[i] = getPointer<float>(layer_bias)[i] * scale + shift;
+				for (int j = 0; j < last_dim; j++)
+					getPointer<float>(layer_weights)[i * last_dim + j] *= scale;
+			}
+		}
+
 	}
 
 	void cpu_layernorm_forward(mlContext_t context, mlShape_t shape, mlDataType_t dtype, const void *input, void *output, const void *weights,

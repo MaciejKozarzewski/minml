@@ -87,7 +87,7 @@ namespace ml
 	}
 	void DepthwiseConv2D::init()
 	{
-		m_initializer.init_weights(context(), getWeights(), std::sqrt(1.0f / m_filters), 0.0f);
+		m_initializer.init_weights(context(), getWeights(), 0.1f * std::sqrt(1.0f / m_filters), 0.0f);
 		m_initializer.init_bias(context(), getBias(), 0.1f, 0.0f);
 	}
 

@@ -490,9 +490,9 @@ namespace
 		}
 		__syncthreads();
 
-		__shared__ cg::block_tile_memory<256> btm;
+		__shared__ cg::block_tile_memory < 256 > btm;
 		cg::thread_block thb = cg::this_thread_block(btm);
-		cg::thread_block_tile<256> tile = cg::tiled_partition<256>(thb);
+		cg::thread_block_tile < 256 > tile = cg::tiled_partition<256>(thb);
 
 		for (int i = blockIdx.x; i < first_dim; i += gridDim.x)
 		{
@@ -544,9 +544,9 @@ namespace
 		}
 		__syncthreads();
 
-		__shared__ cg::block_tile_memory<256> btm;
+		__shared__ cg::block_tile_memory < 256 > btm;
 		cg::thread_block thb = cg::this_thread_block(btm);
-		cg::thread_block_tile<256> tile = cg::tiled_partition<256>(thb);
+		cg::thread_block_tile < 256 > tile = cg::tiled_partition<256>(thb);
 
 		for (int i = blockIdx.x; i < first_dim; i += gridDim.x)
 		{
@@ -732,9 +732,9 @@ namespace
 		float *shared_weights_update = shared_weights + last_dim;
 		float *shared_bias_update = shared_weights_update + last_dim;
 
-		__shared__ cg::block_tile_memory<256> btm;
+		__shared__ cg::block_tile_memory < 256 > btm;
 		cg::thread_block thb = cg::this_thread_block(btm);
-		cg::thread_block_tile<256> tile = cg::tiled_partition<256>(thb);
+		cg::thread_block_tile < 256 > tile = cg::tiled_partition<256>(thb);
 
 		vec<float, N> thread_weights_update = 0.0f;
 		vec<float, N> thread_bias_update = 0.0f;
@@ -892,9 +892,9 @@ namespace
 			__syncthreads();
 		}
 
-		__shared__ cg::block_tile_memory<256> btm;
+		__shared__ cg::block_tile_memory < 256 > btm;
 		cg::thread_block thb = cg::this_thread_block(btm);
-		cg::thread_block_tile<256> tile = cg::tiled_partition<256>(thb);
+		cg::thread_block_tile < 256 > tile = cg::tiled_partition<256>(thb);
 
 		for (int i = blockIdx.x; i < first_dim; i += gridDim.x)
 		{
@@ -1153,7 +1153,18 @@ namespace ml
 	void cuda_fold_batchnorm(mlContext_t context, mlShape_t shape, void *layer_weights, void *layer_bias, const void *batchnorm_weights)
 	{
 		cudaStream_t stream = cuda::Context::getStream(context);
-		if (shape.rank == 4)
+		if (shape.rank == 3)
+		{ // depthwise conv2D
+			const int first_dim = volume_without_last_dim(shape);
+			const int last_dim = get_last_dim(shape);
+			dim3 blockDim(256);
+			dim3 gridDim(first_dim);
+
+			kernel_fold_batchnorm_3D<<<gridDim, blockDim, 0, stream>>>(first_dim, last_dim, getPointer<float>(layer_weights),
+					getPointer<float>(layer_bias), getPointer<float>(batchnorm_weights));
+			assert(cudaGetLastError() == cudaSuccess);
+		}
+		else
 		{
 			const int first_dim = get_first_dim(shape);
 			const int last_dim = volume_without_first_dim(shape);
@@ -1161,17 +1172,6 @@ namespace ml
 			dim3 gridDim(first_dim);
 
 			kernel_fold_batchnorm_4D<<<gridDim, blockDim, 0, stream>>>(first_dim, last_dim, getPointer<float>(layer_weights),
-					getPointer<float>(layer_bias), getPointer<float>(batchnorm_weights));
-			assert(cudaGetLastError() == cudaSuccess);
-		}
-		if (shape.rank == 3)
-		{
-			const int first_dim = volume_without_last_dim(shape);
-			const int last_dim = get_last_dim(shape);
-			dim3 blockDim(256);
-			dim3 gridDim(first_dim);
-
-			kernel_fold_batchnorm_3D<<<gridDim, blockDim, 0, stream>>>(first_dim, last_dim, getPointer<float>(layer_weights),
 					getPointer<float>(layer_bias), getPointer<float>(batchnorm_weights));
 			assert(cudaGetLastError() == cudaSuccess);
 		}
