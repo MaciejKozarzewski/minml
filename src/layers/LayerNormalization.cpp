@@ -68,6 +68,7 @@ namespace ml
 	std::unique_ptr<Layer> LayerNormalization::clone(const Json &config) const
 	{
 		std::unique_ptr<LayerNormalization> result = std::make_unique<LayerNormalization>(config["use_gamma"], config["use_beta"]);
+		result->loadConfig(config);
 		return result;
 	}
 

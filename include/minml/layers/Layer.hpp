@@ -35,7 +35,8 @@ namespace ml
 		TANH,
 		RELU,
 		GELU,
-		EXP
+		EXP,
+		SOFTMAX
 	};
 	std::string toString(ActivationType act);
 	ActivationType activationFromString(const std::string &str);
@@ -55,6 +56,7 @@ namespace ml
 
 			DataType m_dtype = DataType::FLOAT32;
 			ActivationType m_activation;
+			bool m_is_quantizable = true;
 		public:
 			Layer(std::string activation = "linear", DataType dtype = DataType::FLOAT32);
 
@@ -65,14 +67,17 @@ namespace ml
 			virtual ~Layer() = default;
 
 			bool isTrainable() const noexcept;
+			bool isQuantizable() const noexcept;
 
 			ActivationType getActivationType() const noexcept;
 			void setActivationType(ActivationType act) noexcept;
+			virtual Layer& quantizable(bool b) noexcept;
 			/**
 			 * documentation
 			 */
 			virtual std::string name() const = 0;
 			virtual Json getConfig() const;
+			virtual void loadConfig(const Json &config);
 
 			virtual Json saveParameters(SerializedObject &binary_data) const;
 			virtual void loadParameters(const Json &json, const SerializedObject &binary_data);

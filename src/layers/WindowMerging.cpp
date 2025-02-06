@@ -50,7 +50,7 @@ namespace ml
 	std::unique_ptr<Layer> WindowMerging::clone(const Json &config) const
 	{
 		std::unique_ptr<WindowMerging> result = std::make_unique<WindowMerging>(Shape(config["dst_shape"]), config["window_shift"].getInt());
-		result->m_dtype = typeFromString(config["dtype"].getString());
+		result->loadConfig(config);
 		return result;
 	}
 	void WindowMerging::forward(const std::vector<Tensor> &input, Tensor &output)

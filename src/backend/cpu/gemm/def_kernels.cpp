@@ -468,7 +468,7 @@ namespace
 		assert(A.rows() == B.rows());
 
 		const int N = B.columns();
-		assert(A.columns() % N ==0);
+		assert(A.columns() % N == 0);
 		const int M = A.columns() / N;
 		const int K = A.rows();
 
@@ -502,6 +502,45 @@ namespace
 		for (int m = 0; m < M; m++)
 			for (int n = 0; n < N; n++)
 				C.at<CT>(m, n) = convert<float, CT>(acc[m * N + n]);
+	}
+	template<typename AT, typename BT, typename CT>
+	void kernel_depthwise_conv_v2(Fragment &C, const Fragment &A, const Fragment &B, const Fragment &bias) noexcept
+	{
+		assert(A.is_packed() && A.data() != nullptr);
+		assert(B.is_packed() && B.data() != nullptr);
+
+		const int channels = B.columns();
+		const int kernel_size = std::sqrt(B.rows());
+		const int inputs = A.columns() / channels;
+		const int outputs = C.rows();
+
+		std::unique_ptr<float[]> acc = std::make_unique<float[]>(outputs * channels);
+		for (int i = 0; i < outputs * channels; i++)
+			acc[i] = 0.0f;
+
+		for (int h = 0; h < kernel_size; h++)
+			for (int out = 0; out < outputs; out++)
+				for (int w = 0; w < kernel_size; w++)
+				{
+					for (int c = 0; c < channels; c++)
+						acc[out * channels + c] += convert<AT, float>(A.at<AT>(h, (out + w) * channels + c))
+								* convert<BT, float>(B.at<BT>(h * kernel_size + w, c));
+				}
+
+		if (bias.is_packed())
+		{
+			assert(bias.data() != nullptr);
+			assert(bias.rows() == 1);
+			assert(bias.columns() == channels);
+			assert(bias.dtype() == B.dtype());
+			for (int out = 0; out < outputs; out++)
+				for (int c = 0; c < channels; c++)
+					acc[out * channels + c] += convert<BT, float>(bias.at<BT>(0, c));
+		}
+
+		for (int out = 0; out < outputs; out++)
+			for (int c = 0; c < channels; c++)
+				C.at<CT>(out, c) = convert<float, CT>(acc[out * channels + c]);
 	}
 }
 
@@ -619,6 +658,16 @@ namespace ml
 			kernel_depthwise_conv<float, float, float>(C, alpha, A, B);
 		else
 			kernel_depthwise_conv<float, float, float16>(C, alpha, A, B);
+	}
+	void depthwise_conv_def_MxN_v2(Fragment &C, const Fragment &A, const Fragment &B, const Fragment &bias) noexcept
+	{
+		assert(A.is_fp32());
+		assert(B.is_fp32());
+		assert(C.is_fp32() || C.is_fp16());
+		if (C.is_fp32())
+			kernel_depthwise_conv_v2<float, float, float>(C, A, B, bias);
+		else
+			kernel_depthwise_conv_v2<float, float, float16>(C, A, B, bias);
 	}
 } /* namespace ml */
 

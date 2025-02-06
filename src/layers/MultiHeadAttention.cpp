@@ -85,7 +85,7 @@ namespace ml
 	{
 		std::unique_ptr<MultiHeadAttention> result = std::make_unique<MultiHeadAttention>(config["number_of_heads"].getInt(),
 				config["positional_encoding_range"].getInt(), config["symmetric"].getBool());
-		result->m_dtype = typeFromString(config["dtype"].getString());
+		result->loadConfig(config);
 		return result;
 	}
 

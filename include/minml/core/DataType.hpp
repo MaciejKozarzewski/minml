@@ -19,6 +19,9 @@ namespace ml
 		FLOAT16,
 		FLOAT32,
 		FLOAT64,
+		UINT8,
+		INT8,
+		INT16,
 		INT32
 	};
 

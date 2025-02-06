@@ -87,6 +87,7 @@ namespace ml
 	{
 		std::unique_ptr<BatchNormalization> result = std::make_unique<BatchNormalization>(config["nonlinearity"], config["use_gamma"],
 				config["use_beta"], config["history_size"]);
+		result->loadConfig(config);
 		return result;
 	}
 

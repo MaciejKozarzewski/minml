@@ -45,6 +45,7 @@ namespace ml
 	}
 	Shape PositionalEncoding::getBiasShape() const
 	{
+//		Shape tmp( { getInputShape().dim(1), getInputShape().dim(2), getInputShape().dim(3), getInputShape().dim(3) });
 		Shape tmp = getInputShape();
 		tmp.removeDim(0);
 		return tmp;
@@ -62,6 +63,7 @@ namespace ml
 	std::unique_ptr<Layer> PositionalEncoding::clone(const Json &config) const
 	{
 		std::unique_ptr<PositionalEncoding> result = std::make_unique<PositionalEncoding>();
+		result->loadConfig(config);
 		return result;
 	}
 

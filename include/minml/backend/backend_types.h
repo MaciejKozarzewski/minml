@@ -37,6 +37,9 @@ namespace ml
 			DTYPE_FLOAT16,
 			DTYPE_FLOAT32,
 			DTYPE_FLOAT64,
+			DTYPE_UINT8,
+			DTYPE_INT8,
+			DTYPE_INT16,
 			DTYPE_INT32
 		} mlDataType_t;
 

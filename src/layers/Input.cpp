@@ -45,7 +45,7 @@ namespace ml
 	{
 		std::unique_ptr<Input> result = std::make_unique<Input>(Shape(config["input_shape"]));
 		result->m_activation = activationFromString(config["nonlinearity"]);
-		result->m_dtype = typeFromString(config["dtype"].getString());
+		result->loadConfig(config);
 		return std::unique_ptr<Layer>(static_cast<Layer*>(result.release()));
 	}
 

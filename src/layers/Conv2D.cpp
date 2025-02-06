@@ -113,7 +113,7 @@ namespace ml
 		std::unique_ptr<Conv2D> result = std::make_unique<Conv2D>(config["output_filters"], config["kernel_size"], config["nonlinearity"],
 				config["use_bias"]);
 		result->m_input_filters = config["input_filters"];
-		result->m_dtype = typeFromString(config["dtype"].getString());
+		result->loadConfig(config);
 		return result;
 	}
 	void Conv2D::init()

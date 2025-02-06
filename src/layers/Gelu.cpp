@@ -44,7 +44,7 @@ namespace ml
 	std::unique_ptr<Layer> Gelu::clone(const Json &config) const
 	{
 		auto result = std::make_unique<Gelu>();
-		result->m_dtype = typeFromString(config["dtype"].getString());
+		result->loadConfig(config);
 		return result;
 	}
 

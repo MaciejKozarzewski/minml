@@ -49,7 +49,7 @@ namespace ml
 	{
 		std::unique_ptr<DepthToSpace> result = std::make_unique<DepthToSpace>(config["patch_size_h"].getInt(), config["patch_size_w"].getInt(),
 				Shape(config["output_shape"]));
-		result->m_dtype = typeFromString(config["dtype"].getString());
+		result->loadConfig(config);
 		return result;
 	}
 	void DepthToSpace::forward(const std::vector<Tensor> &input, Tensor &output)

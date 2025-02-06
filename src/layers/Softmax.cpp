@@ -63,7 +63,7 @@ namespace ml
 		for (int i = 0; i < config["axis"].size(); i++)
 			axis.push_back(config["axis"][i]);
 		auto result = std::make_unique<Softmax>(axis);
-		result->m_dtype = typeFromString(config["dtype"].getString());
+		result->loadConfig(config);
 		return result;
 	}
 

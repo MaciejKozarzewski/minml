@@ -14,6 +14,7 @@ target_sources(${LibName} PRIVATE 	Add.cpp
 								Multiply.cpp
 								Parameter.cpp
 								PositionalEncoding.cpp
+								quantization.cpp
 								RMSNormalization.cpp
 								Softmax.cpp
 								SpaceToDepth.cpp

@@ -13,6 +13,7 @@
 
 #include <cinttypes>
 #include <cassert>
+#include <cmath>
 
 #include "../assembly_macros.hpp"
 #include "common_operations.hpp"
@@ -73,6 +74,127 @@
 	vfmadd231ps(ymm0, ymm3, ymm13)\
 	vfmadd231ps(ymm1, ymm2, ymm14)\
 	vfmadd231ps(ymm1, ymm3, ymm15)
+
+//#define SUB_KERNEL_12xINT16_8xINT16(n) \
+//	vmovaps(mem(rbx, n*16*2), ymm0)\
+//	vbroadcastss(mem(rax, (12*n+0)*4), ymm1)\
+//	vbroadcastss(mem(rax, (12*n+1)*4), ymm2)\
+//	vpmaddwd(ymm0, ymm1, ymm1)\
+//	vpmaddwd(ymm0, ymm2, ymm2)\
+//	vpaddd(ymm1, ymm4, ymm4)\
+//	vpaddd(ymm2, ymm5, ymm5)\
+//	vbroadcastss(mem(rax, (12*n+2)*4), ymm1)\
+//	vbroadcastss(mem(rax, (12*n+3)*4), ymm2)\
+//	vpmaddwd(ymm0, ymm1, ymm1)\
+//	vpmaddwd(ymm0, ymm2, ymm2)\
+//	vpaddd(ymm1, ymm6, ymm6)\
+//	vpaddd(ymm2, ymm7, ymm7)\
+//	vbroadcastss(mem(rax, (12*n+4)*4), ymm1)\
+//	vbroadcastss(mem(rax, (12*n+5)*4), ymm2)\
+//	vpmaddwd(ymm0, ymm1, ymm1)\
+//	vpmaddwd(ymm0, ymm2, ymm2)\
+//	vpaddd(ymm1, ymm8, ymm8)\
+//	vpaddd(ymm2, ymm9, ymm9)\
+//	vbroadcastss(mem(rax, (12*n+6)*4), ymm1)\
+//	vbroadcastss(mem(rax, (12*n+7)*4), ymm2)\
+//	vpmaddwd(ymm0, ymm1, ymm1)\
+//	vpmaddwd(ymm0, ymm2, ymm2)\
+//	vpaddd(ymm1, ymm10, ymm10)\
+//	vpaddd(ymm2, ymm11, ymm11)\
+//	vbroadcastss(mem(rax, (12*n+8)*4), ymm1)\
+//	vbroadcastss(mem(rax, (12*n+9)*4), ymm2)\
+//	vpmaddwd(ymm0, ymm1, ymm1)\
+//	vpmaddwd(ymm0, ymm2, ymm2)\
+//	vpaddd(ymm1, ymm12, ymm12)\
+//	vpaddd(ymm2, ymm13, ymm13)\
+//	vbroadcastss(mem(rax, (12*n+10)*4), ymm1)\
+//	vbroadcastss(mem(rax, (12*n+11)*4), ymm2)\
+//	vpmaddwd(ymm0, ymm1, ymm1)\
+//	vpmaddwd(ymm0, ymm2, ymm2)\
+//	vpaddd(ymm1, ymm14, ymm14)\
+//	vpaddd(ymm2, ymm15, ymm15)
+//#define SUB_KERNEL_12xINT16_8xINT16(n) \
+//	vmovaps(mem(rbx, n*16*2), ymm0)\
+//	vbroadcastss(mem(rax, (12*n+0)*4), ymm2)\
+//	vbroadcastss(mem(rax, (12*n+1)*4), ymm3)\
+//	vpmaddubsw(ymm0, ymm2, ymm2)\
+//	vpmaddubsw(ymm0, ymm3, ymm3)\
+//	vpmaddwd(ymm1, ymm2, ymm2)\
+//	vpmaddwd(ymm1, ymm3, ymm3)\
+//	vpaddd(ymm2, ymm4, ymm4)\
+//	vpaddd(ymm3, ymm5, ymm5)\
+//	vbroadcastss(mem(rax, (12*n+2)*4), ymm2)\
+//	vbroadcastss(mem(rax, (12*n+3)*4), ymm3)\
+//	vpmaddubsw(ymm0, ymm2, ymm2)\
+//	vpmaddubsw(ymm0, ymm3, ymm3)\
+//	vpmaddwd(ymm1, ymm2, ymm2)\
+//	vpmaddwd(ymm1, ymm3, ymm3)\
+//	vpaddd(ymm2, ymm6, ymm6)\
+//	vpaddd(ymm3, ymm7, ymm7)\
+//	vbroadcastss(mem(rax, (12*n+4)*4), ymm2)\
+//	vbroadcastss(mem(rax, (12*n+5)*4), ymm3)\
+//	vpmaddubsw(ymm0, ymm2, ymm2)\
+//	vpmaddubsw(ymm0, ymm3, ymm3)\
+//	vpmaddwd(ymm1, ymm2, ymm2)\
+//	vpmaddwd(ymm1, ymm3, ymm3)\
+//	vpaddd(ymm2, ymm8, ymm8)\
+//	vpaddd(ymm3, ymm9, ymm9)\
+//	vbroadcastss(mem(rax, (12*n+6)*4), ymm2)\
+//	vbroadcastss(mem(rax, (12*n+7)*4), ymm3)\
+//	vpmaddubsw(ymm0, ymm2, ymm2)\
+//	vpmaddubsw(ymm0, ymm3, ymm3)\
+//	vpmaddwd(ymm1, ymm2, ymm2)\
+//	vpmaddwd(ymm1, ymm3, ymm3)\
+//	vpaddd(ymm2, ymm10, ymm10)\
+//	vpaddd(ymm3, ymm11, ymm11)\
+//	vbroadcastss(mem(rax, (12*n+8)*4), ymm2)\
+//	vbroadcastss(mem(rax, (12*n+9)*4), ymm3)\
+//	vpmaddubsw(ymm0, ymm2, ymm2)\
+//	vpmaddubsw(ymm0, ymm3, ymm3)\
+//	vpmaddwd(ymm1, ymm2, ymm2)\
+//	vpmaddwd(ymm1, ymm3, ymm3)\
+//	vpaddd(ymm2, ymm12, ymm12)\
+//	vpaddd(ymm3, ymm13, ymm13)\
+//	vbroadcastss(mem(rax, (12*n+10)*4), ymm2)\
+//	vbroadcastss(mem(rax, (12*n+11)*4), ymm3)\
+//	vpmaddubsw(ymm0, ymm2, ymm2)\
+//	vpmaddubsw(ymm0, ymm3, ymm3)\
+//	vpmaddwd(ymm1, ymm2, ymm2)\
+//	vpmaddwd(ymm1, ymm3, ymm3)\
+//	vpaddd(ymm2, ymm14, ymm14)\
+//	vpaddd(ymm3, ymm15, ymm15)
+#define SUB_KERNEL_12xINT16_8xINT16(n) \
+	vpmaddwd(ymm0, ymm2, ymm4)\
+	vpmaddwd(ymm0, ymm3, ymm5)\
+	vpmaddwd(ymm1, ymm2, ymm6)\
+	vpmaddwd(ymm1, ymm3, ymm7)\
+	vpmaddwd(ymm0, ymm2, ymm8)\
+	vpmaddwd(ymm0, ymm3, ymm9)\
+	vpmaddwd(ymm1, ymm2, ymm10)\
+	vpmaddwd(ymm1, ymm3, ymm11)\
+	vpmaddwd(ymm0, ymm2, ymm12)\
+	vpmaddwd(ymm0, ymm3, ymm13)\
+	vpmaddwd(ymm1, ymm2, ymm14)\
+	vpmaddwd(ymm1, ymm3, ymm15)\
+	vpaddd(ymm4, ymm4, ymm4)\
+	vpaddd(ymm5, ymm5, ymm5)\
+	vpaddd(ymm6, ymm6, ymm6)\
+	vpaddd(ymm7, ymm7, ymm7)\
+	vpaddd(ymm8, ymm8, ymm8)\
+	vpaddd(ymm9, ymm9, ymm9)\
+	vpaddd(ymm10, ymm10, ymm10)\
+	vpaddd(ymm11, ymm11, ymm11)\
+	vpaddd(ymm12, ymm12, ymm12)\
+	vpaddd(ymm13, ymm13, ymm13)\
+	vpaddd(ymm14, ymm14, ymm14)\
+	vpaddd(ymm15, ymm15, ymm15)
+
+#define STORE_4x8xINT8(reg0, reg1, reg2, reg3)\
+	movsd(reg0, mem(rcx)) \
+	movsd(reg1, mem(rcx, r14, 1)) \
+	movsd(reg2, mem(rcx, r14, 2)) \
+	movsd(reg3, mem(rcx, r13, 1)) \
+	add(r15, rcx)
 
 #define ADD_BIAS_12x8xFP32(reg)\
 	vaddps(reg, ymm4, ymm4) \
@@ -2459,6 +2581,366 @@ namespace ml
 				[C_stride] "m"(C_stride),
 				[alpha_ptr] "m"(alpha_ptr),
 				[c_in_fp16] "m"(c_in_fp16),
+				[scalar_alpha] "m"(scalar_alpha)
+				:// clobbers
+				"cc", "memory", "%ymm0", "%ymm1", "%ymm2", "%ymm3", "%ymm4", "%ymm5", "%ymm6", "%ymm7", "%ymm8", "%ymm9", "%ymm10", "%ymm11", "%ymm12",
+				"%ymm13", "%ymm14", "%ymm15", "%rax", "%rbx", "%rcx", "%r11", "%r13", "%r14", "%r15")
+	}
+	void depthwise_conv_avx2_6x8_v2(Fragment &C, const Fragment &A, const Fragment &B, const Fragment &bias) noexcept
+	{
+		assert(A.is_fp32());
+		assert(B.is_fp32());
+		assert(C.is_fp32());
+		assert(B.stride() == 8);
+
+		assert(cpu::is_aligned(A.data(), 32));
+		assert(cpu::is_aligned(B.data(), 32));
+		if (bias.is_packed())
+		{
+			assert(cpu::is_aligned(bias.data(), 32));
+		}
+		const void *bias_ptr = bias.is_packed() ? bias.data() : nullptr;
+
+		const void *A_ptr = A.data();
+		const void *B_ptr = B.data();
+		void *C_ptr = C.data();
+
+		const uint64_t C_stride = C.stride_in_bytes();
+
+		begin_asm()
+		movq(var(A_ptr), rax)
+		movq(var(B_ptr), rbx)
+
+		vxorps(ymm0, ymm0, ymm0)
+		vxorps(ymm1, ymm1, ymm1)
+		vxorps(ymm2, ymm2, ymm2)
+		vxorps(ymm3, ymm3, ymm3)
+		vxorps(ymm4, ymm4, ymm4)
+		vxorps(ymm5, ymm5, ymm5)
+
+		vxorps(ymm6, ymm6, ymm6)
+		vxorps(ymm7, ymm7, ymm7)
+		vxorps(ymm8, ymm8, ymm8)
+		vxorps(ymm9, ymm9, ymm9)
+		vxorps(ymm10, ymm10, ymm10)
+		vxorps(ymm11, ymm11, ymm11)
+		vxorps(ymm12, ymm12, ymm12)
+		vxorps(ymm13, ymm13, ymm13)
+		vxorps(ymm14, ymm14, ymm14)
+		vxorps(ymm15, ymm15, ymm15)
+
+		movq(imm(7), r14) // load the number of h-unrolled iterations
+		test(r14, r14)
+		je(EPILOGUE)
+
+		label(MAINLOOP)
+//		vmovaps(mem(rbx, 0*8*4), ymm15)// load w0
+//
+//		vmovaps(mem(rax, 0*8*4), ymm6)// load i0
+//		vmovaps(mem(rax, 1*8*4), ymm7)// load i1
+//		vmovaps(mem(rax, 2*8*4), ymm8)// load i2
+//		vmovaps(mem(rax, 3*8*4), ymm9)// load i3
+//		vmovaps(mem(rax, 4*8*4), ymm10)// load i4
+//		vmovaps(mem(rax, 5*8*4), ymm11)// load i5
+//		vmovaps(mem(rax, 6*8*4), ymm12)// load i6
+//		vmovaps(mem(rax, 7*8*4), ymm13)// load i7
+//		vmovaps(mem(rax, 8*8*4), ymm14)// load i8
+
+		// w0
+		vfmadd231ps(ymm15, ymm6, ymm0)// w0*i0
+		vfmadd231ps(ymm15, ymm7, ymm1)// w0*i1
+		vfmadd231ps(ymm15, ymm8, ymm2)// w0*i2
+		vfmadd231ps(ymm15, ymm9, ymm3)// w0*i3
+		vfmadd231ps(ymm15, ymm10, ymm4)// w0*i4
+		vfmadd231ps(ymm15, ymm11, ymm5)// w0*i5
+//		vmovaps(mem(rbx, 1*8*4), ymm15)// load w1
+//		vmovaps(mem(rax, 9*8*4), ymm6)// load i9
+
+		// w1
+		vfmadd231ps(ymm15, ymm7, ymm0)// w1*i1
+		vfmadd231ps(ymm15, ymm8, ymm1)// w1*i2
+		vfmadd231ps(ymm15, ymm9, ymm2)// w1*i3
+		vfmadd231ps(ymm15, ymm10, ymm3)// w1*i4
+		vfmadd231ps(ymm15, ymm11, ymm4)// w1*i5
+		vfmadd231ps(ymm15, ymm12, ymm5)// w1*i6
+//		vmovaps(mem(rbx, 2*8*4), ymm15)// load w2
+//		vmovaps(mem(rax, 10*8*4), ymm7)// load i10
+
+		// w2
+		vfmadd231ps(ymm15, ymm8, ymm0)// w2*i2
+		vfmadd231ps(ymm15, ymm9, ymm1)// w2*i3
+		vfmadd231ps(ymm15, ymm10, ymm2)// w2*i4
+		vfmadd231ps(ymm15, ymm11, ymm3)// w2*i5
+		vfmadd231ps(ymm15, ymm12, ymm4)// w2*i6
+		vfmadd231ps(ymm15, ymm13, ymm5)// w2*i7
+//		vmovaps(mem(rbx, 3*8*4), ymm15)// load w3
+//		vmovaps(mem(rax, 11*8*4), ymm8)// load i11
+
+		// w3
+		vfmadd231ps(ymm15, ymm10, ymm0)// w3*i3
+		vfmadd231ps(ymm15, ymm11, ymm1)// w3*i4
+		vfmadd231ps(ymm15, ymm12, ymm2)// w3*i5
+		vfmadd231ps(ymm15, ymm13, ymm3)// w3*i6
+		vfmadd231ps(ymm15, ymm14, ymm4)// w3*i7
+		vfmadd231ps(ymm15, ymm6, ymm5)// w3*i8
+//		vmovaps(mem(rbx, 4*8*4), ymm15)// load w4
+
+		// w4
+		vfmadd231ps(ymm15, ymm11, ymm0)// w4*i4
+		vfmadd231ps(ymm15, ymm12, ymm1)// w4*i5
+		vfmadd231ps(ymm15, ymm13, ymm2)// w4*i6
+		vfmadd231ps(ymm15, ymm14, ymm3)// w4*i7
+		vfmadd231ps(ymm15, ymm6, ymm4)// w4*i8
+		vfmadd231ps(ymm15, ymm7, ymm5)// w4*i9
+//		vmovaps(mem(rbx, 5*8*4), ymm15)// load w5
+
+		// w5
+		vfmadd231ps(ymm15, ymm12, ymm0)// w3*i5
+		vfmadd231ps(ymm15, ymm13, ymm1)// w3*i6
+		vfmadd231ps(ymm15, ymm14, ymm2)// w3*i7
+		vfmadd231ps(ymm15, ymm6, ymm3)// w3*i8
+		vfmadd231ps(ymm15, ymm7, ymm4)// w3*i9
+		vfmadd231ps(ymm15, ymm8, ymm5)// w3*i10
+//		vmovaps(mem(rbx, 6*8*4), ymm15)// load w6
+
+		// w6
+		vfmadd231ps(ymm15, ymm9, ymm0)// w3*i6
+		vfmadd231ps(ymm15, ymm10, ymm1)// w3*i7
+		vfmadd231ps(ymm15, ymm11, ymm2)// w3*i8
+		vfmadd231ps(ymm15, ymm12, ymm3)// w3*i9
+		vfmadd231ps(ymm15, ymm13, ymm4)// w3*i10
+		vfmadd231ps(ymm15, ymm14, ymm5)// w3*i11
+
+		add(imm(12*8*4), rax)// 12 x 8 elements x 4 bytes
+		add(imm(7*8*4), rbx)// 7 x 8 elements x 4 bytes
+		dec(r14)
+		jne(MAINLOOP)
+
+		label(EPILOGUE)
+
+//		movq(var(bias_ptr), rax)
+//		test(rax, rax)
+//		je(AFTER_BIAS)
+//		vmovaps(mem(rax), ymm15)// load bias
+//		vaddps(ymm0, ymm15, ymm0)
+//		vaddps(ymm1, ymm15, ymm1)
+//		vaddps(ymm2, ymm15, ymm2)
+//		vaddps(ymm3, ymm15, ymm3)
+//		vaddps(ymm4, ymm15, ymm4)
+//		vaddps(ymm5, ymm15, ymm5)
+//		label(AFTER_BIAS)
+
+//		movq(var(C_stride), r14)// C stride is r14
+//		movq(var(C_ptr), rcx)// C pointer is in rcx
+//		movq(r14, r13)// r13 = r14
+//		sal(imm(1), r13)// r13 = 2 * r14 (2 * stride)
+//		add(r14, r13)// r13 = 2 * r14 + r14 = 3 * r14 (3*D_stride)
+//		movq(r14, r15)// r15 = r14
+//		sal(imm(2), r15)// r15 = 4 * r14 (4 * stride)
+//
+//		vmovups(ymm0, mem(rcx))
+//		vmovups(ymm1, mem(rcx, r14, 1))
+//		vmovups(ymm2, mem(rcx, r14, 2))
+//		vmovups(ymm3, mem(rcx, r13, 1))
+//		add(r15, rcx)
+//		vmovups(ymm4, mem(rcx))
+//		vmovups(ymm5, mem(rcx, r14, 1))
+
+		label(END)
+		vzeroupper()
+
+		end_asm(
+				:// outputs
+				:// inputs
+				[A_ptr] "m"(A_ptr),
+				[B_ptr] "m"(B_ptr),
+				[C_ptr] "m"(C_ptr),
+				[bias_ptr] "m"(bias_ptr),
+				[C_stride] "m"(C_stride)
+				:// clobbers
+				"cc", "memory", "%ymm0", "%ymm1", "%ymm2", "%ymm3", "%ymm4", "%ymm5", "%ymm6", "%ymm7", "%ymm8", "%ymm9", "%ymm10", "%ymm11", "%ymm12",
+				"%ymm13", "%ymm14", "%ymm15", "%rax", "%rbx", "%rcx", "%r11", "%r13", "%r14", "%r15")
+	}
+
+	void intgemm_avx2_12x8(Fragment &D, const Fragment &alpha, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,
+			const Fragment &bias, bool use_relu) noexcept
+	{
+//		assert(A.is_fp32());
+//		assert(B.is_fp32());
+//		assert(C.is_fp32() || C.is_fp16());
+//		assert(D.is_fp32() || D.is_fp16());
+//		assert(A.rows() == B.rows());
+//		assert(A.stride() == 12);
+//		assert(B.stride() == 8);
+//		assert(D.rows() == A.columns());
+//		assert(D.columns() == B.columns());
+//
+//		assert(alpha.is_packed());
+//		assert(alpha.is_fp32());
+//		assert(cpu::is_aligned(A.data(), 32));
+//		assert(cpu::is_aligned(B.data(), 32));
+//		assert(beta_ptr != nullptr);
+		if (bias.is_packed())
+		{
+			assert(cpu::is_aligned(bias.data(), 32));
+		}
+
+		const void *A_ptr = A.data();
+		const void *B_ptr = B.data();
+		const void *C_ptr = C.data();
+		void *D_ptr = D.data();
+		const void *bias_ptr = bias.is_packed() ? bias.data() : nullptr;
+		const void *alpha_ptr = alpha.data();
+
+		const int K = A.rows();
+		uint64_t k_iter = K / 4;
+		uint64_t k_left = K % 4;
+		const uint64_t C_stride = C.stride_in_bytes();
+		const uint64_t D_stride = D.stride_in_bytes();
+		const uint64_t flag_relu = use_relu;
+		const uint64_t cd_in_fp32 = C.is_fp32() | (D.is_fp32() << 1);
+		const uint64_t scalar_alpha = alpha.rows() == 1;
+
+		begin_asm()
+		movq(var(A_ptr), rax)
+		movq(var(B_ptr), rbx)
+		ZERO_ACCUMULATORS()
+
+		movq(var(k_iter), r14) // load the number of 4-unrolled iterations
+		test(r14, r14)
+		je(FINALLOOP)
+
+		label(UNROLLED_x4)
+		SUB_KERNEL_12xINT16_8xINT16(0)
+		SUB_KERNEL_12xINT16_8xINT16(1)
+		SUB_KERNEL_12xINT16_8xINT16(2)
+		SUB_KERNEL_12xINT16_8xINT16(3)
+
+		add(imm(4*12*4), rax)// 4 iterations x 12 elements x 4 bytes
+		add(imm(4*8*4), rbx)// 4 iterations x 8 elements x 4 bytes
+		dec(r14)
+		jne(UNROLLED_x4)
+
+		label(FINALLOOP)
+		movq(var(k_left), r14)// load the number of 1-unrolled iterations
+		test(r14, r14)
+		je(EPILOGUE)
+
+		label(UNROLLED_x1)
+		SUB_KERNEL_12xINT16_8xINT16(0)
+		add(imm(1*12*4), rax)// 1 iteration x 12 elements x 4 bytes
+		add(imm(1*8*4), rbx)// 1 iteration x 8 elements x 4 bytes
+		dec(r14)
+		jne(UNROLLED_x1)
+
+		label(EPILOGUE)
+		vcvtdq2ps(ymm4, ymm4)
+		vcvtdq2ps(ymm5, ymm5)
+		vcvtdq2ps(ymm6, ymm6)
+		vcvtdq2ps(ymm7, ymm7)
+		vcvtdq2ps(ymm8, ymm8)
+		vcvtdq2ps(ymm9, ymm9)
+		vcvtdq2ps(ymm10, ymm10)
+		vcvtdq2ps(ymm11, ymm11)
+		vcvtdq2ps(ymm12, ymm12)
+		vcvtdq2ps(ymm13, ymm13)
+		vcvtdq2ps(ymm14, ymm14)
+
+		movq(var(alpha_ptr), rax)// load address of alpha
+		movq(var(scalar_alpha), r14)
+		test(r14, r14)
+		je(COLUMN_ALPHA)
+		vbroadcastss(mem(rax), ymm0)
+		SCALE_ACCUMULATORS_1xN(ymm0)
+		jmp(AFTER_ALPHA_SCALING)
+
+		label(COLUMN_ALPHA)
+		SCALE_ACCUMULATORS_12x1()
+		label(AFTER_ALPHA_SCALING)
+
+		// load address of bias pointer
+		movq(var(bias_ptr), rax)
+		test(rax, rax)
+		je(AFTER_BIAS)
+		vmovaps(mem(rax), ymm2)// load bias
+		ADD_BIAS_12x8xFP32(ymm2)
+		label(AFTER_BIAS)
+
+//		movq(var(beta_ptr), rbx)// load address of beta
+//		vbroadcastss(mem(rbx), ymm0)
+//		vxorps(ymm1, ymm1, ymm1)
+//		vucomiss(xmm0, xmm1)// set ZF if beta == 0.
+//		je(AFTER_LOAD_C)
+//		movq(var(C_stride), r14)// C stride is r14
+//		movq(var(C_ptr), rcx)// C pointer is in rcx
+//		movq(r14, r15)// r15 = r14
+//		sal(imm(1), r15)// r15 = 2 * r14
+//		add(r14, r15)// r15 = 2 * r14 + r14 = 3 * r14 (3*C_stride)
+//
+//		movq(var(cd_in_fp32), r11)// load fp16 flags
+//		and_(imm(0x1), r11)// if set
+//		test(r11, r11)
+//		je(C_IN_FP32)
+//		LOAD_ADD_3x8xFP16(ymm0, ymm4, ymm5, ymm6)
+//		LOAD_ADD_3x8xFP16(ymm0, ymm7, ymm8, ymm9)
+//		LOAD_ADD_3x8xFP16(ymm0, ymm10, ymm11, ymm12)
+//		LOAD_ADD_3x8xFP16(ymm0, ymm13, ymm14, ymm15)
+//		jmp(AFTER_LOAD_C)
+//
+//		label(C_IN_FP32)
+//		LOAD_ADD_3x8xFP32(ymm0, ymm4, ymm5, ymm6)
+//		LOAD_ADD_3x8xFP32(ymm0, ymm7, ymm8, ymm9)
+//		LOAD_ADD_3x8xFP32(ymm0, ymm10, ymm11, ymm12)
+//		LOAD_ADD_3x8xFP32(ymm0, ymm13, ymm14, ymm15)
+//		label(AFTER_LOAD_C)
+
+		movq(var(flag_relu), r14)// load flag if to use relu
+		test(r14, r14)
+		je(AFTER_RELU)
+		RELU_12x8xFP32()
+		label(AFTER_RELU)
+
+		movq(var(D_stride), r14)// D stride is r14
+		movq(var(D_ptr), rcx)// D pointer is in rcx
+		movq(r14, r13)// r13 = r14
+		sal(imm(1), r13)// r13 = 2 * r14 (2 * stride)
+		add(r14, r13)// r13 = 2 * r14 + r14 = 3 * r14 (3*D_stride)
+		movq(r14, r15)// r15 = r14
+		sal(imm(2), r15)// r15 = 4 * r14 (4 * stride)
+
+		movq(var(cd_in_fp32), r11)// load fp16 flags
+		and_(imm(0x2), r11)// if set
+		test(r11, r11)
+		je(D_IN_INT8)
+		STORE_4x8xFP32(ymm4, ymm5, ymm6, ymm7)
+		STORE_4x8xFP32(ymm8, ymm9, ymm10, ymm11)
+		STORE_4x8xFP32(ymm12, ymm13, ymm14, ymm15)
+		jmp(END)
+
+		label(D_IN_INT8)
+		STORE_4x8xINT8(xmm4, xmm5, xmm6, xmm7)
+		STORE_4x8xINT8(xmm8, xmm9, xmm10, xmm11)
+		STORE_4x8xINT8(xmm12, xmm13, xmm14, xmm15)
+
+		label(END)
+		vzeroupper()
+
+		end_asm(
+				:// outputs
+				:// inputs
+				[A_ptr] "m"(A_ptr),
+				[B_ptr] "m"(B_ptr),
+				[C_ptr] "m"(C_ptr),
+				[D_ptr] "m"(D_ptr),
+				[k_iter] "m"(k_iter),
+				[k_left] "m"(k_left),
+				[C_stride] "m"(C_stride),
+				[D_stride] "m"(D_stride),
+				[alpha_ptr] "m"(alpha_ptr),
+				[beta_ptr] "m"(beta_ptr),
+				[flag_relu] "m"(flag_relu),
+				[bias_ptr] "m"(bias_ptr),
+				[cd_in_fp32] "m"(cd_in_fp32),
 				[scalar_alpha] "m"(scalar_alpha)
 				:// clobbers
 				"cc", "memory", "%ymm0", "%ymm1", "%ymm2", "%ymm3", "%ymm4", "%ymm5", "%ymm6", "%ymm7", "%ymm8", "%ymm9", "%ymm10", "%ymm11", "%ymm12",

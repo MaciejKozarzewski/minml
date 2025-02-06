@@ -23,7 +23,7 @@ namespace ml
 			bool m_use_beta = true;
 
 		public:
-			BatchNormalization(std::string activation = "linear", bool useGamma = true, bool useBeta = true, int historySize = 64);
+			BatchNormalization(std::string activation = "linear", bool useGamma = true, bool useBeta = true, int historySize = 100);
 
 			BatchNormalization& useGamma(bool b) noexcept;
 			BatchNormalization& useBeta(bool b) noexcept;

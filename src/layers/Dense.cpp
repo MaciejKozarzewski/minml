@@ -111,7 +111,7 @@ namespace ml
 		if (config.hasKey("use_weights"))
 			result->m_use_weights = config["use_weights"].getBool();
 		result->m_use_bias = config["use_bias"].getBool();
-		result->m_dtype = typeFromString(config["dtype"].getString());
+		result->loadConfig(config);
 		return result;
 	}
 

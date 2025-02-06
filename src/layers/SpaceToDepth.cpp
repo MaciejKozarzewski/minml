@@ -45,7 +45,7 @@ namespace ml
 	std::unique_ptr<Layer> SpaceToDepth::clone(const Json &config) const
 	{
 		std::unique_ptr<SpaceToDepth> result = std::make_unique<SpaceToDepth>(config["patch_size_h"].getInt(), config["patch_size_w"].getInt());
-		result->m_dtype = typeFromString(config["dtype"].getString());
+		result->loadConfig(config);
 		return result;
 	}
 	void SpaceToDepth::forward(const std::vector<Tensor> &input, Tensor &output)

@@ -61,6 +61,8 @@ namespace ml
 				return "gelu";
 			case ActivationType::EXP:
 				return "exp";
+			case ActivationType::SOFTMAX:
+				return "softmax";
 		}
 	}
 	ActivationType activationFromString(const std::string &str)
@@ -77,6 +79,8 @@ namespace ml
 			return ActivationType::GELU;
 		if (str == "exp")
 			return ActivationType::EXP;
+		if (str == "softmax")
+			return ActivationType::SOFTMAX;
 		throw LogicError(METHOD_NAME, "unknown nonlinearity '" + str + "'");
 	}
 
@@ -90,6 +94,10 @@ namespace ml
 	{
 		return getWeights().isTrainable() or getBias().isTrainable();
 	}
+	bool Layer::isQuantizable() const noexcept
+	{
+		return m_is_quantizable;
+	}
 
 	ActivationType Layer::getActivationType() const noexcept
 	{
@@ -99,6 +107,11 @@ namespace ml
 	{
 		m_activation = act;
 	}
+	Layer& Layer::quantizable(bool b) noexcept
+	{
+		m_is_quantizable = b;
+		return *this;
+	}
 
 	Json Layer::getConfig() const
 	{
@@ -106,7 +119,14 @@ namespace ml
 		result["name"] = name();
 		result["nonlinearity"] = toString(m_activation);
 		result["dtype"] = toString(m_dtype);
+		result["is_quantizable"] = m_is_quantizable;
 		return result;
+	}
+	void Layer::loadConfig(const Json &config)
+	{
+		this->m_dtype = typeFromString(config["dtype"].getString());
+		if (config.hasKey("is_quantizable"))
+			this->m_is_quantizable = config["is_quantizable"].getBool();
 	}
 	Json Layer::saveParameters(SerializedObject &binary_data) const
 	{

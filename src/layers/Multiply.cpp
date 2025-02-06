@@ -43,7 +43,7 @@ namespace ml
 	std::unique_ptr<Layer> Multiply::clone(const Json &config) const
 	{
 		std::unique_ptr<Multiply> result = std::make_unique<Multiply>();
-		result->m_dtype = typeFromString(config["dtype"].getString());
+		result->loadConfig(config);
 		return std::unique_ptr<Layer>(static_cast<Layer*>(result.release()));
 	}
 

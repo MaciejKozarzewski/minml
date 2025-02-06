@@ -471,6 +471,7 @@
 #define vrcp14ps(_0, _1) INSTR_(vrcp14ps, _0, _1)
 
 #define vpmaddwd(_0, _1, _2) INSTR_(vpmaddwd, _0, _1, _2)
+#define vpmaddubsw(_0, _1, _2) INSTR_(vpmaddubsw, _0, _1, _2)
 #define vpaddd(_0, _1, _2) INSTR_(vpaddd, _0, _1, _2)
 #define vpsubd(_0, _1, _2) INSTR_(vpsubd, _0, _1, _2)
 

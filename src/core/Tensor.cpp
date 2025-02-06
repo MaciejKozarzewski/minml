@@ -21,6 +21,23 @@
 
 namespace
 {
+	template<typename T>
+	T load(uint64_t data)
+	{
+		static_assert(sizeof(T) <= sizeof(uint64_t), "");
+		T result;
+		std::memcpy(&result, &data, sizeof(T));
+		return result;
+	}
+	template<typename T>
+	uint64_t store(T value)
+	{
+		static_assert(sizeof(T) <= sizeof(uint64_t), "");
+		uint64_t result = 0u;
+		std::memcpy(&result, &value, sizeof(T));
+		return result;
+	}
+
 	class Data
 	{
 			uint64_t m_data = 0u;
@@ -36,23 +53,23 @@ namespace
 				switch (m_dtype)
 				{
 					case ml::DataType::FLOAT16:
-						reinterpret_cast<uint16_t*>(&m_data)[0] = ml::convert_fp32_to_fp16(value);
+						m_data = store(ml::convert_fp32_to_fp16(value));
 						break;
 					case ml::DataType::FLOAT32:
-						std::memcpy(&m_data, &value, sizeof(float));
+						m_data = store(value);
 						break;
 					case ml::DataType::FLOAT64:
-					{
-						const double x = value;
-						std::memcpy(&m_data, &x, sizeof(double));
+						m_data = store(static_cast<double>(value));
 						break;
-					}
+					case ml::DataType::UINT8:
+						m_data = store(static_cast<uint8_t>(value));
+						break;
+					case ml::DataType::INT8:
+						m_data = store(static_cast<int8_t>(value));
+						break;
 					case ml::DataType::INT32:
-					{
-						const int tmp = static_cast<int>(value);
-						std::memcpy(&m_data, &tmp, sizeof(int));
+						m_data = store(static_cast<int32_t>(value));
 						break;
-					}
 					default:
 						throw ml::DataTypeMismatch(METHOD_NAME, "unknown data type");
 				}
@@ -62,25 +79,17 @@ namespace
 				switch (m_dtype)
 				{
 					case ml::DataType::FLOAT16:
-						return ml::convert_fp16_to_fp32(reinterpret_cast<const uint16_t*>(&m_data)[0]);
+						return ml::convert_fp16_to_fp32(load<uint16_t>(m_data));
 					case ml::DataType::FLOAT32:
-					{
-						float x;
-						std::memcpy(&x, &m_data, sizeof(float));
-						return x;
-					}
+						return load<float>(m_data);
 					case ml::DataType::FLOAT64:
-					{
-						double x;
-						std::memcpy(&x, &m_data, sizeof(double));
-						return x;
-					}
+						return load<double>(m_data);
+					case ml::DataType::UINT8:
+						return load<uint8_t>(m_data);
+					case ml::DataType::INT8:
+						return load<int8_t>(m_data);
 					case ml::DataType::INT32:
-					{
-						int x;
-						std::memcpy(&x, &m_data, sizeof(int));
-						return static_cast<float>(x);
-					}
+						return load<int32_t>(m_data);
 					default:
 						throw ml::DataTypeMismatch(METHOD_NAME, "unknown data type");
 				}
@@ -118,6 +127,18 @@ namespace
 				std::memcpy(&x, ptr, sizeof(double));
 				return static_cast<T>(x);
 			}
+			case ml::DataType::UINT8:
+			{
+				uint8_t x;
+				std::memcpy(&x, ptr, sizeof(uint8_t));
+				return static_cast<T>(x);
+			}
+			case ml::DataType::INT8:
+			{
+				int8_t x;
+				std::memcpy(&x, ptr, sizeof(int8_t));
+				return static_cast<T>(x);
+			}
 			case ml::DataType::INT32:
 			{
 				int32_t x;
@@ -149,6 +170,18 @@ namespace
 			{
 				const double value = static_cast<double>(x);
 				std::memcpy(ptr, &value, sizeof(double));
+				break;
+			}
+			case ml::DataType::UINT8:
+			{
+				const uint8_t value = static_cast<uint8_t>(x);
+				std::memcpy(ptr, &value, sizeof(uint8_t));
+				break;
+			}
+			case ml::DataType::INT8:
+			{
+				const int8_t value = static_cast<int8_t>(x);
+				std::memcpy(ptr, &value, sizeof(int8_t));
 				break;
 			}
 			case ml::DataType::INT32:

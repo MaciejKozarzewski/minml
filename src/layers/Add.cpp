@@ -43,8 +43,8 @@ namespace ml
 	std::unique_ptr<Layer> Add::clone(const Json &config) const
 	{
 		std::unique_ptr<Add> result = std::make_unique<Add>(config["nonlinearity"]);
-		result->m_dtype = typeFromString(config["dtype"].getString());
-		return std::unique_ptr<Layer>(static_cast<Layer*>(result.release()));
+		result->loadConfig(config);
+		return result;
 	}
 
 	void Add::forward(const std::vector<Tensor> &input, Tensor &output)

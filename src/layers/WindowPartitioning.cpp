@@ -54,7 +54,7 @@ namespace ml
 	{
 		std::unique_ptr<WindowPartitioning> result = std::make_unique<WindowPartitioning>(config["window_size"].getInt(),
 				config["window_shift"].getInt());
-		result->m_dtype = typeFromString(config["dtype"].getString());
+		result->loadConfig(config);
 		return result;
 	}
 	void WindowPartitioning::forward(const std::vector<Tensor> &input, Tensor &output)

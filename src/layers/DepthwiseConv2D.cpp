@@ -82,7 +82,7 @@ namespace ml
 	std::unique_ptr<Layer> DepthwiseConv2D::clone(const Json &config) const
 	{
 		std::unique_ptr<DepthwiseConv2D> result = std::make_unique<DepthwiseConv2D>(config["filters"], config["kernel_size"], config["use_bias"]);
-		result->m_dtype = typeFromString(config["dtype"].getString());
+		result->loadConfig(config);
 		return result;
 	}
 	void DepthwiseConv2D::init()

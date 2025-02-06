@@ -57,7 +57,7 @@ namespace
 				Line<T, OutputTile> result;
 				for (int i = 0; i < OutputTile; i++)
 					result[i] = x;
-				return Line<T, OutputTile>();
+				return result;
 			}
 			__device__ Line<T, KernelSize + OutputTile - 1> load_input(const T *src, int row) const
 			{

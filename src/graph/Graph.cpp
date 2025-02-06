@@ -7,6 +7,7 @@
 
 #include <minml/graph/Graph.hpp>
 #include <minml/graph/GraphNode.hpp>
+#include <minml/graph/CalibrationTable.hpp>
 #include <minml/core/Device.hpp>
 #include <minml/core/Context.hpp>
 #include <minml/core/ml_exceptions.hpp>
@@ -313,6 +314,19 @@ namespace ml
 	bool Graph::isTrainable() const noexcept
 	{
 		return m_is_trainable;
+	}
+	void Graph::calibrate(CalibrationTable &table) const
+	{
+		for (size_t i = 0; i < m_nodes.size(); i++)
+		{
+			if (m_nodes[i]->getLayer().isQuantizable())
+			{
+				if (not table.getHistogram(i).isReady())
+					table.getHistogram(i).collectStatistics(m_nodes[i]->getOutputTensor());
+			}
+			else
+				table.getHistogram(i).markAsUnused();
+		}
 	}
 
 	int Graph::numberOfNodes() const noexcept

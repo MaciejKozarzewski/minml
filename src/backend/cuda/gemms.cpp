@@ -40,6 +40,16 @@ namespace ml
 		assert(err == CUBLAS_STATUS_SUCCESS);
 		switch (dtype)
 		{
+			case DTYPE_INT32: // AB [int8], C[int32]
+			{
+				assert(K % 4 == 0);
+				const int32_t _alpha = static_cast<int32_t>(alpha);
+				const int32_t _beta = static_cast<int32_t>(beta);
+				cublasStatus_t status = cublasGemmEx(handle, op_B, op_A, M, N, K, &_alpha, getPointer<void>(B), CUDA_R_8I, LDB, getPointer<void>(A),
+						CUDA_R_8I, LDA, &_beta, getPointer<void>(C), CUDA_R_32I, LDC, CUBLAS_COMPUTE_32I, CUBLAS_GEMM_DEFAULT);
+				assert(status == CUBLAS_STATUS_SUCCESS);
+				break;
+			}
 			case DTYPE_FLOAT16: // ABC [float16]
 			{
 				if (cuda::has_fp16_math(context))

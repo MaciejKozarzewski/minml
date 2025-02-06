@@ -27,6 +27,7 @@ namespace ml
 	class Tensor;
 	class Optimizer;
 	class Regularizer;
+	class CalibrationTable;
 } /* namespace ml */
 
 namespace ml
@@ -100,6 +101,7 @@ namespace ml
 			void print() const;
 			void makeNonTrainable();
 			bool isTrainable() const noexcept;
+			void calibrate(CalibrationTable &table) const;
 
 			int numberOfNodes() const noexcept;
 			const GraphNode& getNode(int index) const;

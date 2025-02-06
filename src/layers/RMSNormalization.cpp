@@ -59,6 +59,7 @@ namespace ml
 	std::unique_ptr<Layer> RMSNormalization::clone(const Json &config) const
 	{
 		std::unique_ptr<RMSNormalization> result = std::make_unique<RMSNormalization>(config["use_gamma"]);
+		result->loadConfig(config);
 		return result;
 	}
 

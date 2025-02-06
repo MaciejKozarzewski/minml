@@ -186,7 +186,11 @@ namespace ml
 	{
 		switch (t)
 		{
+			case DataType::UINT8:
+			case DataType::INT8:
+				return 1;
 			case DataType::FLOAT16:
+			case DataType::INT16:
 				return 2;
 			case DataType::FLOAT32:
 			case DataType::INT32:
@@ -206,6 +210,12 @@ namespace ml
 			return DataType::FLOAT32;
 		if (str == "fp64" or str == "float64" or str == "FLOAT64")
 			return DataType::FLOAT64;
+		if (str == "uint8" or str == "UINT8")
+			return DataType::UINT8;
+		if (str == "int8" or str == "INT8")
+			return DataType::INT8;
+		if (str == "int16" or str == "INT16")
+			return DataType::INT16;
 		if (str == "int32" or str == "INT32")
 			return DataType::INT32;
 		throw DataTypeNotSupported(METHOD_NAME, "unknown data type '" + str + "'");
@@ -220,6 +230,12 @@ namespace ml
 				return std::string("FLOAT32");
 			case DataType::FLOAT64:
 				return std::string("FLOAT64");
+			case DataType::UINT8:
+				return std::string("INT8");
+			case DataType::INT8:
+				return std::string("INT8");
+			case DataType::INT16:
+				return std::string("INT16");
 			case DataType::INT32:
 				return std::string("INT32");
 			default:

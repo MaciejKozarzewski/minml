@@ -76,7 +76,7 @@ namespace ml
 	std::unique_ptr<Layer> GlobalBroadcastHW::clone(const Json &config) const
 	{
 		std::unique_ptr<GlobalBroadcastHW> result = std::make_unique<GlobalBroadcastHW>(config["nonlinearity"], config["use_bias"]);
-		result->m_dtype = typeFromString(config["dtype"].getString());
+		result->loadConfig(config);
 		return result;
 	}
 

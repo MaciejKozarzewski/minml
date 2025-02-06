@@ -11,6 +11,7 @@
 namespace ml
 {
 	class Graph;
+	class CalibrationTable;
 }
 
 namespace ml
@@ -30,6 +31,14 @@ namespace ml
 	class FoldGelu
 	{
 		public:
+			bool optimize(Graph &graph) const;
+	};
+
+	class Quantize
+	{
+			const CalibrationTable &m_table;
+		public:
+			Quantize(const CalibrationTable &table);
 			bool optimize(Graph &graph) const;
 	};
 

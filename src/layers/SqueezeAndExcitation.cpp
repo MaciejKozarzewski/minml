@@ -53,7 +53,7 @@ namespace ml
 	std::unique_ptr<Layer> SqueezeAndExcitation::clone(const Json &config) const
 	{
 		std::unique_ptr<SqueezeAndExcitation> result = std::make_unique<SqueezeAndExcitation>(config["nonlinearity"]);
-		result->m_dtype = typeFromString(config["dtype"].getString());
+		result->loadConfig(config);
 		return result;
 	}
 
