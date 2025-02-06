@@ -13,6 +13,7 @@
 #include <minml/graph/Graph.hpp>
 #include <minml/graph/graph_optimizers.hpp>
 #include <minml/layers/Dense.hpp>
+#include <minml/layers/DepthwiseConv2D.hpp>
 #include <minml/layers/Conv2D.hpp>
 #include <minml/layers/BatchNormalization.hpp>
 #include <minml/layers/Gelu.hpp>
@@ -2891,6 +2892,210 @@ void test_mha_kernel(const int M, const int N, const int K,
 	gemm::aligned_free(correct_softmax_ptr, 4096);
 }
 
+void test_depthwise_conv_kernel(const int M, const int N, const int K, mlDataType_t dtype,
+		std::function<void(Fragment&, const Fragment&, const Fragment&, const Fragment&)> kernel)
+{
+	std::unique_ptr<float[]> matrix_c = std::make_unique<float[]>(1024 * 1024);
+	std::unique_ptr<float[]> correct_c = std::make_unique<float[]>(1024 * 1024);
+
+	const size_t size_in_bytes_lhs = sizeof(float) * M * N * K;
+	const size_t size_in_bytes_rhs = sizeof(float) * N * K;
+	void *lhs = gemm::aligned_new(size_in_bytes_lhs, 4096);
+	void *rhs = gemm::aligned_new(size_in_bytes_rhs, 4096);
+	void *alpha_ptr = gemm::aligned_new(sizeof(float) * 1024, 4096);
+	std::memset(lhs, 0, size_in_bytes_lhs);
+	std::memset(rhs, 0, size_in_bytes_rhs);
+	std::memset(alpha_ptr, 0, sizeof(float) * 1024);
+
+	Fragment fragment_a(lhs, DTYPE_FLOAT32, M * N);
+	Fragment fragment_b(rhs, DTYPE_FLOAT32, N);
+	Fragment fragment_c(matrix_c.get(), dtype, 1024);
+	Fragment correct_fragment_c(correct_c.get(), dtype, 1024);
+	Fragment fragment_alpha(alpha_ptr, DTYPE_FLOAT32, 1);
+	fragment_a.mark_as_packed_with_size( { K, M * N });
+	fragment_b.mark_as_packed_with_size( { K, N });
+	fragment_c.mark_as_packed_with_size( { M, N });
+	correct_fragment_c.mark_as_packed_with_size( { M, N });
+	fragment_alpha.mark_as_packed_with_size( { 1, N });
+
+	for (int k = 0; k < K; k++)
+	{
+		for (int mn = 0; mn < M * N; mn++)
+			fragment_a.at<float>(k, mn) = randFloat() - 0.5f;
+		for (int n = 0; n < N; n++)
+			fragment_b.at<float>(k, n) = randFloat() - 0.5f;
+	}
+
+	const float alpha = 1.0f;
+	if (fragment_alpha.rows() == 1)
+		fragment_alpha.at<float>(0, 0) = alpha;
+	else
+	{
+		for (int n = 0; n < N; n++)
+			fragment_alpha.at<float>(0, n) = n + randFloat();
+	}
+
+	depthwise_conv_def_MxN(correct_fragment_c, fragment_alpha, fragment_a, fragment_b);
+	kernel(fragment_c, fragment_alpha, fragment_a, fragment_b);
+
+	double diff = 0.0;
+	for (int m = 0; m < M; m++)
+		for (int n = 0; n < N; n++)
+			if (fragment_c.dtype() == DTYPE_FLOAT16)
+				diff += std::fabs(half_to_float(correct_fragment_c.at<uint16_t>(m, n)) - half_to_float(fragment_c.at<uint16_t>(m, n)));
+			else
+				diff += std::fabs(correct_fragment_c.at<float>(m, n) - fragment_c.at<float>(m, n));
+	diff /= (M * N);
+	if (diff > 1.0e-4)
+	{
+		std::cout << "Correct\n";
+		for (int m = 0; m < M; m++)
+		{
+			for (int n = 0; n < N; n++)
+				if (correct_fragment_c.dtype() == DTYPE_FLOAT16)
+					std::cout << half_to_float(correct_fragment_c.at<uint16_t>(m, n)) << ' ';
+				else
+					std::cout << correct_fragment_c.at<float>(m, n) << ' ';
+			std::cout << '\n';
+		}
+		std::cout << "-------------------------------------------\n";
+
+		std::cout << "Actual\n";
+		for (int m = 0; m < M; m++)
+		{
+			for (int n = 0; n < N; n++)
+				if (fragment_c.dtype() == DTYPE_FLOAT16)
+					std::cout << half_to_float(fragment_c.at<uint16_t>(m, n)) << ' ';
+				else
+					std::cout << fragment_c.at<float>(m, n) << ' ';
+			std::cout << '\n';
+		}
+
+		std::cout << "\ndiff = " << diff << '\n';
+		exit(255);
+	}
+	else
+		std::cout << "depthwise conv kernel = " << M << "x" << N << "x" << K << " : OK\n";
+
+	const double repeats = 1.0e8;
+	const double start = getTime();
+	int i = 0;
+	for (; i < repeats; i++)
+	{
+		kernel(fragment_c, fragment_alpha, fragment_a, fragment_b);
+		if ((getTime() - start) > 10.0)
+			break;
+	}
+	const double stop = getTime();
+	const double flops = (double) i * (M * N * K) / (stop - start);
+	std::cout << M << "x" << N << "x" << K << " : " << flops / 1.0e9 << " GFLOPS\n";
+	std::cout << "time = " << (stop - start) / (i / 1.0e6) << "us\n";
+
+	gemm::aligned_free(lhs, 4096);
+	gemm::aligned_free(rhs, 4096);
+	gemm::aligned_free(alpha_ptr, 4096);
+}
+
+void test_depthwise_conv_kernel_v2(const int outputs, const int channels, mlDataType_t dtype,
+		std::function<void(Fragment&, const Fragment&, const Fragment&, const Fragment&)> kernel)
+{
+	std::unique_ptr<float[]> matrix_c = std::make_unique<float[]>(1024 * 1024);
+	std::unique_ptr<float[]> correct_c = std::make_unique<float[]>(1024 * 1024);
+	const int kernel_size = 7;
+	const int inputs = outputs + kernel_size - 1;
+
+	const size_t size_in_bytes_lhs = sizeof(float) * kernel_size * inputs * channels;
+	const size_t size_in_bytes_rhs = sizeof(float) * kernel_size * kernel_size * channels;
+	void *lhs = gemm::aligned_new(size_in_bytes_lhs, 4096);
+	void *rhs = gemm::aligned_new(size_in_bytes_rhs, 4096);
+	void *bias_ptr = gemm::aligned_new(sizeof(float) * 1024, 4096);
+	std::memset(lhs, 0, size_in_bytes_lhs);
+	std::memset(rhs, 0, size_in_bytes_rhs);
+	std::memset(bias_ptr, 0, sizeof(float) * 1024);
+
+	Fragment fragment_a(lhs, DTYPE_FLOAT32, inputs * channels);
+	Fragment fragment_b(rhs, DTYPE_FLOAT32, channels);
+	Fragment fragment_c(matrix_c.get(), dtype, 1024);
+	Fragment correct_fragment_c(correct_c.get(), dtype, 1024);
+	Fragment fragment_bias(bias_ptr, DTYPE_FLOAT32, 0);
+	fragment_a.mark_as_packed_with_size( { kernel_size, inputs * channels });
+	fragment_b.mark_as_packed_with_size( { kernel_size * kernel_size, channels });
+	fragment_c.mark_as_packed_with_size( { outputs, channels });
+	correct_fragment_c.mark_as_packed_with_size( { outputs, channels });
+	fragment_bias.mark_as_packed_with_size( { 1, channels });
+
+	for (int k = 0; k < kernel_size; k++)
+		for (int mn = 0; mn < inputs * channels; mn++)
+			fragment_a.at<float>(k, mn) = randFloat() - 0.5f;
+
+	for (int k = 0; k < kernel_size * kernel_size; k++)
+		for (int n = 0; n < channels; n++)
+			fragment_b.at<float>(k, n) = randFloat() - 0.5f;
+
+	for (int n = 0; n < channels; n++)
+		fragment_bias.at<float>(0, n) = randFloat() - 0.5f;
+
+//	depthwise_conv_def_MxN_v2(correct_fragment_c, fragment_a, fragment_b, fragment_bias);
+	kernel(correct_fragment_c, fragment_a, fragment_b, fragment_bias);
+
+//	double diff = 0.0;
+//	for (int m = 0; m < outputs; m++)
+//		for (int n = 0; n < channels; n++)
+//			if (fragment_c.dtype() == DTYPE_FLOAT16)
+//				diff += std::fabs(half_to_float(correct_fragment_c.at<uint16_t>(m, n)) - half_to_float(fragment_c.at<uint16_t>(m, n)));
+//			else
+//				diff += std::fabs(correct_fragment_c.at<float>(m, n) - fragment_c.at<float>(m, n));
+//	diff /= (outputs * channels);
+//	if (diff > 1.0e-4)
+//	{
+//		std::cout << "Correct\n";
+//		for (int m = 0; m < outputs; m++)
+//		{
+//			for (int n = 0; n < channels; n++)
+//				if (correct_fragment_c.dtype() == DTYPE_FLOAT16)
+//					std::cout << half_to_float(correct_fragment_c.at<uint16_t>(m, n)) << ' ';
+//				else
+//					std::cout << correct_fragment_c.at<float>(m, n) << ' ';
+//			std::cout << '\n';
+//		}
+//		std::cout << "-------------------------------------------\n";
+//
+//		std::cout << "Actual\n";
+//		for (int m = 0; m < outputs; m++)
+//		{
+//			for (int n = 0; n < channels; n++)
+//				if (fragment_c.dtype() == DTYPE_FLOAT16)
+//					std::cout << half_to_float(fragment_c.at<uint16_t>(m, n)) << ' ';
+//				else
+//					std::cout << fragment_c.at<float>(m, n) << ' ';
+//			std::cout << '\n';
+//		}
+//
+//		std::cout << "\ndiff = " << diff << '\n';
+//		exit(255);
+//	}
+//	else
+//		std::cout << "depthwise conv kernel = " << outputs << "x" << channels << "x" << kernel_size << " : OK\n";
+
+	const double repeats = 1.0e8;
+	const double start = getTime();
+	int i = 0;
+	for (; i < repeats; i++)
+	{
+		kernel(fragment_c, fragment_a, fragment_b, fragment_bias);
+		if ((getTime() - start) > 10.0)
+			break;
+	}
+	const double stop = getTime();
+	const double flops = (double) i * (outputs * kernel_size * kernel_size * channels) / (stop - start);
+	std::cout << outputs << "x" << channels << "x" << kernel_size << " : " << flops / 1.0e9 << " GFLOPS\n";
+	std::cout << "time = " << (stop - start) / (i / 1.0e6) << "us\n";
+
+	gemm::aligned_free(lhs, 4096);
+	gemm::aligned_free(rhs, 4096);
+	gemm::aligned_free(bias_ptr, 4096);
+}
+
 //__m128 BetterFastExpSse(__m128 x) noexcept
 //{
 //	const __m128 a = _mm_set1_ps((1 << 22) / float(M_LN2));
@@ -3080,53 +3285,53 @@ int main()
 {
 	std::cout << "BEGIN" << std::endl;
 	std::cout << ml::Device::hardwareInfo();
-	{
-		Tensor input( { 100, 15, 15, 100 }, "float32", Device::cpu());
-		for (int i = 0; i < input.dim(1); i++)
-			for (int j = 0; j < input.dim(2); j++)
-				input.at( { 0, i, j, 0 }) = (i + 0.01f * j);
-
-		for (int j = 0; j < input.dim(1); j++)
-		{
-			for (int k = 0; k < input.dim(2); k++)
-				std::cout << (float) input.at( { 0, j, k, 0 }) << ' ';
-			std::cout << "\n";
-		}
-
-		Context context(Device::cuda(0));
-		input.moveTo(context.device());
-
-		Tensor output( { 100, 15, 15, 100 }, "float32", context.device());
-
-		windowPartitioning(context, input, output, { 2, 2 });
-		context.synchronize();
-
-//		for (int i = 0; i < output.dim(0); i++)
+//	{
+//		Tensor input( { 100, 15, 15, 100 }, "float32", Device::cpu());
+//		for (int i = 0; i < input.dim(1); i++)
+//			for (int j = 0; j < input.dim(2); j++)
+//				input.at( { 0, i, j, 0 }) = (i + 0.01f * j);
+//
+//		for (int j = 0; j < input.dim(1); j++)
 //		{
-//			std::cout << "\n---Window " << i << "---\n";
-//			for (int j = 0; j < output.dim(1); j++)
-//			{
-//				for (int k = 0; k < output.dim(2); k++)
-//					std::cout << (float) output.at( { i, j, k, 0 }) << ' ';
-//				std::cout << "\n";
-//			}
+//			for (int k = 0; k < input.dim(2); k++)
+//				std::cout << (float) input.at( { 0, j, k, 0 }) << ' ';
+//			std::cout << "\n";
 //		}
-
-		Tensor recovered = zeros_like(input);
-		windowMerging(context, output, recovered, { 2, 2 });
-		context.synchronize();
-
-		std::cout << "\n\n\n";
-		for (int j = 0; j < recovered.dim(1); j++)
-		{
-			for (int k = 0; k < recovered.dim(2); k++)
-				std::cout << (float) recovered.at( { 0, j, k, 0 }) << ' ';
-			std::cout << "\n";
-		}
-
-		std::cout << "\ndiff = " << testing::diffForTest(recovered, input) << '\n';
-		return 0;
-	}
+//
+//		Context context(Device::cuda(0));
+//		input.moveTo(context.device());
+//
+//		Tensor output( { 100, 15, 15, 100 }, "float32", context.device());
+//
+//		windowPartitioning(context, input, output, { 2, 2 });
+//		context.synchronize();
+//
+////		for (int i = 0; i < output.dim(0); i++)
+////		{
+////			std::cout << "\n---Window " << i << "---\n";
+////			for (int j = 0; j < output.dim(1); j++)
+////			{
+////				for (int k = 0; k < output.dim(2); k++)
+////					std::cout << (float) output.at( { i, j, k, 0 }) << ' ';
+////				std::cout << "\n";
+////			}
+////		}
+//
+//		Tensor recovered = zeros_like(input);
+//		windowMerging(context, output, recovered, { 2, 2 });
+//		context.synchronize();
+//
+//		std::cout << "\n\n\n";
+//		for (int j = 0; j < recovered.dim(1); j++)
+//		{
+//			for (int k = 0; k < recovered.dim(2); k++)
+//				std::cout << (float) recovered.at( { 0, j, k, 0 }) << ' ';
+//			std::cout << "\n";
+//		}
+//
+//		std::cout << "\ndiff = " << testing::diffForTest(recovered, input) << '\n';
+//		return 0;
+//	}
 
 //	return 0;
 	{
@@ -3199,9 +3404,20 @@ int main()
 //		std::cout << "Base GEMM\n";
 //		for (int i = 1; i <= 512; i *= 2)
 //			test_microkernel(12, 8, i, dtype, gemm_avx2_12x8);
+
+		std::cout << "fp32 kernel\n";
+		for (int i = 1; i <= 512; i *= 2)
+			test_microkernel(12, 8, i, dtype, gemm_avx2_12x8);
+
+		std::cout << "int8 kernel\n";
+		for (int i = 1; i <= 512; i *= 2)
+			test_microkernel(12, 8, i, dtype, intgemm_avx2_12x8);
+
+//		test_depthwise_conv_kernel_v2(6, 8, dtype, depthwise_conv_avx2_6x8_v2);
+//		test_depthwise_conv_kernel(12, 8, 49, dtype, depthwise_conv_avx2_12x8);
 //		for (int i = 1; i <= 512; i *= 2)
-//			test_microkernel(6, 16, i, dtype, gemm_avx2_6x16);
-//		return 0;
+//			test_depthwise_conv_kernel(12, 8, i, dtype, depthwise_conv_avx2_12x8);
+		return 0;
 
 //		int32_t center = 0;
 //		int32_t range = 0;
@@ -3290,15 +3506,15 @@ int main()
 	{
 		Graph graph;
 		const bool symmetric = false;
-		const int batch_size = 8;
+		const int batch_size = 256;
 		const int board_size = 15;
-		int embedding = 128;
+		int embedding = 256;
 		const int patch_size = 1;
 		const int head_dim = 32;
 		const int pos_encoding_range = (board_size + patch_size - 1) / patch_size;
 
-		auto x = graph.addInput( { batch_size, board_size, board_size, 32 });
-		x = graph.add(Conv2D(embedding / (patch_size * patch_size), 5, "relu"), x);
+		auto x = graph.addInput( { batch_size, board_size, board_size, 8 });
+		x = graph.add(Conv2D(embedding / (patch_size * patch_size), 3, "relu"), x);
 //		x = graph.add(Conv2D(embedding / (patch_size * patch_size), 5).useBias(false), x);
 //		x = graph.add(BatchNormalization("relu").useGamma(false), x);
 //		x = graph.add(ml::SpaceToDepth(patch_size), x);
@@ -3334,41 +3550,51 @@ int main()
 //		x = graph.add(ml::Conv2D(embedding, 3, "relu"), x);
 //		x = graph.add(ml::Conv2D(embedding, 3, "relu"), x);
 
-		for (int i = 0; i < 0; i++)
-		{
-//			auto y = graph.add(ml::RMSNormalization(), x);
-//			y = graph.add(ml::Conv2D((3 - symmetric) * embedding, 1).useBias(false), y);
-//			y = graph.add(ml::MultiHeadAttention(embedding / head_dim, pos_encoding_range, symmetric), y);
-//			y = graph.add(ml::Conv2D(embedding, 1).useBias(false), y);
-//			x = graph.add(ml::Add(), { x, y });
+//		for (int i = 0; i < 4; i++)
+//		{
+////			auto y = graph.add(ml::RMSNormalization(), x);
+////			y = graph.add(ml::Conv2D((3 - symmetric) * embedding, 1).useBias(false), y);
+////			y = graph.add(ml::MultiHeadAttention(embedding / head_dim, pos_encoding_range, symmetric), y);
+////			y = graph.add(ml::Conv2D(embedding, 1).useBias(false), y);
+////			x = graph.add(ml::Add(), { x, y });
+////
+////			y = graph.add(ml::RMSNormalization(), x);
+////			y = graph.add(ml::Conv2D(embedding, 1, "relu"), y);
+////			y = graph.add(ml::Conv2D(embedding, 1), y);
+////			x = graph.add(ml::Add(), { x, y });
 //
-//			y = graph.add(ml::RMSNormalization(), x);
-//			y = graph.add(ml::Conv2D(embedding, 1, "relu"), y);
-//			y = graph.add(ml::Conv2D(embedding, 1), y);
+////			auto y = graph.add(ml::Conv2D(embedding, 3, "relu"), x);
+////			y = graph.add(ml::Conv2D(embedding, 3, "linear"), y);
+////			x = graph.add(ml::Add("relu"), { x, y });
+//
+//			auto y = graph.add(ml::Conv2D(embedding, 1, "relu"), x);
+////			y = graph.add(ml::Conv2D(embedding, 3, "relu"), y);
+//			y = graph.add(ml::Conv2D(embedding, 1, "linear"), y);
 //			x = graph.add(ml::Add(), { x, y });
-
-//			auto y = graph.add(ml::Conv2D(embedding, 3, "relu"), x);
-//			y = graph.add(ml::Conv2D(embedding, 3, "linear"), y);
-//			x = graph.add(ml::Add("relu"), { x, y });
-		}
+//		}
 //		embedding *= 2;
 //		x = graph.add(ml::Conv2D(embedding, 1, "relu"), x);
 
 		for (int i = 0; i < 8; i++)
 		{
-			auto y = graph.add(ml::RMSNormalization(false), x);
-			y = graph.add(ml::Conv2D((3 - symmetric) * embedding, 1).useBias(false), y);
-			y = graph.add(ml::MultiHeadAttention(embedding / head_dim, pos_encoding_range, symmetric), y);
-			y = graph.add(ml::Conv2D(embedding, 1).useBias(false), y);
-			x = graph.add(ml::Add(), { x, y });
+//			auto y = graph.add(ml::RMSNormalization(false), x);
+//			y = graph.add(ml::Conv2D((3 - symmetric) * embedding, 1).useBias(false), y);
+//			y = graph.add(ml::MultiHeadAttention(embedding / head_dim, pos_encoding_range, symmetric), y);
+//			y = graph.add(ml::Conv2D(embedding, 1).useBias(false), y);
+//			x = graph.add(ml::Add(), { x, y });
+//
+//			y = graph.add(ml::RMSNormalization(false), x);
+//			y = graph.add(ml::Conv2D(embedding, 1, "relu"), y);
+//			y = graph.add(ml::Conv2D(embedding, 1), y);
+//			x = graph.add(ml::Add(), { x, y });
 
-			y = graph.add(ml::RMSNormalization(false), x);
+			auto y = graph.add(ml::DepthwiseConv2D(embedding, 7), x);
 			y = graph.add(ml::Conv2D(embedding, 1, "relu"), y);
-			y = graph.add(ml::Conv2D(embedding, 1), y);
+			y = graph.add(ml::Conv2D(embedding, 1, "linear"), y);
 			x = graph.add(ml::Add(), { x, y });
 
 //			auto y = graph.add(ml::Conv2D(embedding / 2, 1, "relu"), x);
-//			y = graph.add(ml::Conv2D(embedding / 2, 3, "linear"), y);
+//			y = graph.add(ml::Conv2D(embedding / 2, 3, "relu"), y);
 //			y = graph.add(ml::Conv2D(embedding, 3, "linear"), y);
 //			x = graph.add(ml::Add("relu"), { x, y });
 		}
@@ -3415,24 +3641,25 @@ int main()
 //		}
 
 		// policy head
-		auto p = graph.add(ml::Conv2D(embedding, 3, "relu"), x);
-//		auto p = graph.add(ml::Conv2D(embedding, 3).useBias(false), x);
-//		p = graph.add(BatchNormalization("relu").useGamma(false), p);
+		auto p = graph.add(ml::DepthwiseConv2D(embedding, 7), x);
+		p = graph.add(ml::Conv2D(embedding, 1, "relu"), p);
 		p = graph.add(ml::Conv2D(1, 1, "linear"), p);
 		p = graph.add(ml::Softmax( { 1, 2, 3 }), p);
 		graph.addOutput(p, ml::CrossEntropyLoss(1.0f));
 //		auto p = graph.add(ml::RMSNormalization(), x);
-//		p = graph.add(ml::Conv2D(3 * embedding, 1).useBias(false), p);
-//		p = graph.add(ml::MultiHeadAttention(embedding / head_dim, pos_encoding_range), p);
+//		p = graph.add(ml::Conv2D(2 * embedding, 1).useBias(false), p);
+//		p = graph.add(ml::MultiHeadAttention(1, pos_encoding_range, true), p);
 //		p = graph.add(ml::Conv2D(1, 1), p);
 //		p = graph.add(ml::Softmax( { 1, 2, 3 }), p);
 //		graph.addOutput(p);
 
-		auto common = graph.add(ml::GlobalPooling(), x);
+//		auto common = graph.add(ml::GlobalPooling(), x);
 //		common = graph.add(ml::Dense(256, "relu"), common);
 
 		// value head
-		auto v = graph.add(ml::Dense(256, "relu"), common);
+		auto v = graph.add(ml::Conv2D(embedding, 1, "relu"), x);
+		v = graph.add(ml::GlobalPooling(), v);
+		v = graph.add(ml::Dense(256, "relu"), v);
 //		auto v = graph.add(ml::Dense(256).useBias(false), common);
 //		v = graph.add(BatchNormalization("relu").useGamma(false), v);
 		v = graph.add(ml::Dense(3), v);
@@ -3488,9 +3715,9 @@ int main()
 //		graph.print();
 
 		graph.init();
-		graph.moveTo(Device::cpu());
-//		graph.moveTo(Device::cuda(0));
-//		graph.convertTo(DataType::FLOAT16);
+//		graph.moveTo(Device::cpu());
+		graph.moveTo(Device::cuda(0));
+		graph.convertTo(DataType::FLOAT16);
 
 		Tensor input(graph.getInputShape(), graph.dtype(), Device::cpu());
 		for (int i = 0; i < input.shape().volumeWithoutLastDim(); i++)
@@ -3538,7 +3765,7 @@ int main()
 		std::cout << "starting benchmark\n";
 		const double start = getTime();
 		int repeats = 0;
-		for (; repeats < 10000; repeats++)
+		for (; repeats < 100000; repeats++)
 		{
 			graph.forward(batch_size);
 			graph.context().synchronize();
