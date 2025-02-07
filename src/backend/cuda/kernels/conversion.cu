@@ -110,7 +110,7 @@ namespace
 			const int patch_idx_w = (i / stride3) % num_patches_w;
 			const int patch_idx_h = (i / stride4) % num_patches_h;
 
-			if ((patch_idx_h * patch_size_h + in_patch_h) < input_height and (patch_idx_w * patch_size_w + in_patch_w) < input_width)
+			if ((patch_idx_h * patch_size_h + in_patch_h) < input_height && (patch_idx_w * patch_size_w + in_patch_w) < input_width)
 			{
 				const Indexer<3> input_indexer(input_height, input_width, num_channels);
 				output[i] = input_indexer.at(patch_idx_h * patch_size_h + in_patch_h, patch_idx_w * patch_size_w + in_patch_w, channel);

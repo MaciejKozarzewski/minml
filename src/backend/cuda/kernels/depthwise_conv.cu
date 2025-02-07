@@ -341,7 +341,7 @@ namespace
 		// load filters into shared memory
 		const int f = blockIdx.z * blockDim.x + threadIdx.x;
 
-		if (threadIdx.y == 0 and f < channels)
+		if (threadIdx.y == 0 && f < channels)
 			bias_tile[threadIdx.x] = (bias == nullptr) ? get_zero<T>() : bias[f];
 
 		for (int i = threadIdx.y; i < KernelSize * KernelSize; i += blockDim.y)

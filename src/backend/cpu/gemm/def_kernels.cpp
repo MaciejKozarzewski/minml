@@ -18,6 +18,10 @@
 #include <iostream>
 #include <cmath>
 
+#ifndef M_LN2
+#define M_LN2 0.69314718056
+#endif
+
 namespace
 {
 	uint32_t as_uint(const float x) noexcept

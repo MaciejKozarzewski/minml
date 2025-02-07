@@ -49,6 +49,10 @@
 #include <x86intrin.h>
 #include <omp.h>
 
+#ifndef M_LN2
+#define M_LN2 0.69314718056
+#endif
+
 using namespace ml;
 
 class MNIST

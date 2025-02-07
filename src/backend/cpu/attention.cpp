@@ -16,6 +16,10 @@
 
 #include <cmath>
 
+#ifndef M_LN2
+#define M_LN2 0.69314718056
+#endif
+
 namespace
 {
 	using namespace ml;
