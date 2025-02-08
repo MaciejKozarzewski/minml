@@ -19,6 +19,7 @@
 #include <minml/training/Regularizer.hpp>
 #include <minml/training/Initializer.hpp>
 
+#include <minml/layers/ChannelScaling.hpp>
 #include <minml/layers/Conv2D.hpp>
 #include <minml/layers/Dense.hpp>
 #include <minml/layers/DepthToSpace.hpp>
@@ -28,6 +29,7 @@
 #include <minml/layers/BatchNormalization.hpp>
 #include <minml/layers/LayerNormalization.hpp>
 #include <minml/layers/Gelu.hpp>
+#include <minml/layers/GlobalAveragePooling.hpp>
 #include <minml/layers/GlobalBroadcastHW.hpp>
 #include <minml/layers/GlobalPooling.hpp>
 #include <minml/layers/MultiHeadAttention.hpp>
@@ -266,11 +268,13 @@ namespace ml
 	{
 		static const Add add;
 		static const BatchNormalization batchnorm;
+		static const ChannelScaling channel_scaling;
 		static const Conv2D conv2d(0, 0);
 		static const Dense dense(0);
 		static const DepthToSpace depth_to_space(0, { 0, 0 });
 		static const DepthwiseConv2D depthwise_conv2d(0, 0);
 		static const Gelu gelu;
+		static const GlobalAveragePooling global_average_pooling;
 		static const GlobalBroadcastHW global_broadcast;
 		static const GlobalPooling global_pooling;
 		static const LayerNormalization layernorm;
@@ -291,6 +295,8 @@ namespace ml
 			result = add.clone(json);
 		if (name == batchnorm.name())
 			result = batchnorm.clone(json);
+		if (name == channel_scaling.name())
+			result = channel_scaling.clone(json);
 		if (name == conv2d.name())
 			result = conv2d.clone(json);
 		if (name == dense.name())
@@ -301,6 +307,8 @@ namespace ml
 			result = depthwise_conv2d.clone(json);
 		if (name == gelu.name())
 			result = gelu.clone(json);
+		if (name == global_average_pooling.name())
+			result = global_average_pooling.clone(json);
 		if (name == global_broadcast.name())
 			result = global_broadcast.clone(json);
 		if (name == global_pooling.name())

@@ -1,10 +1,12 @@
 target_sources(${LibName} PRIVATE 	Add.cpp
 								BatchNormalization.cpp
+								ChannelScaling.cpp
 								Conv2D.cpp
 								Dense.cpp
 								DepthToSpace.cpp
 								DepthwiseConv2D.cpp
 								Gelu.cpp
+								GlobalAveragePooling.cpp
 								GlobalBroadcastHW.cpp
 								GlobalPooling.cpp
 								Input.cpp

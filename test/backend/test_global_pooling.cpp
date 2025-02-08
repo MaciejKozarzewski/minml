@@ -119,6 +119,79 @@ namespace
 			}
 	}
 
+	template<typename T = float>
+	void baseline_average_pooling_forward(const Tensor &input, Tensor &output)
+	{
+		assert(input.rank() == 4);
+		assert(output.rank() == 2);
+		assert(input.firstDim() == output.firstDim());
+		assert(input.lastDim() == output.lastDim());
+
+		const T inv = 1.0 / (input.dim(1) * input.dim(2));
+		for (int i = 0; i < input.firstDim(); i++)
+			for (int l = 0; l < input.lastDim(); l++)
+			{
+				T avg_value = 0.0;
+				for (int j = 0; j < input.dim(1); j++)
+					for (int k = 0; k < input.dim(2); k++)
+						avg_value += (T) input.at( { i, j, k, l });
+				output.at( { i, l }) = avg_value * inv;
+			}
+	}
+	template<typename T = float>
+	void baseline_average_pooling_backward(Tensor &gradient_prev, const Tensor &gradient_next)
+	{
+		assert(gradient_prev.rank() == 4);
+		assert(gradient_next.rank() == 2);
+		assert(gradient_prev.firstDim() == gradient_next.firstDim());
+		assert(gradient_prev.lastDim() == gradient_next.lastDim());
+
+		const T inv = 1.0 / (gradient_prev.dim(1) * gradient_prev.dim(2));
+		for (int i = 0; i < gradient_prev.dim(0); i++)
+			for (int l = 0; l < gradient_prev.dim(3); l++)
+				for (int j = 0; j < gradient_prev.dim(1); j++)
+					for (int k = 0; k < gradient_prev.dim(2); k++)
+						gradient_prev.at( { i, j, k, l }) = inv * (T) gradient_next.at( { i, l });
+	}
+
+	template<typename T = float>
+	void baseline_channel_scaling_forward(const Tensor &input, Tensor &output, const Tensor &scales)
+	{
+		assert(input.rank() == 4);
+		assert(input.shape() == output.shape());
+		assert(scales.rank() == 2);
+		assert(scales.firstDim() == output.firstDim());
+		assert(scales.lastDim() == output.lastDim());
+
+		for (int i = 0; i < input.dim(0); i++)
+			for (int j = 0; j < input.dim(1); j++)
+				for (int k = 0; k < input.dim(2); k++)
+					for (int l = 0; l < input.dim(3); l++)
+						output.at( { i, j, k, l }) = (T) input.at( { i, j, k, l }) * (T) scales.at( { i, l });
+	}
+	template<typename T = float>
+	void baseline_channel_scaling_backward(Tensor &gradient_prev, Tensor &gradient_scales, const Tensor &gradient_next, const Tensor &input,
+			const Tensor &scales)
+	{
+		assert(input.rank() == 4);
+		assert(gradient_prev.shape() == input.shape());
+		assert(gradient_scales.shape() == scales.shape());
+		assert(gradient_prev.shape() == gradient_next.shape());
+
+		for (int i = 0; i < gradient_next.dim(0); i++)
+			for (int l = 0; l < gradient_next.dim(3); l++)
+			{
+				T grad = 0;
+				for (int j = 0; j < gradient_next.dim(1); j++)
+					for (int k = 0; k < gradient_next.dim(2); k++)
+					{
+						grad += (T) gradient_next.at( { i, j, k, l }) * (T) input.at( { i, j, k, l });
+						gradient_prev.at( { i, j, k, l }) = (T) scales.at( { i, l }) * (T) gradient_next.at( { i, j, k, l });
+					}
+				gradient_scales.at( { i, l }) = grad;
+			}
+	}
+
 	class BaselineGlobalPooling: public Layer
 	{
 		public:
@@ -161,6 +234,88 @@ namespace
 					baseline_pooling_backward<double>(gradient_prev[0], gradient_next, input[0], output);
 			}
 	};
+	class BaselineGlobalAveragePooling: public Layer
+	{
+		public:
+			BaselineGlobalAveragePooling() :
+					Layer("linear")
+			{
+			}
+			void setInputShape(const std::vector<Shape> &shapes)
+			{
+				m_input_shapes = shapes;
+			}
+			Shape getOutputShape() const
+			{
+				const int batch_size = getInputShape().firstDim();
+				const int channels = getInputShape().lastDim();
+				return Shape( { batch_size, channels });
+			}
+			std::string name() const
+			{
+				return "BaselineGlobalAveragePooling";
+			}
+			std::unique_ptr<Layer> clone(const Json &config) const
+			{
+				std::unique_ptr<BaselineGlobalAveragePooling> result = std::make_unique<BaselineGlobalAveragePooling>();
+				result->loadConfig(config);
+				return result;
+			}
+			void forward(const std::vector<Tensor> &input, Tensor &output)
+			{
+				if (input[0].dtype() == DataType::FLOAT32)
+					baseline_average_pooling_forward<float>(input[0], output);
+				if (input[0].dtype() == DataType::FLOAT64)
+					baseline_average_pooling_forward<double>(input[0], output);
+			}
+			void backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next)
+			{
+				if (input[0].dtype() == DataType::FLOAT32)
+					baseline_average_pooling_backward<float>(gradient_prev[0], gradient_next);
+				if (input[0].dtype() == DataType::FLOAT64)
+					baseline_average_pooling_backward<double>(gradient_prev[0], gradient_next);
+			}
+	};
+	class BaselineChannelScaling: public Layer
+	{
+		public:
+			BaselineChannelScaling() :
+					Layer("linear")
+			{
+			}
+			void setInputShape(const std::vector<Shape> &shapes)
+			{
+				m_input_shapes = shapes;
+			}
+			Shape getOutputShape() const
+			{
+				return getInputShape(0);
+			}
+			std::string name() const
+			{
+				return "BaselineChannelScaling";
+			}
+			std::unique_ptr<Layer> clone(const Json &config) const
+			{
+				std::unique_ptr<BaselineChannelScaling> result = std::make_unique<BaselineChannelScaling>();
+				result->loadConfig(config);
+				return result;
+			}
+			void forward(const std::vector<Tensor> &input, Tensor &output)
+			{
+				if (input[0].dtype() == DataType::FLOAT32)
+					baseline_channel_scaling_forward<float>(input[0], output, input[1]);
+				if (input[0].dtype() == DataType::FLOAT64)
+					baseline_channel_scaling_forward<double>(input[0], output, input[1]);
+			}
+			void backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next)
+			{
+				if (input[0].dtype() == DataType::FLOAT32)
+					baseline_channel_scaling_backward<float>(gradient_prev[0], gradient_prev[1], gradient_next, input[0], input[1]);
+				if (input[0].dtype() == DataType::FLOAT64)
+					baseline_channel_scaling_backward<double>(gradient_prev[0], gradient_prev[1], gradient_next, input[0], input[1]);
+			}
+	};
 
 }
 
@@ -172,6 +327,25 @@ namespace ml
 //		gradcheck.setInputShape(Shape( { 13, 7, 8, 34 }));
 //
 //		gradcheck.check(1000, 1.0e-4, "all");
+//
+//		exit(0);
+//	}
+//	TEST(TestGlobalAveragePooling, baseline)
+//	{
+//		testing::GradientCheck gradcheck { BaselineGlobalAveragePooling() };
+//		gradcheck.setInputShape(Shape( { 13, 7, 8, 34 }));
+//
+//		gradcheck.check(100, 1.0e-4, "all", true);
+//
+//		exit(0);
+//	}
+//	TEST(TestChannelScaling, baseline)
+//	{
+//		testing::GradientCheck gradcheck { BaselineChannelScaling() };
+//		std::vector<Shape> shapes = { Shape( { 13, 7, 8, 34 }), Shape( { 13, 34 }) };
+//		gradcheck.setInputShape(shapes);
+//
+//		gradcheck.check(100, 1.0e-4, "all", true);
 //
 //		exit(0);
 //	}
@@ -243,6 +417,61 @@ namespace ml
 		}
 	}
 
+	TEST(TestGlobalAveragePooling, forward_fp32)
+	{
+		Context context;
+		Tensor input( { 12, 13, 14, 134 }, "float32", Device::cpu());
+		Tensor output( { input.firstDim(), input.lastDim() }, input.dtype(), Device::cpu());
+		Tensor correct_output = zeros_like(output);
+
+		testing::initForTest(input, 0.0);
+
+		baseline_average_pooling_forward(input, correct_output);
+
+//		globalAveragePoolingForward(context, input, output);
+//		EXPECT_LE(testing::diffForTest(correct_output, output), 1.0e-6f);
+
+		if (testing::has_device_supporting(DataType::FLOAT32))
+		{
+			const Device device = testing::get_device_for_test();
+			Context context(device);
+			testing::initForTest(output, 1.57f);
+			input.moveTo(device);
+			output.moveTo(device);
+			output.zeroall();
+			globalAveragePoolingForward(context, input, output);
+			context.synchronize();
+
+			EXPECT_LE(testing::diffForTest(correct_output, output), 1.0e-6);
+		}
+	}
+	TEST(TestGlobalAveragePooling, backward)
+	{
+		Context context;
+		Tensor gradient_prev( { 12, 13, 14, 34 }, "float32", Device::cpu());
+		Tensor gradient_next( { gradient_prev.firstDim(), gradient_prev.lastDim() }, "float32", Device::cpu());
+
+		Tensor correct_gradient_prev = zeros_like(gradient_prev);
+
+		testing::initForTest(gradient_next, 1.57);
+		baseline_average_pooling_backward(correct_gradient_prev, gradient_next);
+
+//		globalAveragePoolingBackward(context, gradient_prev, gradient_next);
+//		EXPECT_LE(testing::diffForTest(correct_gradient_prev, gradient_prev), 1.0e-6f);
+
+		if (testing::has_device_supporting(DataType::FLOAT32))
+		{
+			const Device device = testing::get_device_for_test();
+			Context context(device);
+			gradient_prev.moveTo(device);
+			gradient_next.moveTo(device);
+			gradient_prev.zeroall();
+			globalAveragePoolingBackward(context, gradient_prev, gradient_next);
+			context.synchronize();
+
+			EXPECT_LE(testing::diffForTest(correct_gradient_prev, gradient_prev), 1.0e-6f);
+		}
+	}
 	TEST(TestGlobalBroadcasting, forward_fp32)
 	{
 		Context context;
@@ -305,6 +534,78 @@ namespace ml
 			context.synchronize();
 
 			EXPECT_LE(testing::diffForTest(correct_gradient_prev, gradient_prev), 1.0e-4f);
+		}
+	}
+
+	TEST(TestChannelScaling, forward_fp32)
+	{
+		Context context;
+		Tensor input( { 12, 13, 14, 34 }, "float32", Device::cpu());
+		Tensor scales( { input.firstDim(), input.lastDim() }, "float32", Device::cpu());
+		Tensor output(input.shape(), "float32", Device::cpu());
+		Tensor correct_output(output.shape(), "float32", Device::cpu());
+
+		testing::initForTest(input, 0.0);
+		testing::initForTest(scales, 1.0);
+
+		baseline_channel_scaling_forward(input, correct_output, scales);
+
+//		channelScalingForward(context, input, output, scales);
+//		EXPECT_LE(testing::diffForTest(correct_output, output), 1.0e-6f);
+
+		if (testing::has_device_supporting(DataType::FLOAT32))
+		{
+			const Device device = testing::get_device_for_test();
+			Context context(device);
+			input.moveTo(device);
+			scales.moveTo(device);
+			output.moveTo(device);
+			output.zeroall();
+			channelScalingForward(context, input, output, scales);
+			context.synchronize();
+
+			EXPECT_LE(testing::diffForTest(correct_output, output), 1.0e-6f);
+		}
+	}
+	TEST(TestChannelScaling, backward)
+	{
+		Context context;
+		Tensor input( { 12, 13, 14, 34 });
+		Tensor scales( { input.firstDim(), input.lastDim() });
+		Tensor gradient_next = zeros_like(input);
+
+		Tensor gradient_input = zeros_like(input);
+		Tensor gradient_scales = zeros_like(scales);
+
+		Tensor correct_gradient_input = zeros_like(gradient_input);
+		Tensor correct_gradient_scales = zeros_like(gradient_scales);
+
+		testing::initForTest(input, 0.0);
+		testing::initForTest(scales, 1.0);
+		testing::initForTest(gradient_next, 2.0);
+
+		baseline_channel_scaling_backward(correct_gradient_input, correct_gradient_scales, gradient_next, input, scales);
+
+//		channelScalingBackward(context, gradient_input, gradient_scales, gradient_next, input, scales);
+//		EXPECT_LE(testing::diffForTest(correct_gradient_input, gradient_input), 1.0e-6f);
+//		EXPECT_LE(testing::diffForTest(correct_gradient_scales, gradient_scales), 1.0e-6f);
+
+		if (testing::has_device_supporting(DataType::FLOAT32))
+		{
+			const Device device = testing::get_device_for_test();
+			Context context(device);
+			input.moveTo(device);
+			scales.moveTo(device);
+			gradient_next.moveTo(device);
+			gradient_input.moveTo(device);
+			gradient_scales.moveTo(device);
+			gradient_input.zeroall();
+			gradient_scales.zeroall();
+			channelScalingBackward(context, gradient_input, gradient_scales, gradient_next, input, scales);
+			context.synchronize();
+
+			EXPECT_LE(testing::diffForTest(correct_gradient_input, gradient_input), 1.0e-5f);
+			EXPECT_LE(testing::diffForTest(correct_gradient_scales, gradient_scales), 1.0e-5f);
 		}
 	}
 
