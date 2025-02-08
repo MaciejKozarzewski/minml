@@ -305,6 +305,20 @@ namespace ml
 		removeByValue(prev->m_output_nodes, next);
 		removeByValue(next->m_input_nodes, prev);
 	}
+	void GraphNode::replaceInputLink(GraphNode *old_prev, GraphNode *new_prev, GraphNode *next)
+	{
+		const int idx = indexOf(next->m_input_nodes, old_prev);
+		next->m_input_nodes.at(idx) = new_prev; // replace input link old_prev->next into new_prev->next
+		removeByValue(old_prev->m_output_nodes, next); // remove link old_prev->next
+		new_prev->m_output_nodes.push_back(next); // create link new_prev->next
+	}
+	void GraphNode::replaceOutputLink(GraphNode *prev, GraphNode *old_next, GraphNode *new_next)
+	{
+		const int idx = indexOf(prev->m_output_nodes, old_next);
+		prev->m_output_nodes.at(idx) = new_next; // replace link prev->old_next into prev->new_next
+		removeByValue(prev->m_output_nodes, old_next); // remove link prev->old_next
+		new_next->m_input_nodes.push_back(prev); // create link prev->new_next
+	}
 	void GraphNode::removeAllLinks()
 	{
 		while (m_input_nodes.size() > 0)

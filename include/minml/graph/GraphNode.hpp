@@ -111,6 +111,8 @@ namespace ml
 			static void link(const std::vector<GraphNode*> &prev, const std::vector<GraphNode*> &next);
 
 			static void removeLink(GraphNode *prev, GraphNode *next);
+			static void replaceInputLink(GraphNode *old_prev, GraphNode *new_prev, GraphNode *next);
+			static void replaceOutputLink(GraphNode *prev, GraphNode *old_next, GraphNode *new_next);
 			void removeAllLinks();
 		private:
 			Tensor change_batch(int batch_size, const Tensor &other);

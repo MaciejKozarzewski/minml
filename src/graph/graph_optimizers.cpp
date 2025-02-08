@@ -98,7 +98,8 @@ namespace ml
 
 						prev->getLayer().setActivationType(next->getLayer().getActivationType());
 
-						GraphNode::link(prev, next->getOutputs());
+						while (next->getOutputs().size() > 0)
+							GraphNode::replaceInputLink(next, prev, next->getOutputs().at(0));
 						graph.remove_node(next);
 						has_anything_changed = true;
 					}
@@ -134,8 +135,8 @@ namespace ml
 					if (can_merge_activations(prev, next))
 					{
 						prev->getLayer().setActivationType(next->getLayer().getActivationType());
-						GraphNode::removeLink(prev, next);
-						GraphNode::link(prev, next->getOutputs());
+						while (next->getOutputs().size() > 0)
+							GraphNode::replaceInputLink(next, prev, next->getOutputs().at(0));
 						GraphNode::link(next->getInputNode(0), prev); // only one input of Add is left now
 						graph.remove_node(next);
 						has_anything_changed = true;
