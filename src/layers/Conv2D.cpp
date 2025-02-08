@@ -244,10 +244,11 @@ namespace ml
 	}
 	void Conv2D::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next)
 	{
-		assert(input.size() == 1 && gradient_prev.size() == 1);
 		choose_algorithm();
 
 		activationBackward(context(), gradient_next, gradient_next, output, m_activation);
+		if (gradient_prev.size() == 2)
+			gradient_prev.at(1).copyFrom(context(), gradient_next);
 		switch (m_algorithm)
 		{
 			default:
