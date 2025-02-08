@@ -73,7 +73,24 @@ namespace ml
 		result["use_gamma"] = m_use_gamma;
 		result["use_beta"] = m_use_beta;
 		result["history_size"] = m_history_size;
+		result["total_steps"] = m_total_steps;
+		result["running_id"] = m_running_id;
 		return result;
+	}
+	Json BatchNormalization::saveParameters(SerializedObject &binary_data) const
+	{
+		Json result = Layer::saveParameters(binary_data);
+		result["running_stats"] = (m_running_stats == nullptr) ? Json() : m_running_stats->serialize(binary_data);
+		return result;
+	}
+	void BatchNormalization::loadParameters(const Json &json, const SerializedObject &binary_data)
+	{
+		Layer::loadParameters(json, binary_data);
+		if (json.hasKey("running_stats") and not json["running_stats"].isNull())
+		{
+			m_running_stats = std::make_unique<Tensor>();
+			m_running_stats->unserialize(json["running_stats"], binary_data);
+		}
 	}
 
 	void BatchNormalization::changeContext(std::shared_ptr<Context> &context)
@@ -88,6 +105,10 @@ namespace ml
 		std::unique_ptr<BatchNormalization> result = std::make_unique<BatchNormalization>(config["nonlinearity"], config["use_gamma"],
 				config["use_beta"], config["history_size"]);
 		result->loadConfig(config);
+		if (config.hasKey("total_steps"))
+			result->m_total_steps = config["total_steps"];
+		if (config.hasKey("running_id"))
+			result->m_running_id = config["running_id"];
 		return result;
 	}
 
@@ -156,6 +177,10 @@ namespace ml
 	void BatchNormalization::learn()
 	{
 		Layer::learn();
+		updateStatistics();
+	}
+	void BatchNormalization::updateStatistics()
+	{
 		m_total_steps++;
 		m_running_id = (m_running_id + 1) % m_history_size;
 		batchnormUpdate(context(), *m_running_stats, std::min(m_history_size, m_total_steps), getWeights().getParam(), m_use_gamma, m_use_beta);

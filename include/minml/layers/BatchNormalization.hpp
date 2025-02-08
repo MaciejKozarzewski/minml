@@ -37,6 +37,9 @@ namespace ml
 			std::string name() const;
 			Json getConfig() const;
 
+			Json saveParameters(SerializedObject &binary_data) const;
+			void loadParameters(const Json &json, const SerializedObject &binary_data);
+
 			std::unique_ptr<Layer> clone(const Json &config) const;
 
 			void changeContext(std::shared_ptr<Context> &context);
@@ -46,6 +49,7 @@ namespace ml
 			void forward(const std::vector<Tensor> &input, Tensor &output);
 			void backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next);
 			void learn();
+			void updateStatistics();
 	};
 
 } /* namespace ml */
