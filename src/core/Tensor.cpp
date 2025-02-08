@@ -266,6 +266,10 @@ namespace ml
 	{
 		std::memset(m_stride, 0, sizeof(m_stride));
 	}
+	Tensor::Tensor(const Shape &shape) :
+			Tensor(shape, DataType::FLOAT32, Device::cpu())
+	{
+	}
 	Tensor::Tensor(const Shape &shape, DataType dtype, Device device) :
 			m_device(device),
 			m_shape(shape),

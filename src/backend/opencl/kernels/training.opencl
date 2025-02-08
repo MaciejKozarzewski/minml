@@ -133,13 +133,13 @@ __kernel void multiply_tensors(__global storage_type *dst, const __global storag
 		store(x0 * x1, dst, i);
 	}
 }
-__kernel void add_tensors(__global storage_type *dst, const __global storage_type *src0, const __global storage_type *src1, int elements)
+__kernel void add_tensors(__global storage_type *dst, float alpha1, const __global storage_type *src0, float alpha2, const __global storage_type *src1, int elements)
 {
 	for (int i = get_global_id(0); i < elements; i += get_global_size(0))
 	{
 		const compute_type x0 = load(src0, i);
 		const compute_type x1 = load(src1, i);
-		store(x0 + x1, dst, i);
+		store(alpha1 * x0 + alpha2 * x1, dst, i);
 	}
 }
 

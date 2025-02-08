@@ -186,38 +186,18 @@ namespace
 			y.store(dst + i, tmp);
 		}
 	}
-	template<typename T>
-	__global__ void kernel_multiply_tensors(T *dst, const T *src, int elements)
-	{
-		for (int i = (blockIdx.x * blockDim.x + threadIdx.x) * vector_length<T>(); i < elements; i += gridDim.x * blockDim.x * vector_length<T>())
-		{
-			const int tmp = elements - i;
-			const Vector<T> x(src + i, tmp);
-			const Vector<T> y = Vector<T>(dst + i, tmp) * x;
-			y.store(dst + i, tmp);
-		}
-	}
 
 	template<typename T>
-	__global__ void kernel_add_tensors(T *dst, const T *src0, const T *src1, int elements)
+	__global__ void kernel_add_tensors(T *dst, float alpha1, const T *src0, float alpha2, const T *src1, int elements)
 	{
+		const Vector<T> a1(alpha1);
+		const Vector<T> a2(alpha2);
 		for (int i = (blockIdx.x * blockDim.x + threadIdx.x) * vector_length<T>(); i < elements; i += gridDim.x * blockDim.x * vector_length<T>())
 		{
 			const int tmp = elements - i;
 			const Vector<T> x0(src0 + i, tmp);
 			const Vector<T> x1(src1 + i, tmp);
-			const Vector<T> y = x0 + x1;
-			y.store(dst + i, tmp);
-		}
-	}
-	template<typename T>
-	__global__ void kernel_add_tensors(T *dst, const T *src, int elements)
-	{
-		for (int i = (blockIdx.x * blockDim.x + threadIdx.x) * vector_length<T>(); i < elements; i += gridDim.x * blockDim.x * vector_length<T>())
-		{
-			const int tmp = elements - i;
-			const Vector<T> x(src + i, tmp);
-			const Vector<T> y = Vector<T>(dst + i, tmp) + x;
+			const Vector<T> y = a1 * x0 + a2 * x1;
 			y.store(dst + i, tmp);
 		}
 	}
@@ -305,35 +285,21 @@ namespace ml
 		dim3 gridDim = cuda::gridSize<1024>(length, blockDim.x);
 		cudaStream_t stream = cuda::Context::getStream(context);
 
-		if (dst == src1)
-		{ // in place addition
-			switch (dtype)
-			{
-				case DTYPE_FLOAT16:
-					kernel_multiply_tensors<<<gridDim, blockDim, 0, stream>>>(getPointer<half>(dst), getPointer<half>(src2), length);
-					break;
-				case DTYPE_FLOAT32:
-					kernel_multiply_tensors<<<gridDim, blockDim, 0, stream>>>(getPointer<float>(dst), getPointer<float>(src2), length);
-					break;
-			}
-		}
-		else
+		switch (dtype)
 		{
-			switch (dtype)
-			{
-				case DTYPE_FLOAT16:
-					kernel_multiply_tensors<<<gridDim, blockDim, 0, stream>>>(getPointer<half>(dst), getPointer<half>(src1), getPointer<half>(src2),
-							length);
-					break;
-				case DTYPE_FLOAT32:
-					kernel_multiply_tensors<<<gridDim, blockDim, 0, stream>>>(getPointer<float>(dst), getPointer<float>(src1),
-							getPointer<float>(src2), length);
-					break;
-			}
+			case DTYPE_FLOAT16:
+				kernel_multiply_tensors<<<gridDim, blockDim, 0, stream>>>(getPointer<half>(dst), getPointer<half>(src1), getPointer<half>(src2),
+						length);
+				break;
+			case DTYPE_FLOAT32:
+				kernel_multiply_tensors<<<gridDim, blockDim, 0, stream>>>(getPointer<float>(dst), getPointer<float>(src1), getPointer<float>(src2),
+						length);
+				break;
 		}
 		assert(cudaGetLastError() == cudaSuccess);
 	}
-	void cuda_add_tensors(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *dst, const void *src1, const void *src2)
+	void cuda_add_tensors(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *dst, float alpha1, const void *src1, float alpha2,
+			const void *src2)
 	{
 		assert(dst != nullptr);
 		assert(src1 != nullptr);
@@ -344,31 +310,16 @@ namespace ml
 		dim3 gridDim = cuda::gridSize<1024>(length, blockDim.x);
 		cudaStream_t stream = cuda::Context::getStream(context);
 
-		if (dst == src1)
-		{ // in place addition
-			switch (dtype)
-			{
-				case DTYPE_FLOAT16:
-					kernel_add_tensors<<<gridDim, blockDim, 0, stream>>>(getPointer<half>(dst), getPointer<half>(src2), length);
-					break;
-				case DTYPE_FLOAT32:
-					kernel_add_tensors<<<gridDim, blockDim, 0, stream>>>(getPointer<float>(dst), getPointer<float>(src2), length);
-					break;
-			}
-		}
-		else
+		switch (dtype)
 		{
-			switch (dtype)
-			{
-				case DTYPE_FLOAT16:
-					kernel_add_tensors<<<gridDim, blockDim, 0, stream>>>(getPointer<half>(dst), getPointer<half>(src1), getPointer<half>(src2),
-							length);
-					break;
-				case DTYPE_FLOAT32:
-					kernel_add_tensors<<<gridDim, blockDim, 0, stream>>>(getPointer<float>(dst), getPointer<float>(src1), getPointer<float>(src2),
-							length);
-					break;
-			}
+			case DTYPE_FLOAT16:
+				kernel_add_tensors<<<gridDim, blockDim, 0, stream>>>(getPointer<half>(dst), alpha1, getPointer<half>(src1), alpha2,
+						getPointer<half>(src2), length);
+				break;
+			case DTYPE_FLOAT32:
+				kernel_add_tensors<<<gridDim, blockDim, 0, stream>>>(getPointer<float>(dst), alpha1, getPointer<float>(src1), alpha2,
+						getPointer<float>(src2), length);
+				break;
 		}
 		assert(cudaGetLastError() == cudaSuccess);
 	}

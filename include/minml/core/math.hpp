@@ -49,6 +49,12 @@ namespace ml
 	void globalBroadcastingForward(const Context &context, const Tensor &input, Tensor &output, const Tensor &bias, ActivationType act);
 	void globalBroadcastingBackward(const Context &context, Tensor &gradient_prev, Tensor &gradient_next, const Tensor &output, ActivationType act);
 
+	void globalAveragePoolingForward(const Context &context, const Tensor &input, Tensor &output);
+	void globalAveragePoolingBackward(const Context &context, Tensor &gradient_prev, const Tensor &gradient_next);
+	void channelScalingForward(const Context &context, const Tensor &input, Tensor &output, const Tensor &scales);
+	void channelScalingBackward(const Context &context, Tensor &gradient_prev_0, Tensor &gradient_prev_1, const Tensor &gradient_next,
+			const Tensor &input_0, const Tensor &input_1);
+
 	void gemm(const Context &context, char opA, char opB, Tensor &C, const Tensor &A, const Tensor &B, float alpha, float beta);
 	void gemmBatched(const Context &context, char opA, char opB, Tensor &C, const Tensor &A, const Tensor &B, float alpha, float beta);
 
@@ -104,6 +110,8 @@ namespace ml
 	void sumOverFirstDim(const Context &context, Tensor &dst, const Tensor &src, float beta);
 	void multiplyTensors(const Context &context, Tensor &dst, const Tensor &lhs, const Tensor &rhs);
 	void addTensors(const Context &context, Tensor &dst, const Tensor &src1, const Tensor &src2);
+	// computes dst = alpha1 * src1 + alpha2 * src2
+	void addTensors(const Context &context, Tensor &dst, float alpha1, const Tensor &src1, float alpha2, const Tensor &src2);
 
 	float meanSquaredLoss(const Context &context, const Tensor &output, const Tensor &target);
 	void meanSquaredGradient(const Context &context, Tensor &gradient, const Tensor &output, const Tensor &target, float weight = 1.0f);

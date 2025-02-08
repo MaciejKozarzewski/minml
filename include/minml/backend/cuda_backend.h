@@ -98,6 +98,13 @@ namespace ml
 				const void *bias, mlActivationType_t act);
 		DLL_PUBLIC void cuda_global_broadcasting_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, void *gradient_next,
 				const void *output, mlActivationType_t act);
+		DLL_PUBLIC void cuda_global_average_pooling_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output,
+				const void *input);
+		DLL_PUBLIC void cuda_global_average_pooling_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next);
+		DLL_PUBLIC void cuda_channel_scaling_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input,
+				const void *scales);
+		DLL_PUBLIC void cuda_channel_scaling_backward(mlContext_t context, mlShape_t shape, void *gradient_prev_0, void *gradient_prev_1,
+				const void *gradient_next, const void *input_0, const void *input_1);
 
 		// implemented in 'gemms.cpp'
 		DLL_PUBLIC void cuda_gemm(mlContext_t context, mlDataType_t dtype, mlShape_t shape_C, void *C, mlShape_t shape_A, const void *A,
@@ -174,7 +181,8 @@ namespace ml
 		DLL_PUBLIC void cuda_emulate_low_precision(mlContext_t context, mlShape_t shape, void *dst, const void *src);
 		DLL_PUBLIC void cuda_multiply_tensors(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *dst, const void *src1,
 				const void *src2);
-		DLL_PUBLIC void cuda_add_tensors(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *dst, const void *src1, const void *src2);
+		DLL_PUBLIC void cuda_add_tensors(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *dst, float alpha1, const void *src1,
+				float alpha2, const void *src2);
 		DLL_PUBLIC void cuda_sum_over_first_dim(mlContext_t context, mlShape_t shape, void *dst, const void *src, float beta);
 
 		DLL_PUBLIC float cuda_mean_squared_loss(mlContext_t context, mlShape_t shape, const void *output, const void *target);

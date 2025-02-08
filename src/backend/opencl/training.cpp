@@ -67,7 +67,8 @@ namespace ml
 
 		opencl::runKernel(context, kernel, global, local);
 	}
-	void opencl_add_tensors(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *dst, const void *src1, const void *src2)
+	void opencl_add_tensors(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *dst, float alpha1, const void *src1, float alpha2,
+			const void *src2)
 	{
 		const int elements = volume(shape);
 		cl::Kernel kernel;
@@ -86,9 +87,11 @@ namespace ml
 		}
 
 		kernel.setArg(0, opencl::getMemoryObject(dst).buffer());
-		kernel.setArg(1, opencl::getMemoryObject(src1).buffer());
-		kernel.setArg(2, opencl::getMemoryObject(src2).buffer());
-		kernel.setArg(3, elements);
+		kernel.setArg(1, alpha1);
+		kernel.setArg(2, opencl::getMemoryObject(src1).buffer());
+		kernel.setArg(3, alpha2);
+		kernel.setArg(4, opencl::getMemoryObject(src2).buffer());
+		kernel.setArg(5, elements);
 
 		opencl::runKernel(context, kernel, global, local);
 	}

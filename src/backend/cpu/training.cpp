@@ -27,40 +27,16 @@ namespace
 		return (y >= max_y) ? 0.0f : std::pow(x, y);
 	}
 	template<typename T>
-	void add_kernel(void *dst, const void *src1, const void *src2, int elements)
+	void add_kernel(T *dst, T alpha1, const T *src1, T alpha2, const T *src2, int elements)
 	{
-		T *dst_ptr = ml::getPointer<T>(dst);
-		const T *src1_ptr = ml::getPointer<T>(src1);
-		const T *src2_ptr = ml::getPointer<T>(src2);
-
-		if (dst == src1)
-		{ // in place addition
-			for (int i = 0; i < elements; i++)
-				dst_ptr[i] += src2_ptr[i];
-		}
-		else
-		{
-			for (int i = 0; i < elements; i++)
-				dst_ptr[i] = src1_ptr[i] + src2_ptr[i];
-		}
+		for (int i = 0; i < elements; i++)
+			dst[i] = alpha1 * src1[i] + alpha2 * src2[i];
 	}
 	template<typename T>
-	void multiply_kernel(void *dst, const void *src1, const void *src2, int elements)
+	void multiply_kernel(T *dst, const T *src1, const T *src2, int elements)
 	{
-		T *dst_ptr = ml::getPointer<T>(dst);
-		const T *src1_ptr = ml::getPointer<T>(src1);
-		const T *src2_ptr = ml::getPointer<T>(src2);
-
-		if (dst == src1)
-		{ // in place multiplication
-			for (int i = 0; i < elements; i++)
-				dst_ptr[i] *= src2_ptr[i];
-		}
-		else
-		{
-			for (int i = 0; i < elements; i++)
-				dst_ptr[i] = src1_ptr[i] * src2_ptr[i];
-		}
+		for (int i = 0; i < elements; i++)
+			dst[i] = src1[i] * src2[i];
 	}
 
 	struct float3
@@ -112,15 +88,16 @@ namespace ml
 		switch (dtype)
 		{
 			case DTYPE_FLOAT32:
-				multiply_kernel<float>(dst, src1, src2, elements);
+				multiply_kernel(getPointer<float>(dst), getPointer<float>(src1), getPointer<float>(src2), elements);
 				break;
 			case DTYPE_FLOAT64:
-				multiply_kernel<double>(dst, src1, src2, elements);
+				multiply_kernel(getPointer<double>(dst), getPointer<double>(src1), getPointer<double>(src2), elements);
 				break;
 		}
 
 	}
-	void cpu_add_tensors(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *dst, const void *src1, const void *src2)
+	void cpu_add_tensors(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *dst, float alpha1, const void *src1, float alpha2,
+			const void *src2)
 	{
 		assert(dst != nullptr);
 		assert(src1 != nullptr);
@@ -131,10 +108,10 @@ namespace ml
 		switch (dtype)
 		{
 			case DTYPE_FLOAT32:
-				add_kernel<float>(dst, src1, src2, elements);
+				add_kernel(getPointer<float>(dst), alpha1, getPointer<float>(src1), alpha2, getPointer<float>(src2), elements);
 				break;
 			case DTYPE_FLOAT64:
-				add_kernel<double>(dst, src1, src2, elements);
+				add_kernel(getPointer<double>(dst), (double) alpha1, getPointer<double>(src1), (double) alpha2, getPointer<double>(src2), elements);
 				break;
 		}
 	}

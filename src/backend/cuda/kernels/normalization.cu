@@ -402,11 +402,11 @@ namespace
 	{
 		return 1.0f / std::sqrt(epsilon + variance / (N - 1));
 	}
-	template<>
-	__device__ half get_inv_stddev(half variance, int N, float epsilon)
-	{
-		return static_cast<half>(1.0f) / hsqrt(static_cast<half>(epsilon) + variance / static_cast<half>(N - 1));
-	}
+//	template<>
+//	__device__ half get_inv_stddev(half variance, int N, float epsilon)
+//	{
+//		return static_cast<half>(1.0f) / hsqrt(static_cast<half>(epsilon) + variance / static_cast<half>(N - 1));
+//	}
 
 	template<int N, typename T, typename U>
 	__device__ void vector_copy(T *dst, const U *src)

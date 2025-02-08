@@ -156,7 +156,8 @@ namespace ml
 		// used for training
 		void cpu_emulate_low_precision(mlContext_t context, mlShape_t shape, void *dst, const void *src);
 		void cpu_multiply_tensors(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *dst, const void *src1, const void *src2);
-		void cpu_add_tensors(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *dst, const void *src1, const void *src2);
+		void cpu_add_tensors(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *dst, float alpha1, const void *src1, float alpha2,
+				const void *src2);
 		void cpu_sum_over_first_dim(mlContext_t context, mlShape_t shape, void *dst, const void *src, float beta);
 
 		float cpu_mean_squared_loss(mlContext_t context, mlShape_t shape, const void *output, const void *target);

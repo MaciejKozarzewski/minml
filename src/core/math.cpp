@@ -504,6 +504,65 @@ namespace ml
 		}
 	}
 
+	void globalAveragePoolingForward(const Context &context, const Tensor &input, Tensor &output)
+	{
+		static Timer timer("global_average_pooling");
+		TimerGuard tg(timer);
+		switch (context.device().type())
+		{
+			case DeviceType::CPU:
+				break;
+			case DeviceType::CUDA:
+				cuda_global_average_pooling_forward(get(context), get(input.dtype()), get_shape(input), output.data(), input.data());
+				break;
+			case DeviceType::OPENCL:
+				break;
+		}SYNC();
+	}
+	void globalAveragePoolingBackward(const Context &context, Tensor &gradient_prev, const Tensor &gradient_next)
+	{
+		switch (context.device().type())
+		{
+			case DeviceType::CPU:
+				break;
+			case DeviceType::CUDA:
+				cuda_global_average_pooling_backward(get(context), get_shape(gradient_prev), gradient_prev.data(), gradient_next.data());
+				break;
+			case DeviceType::OPENCL:
+				break;
+		}
+	}
+	void channelScalingForward(const Context &context, const Tensor &input, Tensor &output, const Tensor &scales)
+	{
+		static Timer timer("channel_scaling");
+		TimerGuard tg(timer);
+		switch (context.device().type())
+		{
+			case DeviceType::CPU:
+				break;
+			case DeviceType::CUDA:
+				cuda_channel_scaling_forward(get(context), get(input.dtype()), get_shape(input), output.data(), input.data(), scales.data());
+				break;
+			case DeviceType::OPENCL:
+				break;
+		}SYNC();
+	}
+	void channelScalingBackward(const Context &context, Tensor &gradient_prev_0, Tensor &gradient_prev_1, const Tensor &gradient_next,
+			const Tensor &input_0, const Tensor &input_1)
+	{
+		switch (context.device().type())
+		{
+			case DeviceType::CPU:
+				break;
+			case DeviceType::CUDA:
+				cuda_channel_scaling_backward(get(context), get_shape(gradient_prev_0), gradient_prev_0.data(), gradient_prev_1.data(),
+						gradient_next.data(), input_0.data(), input_1.data());
+				break;
+			case DeviceType::OPENCL:
+				break;
+		}
+	}
+
 	void gemm(const Context &context, char opA, char opB, Tensor &C, const Tensor &A, const Tensor &B, float alpha, float beta)
 	{
 		static Timer timer("gemm");
@@ -965,16 +1024,20 @@ namespace ml
 	}
 	void addTensors(const Context &context, Tensor &dst, const Tensor &src1, const Tensor &src2)
 	{
+		addTensors(context, dst, 1.0f, src1, 1.0f, src2);
+	}
+	void addTensors(const Context &context, Tensor &dst, float alpha1, const Tensor &src1, float alpha2, const Tensor &src2)
+	{
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
-				cpu_add_tensors(get(context), get(dst.dtype()), get_shape(dst), dst.data(), src1.data(), src2.data());
+				cpu_add_tensors(get(context), get(dst.dtype()), get_shape(dst), dst.data(), alpha1, src1.data(), alpha2, src2.data());
 				break;
 			case DeviceType::CUDA:
-				cuda_add_tensors(get(context), get(dst.dtype()), get_shape(dst), dst.data(), src1.data(), src2.data());
+				cuda_add_tensors(get(context), get(dst.dtype()), get_shape(dst), dst.data(), alpha1, src1.data(), alpha2, src2.data());
 				break;
 			case DeviceType::OPENCL:
-				opencl_add_tensors(get(context), get(dst.dtype()), get_shape(dst), dst.data(), src1.data(), src2.data());
+				opencl_add_tensors(get(context), get(dst.dtype()), get_shape(dst), dst.data(), alpha1, src1.data(), alpha2, src2.data());
 				break;
 		}
 	}

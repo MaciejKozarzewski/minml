@@ -223,6 +223,23 @@ namespace ml
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
+	void cuda_global_average_pooling_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+	void cuda_global_average_pooling_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+	void cuda_channel_scaling_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input, const void *scales)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+	void cuda_channel_scaling_backward(mlContext_t context, mlShape_t shape, void *gradient_prev_0, void *gradient_prev_1, const void *gradient_next,
+			const void *input_0, const void *input_1)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
 
 	// implemented in 'gemms.cpp'
 	void cuda_gemm(mlContext_t context, mlDataType_t dtype, mlShape_t shape_C, void *C, mlShape_t shape_A, const void *A, mlShape_t shape_B,
@@ -352,7 +369,8 @@ namespace ml
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
-	void cuda_add_tensors(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *dst, const void *src1, const void *src2)
+	void cuda_add_tensors(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *dst, float alpha1, const void *src1, float alpha2,
+			const void *src2)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
