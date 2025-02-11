@@ -17,10 +17,9 @@
 #define HOST_DEVICE_INLINE __host__ __device__ __forceinline__
 #define HOST_DEVICE __host__ __device__
 
-#define BF16_COMPUTE_MIN_ARCH 800
+#define BF16_MIN_ARCH 800
 
-#define FP16_COMPUTE_MIN_ARCH 700
-#define FP16_STORAGE_MIN_ARCH 530
+#define FP16_MIN_ARCH 700
 
 namespace vectors2
 {

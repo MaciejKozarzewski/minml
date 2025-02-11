@@ -109,9 +109,10 @@ namespace
 			const vec<T, N> _bias = load_vec<T, N>(bias + j);
 			for (int i = blockIdx.y; i < first_dim; i += gridDim.y)
 			{
-				vec<T, N> tmp = load_vec<T, N>(input + i * last_dim + j);
+				const int offset = i * last_dim + j;
+				vec<T, N> tmp = (input == output) ? load_vec<T, N>(output + offset) : load_vec<T, N>(input + offset);
 				tmp = activation_forward<ACT>(tmp + _bias);
-				store_vec(output + i * last_dim + j, tmp);
+				store_vec(output + offset, tmp);
 			}
 		}
 	}

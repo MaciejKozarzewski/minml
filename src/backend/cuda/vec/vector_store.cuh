@@ -70,7 +70,7 @@ namespace vectors2
 	}
 	DEVICE_INLINE void partial_store_vec(half *ptr, const vec<half, 2> &value, int num)
 	{
-#if __CUDA_ARCH__ >= FP16_STORAGE_MIN_ARCH
+#if __CUDA_ARCH__ >= FP16_MIN_ARCH
 		assert(ptr != nullptr);
 		assert(0 <= num && num <= 2);
 		switch (num)
@@ -117,7 +117,7 @@ namespace vectors2
 	}
 	DEVICE_INLINE void partial_store_vec(half *ptr, const vec<half, 4> &value, int num)
 	{
-#if __CUDA_ARCH__ >= FP16_STORAGE_MIN_ARCH
+#if __CUDA_ARCH__ >= FP16_MIN_ARCH
 		assert(ptr != nullptr);
 		assert(0 <= num && num <= 4);
 		switch (num)

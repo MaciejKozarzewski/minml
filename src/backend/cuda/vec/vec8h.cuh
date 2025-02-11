@@ -21,7 +21,7 @@ namespace vectors2
 {
 	using vec8h = vec<half, 8>;
 
-#if __CUDA_ARCH__ >= FP16_STORAGE_MIN_ARCH
+#if __CUDA_ARCH__ >= FP16_MIN_ARCH
 	template<>
 	class __builtin_align__(16) vec<half, 8>
 	{

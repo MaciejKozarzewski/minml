@@ -396,6 +396,62 @@ namespace
 			}
 		}
 	}
+	template<int TileSize, int KernelSize, typename T>
+	__global__ void kernel_depthwise_conv_forward_v2(T *output, const T *input, const T *weights, const T *bias, int height, int width, int channels,
+			bool invert_filter)
+	{
+		assert(blockDim.x == 32);
+		assert(blockDim.y == TileSize);
+		constexpr int InputSize = TileSize + KernelSize - 1;
+		constexpr int Padding = (KernelSize - 1) / 2;
+		__shared__ T filter_tile[KernelSize * KernelSize * 32];
+		__shared__ T bias_tile[32];
+
+		const int f = blockIdx.z * blockDim.x + threadIdx.x;
+
+		if (threadIdx.y == 0 && f < channels)
+			bias_tile[threadIdx.x] = (bias == nullptr) ? get_zero<T>() : bias[f];
+
+		for (int i = threadIdx.y; i < KernelSize * KernelSize; i += blockDim.y)
+			if (f < channels)
+			{
+				const int tmp = invert_filter ? (KernelSize * KernelSize - 1 - i) : i;
+				filter_tile[tmp * 32 + threadIdx.x] = weights[i * channels + f];
+			}
+		__syncthreads();
+
+		const Convolution1D<KernelSize, TileSize, T> convolution;
+		const Indexer<4> input_indexer(gridDim.y, height, width, channels);
+
+		for (int origin_w = 0; origin_w < width; origin_w += TileSize)
+		{
+			const int origin_h = TileSize * blockIdx.x;
+			Line<T, TileSize> acc = convolution.set(bias_tile[threadIdx.x]);
+			for (int k = 0; k < KernelSize; k++)
+			{
+				Line<T, InputSize> inp;
+				for (int i = 0; i < InputSize; i++)
+				{
+					const int h = origin_h + threadIdx.y + k - Padding;
+					const int w = origin_w + i - Padding;
+					if (f < channels && is_inside(h, w, height, width))
+						inp[i] = input[input_indexer.at(blockIdx.y, h, w, f)];
+					else
+						inp[i] = get_zero<T>();
+				}
+
+				const Line<T, KernelSize> fil = convolution.load_filter(filter_tile, k);
+				convolution.accumulate(acc, inp, fil);
+			}
+			for (int i = 0; i < TileSize; i++)
+			{
+				const int h = origin_h + threadIdx.y;
+				const int w = origin_w + i;
+				if (f < channels && is_inside(h, w, height, width))
+					output[input_indexer.at(blockIdx.y, h, w, f)] = acc[i];
+			}
+		}
+	}
 	template<int TileSize, int KernelSize>
 	__global__ void kernel_depthwise_conv_update(const float *input, const float *gradient_next, float *weights_update, int batch_size, int height,
 			int width, int channels)
@@ -404,20 +460,13 @@ namespace
 		assert(blockDim.y == KernelSize);
 		constexpr int InputSize = TileSize + KernelSize - 1;
 		constexpr int Padding = (KernelSize - 1) / 2;
-		__shared__ float input_tile[InputSize * InputSize * 32];
 		__shared__ float gradient_tile[TileSize * TileSize * 32];
-		__shared__ Index2D indices_in[InputSize * InputSize];
 		__shared__ Index2D indices_grad[TileSize * TileSize];
 
 		const int f = blockIdx.x * blockDim.x + threadIdx.x;
 
 		// prepare indices table
 		const int tid = threadIdx.y * blockDim.x + threadIdx.x;
-		for (int i = tid; i < InputSize * InputSize; i += blockDim.x * blockDim.y)
-		{
-			indices_in[i].x = i / InputSize;
-			indices_in[i].y = i - indices_in[i].x * InputSize;
-		}
 		for (int i = tid; i < TileSize * TileSize; i += blockDim.x * blockDim.y)
 		{
 			indices_grad[i].x = i / TileSize;
@@ -433,15 +482,6 @@ namespace
 				for (int origin_w = 0; origin_w < width; origin_w += TileSize)
 				{
 					const Indexer<4> input_indexer(batch_size, height, width, channels);
-					for (int i = threadIdx.y; i < InputSize * InputSize; i += blockDim.y)
-					{
-						const int h = origin_h + indices_in[i].x - Padding;
-						const int w = origin_w + indices_in[i].y - Padding;
-						if (f < channels && is_inside(h, w, height, width))
-							input_tile[i * 32 + threadIdx.x] = input[input_indexer.at(b, h, w, f)];
-						else
-							input_tile[i * 32 + threadIdx.x] = 0.0f;
-					}
 					for (int i = threadIdx.y; i < TileSize * TileSize; i += blockDim.y)
 					{
 						const int h = origin_h + indices_grad[i].x;
@@ -455,20 +495,27 @@ namespace
 
 					for (int i = 0; i < TileSize; i++)
 					{
-						const Line<float, InputSize> inp = convolution.load_input(input_tile, i + threadIdx.y);
+						Line<float, InputSize> inp;
+						for (int j = 0; j < InputSize; j++)
+						{
+							const int h = origin_h + threadIdx.y + i - Padding;
+							const int w = origin_w + j - Padding;
+							if (f < channels && is_inside(h, w, height, width))
+								inp[j] = input[input_indexer.at(blockIdx.y, h, w, f)];
+							else
+								inp[j] = 0.0f;
+						}
 						const Line<float, TileSize> fil = convolution.load_filter(gradient_tile, i);
 						convolution.accumulate(update_acc, inp, fil);
 					}
 					__syncthreads();
 				}
 
-		convolution.store_output(input_tile, threadIdx.y, update_acc); // reusing input tile to save shared memory
-		__syncthreads();
 		if (f < channels)
 		{
-			const Indexer<3> update_indexer(gridDim.y, KernelSize * KernelSize, channels);
-			for (int i = threadIdx.y; i < KernelSize * KernelSize; i += blockDim.y)
-				weights_update[update_indexer.at(blockIdx.y, i, f)] = input_tile[i * 32 + threadIdx.x];
+			const Indexer<4> update_indexer(gridDim.y, KernelSize, KernelSize, channels);
+			for (int i = 0; i < KernelSize; i++)
+				weights_update[update_indexer.at(blockIdx.y, threadIdx.y, i, f)] = update_acc[i];
 		}
 	}
 	__global__ void kernel_sum_update(float *dst, const float *src, int first_dim, int last_dim)
@@ -532,16 +579,16 @@ namespace ml
 			switch (filter_size)
 			{
 				case 3:
-					kernel_depthwise_conv_forward<TileSize, 3> <<<gridDim, blockDim, 0, stream>>>(getPointer<float>(output), getPointer<float>(input),
-							getPointer<float>(weights), getPointer<float>(bias), height, width, channels, false);
+					kernel_depthwise_conv_forward_v2<TileSize, 3> <<<gridDim, blockDim, 0, stream>>>(getPointer<float>(output),
+							getPointer<float>(input), getPointer<float>(weights), getPointer<float>(bias), height, width, channels, false);
 					break;
 				case 5:
-					kernel_depthwise_conv_forward<TileSize, 5> <<<gridDim, blockDim, 0, stream>>>(getPointer<float>(output), getPointer<float>(input),
-							getPointer<float>(weights), getPointer<float>(bias), height, width, channels, false);
+					kernel_depthwise_conv_forward_v2<TileSize, 5> <<<gridDim, blockDim, 0, stream>>>(getPointer<float>(output),
+							getPointer<float>(input), getPointer<float>(weights), getPointer<float>(bias), height, width, channels, false);
 					break;
 				case 7:
-					kernel_depthwise_conv_forward<TileSize, 7> <<<gridDim, blockDim, 0, stream>>>(getPointer<float>(output), getPointer<float>(input),
-							getPointer<float>(weights), getPointer<float>(bias), height, width, channels, false);
+					kernel_depthwise_conv_forward_v2<TileSize, 7> <<<gridDim, blockDim, 0, stream>>>(getPointer<float>(output),
+							getPointer<float>(input), getPointer<float>(weights), getPointer<float>(bias), height, width, channels, false);
 					break;
 				default:
 					break;
@@ -553,16 +600,16 @@ namespace ml
 			switch (filter_size)
 			{
 				case 3:
-					kernel_depthwise_conv_forward<TileSize, 3> <<<gridDim, blockDim, 0, stream>>>(getPointer<half2>(output), getPointer<half2>(input),
-							getPointer<half2>(weights), getPointer<half2>(bias), height, width, channels / 2, false);
+					kernel_depthwise_conv_forward_v2<TileSize, 3> <<<gridDim, blockDim, 0, stream>>>(getPointer<half2>(output),
+							getPointer<half2>(input), getPointer<half2>(weights), getPointer<half2>(bias), height, width, channels / 2, false);
 					break;
 				case 5:
-					kernel_depthwise_conv_forward<TileSize, 5> <<<gridDim, blockDim, 0, stream>>>(getPointer<half2>(output), getPointer<half2>(input),
-							getPointer<half2>(weights), getPointer<half2>(bias), height, width, channels / 2, false);
+					kernel_depthwise_conv_forward_v2<TileSize, 5> <<<gridDim, blockDim, 0, stream>>>(getPointer<half2>(output),
+							getPointer<half2>(input), getPointer<half2>(weights), getPointer<half2>(bias), height, width, channels / 2, false);
 					break;
 				case 7:
-					kernel_depthwise_conv_forward<TileSize, 7> <<<gridDim, blockDim, 0, stream>>>(getPointer<half2>(output), getPointer<half2>(input),
-							getPointer<half2>(weights), getPointer<half2>(bias), height, width, channels / 2, false);
+					kernel_depthwise_conv_forward_v2<TileSize, 7> <<<gridDim, blockDim, 0, stream>>>(getPointer<half2>(output),
+							getPointer<half2>(input), getPointer<half2>(weights), getPointer<half2>(bias), height, width, channels / 2, false);
 					break;
 				default:
 					break;
@@ -595,15 +642,15 @@ namespace ml
 		switch (filter_size)
 		{
 			case 3:
-				kernel_depthwise_conv_forward<TileSize, 3, float> <<<gridDim, blockDim, 0, stream>>>(getPointer<float>(gradient_prev),
+				kernel_depthwise_conv_forward_v2<TileSize, 3, float> <<<gridDim, blockDim, 0, stream>>>(getPointer<float>(gradient_prev),
 						getPointer<float>(gradient_next), getPointer<float>(weights), nullptr, height, width, channels, true);
 				break;
 			case 5:
-				kernel_depthwise_conv_forward<TileSize, 5, float> <<<gridDim, blockDim, 0, stream>>>(getPointer<float>(gradient_prev),
+				kernel_depthwise_conv_forward_v2<TileSize, 5, float> <<<gridDim, blockDim, 0, stream>>>(getPointer<float>(gradient_prev),
 						getPointer<float>(gradient_next), getPointer<float>(weights), nullptr, height, width, channels, true);
 				break;
 			case 7:
-				kernel_depthwise_conv_forward<TileSize, 7, float> <<<gridDim, blockDim, 0, stream>>>(getPointer<float>(gradient_prev),
+				kernel_depthwise_conv_forward_v2<TileSize, 7, float> <<<gridDim, blockDim, 0, stream>>>(getPointer<float>(gradient_prev),
 						getPointer<float>(gradient_next), getPointer<float>(weights), nullptr, height, width, channels, true);
 				break;
 			default:

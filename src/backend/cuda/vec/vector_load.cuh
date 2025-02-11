@@ -91,7 +91,7 @@ namespace vectors2
 	template<>
 	DEVICE_INLINE vec<half, 1> partial_load_vec(const half *ptr, int num)
 	{
-#if __CUDA_ARCH__ >= FP16_STORAGE_MIN_ARCH
+#if __CUDA_ARCH__ >= FP16_MIN_ARCH
 		assert(ptr != nullptr);
 		assert(0 <= num && num <= 1);
 		if (num == 0)
@@ -105,7 +105,7 @@ namespace vectors2
 	template<>
 	DEVICE_INLINE vec<half, 2> partial_load_vec(const half *ptr, int num)
 	{
-#if __CUDA_ARCH__ >= FP16_STORAGE_MIN_ARCH
+#if __CUDA_ARCH__ >= FP16_MIN_ARCH
 		assert(ptr != nullptr);
 		assert(0 <= num && num <= 2);
 		switch (num)
@@ -124,7 +124,7 @@ namespace vectors2
 	template<>
 	DEVICE_INLINE vec<half, 4> partial_load_vec(const half *ptr, int num)
 	{
-#if __CUDA_ARCH__ >= FP16_STORAGE_MIN_ARCH
+#if __CUDA_ARCH__ >= FP16_MIN_ARCH
 		assert(ptr != nullptr);
 		assert(0 <= num && num <= 4);
 		switch (num)

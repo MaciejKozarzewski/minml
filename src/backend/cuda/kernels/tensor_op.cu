@@ -13,6 +13,7 @@
 #include "../vectors/vectors.cuh"
 #include "../vec/vec1f.cuh"
 #include "../vec/vec4f.cuh"
+#include "../vec/vec8h.cuh"
 
 #include <cuda_runtime_api.h>
 #include <cuda_runtime.h>
@@ -202,6 +203,35 @@ namespace
 		}
 	}
 
+	__global__ void kernel_add_tensors_vect_fp32(float *dst, float alpha1, const float *src0, float alpha2, const float *src1, int elements)
+	{
+		assert(elements % 4 == 0);
+		const vec4f a1(alpha1);
+		const vec4f a2(alpha2);
+		for (int i = (blockIdx.x * blockDim.x + threadIdx.x) * 4; i < elements; i += gridDim.x * blockDim.x * 4)
+		{
+			const vec4f x0 = (src0 == dst) ? vec4f(dst + i) : vec4f(src0 + i);
+			const vec4f x1 = (src1 == dst) ? vec4f(dst + i) : vec4f(src1 + i);
+			const vec4f y = a1 * x0 + a2 * x1;
+			y.store(dst + i);
+		}
+	}
+	__global__ void kernel_add_tensors_vect_fp16(half *dst, float alpha1, const half *src0, float alpha2, const half *src1, int elements)
+	{
+#if __CUDA_ARCH__ >= FP16_MIN_ARCH
+		assert(elements % 8 == 0);
+		const vec8h a1(alpha1);
+		const vec8h a2(alpha2);
+		for (int i = (blockIdx.x * blockDim.x + threadIdx.x) * 8; i < elements; i += gridDim.x * blockDim.x * 8)
+		{
+			const vec8h x0 = (src0 == dst) ? vec8h(dst + i) : vec8h(src0 + i);
+			const vec8h x1 = (src1 == dst) ? vec8h(dst + i) : vec8h(src1 + i);
+			const vec8h y = a1 * x0 + a2 * x1;
+			y.store(dst + i);
+		}
+#endif
+	}
+
 	__global__ void kernel_emulate_low_precision(uint32_t *dst, const uint32_t *src, int elements)
 	{
 		for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < elements; i += gridDim.x * blockDim.x)
@@ -313,13 +343,25 @@ namespace ml
 		switch (dtype)
 		{
 			case DTYPE_FLOAT16:
-				kernel_add_tensors<<<gridDim, blockDim, 0, stream>>>(getPointer<half>(dst), alpha1, getPointer<half>(src1), alpha2,
-						getPointer<half>(src2), length);
+			{
+				if (length % 8 == 0)
+					kernel_add_tensors_vect_fp16<<<gridDim, blockDim, 0, stream>>>(getPointer<half>(dst), alpha1, getPointer<half>(src1), alpha2,
+							getPointer<half>(src2), length);
+				else
+					kernel_add_tensors<<<gridDim, blockDim, 0, stream>>>(getPointer<half>(dst), alpha1, getPointer<half>(src1), alpha2,
+							getPointer<half>(src2), length);
 				break;
+			}
 			case DTYPE_FLOAT32:
-				kernel_add_tensors<<<gridDim, blockDim, 0, stream>>>(getPointer<float>(dst), alpha1, getPointer<float>(src1), alpha2,
-						getPointer<float>(src2), length);
+			{
+				if (length % 4 == 0)
+					kernel_add_tensors_vect_fp32<<<gridDim, blockDim, 0, stream>>>(getPointer<float>(dst), alpha1, getPointer<float>(src1), alpha2,
+							getPointer<float>(src2), length);
+				else
+					kernel_add_tensors<<<gridDim, blockDim, 0, stream>>>(getPointer<float>(dst), alpha1, getPointer<float>(src1), alpha2,
+							getPointer<float>(src2), length);
 				break;
+			}
 		}
 		assert(cudaGetLastError() == cudaSuccess);
 	}

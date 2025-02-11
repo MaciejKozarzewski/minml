@@ -85,7 +85,7 @@ namespace vectors2
 	template<>
 	DEVICE_INLINE vec<float, 1> convert(const vec<half, 1> &a)
 	{
-#if __CUDA_ARCH__ >= FP16_STORAGE_MIN_ARCH
+#if __CUDA_ARCH__ >= FP16_MIN_ARCH
 		return vec<float, 1>(__half2float(a.x0));
 #else
 		return vec<float, 1> { };
@@ -94,7 +94,7 @@ namespace vectors2
 	template<>
 	DEVICE_INLINE vec<float, 2> convert(const vec<half, 2> &a)
 	{
-#if __CUDA_ARCH__ >= FP16_STORAGE_MIN_ARCH
+#if __CUDA_ARCH__ >= FP16_MIN_ARCH
 		return vec<float, 2>(__half2float(a.x0.x), __half2float(a.x0.y));
 #else
 		return vec<float, 2> { };
@@ -103,7 +103,7 @@ namespace vectors2
 	template<>
 	DEVICE_INLINE vec<float, 4> convert(const vec<half, 4> &a)
 	{
-#if __CUDA_ARCH__ >= FP16_STORAGE_MIN_ARCH
+#if __CUDA_ARCH__ >= FP16_MIN_ARCH
 		return vec<float, 4>(__half2float(a.x0.x), __half2float(a.x0.y), __half2float(a.x1.x), __half2float(a.x1.y));
 #else
 		return vec<float, 4> { };
@@ -116,7 +116,7 @@ namespace vectors2
 	template<>
 	DEVICE_INLINE vec<half, 1> convert(const vec<float, 1> &a)
 	{
-#if __CUDA_ARCH__ >= FP16_STORAGE_MIN_ARCH
+#if __CUDA_ARCH__ >= FP16_MIN_ARCH
 		return vec<half, 1>(__float2half(a.x0));
 #else
 		return vec<half, 1> { };
@@ -125,7 +125,7 @@ namespace vectors2
 	template<>
 	DEVICE_INLINE vec<half, 2> convert(const vec<float, 2> &a)
 	{
-#if __CUDA_ARCH__ >= FP16_STORAGE_MIN_ARCH
+#if __CUDA_ARCH__ >= FP16_MIN_ARCH
 		return vec<half, 2>(__float2half(a.x0), __float2half(a.x1));
 #else
 		return vec<half, 2> { };
@@ -134,7 +134,7 @@ namespace vectors2
 	template<>
 	DEVICE_INLINE vec<half, 4> convert(const vec<float, 4> &a)
 	{
-#if __CUDA_ARCH__ >= FP16_STORAGE_MIN_ARCH
+#if __CUDA_ARCH__ >= FP16_MIN_ARCH
 		return vec<half, 4>(__float2half(a.x0), __float2half(a.x1), __float2half(a.x2), __float2half(a.x3));
 #else
 		return vec<half, 4> { };

@@ -21,7 +21,7 @@ namespace vectors2
 {
 	using vec1h = vec<half, 1>;
 
-#if __CUDA_ARCH__ >= FP16_STORAGE_MIN_ARCH
+#if __CUDA_ARCH__ >= FP16_MIN_ARCH
 	template<>
 	class __builtin_align__(2) vec<half, 1>
 	{
@@ -38,6 +38,20 @@ namespace vectors2
 			HOST_DEVICE vec(half h) :
 					x0(h)
 			{
+			}
+			HOST_DEVICE vec(const half *__restrict__ ptr)
+			{
+				load(ptr);
+			}
+			HOST_DEVICE void load(const half *__restrict__ ptr)
+			{
+				assert(ptr != nullptr);
+				x0 = ptr[0];
+			}
+			HOST_DEVICE void store(half *__restrict__ ptr) const
+			{
+				assert(ptr != nullptr);
+				ptr[0] = x0;
 			}
 			HOST_DEVICE vec1h operator-() const
 			{
