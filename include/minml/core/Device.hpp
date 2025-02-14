@@ -49,8 +49,8 @@ namespace ml
 		public:
 			// device creation
 			static Device cpu() noexcept;
-			static Device cuda(int index);
-			static Device opencl(int index);
+			static Device cuda(int index = 0);
+			static Device opencl(int index = 0);
 			static Device fromString(const std::string &str);
 
 			DeviceType type() const noexcept;
