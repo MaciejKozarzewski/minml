@@ -389,6 +389,10 @@ Json::Json(const char *str) :
 		Json(json_string(str))
 {
 }
+Json::Json(char c) :
+		Json(json_string(1, c))
+{
+}
 Json::Json(const std::initializer_list<Json> &list)
 {
 	bool is_object = std::all_of(list.begin(), list.end(), [](const Json &element)
@@ -416,6 +420,19 @@ Json::Json(const int *list, size_t length) :
 Json::Json(const double *list, size_t length) :
 		m_data(json_array(list, list + length))
 {
+}
+
+Json Json::null()
+{
+	return Json();
+}
+Json Json::object()
+{
+	return Json(JsonType::Object);
+}
+Json Json::array()
+{
+	return Json(JsonType::Array);
 }
 
 bool Json::isNull() const noexcept
@@ -518,6 +535,12 @@ std::string Json::getString() const
 	if (not isString())
 		throw JsonTypeError(METHOD_NAME, storedType());
 	return std::get<std::string>(m_data);
+}
+char Json::getChar() const
+{
+	if (not isString())
+		throw JsonTypeError(METHOD_NAME, storedType());
+	return std::get<std::string>(m_data).at(0);
 }
 
 const Json& Json::operator[](int idx) const

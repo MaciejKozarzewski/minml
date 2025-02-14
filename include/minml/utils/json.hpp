@@ -47,11 +47,16 @@ class Json
 
 		Json(const std::string &str);
 		Json(const char *str);
+		Json(char c);
 
 		Json(const std::initializer_list<Json> &list);
 		Json(const bool *list, size_t length);
 		Json(const int *list, size_t length);
 		Json(const double *list, size_t length);
+
+		static Json null();
+		static Json object();
+		static Json array();
 
 		bool isNull() const noexcept;
 		bool isBool() const noexcept;
@@ -73,6 +78,7 @@ class Json
 		int64_t getLong() const;
 		double getDouble() const;
 		std::string getString() const;
+		char getChar() const;
 
 		const Json& operator[](int idx) const;
 		Json& operator[](int idx);
