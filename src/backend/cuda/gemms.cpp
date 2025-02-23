@@ -17,6 +17,46 @@
 #include <cassert>
 #include <iostream>
 
+namespace
+{
+	using namespace ml;
+	int get_batch_stride(const mlShape_t &shape) noexcept
+	{
+		switch (shape.rank)
+		{
+			default:
+			case 2:
+				return 0;
+			case 3:
+				return shape.dim[1] * shape.dim[2];
+		}
+	}
+	int num_rows(const mlShape_t &shape) noexcept
+	{
+		switch (shape.rank)
+		{
+			default:
+				return 0;
+			case 2:
+				return shape.dim[0];
+			case 3:
+				return shape.dim[1];
+		}
+	}
+	int num_columns(const mlShape_t &shape) noexcept
+	{
+		switch (shape.rank)
+		{
+			default:
+				return 0;
+			case 2:
+				return shape.dim[1];
+			case 3:
+				return shape.dim[2];
+		}
+	}
+}
+
 namespace ml
 {
 
@@ -27,9 +67,9 @@ namespace ml
 		cublasOperation_t op_A = is_transpose(opA) ? CUBLAS_OP_T : CUBLAS_OP_N;
 		cublasOperation_t op_B = is_transpose(opB) ? CUBLAS_OP_T : CUBLAS_OP_N;
 
-		const int M = is_transpose(opB) ? shape_B.dim[0] : shape_B.dim[1];
-		const int N = is_transpose(opA) ? shape_A.dim[1] : shape_A.dim[0];
-		const int K = is_transpose(opB) ? shape_B.dim[1] : shape_B.dim[0];
+		const int M = is_transpose(opB) ? num_rows(shape_B) : num_columns(shape_B);
+		const int N = is_transpose(opA) ? num_columns(shape_A) : num_rows(shape_A);
+		const int K = is_transpose(opB) ? num_columns(shape_B) : num_rows(shape_B);
 
 		const int LDA = get_last_dim(shape_A);
 		const int LDB = get_last_dim(shape_B);
@@ -107,21 +147,22 @@ namespace ml
 			const void *B, char opA, char opB, float alpha, float beta)
 	{
 		assert(context != nullptr);
-		assert(get_first_dim(shape_A) == get_first_dim(shape_B) && get_first_dim(shape_B) == get_first_dim(shape_C)); // uniform batch size
-		const int batch = get_first_dim(shape_A);
+		assert(shape_A.rank == 3 || shape_B.rank == 3);
+		assert(shape_C.rank == 3);
+		const int batch = get_first_dim(shape_C);
 		cublasOperation_t op_A = is_transpose(opA) ? CUBLAS_OP_T : CUBLAS_OP_N;
 		cublasOperation_t op_B = is_transpose(opB) ? CUBLAS_OP_T : CUBLAS_OP_N;
 
-		const int M = is_transpose(opB) ? shape_B.dim[1] : shape_B.dim[2];
-		const int N = is_transpose(opA) ? shape_A.dim[2] : shape_A.dim[1];
-		const int K = is_transpose(opB) ? shape_B.dim[2] : shape_B.dim[1];
+		const int M = is_transpose(opB) ? num_rows(shape_B) : num_columns(shape_B);
+		const int N = is_transpose(opA) ? num_columns(shape_A) : num_rows(shape_A);
+		const int K = is_transpose(opB) ? num_columns(shape_B) : num_rows(shape_B);
 
 		const int LDA = get_last_dim(shape_A);
 		const int LDB = get_last_dim(shape_B);
 		const int LDC = get_last_dim(shape_C);
-		const int strideA = volume_without_first_dim(shape_A);
-		const int strideB = volume_without_first_dim(shape_B);
-		const int strideC = volume_without_first_dim(shape_C);
+		const int strideA = get_batch_stride(shape_A);
+		const int strideB = get_batch_stride(shape_B);
+		const int strideC = get_batch_stride(shape_C);
 
 		cublasHandle_t handle = cuda::Context::getHandle(context);
 		cublasStatus_t err = cublasSetMathMode(handle, CUBLAS_DEFAULT_MATH);

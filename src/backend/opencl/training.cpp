@@ -228,7 +228,7 @@ namespace ml
 	}
 
 	void opencl_radam_optimize(mlContext_t context, mlShape_t shape, void *weight, const void *update, void *momentum, void *variance,
-			float learning_rate, float beta1, float beta2, int step)
+			float learning_rate, float beta1, float beta2, int step, float weight_decay)
 	{
 		const int elements = volume(shape);
 		cl::Kernel kernel = get_kernel(context, "learn_adam");

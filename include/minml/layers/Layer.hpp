@@ -10,6 +10,7 @@
 
 #include <minml/core/DataType.hpp>
 #include <minml/layers/Parameter.hpp>
+#include <minml/layers/quantization.hpp>
 #include <minml/training/Initializer.hpp>
 
 #include <memory>
@@ -56,7 +57,11 @@ namespace ml
 
 			DataType m_dtype = DataType::FLOAT32;
 			ActivationType m_activation;
+
 			bool m_is_quantizable = true;
+			std::vector<TensorQuantizer> m_input_quantizers;
+			TensorQuantizer m_output_quantizer;
+			Tensor m_channel_scales;
 		public:
 			Layer(std::string activation = "linear", DataType dtype = DataType::FLOAT32);
 
@@ -71,7 +76,9 @@ namespace ml
 
 			ActivationType getActivationType() const noexcept;
 			void setActivationType(ActivationType act) noexcept;
+
 			virtual Layer& quantizable(bool b) noexcept;
+			virtual void setupQuantization(const std::vector<TensorQuantizer> &input_quantizers, const TensorQuantizer &output_quantizer);
 			/**
 			 * documentation
 			 */

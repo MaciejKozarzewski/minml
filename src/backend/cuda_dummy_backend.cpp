@@ -179,6 +179,21 @@ namespace ml
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
+	void cudnn_depthwise_conv_forward(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, mlShape_t weights_shape, const void *input,
+			const void *weights, const void *bias, void *output)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+	void cudnn_depthwise_conv_backward(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, const void *gradient_next,
+			const void *weights, void *gradient_prev)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+	void cudnn_depthwise_conv_update(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, const void *input,
+			const void *gradient_next, void *weights_update)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
 
 	void cuda_depthwise_conv_forward(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, mlShape_t weights_shape, const void *input,
 			const void *weights, const void *bias, void *output)
@@ -223,7 +238,8 @@ namespace ml
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
-	void cuda_global_average_pooling_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input)
+	void cuda_global_average_pooling_forward(mlContext_t context, mlDataType_t input_dtype, mlDataType_t output_dtype, mlShape_t shape,
+			void *output, const void *input, float scale, float shift)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
@@ -405,7 +421,7 @@ namespace ml
 	}
 
 	void cuda_radam_optimize(mlContext_t context, mlShape_t shape, void *weight, const void *update, void *momentum, void *variance,
-			float learning_rate, float beta1, float beta2, int step)
+			float learning_rate, float beta1, float beta2, int step, float weight_decay)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}

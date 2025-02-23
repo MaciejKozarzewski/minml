@@ -160,7 +160,7 @@ namespace ml
 		void opencl_value_head_gradient(mlContext_t context, mlShape_t shape, void *gradient, const void *output, const void *target, float weight);
 
 		void opencl_radam_optimize(mlContext_t context, mlShape_t shape, void *weight, const void *update, void *momentum, void *variance,
-				float learning_rate, float beta1, float beta2, int step);
+				float learning_rate, float beta1, float beta2, int step, float weight_decay);
 
 		void opencl_l2_regularization(mlContext_t context, mlShape_t shape, void *gradient, const void *param, float coefficient, float offset);
 

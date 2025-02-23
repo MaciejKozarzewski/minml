@@ -37,6 +37,14 @@ namespace ml
 		return result;
 	}
 
+	[[maybe_unused]] static mlQuantizationData_t make_quantization_data(float scale, float shift) noexcept
+	{
+		mlQuantizationData_t result;
+		result.scale = scale;
+		result.shift = shift;
+		return result;
+	}
+
 	[[maybe_unused]] static size_t size_of(mlDataType_t dtype) noexcept
 	{
 		switch (dtype)

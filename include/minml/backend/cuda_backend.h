@@ -82,11 +82,11 @@ namespace ml
 				mlActivationType_t act);
 
 		// depthwise convolution
-		void cuda_depthwise_conv_forward(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, mlShape_t weights_shape, const void *input,
-				const void *weights, const void *bias, void *output);
-		void cuda_depthwise_conv_backward(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, const void *gradient_next,
+		DLL_PUBLIC void cuda_depthwise_conv_forward(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, mlShape_t weights_shape,
+				const void *input, const void *weights, const void *bias, void *output);
+		DLL_PUBLIC void cuda_depthwise_conv_backward(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, const void *gradient_next,
 				const void *weights, void *gradient_prev);
-		void cuda_depthwise_conv_update(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, const void *input,
+		DLL_PUBLIC void cuda_depthwise_conv_update(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, const void *input,
 				const void *gradient_next, void *weights_update);
 
 		// implemented in 'global_pooling.cu'
@@ -98,8 +98,8 @@ namespace ml
 				const void *bias, mlActivationType_t act);
 		DLL_PUBLIC void cuda_global_broadcasting_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, void *gradient_next,
 				const void *output, mlActivationType_t act);
-		DLL_PUBLIC void cuda_global_average_pooling_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output,
-				const void *input);
+		DLL_PUBLIC void cuda_global_average_pooling_forward(mlContext_t context, mlDataType_t input_dtype, mlDataType_t output_dtype, mlShape_t shape,
+				void *output, const void *input, float scale, float shift);
 		DLL_PUBLIC void cuda_global_average_pooling_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next);
 		DLL_PUBLIC void cuda_channel_scaling_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input,
 				const void *scales);
@@ -112,12 +112,19 @@ namespace ml
 		DLL_PUBLIC void cuda_gemm_batched(mlContext_t context, mlDataType_t dtype, mlShape_t shape_C, void *C, mlShape_t shape_A, const void *A,
 				mlShape_t shape_B, const void *B, char opA, char opB, float alpha, float beta);
 
+		// cudnn methods
 		/*
 		 * Computes D = act(alpha * op_A(A) * op_B(B) + beta * C + bias)
 		 */
 		DLL_PUBLIC void cuda_gemm_ex(mlContext_t context, mlDataType_t dtype, mlShape_t shape_D, void *D, float alpha, char opA, mlShape_t shape_A,
 				const void *A, char opB, mlShape_t shape_B, const void *B, float beta, mlShape_t shape_C, const void *C, const void *bias,
 				mlActivationType_t act);
+		DLL_PUBLIC void cudnn_depthwise_conv_forward(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, mlShape_t weights_shape,
+				const void *input, const void *weights, const void *bias, void *output);
+		DLL_PUBLIC void cudnn_depthwise_conv_backward(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, const void *gradient_next,
+				const void *weights, void *gradient_prev);
+		DLL_PUBLIC void cudnn_depthwise_conv_update(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, const void *input,
+				const void *gradient_next, void *weights_update);
 
 		// implemented in 'add_bias_act.cu'
 		DLL_PUBLIC void cuda_add_bias_act(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input, const void *bias,
@@ -196,7 +203,7 @@ namespace ml
 				float weight);
 
 		DLL_PUBLIC void cuda_radam_optimize(mlContext_t context, mlShape_t shape, void *weight, const void *update, void *momentum, void *variance,
-				float learning_rate, float beta1, float beta2, int step);
+				float learning_rate, float beta1, float beta2, int step, float weight_decay);
 
 		DLL_PUBLIC void cuda_l2_regularization(mlContext_t context, mlShape_t shape, void *gradient, const void *param, float coefficient,
 				float offset);

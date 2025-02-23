@@ -121,7 +121,7 @@ namespace ml
 	void valueHeadGradient(const Context &context, Tensor &gradient, const Tensor &output, const Tensor &target, float weight = 1.0f);
 
 	void radamOptimize(const Context &context, Tensor &weight, const Tensor &update, Tensor &momentum, Tensor &variance, float learning_rate,
-			float beta1, float beta2, int step);
+			float beta1, float beta2, int step, float weight_decay);
 
 	void l2Regularization(const Context &context, Tensor &gradient, const Tensor &param, float coefficient, float offset);
 

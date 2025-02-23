@@ -21,6 +21,7 @@ namespace
 {
 
 	using conversion_function = std::function<void(void*, const void*, size_t)>;
+
 	conversion_function get_conversion_function_fp32_to_fp16(ml::mlContext_t context)
 	{
 		if (ml::cpu::Context::getSimdLevel(context) >= ml::cpu::SimdLevel::AVX and ml::cpu::has_hardware_fp16_conversion())
@@ -302,6 +303,28 @@ namespace ml
 			mlActivationType_t act)
 	{
 		cpu::def_kernel_global_broadcasting_backward(context, shape, gradient_prev, gradient_next, output, act);
+	}
+
+	void cpu_global_average_pooling_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input)
+	{
+		const int batch_size = shape.dim[0];
+		const int hw = shape.dim[1] * shape.dim[2];
+		const int channels = shape.dim[3];
+
+		for(int b=0;b<batch_size;b++)
+		{
+
+		}
+	}
+	void cpu_global_average_pooling_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next)
+	{
+	}
+	void cpu_channel_scaling_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input, const void *scales)
+	{
+	}
+	void cpu_channel_scaling_backward(mlContext_t context, mlShape_t shape, void *gradient_prev_0, void *gradient_prev_1, const void *gradient_next,
+			const void *input_0, const void *input_1)
+	{
 	}
 
 	void cpu_add_bias_act(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input, const void *bias,

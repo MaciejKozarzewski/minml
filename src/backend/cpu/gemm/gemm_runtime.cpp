@@ -12,7 +12,6 @@
 #include "Matrix.hpp"
 #include "utilities.hpp"
 #include "gemm_kernels.hpp"
-#include "gemm_runtime.hpp"
 
 #include <limits>
 

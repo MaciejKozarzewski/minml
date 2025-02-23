@@ -16,8 +16,7 @@ namespace ml
 	class Matrix;
 	class BatchedMatrix;
 	struct Position2D;
-	enum class MatrixOp
-	;
+	enum class MatrixOp;
 	class GemmRuntime;
 }
 

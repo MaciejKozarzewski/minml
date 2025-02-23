@@ -41,14 +41,12 @@ namespace ml
 
 	void DepthwiseConv2D::setInputShape(const std::vector<Shape> &shapes)
 	{
-		if (shapes.size() != 1 and shapes.size() != 2)
-			throw IllegalArgument(METHOD_NAME, "Conv2D layer expects either one or two input shapes");
+		if (shapes.size() != 1)
+			throw IllegalArgument(METHOD_NAME, "DepthwiseConv2D layer expects one input shape");
 		if (shapes[0].rank() != 4)
-			throw IllegalArgument(METHOD_NAME, "Conv2D layer expects 4D shapes");
+			throw IllegalArgument(METHOD_NAME, "DepthwiseConv2D layer expects 4D shapes");
 
 		m_input_shapes = shapes;
-		if (shapes.size() == 2 and shapes[1] != getOutputShape())
-			throw IllegalArgument(METHOD_NAME, "Conv2D layer expects second input shape to be equal to the output shape");
 	}
 	Shape DepthwiseConv2D::getOutputShape() const
 	{
@@ -93,6 +91,7 @@ namespace ml
 
 	void DepthwiseConv2D::forward(const std::vector<Tensor> &input, Tensor &output)
 	{
+		assert(input.size() == 1);
 		depthwiseConvForward(context(), input[0], getWeights().getParam(), output, getBias().getParam());
 	}
 	void DepthwiseConv2D::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next)

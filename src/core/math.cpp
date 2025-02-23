@@ -513,7 +513,8 @@ namespace ml
 			case DeviceType::CPU:
 				break;
 			case DeviceType::CUDA:
-				cuda_global_average_pooling_forward(get(context), get(input.dtype()), get_shape(input), output.data(), input.data());
+				cuda_global_average_pooling_forward(get(context), get(input.dtype()), get(output.dtype()), get_shape(input), output.data(),
+						input.data(), 1.0f, 0.0f);
 				break;
 			case DeviceType::OPENCL:
 				break;
@@ -1127,21 +1128,21 @@ namespace ml
 	}
 
 	void radamOptimize(const Context &context, Tensor &weight, const Tensor &update, Tensor &momentum, Tensor &variance, float learning_rate,
-			float beta1, float beta2, int step)
+			float beta1, float beta2, int step, float weight_decay)
 	{
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
 				cpu_radam_optimize(get(context), get_shape(weight), weight.data(), update.data(), momentum.data(), variance.data(), learning_rate,
-						beta1, beta2, step);
+						beta1, beta2, step, weight_decay);
 				break;
 			case DeviceType::CUDA:
 				cuda_radam_optimize(get(context), get_shape(weight), weight.data(), update.data(), momentum.data(), variance.data(), learning_rate,
-						beta1, beta2, step);
+						beta1, beta2, step, weight_decay);
 				break;
 			case DeviceType::OPENCL:
 				opencl_radam_optimize(get(context), get_shape(weight), weight.data(), update.data(), momentum.data(), variance.data(), learning_rate,
-						beta1, beta2, step);
+						beta1, beta2, step, weight_decay);
 				break;
 		}
 	}

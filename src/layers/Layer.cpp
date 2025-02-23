@@ -6,6 +6,7 @@
  */
 
 #include <minml/layers/Layer.hpp>
+#include <minml/layers/quantization.hpp>
 #include <minml/core/Shape.hpp>
 #include <minml/core/Tensor.hpp>
 #include <minml/core/Device.hpp>
@@ -43,6 +44,20 @@
 #include <unordered_map>
 #include <cmath>
 #include <mutex>
+
+namespace
+{
+	using namespace ml;
+
+	Json to_json(const TensorQuantizer &tq)
+	{
+		return Json( { { "scale", tq.scale }, { "shift", tq.shift } });
+	}
+	TensorQuantizer tensor_quantizer_from_json(const Json &json)
+	{
+		return TensorQuantizer(json["scale"].getDouble(), json["shift"].getDouble());
+	}
+}
 
 namespace ml
 {
@@ -114,6 +129,19 @@ namespace ml
 		m_is_quantizable = b;
 		return *this;
 	}
+	void Layer::setupQuantization(const std::vector<TensorQuantizer> &input_quantizers, const TensorQuantizer &output_quantizer)
+	{
+		m_input_quantizers = input_quantizers;
+		m_output_quantizer = output_quantizer;
+		if (isQuantizable())
+		{
+			const std::string mode = (name() == "DepthwiseConv2D") ? "per_last_dim" : "per_first_dim";
+			const WeightQuantizer tmp = quantize_weights(getWeights().getParam(), getBias().getParam(), input_quantizers.at(0), mode);
+			m_channel_scales = tmp.channel_scales;
+			getWeights().getParam() = tmp.weights;
+			getBias().getParam() = tmp.bias;
+		}
+	}
 
 	Json Layer::getConfig() const
 	{
@@ -122,6 +150,10 @@ namespace ml
 		result["nonlinearity"] = toString(m_activation);
 		result["dtype"] = toString(m_dtype);
 		result["is_quantizable"] = m_is_quantizable;
+		result["input_quantizers"] = Json::array();
+		for (size_t i = 0; i < m_input_quantizers.size(); i++)
+			result["input_quantizers"][i] = to_json(m_input_quantizers[i]);
+		result["output_quantizer"] = to_json(m_output_quantizer);
 		return result;
 	}
 	void Layer::loadConfig(const Json &config)
@@ -129,12 +161,20 @@ namespace ml
 		this->m_dtype = typeFromString(config["dtype"].getString());
 		if (config.hasKey("is_quantizable"))
 			this->m_is_quantizable = config["is_quantizable"].getBool();
+		if (config.hasKey("input_quantizers"))
+		{
+			for (int i = 0; i < config["input_quantizers"].size(); i++)
+				m_input_quantizers.push_back(tensor_quantizer_from_json(config["input_quantizers"][i]));
+		}
+		if (config.hasKey("output_quantizer"))
+			m_output_quantizer = tensor_quantizer_from_json(config["output_quantizer"]);
 	}
 	Json Layer::saveParameters(SerializedObject &binary_data) const
 	{
 		Json result;
-		result["weights"] = (m_weights == nullptr) ? Json() : m_weights->serialize(binary_data);
-		result["bias"] = (m_bias == nullptr) ? Json() : m_bias->serialize(binary_data);
+		result["weights"] = (m_weights == nullptr) ? Json::null() : m_weights->serialize(binary_data);
+		result["bias"] = (m_bias == nullptr) ? Json::null() : m_bias->serialize(binary_data);
+		result["channel_scales"] = m_channel_scales.isEmpty() ? Json::null() : m_channel_scales.serialize(binary_data);
 		return result;
 	}
 	void Layer::loadParameters(const Json &json, const SerializedObject &binary_data)
@@ -143,6 +183,8 @@ namespace ml
 			getWeights().unserialize(json["weights"], binary_data);
 		if (json.hasKey("bias") and not json["bias"].isNull())
 			getBias().unserialize(json["bias"], binary_data);
+		if (json.hasKey("channel_scales") and not json["channel_scales"].isNull())
+			m_channel_scales.unserialize(json["channel_scales"], binary_data);
 	}
 
 	int Layer::numberOfInputs() const noexcept

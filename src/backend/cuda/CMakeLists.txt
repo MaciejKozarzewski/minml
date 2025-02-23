@@ -19,7 +19,7 @@ else()
 		cuda_event.cpp
 		cuda_memory.cu
 		cuda_properties.cpp
-		cudnn_conv.cpp
+		cudnn_math.cpp
 		gemms.cpp
 		utils.cpp)
 
@@ -32,7 +32,7 @@ else()
 
 	if(BUILD_WITH_CUDNN)
 		target_compile_definitions(${CUDA_BACKEND_NAME} PUBLIC USE_CUDNN)
-		target_link_libraries(${CUDA_BACKEND_NAME} PUBLIC cudnn_ops_infer cudnn_cnn_infer cublasLt)
+		target_link_libraries(${CUDA_BACKEND_NAME} PUBLIC cudnn_ops cudnn_cnn cudnn_graph cublasLt)
 	endif()
 
 	set_target_properties(${CUDA_BACKEND_NAME} PROPERTIES CUDA_STANDARD 14)

@@ -246,7 +246,7 @@ namespace ml
 	}
 
 	void cpu_radam_optimize(mlContext_t context, mlShape_t shape, void *weight, const void *update, void *momentum, void *variance,
-			float learning_rate, float beta1, float beta2, int step)
+			float learning_rate, float beta1, float beta2, int step, float weight_decay)
 	{
 		assert(weight != nullptr);
 		assert(update != nullptr);
@@ -281,7 +281,7 @@ namespace ml
 			}
 
 			const float m_dash = momentum_ptr[i] / (1.0f - pow_beta1);
-			weight_ptr[i] -= learning_rate * m_dash * correction;
+			weight_ptr[i] -= learning_rate * (m_dash * correction + weight_decay * weight_ptr[i]);
 			weight_ptr[i] = round_small_to_zero(weight_ptr[i]);
 		}
 	}

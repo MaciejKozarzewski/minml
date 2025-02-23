@@ -8,28 +8,20 @@
 #ifndef MINML_LAYERS_QUANTIZATION_HPP_
 #define MINML_LAYERS_QUANTIZATION_HPP_
 
-#include <memory>
-#include <vector>
+#include <minml/core/Tensor.hpp>
 
-class Json;
-class SerializedObject;
-namespace ml /* forward declarations */
-{
-	class Shape;
-	class Tensor;
-}
+#include <string>
 
 namespace ml
 {
-	class InputQuantizer
+	class TensorQuantizer
 	{
-			float inv_scale = 1.0f;
 		public:
 			float scale = 1.0f;
 			float shift = 0.0f;
 
-			InputQuantizer(float scale, float shift) noexcept :
-					inv_scale(1.0f / scale),
+			TensorQuantizer() noexcept = default;
+			TensorQuantizer(float scale, float shift) noexcept :
 					scale(scale),
 					shift(shift)
 			{
@@ -40,16 +32,19 @@ namespace ml
 			}
 			int8_t to_int8(float x) const noexcept
 			{
-				return std::max(-128.0f, std::min(127.0f, (x - shift) * inv_scale));
+				return std::max(-128.0f, std::min(127.0f, (x - shift) / scale));
 			}
 	};
 
 	class WeightQuantizer
 	{
-			std::unique_ptr<Tensor> m_channel_scales;
 		public:
-			std::pair<Tensor, Tensor> quantize(const Tensor &weights, const Tensor &bias, InputQuantizer input_quantizer, int mode);
+			Tensor weights;
+			Tensor bias;
+			Tensor channel_scales;
 	};
+
+	WeightQuantizer quantize_weights(const Tensor &weights, const Tensor &bias, const TensorQuantizer &input_quantizer, const std::string &mode);
 
 } /* namespace ml */
 

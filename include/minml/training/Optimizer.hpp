@@ -29,8 +29,9 @@ namespace ml
 			float m_beta1 = 0.9f;
 			float m_beta2 = 0.999f;
 			int m_steps = 0;
+			float m_weight_decay = 0.0f;
 		public:
-			Optimizer(float learningRate = 0.001f, float beta1 = 0.9f, float beta2 = 0.999f);
+			Optimizer(float learningRate = 0.001f, float beta1 = 0.9f, float beta2 = 0.999f, float weight_decay = 0.0f);
 			Optimizer(const Optimizer &other);
 			Optimizer(Optimizer &&other) = default;
 			Optimizer& operator=(const Optimizer &other);

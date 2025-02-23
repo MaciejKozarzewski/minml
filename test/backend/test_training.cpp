@@ -84,7 +84,7 @@ namespace ml
 		for (int i = 1; i < 1000; i++)
 		{
 			testing::initForTest(gradient, 1.0f + 0.01f * i);
-			radamOptimize(Context(), cpu_weights, gradient, cpu_momentum, cpu_variance, 1.0e-3f, 0.9f, 0.999f, i);
+			radamOptimize(Context(), cpu_weights, gradient, cpu_momentum, cpu_variance, 1.0e-3f, 0.9f, 0.999f, i, 0.0f);
 		}
 
 		if (testing::has_device_supporting(DataType::FLOAT32))
@@ -100,7 +100,7 @@ namespace ml
 			for (int i = 1; i < 1000; i++)
 			{
 				testing::initForTest(gradient, 1.0f + 0.01f * i);
-				radamOptimize(context, device_weights, gradient, device_momentum, device_variance, 1.0e-3f, 0.9f, 0.999f, i);
+				radamOptimize(context, device_weights, gradient, device_momentum, device_variance, 1.0e-3f, 0.9f, 0.999f, i, 0.0f);
 				context.synchronize();
 			}
 

@@ -157,7 +157,7 @@ namespace
 			for (int i = blockIdx.y; i < dim1; i += gridDim.y)
 			{
 				const int idx = tensor_indexer.at(blockIdx.z, i, j);
-				output[idx] = input[idx] * _scale;
+				output[idx] = static_cast<U>(static_cast<T>(input[idx]) * _scale);
 			}
 		}
 	}
@@ -349,7 +349,8 @@ namespace ml
 		assert(cudaGetLastError() == cudaSuccess);
 	}
 
-	void cuda_global_average_pooling_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input)
+	void cuda_global_average_pooling_forward(mlContext_t context, mlDataType_t input_dtype, mlDataType_t output_dtype, mlShape_t shape, void *output,
+			const void *input, float scale, float shift)
 	{
 		const int dim0 = shape.dim[0];
 		const int dim1 = shape.dim[1] * shape.dim[2];
@@ -358,23 +359,33 @@ namespace ml
 		dim3 blockDim(32, 32);
 		dim3 gridDim((dim2 + 31) / 32, 1, dim0);
 
-		const float scale = 1.0f;
-		const float shift = 0.0f;
-
 		cudaStream_t stream = cuda::Context::getStream(context);
-		switch (dtype)
+		switch (input_dtype)
 		{
 			case DTYPE_FLOAT16:
+				assert(output_dtype == DTYPE_FLOAT16);
 				kernel_average_pooling_forward<<<gridDim, blockDim, 0, stream >>>(getPointer<half>(output), getPointer<half>(input), dim0, dim1, dim2,
 						scale, shift);
 				break;
 			case DTYPE_FLOAT32:
+				assert(output_dtype == DTYPE_FLOAT32);
 				kernel_average_pooling_forward<<<gridDim, blockDim, 0, stream >>>(getPointer<float>(output), getPointer<float>(input), dim0, dim1,
 						dim2, scale, shift);
 				break;
 			case DTYPE_FLOAT64:
+				assert(output_dtype == DTYPE_FLOAT64);
 				kernel_average_pooling_forward<<<gridDim, blockDim, 0, stream >>>(getPointer<double>(output), getPointer<double>(input), dim0, dim1,
 						dim2, scale, shift);
+				break;
+			case DTYPE_UINT8:
+				if (output_dtype == DTYPE_FLOAT32)
+					kernel_average_pooling_forward<<<gridDim, blockDim, 0, stream >>>(getPointer<uint8_t>(output), getPointer<float>(input), dim0,
+							dim1, dim2, scale, shift);
+				break;
+			case DTYPE_INT8:
+				if (output_dtype == DTYPE_FLOAT32)
+					kernel_average_pooling_forward<<<gridDim, blockDim, 0, stream >>>(getPointer<int8_t>(output), getPointer<float>(input), dim0,
+							dim1, dim2, scale, shift);
 				break;
 		}
 		assert(cudaGetLastError() == cudaSuccess);
@@ -416,6 +427,14 @@ namespace ml
 			case DTYPE_FLOAT64:
 				kernel_channel_scaling_forward<<<gridDim, 128, 0, stream >>>(getPointer<double>(output), getPointer<double>(input),
 						getPointer<double>(scales), dim0, dim1, dim2);
+				break;
+			case DTYPE_UINT8:
+				kernel_channel_scaling_forward<<<gridDim, 128, 0, stream >>>(getPointer<uint8_t>(output), getPointer<uint8_t>(input),
+						getPointer<float>(scales), dim0, dim1, dim2);
+				break;
+			case DTYPE_INT8:
+				kernel_channel_scaling_forward<<<gridDim, 128, 0, stream >>>(getPointer<int8_t>(output), getPointer<int8_t>(input),
+						getPointer<float>(scales), dim0, dim1, dim2);
 				break;
 		}
 

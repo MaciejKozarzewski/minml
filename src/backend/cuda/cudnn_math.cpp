@@ -12,8 +12,8 @@
 
 #include "utils.hpp"
 
-#include "cudnn_ops_infer.h"
-#include "cudnn_cnn_infer.h"
+#include "cudnn_ops.h"
+#include "cudnn_cnn.h"
 
 #include <cassert>
 #include <cstring>
@@ -178,28 +178,24 @@ namespace
 	class ConvolutionDescriptor
 	{
 			cudnnConvolutionDescriptor_t m_desc = 0;
-			cudnnConvolutionFwdAlgo_t m_algo = CUDNN_CONVOLUTION_FWD_ALGO_DIRECT;
-			size_t m_workspace_size = 0;
 		public:
 			ConvolutionDescriptor() noexcept = default;
 			ConvolutionDescriptor(cudnnHandle_t handle, const TensorDescriptor &xDesc, const FilterDescriptor &wDesc, const TensorDescriptor &yDesc,
-					mlDataType_t dtype, int kernel_size)
+					mlDataType_t dtype, int kernel_size, int group_count)
 			{
 				cudnnStatus_t status = cudnnCreateConvolutionDescriptor(&m_desc);
 				assert(status == CUDNN_STATUS_SUCCESS);
 				status = cudnnSetConvolutionMathType(m_desc, CUDNN_TENSOR_OP_MATH);
 				assert(status == CUDNN_STATUS_SUCCESS);
-				const int padding = kernel_size / 2;
+				const int padding = (kernel_size - 1) / 2;
 				status = cudnnSetConvolution2dDescriptor(m_desc, padding, padding, 1, 1, 1, 1, CUDNN_CROSS_CORRELATION, cudnn_convert(dtype));
 				assert(status == CUDNN_STATUS_SUCCESS);
 
-				cudnnConvolutionFwdAlgoPerf_t perf;
-				int actual_count = 0;
-				status = cudnnGetConvolutionForwardAlgorithm_v7(handle, xDesc, wDesc, m_desc, yDesc, 1, &actual_count, &perf);
-				assert(status == CUDNN_STATUS_SUCCESS);
-				assert(actual_count > 0);
-				m_algo = perf.algo;
-				m_workspace_size = perf.memory;
+				if (group_count > 1)
+				{
+					status = cudnnSetConvolutionGroupCount(m_desc, group_count);
+					assert(status == CUDNN_STATUS_SUCCESS);
+				}
 			}
 			ConvolutionDescriptor(const ConvolutionDescriptor &other) = delete;
 			ConvolutionDescriptor(ConvolutionDescriptor &&other) noexcept = delete;
@@ -210,19 +206,42 @@ namespace
 				cudnnStatus_t status = cudnnDestroyConvolutionDescriptor(m_desc);
 				assert(status == CUDNN_STATUS_SUCCESS);
 			}
-			size_t getWorkspaceSize() const noexcept
-			{
-				return m_workspace_size;
-			}
-			cudnnConvolutionFwdAlgo_t getAlgorithm() const noexcept
-			{
-				return m_algo;
-			}
 			operator cudnnConvolutionDescriptor_t() const noexcept
 			{
 				return m_desc;
 			}
 	};
+
+	cudnnConvolutionFwdAlgoPerf_t get_conv_forward_algo(cudnnHandle_t handle, const TensorDescriptor &xDesc, const FilterDescriptor &wDesc,
+			const TensorDescriptor &yDesc, const ConvolutionDescriptor &convDesc)
+	{
+		cudnnConvolutionFwdAlgoPerf_t result;
+		int actual_count = 0;
+		cudnnStatus_t status = cudnnGetConvolutionForwardAlgorithm_v7(handle, xDesc, wDesc, convDesc, yDesc, 1, &actual_count, &result);
+		assert(status == CUDNN_STATUS_SUCCESS);
+		assert(actual_count > 0);
+		return result;
+	}
+	cudnnConvolutionBwdDataAlgoPerf_t get_conv_backward_data_algo(cudnnHandle_t handle, const TensorDescriptor &dxDesc, const FilterDescriptor &wDesc,
+			const TensorDescriptor &dyDesc, const ConvolutionDescriptor &convDesc)
+	{
+		cudnnConvolutionBwdDataAlgoPerf_t result;
+		int actual_count = 0;
+		cudnnStatus_t status = cudnnGetConvolutionBackwardDataAlgorithm_v7(handle, wDesc, dyDesc, convDesc, dxDesc, 1, &actual_count, &result);
+		assert(status == CUDNN_STATUS_SUCCESS);
+		assert(actual_count > 0);
+		return result;
+	}
+	cudnnConvolutionBwdFilterAlgoPerf_t get_conv_backward_filter_algo(cudnnHandle_t handle, const TensorDescriptor &xDesc,
+			const FilterDescriptor &dwDesc, const TensorDescriptor &dyDesc, const ConvolutionDescriptor &convDesc)
+	{
+		cudnnConvolutionBwdFilterAlgoPerf_t result;
+		int actual_count = 0;
+		cudnnStatus_t status = cudnnGetConvolutionBackwardFilterAlgorithm_v7(handle, xDesc, dyDesc, convDesc, dwDesc, 1, &actual_count, &result);
+		assert(status == CUDNN_STATUS_SUCCESS);
+		assert(actual_count > 0);
+		return result;
+	}
 
 	class MatrixLayout
 	{
@@ -344,6 +363,52 @@ namespace
 				return m_desc;
 			}
 	};
+
+	mlDataType_t get_compute_dtype(mlContext_t context, mlDataType_t x_dtype, mlDataType_t w_dtype, mlDataType_t y_dtype) noexcept
+	{
+		assert(x_dtype == w_dtype);
+		switch (x_dtype)
+		{
+			default:
+			case DTYPE_UNKNOWN:
+				return DTYPE_UNKNOWN;
+			case DTYPE_FLOAT16:
+			{
+				assert(y_dtype == DTYPE_FLOAT16);
+				return cuda::has_fp16_math(context) ? DTYPE_FLOAT16 : DTYPE_FLOAT32;
+			}
+			case DTYPE_FLOAT32:
+			{
+				assert(y_dtype == DTYPE_FLOAT32);
+				return DTYPE_FLOAT32;
+			}
+			case DTYPE_FLOAT64:
+			{
+				assert(y_dtype == DTYPE_FLOAT64);
+				return DTYPE_FLOAT64;
+			}
+		}
+	}
+
+	void transpose_matrix(mlContext_t context, mlDataType_t dtype, void *output, const void *input, int rows, int columns)
+	{
+		cublasLtHandle_t handle = cuda::Context::getCublasLtHandle(context);
+		cudaStream_t stream = cuda::Context::getStream(context);
+		const float alpha = 1.0f;
+		const float beta = 0.0f;
+
+		const MatrixLayout Adesc(make_shape( { rows, columns }), dtype);
+		const MatrixLayout Cdesc(make_shape( { columns, rows }), dtype);
+
+		TransformDescriptor transformDesc;
+		const cublasOperation_t op = CUBLAS_OP_T;
+		cublasStatus_t status = cublasLtMatrixTransformDescSetAttribute(transformDesc, CUBLASLT_MATRIX_TRANSFORM_DESC_TRANSA, &op, sizeof(op));
+		assert(status == CUBLAS_STATUS_SUCCESS);
+
+		status = cublasLtMatrixTransform(handle, transformDesc, &alpha, input, Adesc, &beta, nullptr, 0, output, Cdesc, stream);
+		assert(status == CUBLAS_STATUS_SUCCESS);
+	}
+
 }
 
 namespace ml
@@ -355,8 +420,6 @@ namespace ml
 
 		assert(weights_shape.dim[1] == weights_shape.dim[2]); // square kernel
 
-		const size_t workspace_size = cuda::Context::getWorkspaceSize(context);
-		void *workspace = cuda::Context::getWorkspace(context);
 		if (weights_shape.dim[1] == 1)
 		{ // 1x1 convolution
 			const MatrixLayout Adesc(volume_without_last_dim(input_shape), get_last_dim(input_shape), dtype);
@@ -398,21 +461,30 @@ namespace ml
 
 			cublasLtHandle_t handle = cuda::Context::getCublasLtHandle(context);
 			cudaStream_t stream = cuda::Context::getStream(context);
+
+			const size_t workspace_size = cuda::Context::getWorkspaceSize(context);
+			void *workspace = cuda::Context::getWorkspace(context);
+
 			cublasStatus_t status = cublasLtMatmul(handle, computeDesc, &alpha, weights, Bdesc, input, Adesc, &beta, C, Cdesc, output, Ddesc, nullptr,
 					workspace, workspace_size, stream);
 			assert(status == CUBLAS_STATUS_SUCCESS);
 		}
 		else
 		{
+			cudnnHandle_t handle = cuda::Context::getCudnnHandle(context);
+
 			const TensorDescriptor xDesc(input_shape, dtype);
 			const FilterDescriptor wDesc(weights_shape, dtype);
 			const TensorDescriptor yDesc(output_shape, dtype);
 
-			const mlDataType_t compute_type = cuda::has_fp16_math(context) ? DTYPE_FLOAT16 : DTYPE_FLOAT32;
-			const ConvolutionDescriptor convDesc(cuda::Context::getCudnnHandle(context), xDesc, wDesc, yDesc, compute_type, weights_shape.dim[1]);
+			const mlDataType_t compute_type = get_compute_dtype(context, dtype, dtype, dtype);
+			const ConvolutionDescriptor convDesc(cuda::Context::getCudnnHandle(context), xDesc, wDesc, yDesc, compute_type, weights_shape.dim[1], 1);
 
-			cuda::Context::setWorkspaceSize(context, convDesc.getWorkspaceSize());
-			cudnnHandle_t handle = cuda::Context::getCudnnHandle(context);
+			const cudnnConvolutionFwdAlgoPerfStruct perf = get_conv_forward_algo(handle, xDesc, wDesc, yDesc, convDesc);
+
+			cuda::Context::setWorkspaceSize(context, perf.memory);
+			const size_t workspace_size = cuda::Context::getWorkspaceSize(context);
+			void *workspace = cuda::Context::getWorkspace(context);
 
 			const float alpha1 = 1.0f;
 			if (bias == nullptr)
@@ -421,8 +493,8 @@ namespace ml
 				if (add != nullptr)
 					cuda_memcpy_within_device(context, output, 0, add, 0, size_of(dtype) * volume(output_shape));
 
-				cudnnStatus_t status = cudnnConvolutionForward(handle, &alpha1, xDesc, input, wDesc, weights, convDesc, convDesc.getAlgorithm(),
-						workspace, workspace_size, &beta, yDesc, output);
+				cudnnStatus_t status = cudnnConvolutionForward(handle, &alpha1, xDesc, input, wDesc, weights, convDesc, perf.algo, workspace,
+						workspace_size, &beta, yDesc, output);
 				assert(status == CUDNN_STATUS_SUCCESS);
 
 				ml::cuda_activation_forward(context, dtype, output_shape, output, output, act);
@@ -437,8 +509,9 @@ namespace ml
 
 				const void *zData = (add == nullptr) ? output : add;
 				const float alpha2 = (add == nullptr) ? 0.0f : 1.0f;
-				cudnnStatus_t status = cudnnConvolutionBiasActivationForward(handle, &alpha1, xDesc, input, wDesc, weights, convDesc,
-						convDesc.getAlgorithm(), workspace, workspace_size, &alpha2, zDesc, zData, biasDesc, bias, activationDesc, yDesc, output);
+				cudnnStatus_t status = cudnnConvolutionBiasActivationForward(handle, &alpha1, xDesc, input, wDesc, weights, convDesc, perf.algo,
+						workspace, workspace_size, &alpha2, zDesc, zData, biasDesc, bias, activationDesc, yDesc, output);
+				std::cout << cudnnGetErrorString(status) << '\n';
 				assert(status == CUDNN_STATUS_SUCCESS);
 			}
 		}
@@ -506,6 +579,143 @@ namespace ml
 				cuda_add_bias_act(context, dtype, shape_D, D, D, bias, act);
 		}
 	}
+
+	void cudnn_depthwise_conv_forward(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, mlShape_t weights_shape, const void *input,
+			const void *weights, const void *bias, void *output)
+	{
+		assert(input_shape.rank == 4);
+		assert(weights_shape.rank == 3);
+		const int batch_size = input_shape.dim[0];
+		const int height = input_shape.dim[1];
+		const int width = input_shape.dim[2];
+		const int filter_size = weights_shape.dim[0];
+		const int channels = weights_shape.dim[2];
+		assert(weights_shape.dim[0] == weights_shape.dim[1]);
+
+		cudnnHandle_t handle = cuda::Context::getCudnnHandle(context);
+
+		const mlShape_t output_shape = input_shape;
+
+		const TensorDescriptor xDesc(input_shape, dtype);
+		const FilterDescriptor wDesc(make_shape( { channels, filter_size, filter_size, 1 }), dtype);
+		const TensorDescriptor yDesc(output_shape, dtype);
+
+		const mlDataType_t compute_type = get_compute_dtype(context, dtype, dtype, dtype);
+		const ConvolutionDescriptor convDesc(handle, xDesc, wDesc, yDesc, compute_type, filter_size, channels);
+
+		const cudnnConvolutionFwdAlgoPerfStruct perf = get_conv_forward_algo(handle, xDesc, wDesc, yDesc, convDesc);
+
+		cuda::Context::setWorkspaceSize(context, perf.memory);
+		const size_t transposed_weights_size = volume(weights_shape) * size_of(dtype);
+		const size_t workspace_size = cuda::Context::getWorkspaceSize(context) - transposed_weights_size;
+		void *transposed_weights = cuda::Context::getWorkspace(context);
+		void *workspace = reinterpret_cast<uint8_t*>(transposed_weights) + transposed_weights_size;
+
+		transpose_matrix(context, dtype, transposed_weights, weights, filter_size * filter_size, channels);
+
+		const float alpha1 = 1.0f;
+		if (bias == nullptr)
+		{
+			const float beta = 0.0f;
+			cudnnStatus_t status = cudnnConvolutionForward(handle, &alpha1, xDesc, input, wDesc, transposed_weights, convDesc, perf.algo, workspace,
+					workspace_size, &beta, yDesc, output);
+			assert(status == CUDNN_STATUS_SUCCESS);
+		}
+		else
+		{
+			const mlShape_t bias_shape = make_shape( { 1, 1, 1, channels });
+			const TensorDescriptor biasDesc(bias_shape, dtype);
+			const TensorDescriptor zDesc(output_shape, dtype);
+
+			const ActivationDescriptor activationDesc(ACTIVATION_LINEAR);
+
+			const void *zData = output;
+			const float alpha2 = 0.0f;
+			cudnnStatus_t status = cudnnConvolutionBiasActivationForward(handle, &alpha1, xDesc, input, wDesc, transposed_weights, convDesc,
+					perf.algo, workspace, workspace_size, &alpha2, zDesc, zData, biasDesc, bias, activationDesc, yDesc, output);
+			assert(status == CUDNN_STATUS_SUCCESS);
+		}
+	}
+	void cudnn_depthwise_conv_backward(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, const void *gradient_next,
+			const void *weights, void *gradient_prev)
+	{
+		assert(input_shape.rank == 4);
+		assert(weights_shape.rank == 3);
+		const int batch_size = input_shape.dim[0];
+		const int height = input_shape.dim[1];
+		const int width = input_shape.dim[2];
+		const int filter_size = weights_shape.dim[0];
+		const int channels = weights_shape.dim[2];
+		assert(weights_shape.dim[0] == weights_shape.dim[1]);
+
+		cudnnHandle_t handle = cuda::Context::getCudnnHandle(context);
+
+		const mlShape_t output_shape = input_shape;
+
+		const TensorDescriptor dxDesc(input_shape, DTYPE_FLOAT32);
+		const FilterDescriptor wDesc(make_shape( { channels, filter_size, filter_size, 1 }), DTYPE_FLOAT32);
+		const TensorDescriptor dyDesc(output_shape, DTYPE_FLOAT32);
+
+		const mlDataType_t compute_type = DTYPE_FLOAT32;
+		const ConvolutionDescriptor convDesc(handle, dxDesc, wDesc, dyDesc, compute_type, filter_size, channels);
+
+		const cudnnConvolutionBwdDataAlgoPerfStruct perf = get_conv_backward_data_algo(handle, dxDesc, wDesc, dyDesc, convDesc);
+
+		cuda::Context::setWorkspaceSize(context, perf.memory);
+		const size_t transposed_weights_size = volume(weights_shape) * size_of(DTYPE_FLOAT32);
+		const size_t workspace_size = cuda::Context::getWorkspaceSize(context) - transposed_weights_size;
+		void *transposed_weights = cuda::Context::getWorkspace(context);
+		void *workspace = reinterpret_cast<uint8_t*>(transposed_weights) + transposed_weights_size;
+
+		transpose_matrix(context, DTYPE_FLOAT32, transposed_weights, weights, filter_size * filter_size, channels);
+
+		const float alpha = 1.0f;
+		const float beta = 0.0f;
+
+		cudnnStatus_t status = cudnnConvolutionBackwardData(handle, &alpha, wDesc, transposed_weights, dyDesc, gradient_next, convDesc, perf.algo,
+				workspace, workspace_size, &beta, dxDesc, gradient_prev);
+		assert(status == CUDNN_STATUS_SUCCESS);
+	}
+	void cudnn_depthwise_conv_update(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, const void *input,
+			const void *gradient_next, void *weights_update)
+	{
+		assert(input_shape.rank == 4);
+		assert(weights_shape.rank == 3);
+		const int batch_size = input_shape.dim[0];
+		const int height = input_shape.dim[1];
+		const int width = input_shape.dim[2];
+		const int filter_size = weights_shape.dim[0];
+		const int channels = weights_shape.dim[2];
+		assert(weights_shape.dim[0] == weights_shape.dim[1]);
+
+		cudnnHandle_t handle = cuda::Context::getCudnnHandle(context);
+
+		const mlShape_t output_shape = input_shape;
+
+		const TensorDescriptor xDesc(input_shape, DTYPE_FLOAT32);
+		const FilterDescriptor dwDesc(make_shape( { channels, filter_size, filter_size, 1 }), DTYPE_FLOAT32);
+		const TensorDescriptor dyDesc(output_shape, DTYPE_FLOAT32);
+
+		const mlDataType_t compute_type = DTYPE_FLOAT32;
+		const ConvolutionDescriptor convDesc(handle, xDesc, dwDesc, dyDesc, compute_type, filter_size, channels);
+
+		const cudnnConvolutionBwdFilterAlgoPerfStruct perf = get_conv_backward_filter_algo(handle, xDesc, dwDesc, dyDesc, convDesc);
+
+		cuda::Context::setWorkspaceSize(context, perf.memory);
+		const size_t transposed_weights_size = volume(weights_shape) * size_of(DTYPE_FLOAT32);
+		const size_t workspace_size = cuda::Context::getWorkspaceSize(context) - transposed_weights_size;
+		void *transposed_weights = cuda::Context::getWorkspace(context);
+		void *workspace = reinterpret_cast<uint8_t*>(transposed_weights) + transposed_weights_size;
+
+		const float alpha = 1.0f;
+		const float beta = 0.0f;
+
+		cudnnStatus_t status = cudnnConvolutionBackwardFilter(handle, &alpha, xDesc, input, dyDesc, gradient_next, convDesc, perf.algo, workspace,
+				workspace_size, &beta, dwDesc, transposed_weights);
+		assert(status == CUDNN_STATUS_SUCCESS);
+
+		transpose_matrix(context, DTYPE_FLOAT32, weights_update, transposed_weights, channels, filter_size * filter_size);
+	}
 }
 
 #else
@@ -529,6 +739,20 @@ namespace ml
 		else
 			cuda_add_bias_act(context, dtype, shape_D, D, D, bias, act);
 	}
+
+	void cudnn_depthwise_conv_forward(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, mlShape_t weights_shape, const void *input,
+			const void *weights, const void *bias, void *output)
+	{
+	}
+	void cudnn_depthwise_conv_backward(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, const void *gradient_next,
+			const void *weights, void *gradient_prev)
+	{
+	}
+	void cudnn_depthwise_conv_update(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, const void *input,
+			const void *gradient_next, void *weights_update)
+	{
+	}
+
 }
 #endif
 

@@ -153,6 +153,13 @@ namespace ml
 		void cpu_global_broadcasting_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, void *gradient_next, const void *output,
 				mlActivationType_t act);
 
+		void cpu_global_average_pooling_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input);
+		void cpu_global_average_pooling_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next);
+		void cpu_channel_scaling_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input,
+				const void *scales);
+		void cpu_channel_scaling_backward(mlContext_t context, mlShape_t shape, void *gradient_prev_0, void *gradient_prev_1,
+				const void *gradient_next, const void *input_0, const void *input_1);
+
 		// used for training
 		void cpu_emulate_low_precision(mlContext_t context, mlShape_t shape, void *dst, const void *src);
 		void cpu_multiply_tensors(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *dst, const void *src1, const void *src2);
@@ -168,7 +175,7 @@ namespace ml
 		void cpu_value_head_gradient(mlContext_t context, mlShape_t shape, void *gradient, const void *output, const void *target, float weight);
 
 		void cpu_radam_optimize(mlContext_t context, mlShape_t shape, void *weight, const void *update, void *momentum, void *variance,
-				float learning_rate, float beta1, float beta2, int step);
+				float learning_rate, float beta1, float beta2, int step, float weight_decay);
 
 		void cpu_l2_regularization(mlContext_t context, mlShape_t shape, void *gradient, const void *param, float coefficient, float offset);
 

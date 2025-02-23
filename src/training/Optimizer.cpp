@@ -16,10 +16,11 @@
 
 namespace ml
 {
-	Optimizer::Optimizer(float learningRate, float beta1, float beta2) :
+	Optimizer::Optimizer(float learningRate, float beta1, float beta2, float weight_decay) :
 			m_learning_rate(learningRate),
 			m_beta1(beta1),
-			m_beta2(beta2)
+			m_beta2(beta2),
+			m_weight_decay(weight_decay)
 	{
 	}
 	Optimizer::Optimizer(const Optimizer &other) :
@@ -86,7 +87,8 @@ namespace ml
 			m_variance = std::make_unique<Tensor>(param.shape(), param.dtype(), param.device());
 
 		m_steps++;
-		radamOptimize(context, param.getParam(), param.getGradient(), *m_momentum, *m_variance, m_learning_rate, m_beta1, m_beta2, m_steps);
+		radamOptimize(context, param.getParam(), param.getGradient(), *m_momentum, *m_variance, m_learning_rate, m_beta1, m_beta2, m_steps,
+				m_weight_decay);
 		param.getGradient().zeroall(context);
 	}
 

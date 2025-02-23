@@ -29,7 +29,7 @@ namespace
 		return x * x;
 	}
 
-	double histogram_l2_diff(const std::vector<double> &P, const std::vector<double> &Q)
+	double histogram_l1_diff(const std::vector<double> &P, const std::vector<double> &Q)
 	{
 		assert(P.size() == Q.size());
 
@@ -198,7 +198,7 @@ namespace ml
 			{
 				const std::vector<double> previous_histogram = m_data;
 				update_histogram(runtime_data);
-				const double diff = histogram_l2_diff(previous_histogram, m_data) / pow(tensor.firstDim(), 0.666f);
+				const double diff = histogram_l1_diff(previous_histogram, m_data) / pow(tensor.firstDim(), 0.666f);
 
 				std::cout << "difference = " << diff << " (" << m_accuracy << ")\n";
 				if (diff < m_accuracy)

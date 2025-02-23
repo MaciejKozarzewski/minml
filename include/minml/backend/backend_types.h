@@ -31,6 +31,12 @@ namespace ml
 				int dim[6];
 		} mlShape_t;
 
+		typedef struct
+		{
+				float scale;
+				float shift;
+		} mlQuantizationData_t;
+
 		typedef enum
 		{
 			DTYPE_UNKNOWN,

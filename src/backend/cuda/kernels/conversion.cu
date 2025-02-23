@@ -20,6 +20,8 @@
 
 namespace
 {
+	using namespace ml;
+
 	template<typename T>
 	__device__ T one()
 	{
@@ -157,6 +159,37 @@ namespace
 		return 0;
 	}
 
+	template<typename T>
+	void convert_helper(cudaStream_t stream, void *dst, const void *src, mlDataType_t src_dtype, int elements)
+	{
+		const dim3 blockDim(256);
+		const dim3 gridDim = cuda::gridSize<1024>(elements, 256);
+		switch (src_dtype)
+		{
+			case DTYPE_FLOAT16:
+				kernel_convert<<<gridDim, blockDim, 0, stream>>>(getPointer<T>(dst), getPointer<half>(src), elements);
+				break;
+			case DTYPE_FLOAT32:
+				kernel_convert<<<gridDim, blockDim, 0, stream>>>(getPointer<T>(dst), getPointer<float>(src), elements);
+				break;
+			case DTYPE_FLOAT64:
+				kernel_convert<<<gridDim, blockDim, 0, stream>>>(getPointer<T>(dst), getPointer<double>(src), elements);
+				break;
+			case DTYPE_UINT8:
+				kernel_convert<<<gridDim, blockDim, 0, stream>>>(getPointer<T>(dst), getPointer<uint8_t>(src), elements);
+				break;
+			case DTYPE_INT8:
+				kernel_convert<<<gridDim, blockDim, 0, stream>>>(getPointer<T>(dst), getPointer<int8_t>(src), elements);
+				break;
+			case DTYPE_INT16:
+				kernel_convert<<<gridDim, blockDim, 0, stream>>>(getPointer<T>(dst), getPointer<int16_t>(src), elements);
+				break;
+			case DTYPE_INT32:
+				kernel_convert<<<gridDim, blockDim, 0, stream>>>(getPointer<T>(dst), getPointer<int32_t>(src), elements);
+				break;
+		}
+	}
+
 }
 
 namespace ml
@@ -177,34 +210,52 @@ namespace ml
 			case DTYPE_FLOAT32:
 				kernel_unpack_input<<<gridDim, blockDim, 0, stream>>>(getPointer<float>(dst), getPointer<uint32_t>(src), first_dim, last_dim);
 				break;
+			case DTYPE_FLOAT64:
+				kernel_unpack_input<<<gridDim, blockDim, 0, stream>>>(getPointer<double>(dst), getPointer<uint32_t>(src), first_dim, last_dim);
+				break;
+			case DTYPE_UINT8:
+				kernel_unpack_input<<<gridDim, blockDim, 0, stream>>>(getPointer<uint8_t>(dst), getPointer<uint32_t>(src), first_dim, last_dim);
+				break;
+			case DTYPE_INT8:
+				kernel_unpack_input<<<gridDim, blockDim, 0, stream>>>(getPointer<int8_t>(dst), getPointer<uint32_t>(src), first_dim, last_dim);
+				break;
 		}
 		assert(cudaGetLastError() == cudaSuccess);
 	}
 	void cuda_convert_type(mlContext_t context, void *dst, mlDataType_t dst_dtype, const void *src, mlDataType_t src_dtype, int elements)
 	{
-		dim3 blockDim(256);
-		dim3 gridDim = cuda::gridSize<1024>(elements, 256);
 		cudaStream_t stream = cuda::Context::getStream(context);
 
 		if (dst_dtype == src_dtype && dst != src)
 		{ // same type, different locations, can just copy memory
-			cudaError_t status = cudaMemcpy(dst, src, elements * size_of(dst_dtype), cudaMemcpyDeviceToDevice);
+			cudaError_t status = cudaMemcpyAsync(dst, src, elements * size_of(dst_dtype), cudaMemcpyDeviceToDevice, stream);
 			assert(status == cudaSuccess);
 			return;
 		}
 
-		if (dst_dtype == DTYPE_FLOAT16 && src_dtype == DTYPE_FLOAT32)
+		switch (dst_dtype)
 		{
-			assert(dst != src);
-			kernel_convert<<<gridDim, blockDim, 0, stream>>>(getPointer<half>(dst), getPointer<float>(src), elements);
-			return;
-		}
-		if (dst_dtype == DTYPE_FLOAT32 && src_dtype == DTYPE_FLOAT16)
-		{
-
-			assert(dst != src);
-			kernel_convert<<<gridDim, blockDim, 0, stream>>>(getPointer<float>(dst), getPointer<half>(src), elements);
-			return;
+			case DTYPE_FLOAT16:
+				convert_helper<half>(stream, dst, src, src_dtype, elements);
+				break;
+			case DTYPE_FLOAT32:
+				convert_helper<float>(stream, dst, src, src_dtype, elements);
+				break;
+			case DTYPE_FLOAT64:
+				convert_helper<double>(stream, dst, src, src_dtype, elements);
+				break;
+			case DTYPE_UINT8:
+				convert_helper<uint8_t>(stream, dst, src, src_dtype, elements);
+				break;
+			case DTYPE_INT8:
+				convert_helper<int8_t>(stream, dst, src, src_dtype, elements);
+				break;
+			case DTYPE_INT16:
+				convert_helper<int16_t>(stream, dst, src, src_dtype, elements);
+				break;
+			case DTYPE_INT32:
+				convert_helper<int32_t>(stream, dst, src, src_dtype, elements);
+				break;
 		}
 		assert(cudaGetLastError() == cudaSuccess);
 	}

@@ -76,11 +76,11 @@ namespace
 		for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < first_dim; i += gridDim.x * blockDim.x)
 		{
 			const float mean = output[i * 2 + 0];
-			const float variance = 1.0f;//output[i * 2 + 1];
+			const float variance = 1.0f; //output[i * 2 + 1];
 			const float Q = target[i];
 
 			gradient[i * 2 + 0] = inv_batch_size * 2.0f * (mean - Q) / variance;
-			gradient[i * 2 + 1] = 0.0f;//inv_batch_size * (variance - square(mean - Q)) / square(variance);
+			gradient[i * 2 + 1] = 0.0f; //inv_batch_size * (variance - square(mean - Q)) / square(variance);
 		}
 	}
 	__global__ void kernel_CE_loss_step_1(float *workspace, const float *output, const float *target, int elements)
@@ -88,7 +88,7 @@ namespace
 		assert(blockDim.x == 256);
 		__shared__ cg::block_tile_memory<256> btm;
 		cg::thread_block thb = cg::this_thread_block(btm);
-		cg::thread_block_tile<256> tile = cg::tiled_partition<256>(thb);
+		cg::thread_block_tile < 256 > tile = cg::tiled_partition<256>(thb);
 
 		float acc = 0.0f;
 		for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < elements; i += gridDim.x * blockDim.x)
@@ -102,7 +102,7 @@ namespace
 		assert(blockDim.x == 256);
 		__shared__ cg::block_tile_memory<256> btm;
 		cg::thread_block thb = cg::this_thread_block(btm);
-		cg::thread_block_tile<256> tile = cg::tiled_partition<256>(thb);
+		cg::thread_block_tile < 256 > tile = cg::tiled_partition<256>(thb);
 
 		float acc = 0.0f;
 		for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < elements; i += gridDim.x * blockDim.x)
@@ -116,13 +116,13 @@ namespace
 		assert(blockDim.x == 256);
 		__shared__ cg::block_tile_memory<256> btm;
 		cg::thread_block thb = cg::this_thread_block(btm);
-		cg::thread_block_tile<256> tile = cg::tiled_partition<256>(thb);
+		cg::thread_block_tile < 256 > tile = cg::tiled_partition<256>(thb);
 
 		float acc = 0.0f;
 		for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < first_dim; i += gridDim.x * blockDim.x)
 		{
 			const float mean = output[i * 2 + 0];
-			const float variance = 1.0f;//output[i * 2 + 1];
+			const float variance = 1.0f; //output[i * 2 + 1];
 			acc += std::log(variance) + square(mean - target[i]) / variance;
 		}
 		const float sum = cg::reduce(tile, acc, cg::plus<float>());
@@ -135,7 +135,7 @@ namespace
 		assert(blockDim.x == 256);
 		__shared__ cg::block_tile_memory<256> btm;
 		cg::thread_block thb = cg::this_thread_block(btm);
-		cg::thread_block_tile<256> tile = cg::tiled_partition<256>(thb);
+		cg::thread_block_tile < 256 > tile = cg::tiled_partition<256>(thb);
 
 		float acc = 0.0f;
 		for (int i = threadIdx.x; i < elements; i += blockDim.x)
@@ -147,7 +147,7 @@ namespace
 
 	template<int N>
 	__global__ void kernel_learn_radam(float *weight, const float *gradient, float *momentum, float *variance, int elements, float learning_rate,
-			float beta1, float beta2, int step)
+			float beta1, float beta2, int step, float weight_decay)
 	{
 		const float pow_beta1 = bounded_pow(beta1, step, 1.0e-8f);
 		const float pow_beta2 = bounded_pow(beta2, step, 1.0e-8f);
@@ -174,7 +174,7 @@ namespace
 			if (p > 4.0f)
 				correction = sqrt((1.0f - pow_beta2) / (v + 1.0e-8f)) * r;
 
-			w = round_small_to_zero(w - learning_rate * correction * m / (1.0f - pow_beta1));
+			w = round_small_to_zero(w - learning_rate * (correction * m / (1.0f - pow_beta1) + weight_decay * w));
 
 			m.store(momentum + i);
 			v.store(variance + i);
@@ -330,7 +330,7 @@ namespace ml
 	}
 
 	void cuda_radam_optimize(mlContext_t context, mlShape_t shape, void *weight, const void *update, void *momentum, void *variance,
-			float learning_rate, float beta1, float beta2, int step)
+			float learning_rate, float beta1, float beta2, int step, float weight_decay)
 	{
 		assert(weight != nullptr);
 		assert(update != nullptr);
@@ -346,13 +346,13 @@ namespace ml
 		{
 			dim3 gridDim = cuda::gridSize<1024>(length / 4, blockDim.x);
 			kernel_learn_radam<4> <<<gridDim, blockDim, 0, stream>>>(getPointer<float>(weight), getPointer<float>(update),
-					getPointer<float>(momentum), getPointer<float>(variance), length, learning_rate, beta1, beta2, step);
+					getPointer<float>(momentum), getPointer<float>(variance), length, learning_rate, beta1, beta2, step, weight_decay);
 		}
 		else
 		{
 			dim3 gridDim = cuda::gridSize<1024>(length, blockDim.x);
 			kernel_learn_radam<1> <<<gridDim, blockDim, 0, stream>>>(getPointer<float>(weight), getPointer<float>(update),
-					getPointer<float>(momentum), getPointer<float>(variance), length, learning_rate, beta1, beta2, step);
+					getPointer<float>(momentum), getPointer<float>(variance), length, learning_rate, beta1, beta2, step, weight_decay);
 		}
 		assert(cudaGetLastError() == cudaSuccess);
 	}

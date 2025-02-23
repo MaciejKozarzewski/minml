@@ -13,7 +13,7 @@
 #include <cuda_runtime_api.h>
 #include <cublas_v2.h>
 #ifdef USE_CUDNN
-#  include "cudnn_ops_infer.h"
+#  include "cudnn_ops.h"
 #  include <cublasLt.h>
 #endif
 

@@ -29,12 +29,6 @@ namespace
 			int8_t y = 0;
 	};
 
-	__device__ float bitwise_and(float x, float mask)
-	{
-		uint32_t result = (reinterpret_cast<uint32_t*>(&x)[0]) & (reinterpret_cast<uint32_t*>(&mask)[0]);
-		return reinterpret_cast<float*>(&result)[0];
-	}
-
 	template<typename T>
 	__host__ __device__ T clamp(T x, T lower, T upper)
 	{

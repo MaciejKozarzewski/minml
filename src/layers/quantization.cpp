@@ -22,19 +22,19 @@ namespace
 namespace ml
 {
 
-	std::pair<Tensor, Tensor> WeightQuantizer::quantize(const Tensor &weights, const Tensor &bias, InputQuantizer input_quantizer, int mode)
+	WeightQuantizer quantize_weights(const Tensor &weights, const Tensor &bias, const TensorQuantizer &input_quantizer, const std::string &mode)
 	{
-		Tensor quantized_weights;
-		Tensor new_bias;
-		if (mode == 0)
-		{ // per first dim
+		assert(mode == "per_first_dim" || mode == "per_last_dim");
+		WeightQuantizer result;
+		if (mode == "per_first_dim")
+		{
 			const int first_dim = weights.firstDim();
 			const int last_dim = weights.shape().volumeWithoutFirstDim();
-			m_channel_scales = std::make_unique<Tensor>(Shape( { first_dim }), "float32", Device::cpu());
+			result.channel_scales = Tensor(Shape( { first_dim }), "float32", Device::cpu());
 			Tensor tmp = weights.view( { first_dim, last_dim });
 
-			quantized_weights = Tensor( { first_dim, last_dim }, "int8", Device::cpu());
-			new_bias = Tensor( { first_dim }, "float32", Device::cpu());
+			result.weights = Tensor( { first_dim, last_dim }, "int8", Device::cpu());
+			result.bias = Tensor( { first_dim }, "float32", Device::cpu());
 			for (int i = 0; i < first_dim; i++)
 			{
 				float max_abs_value = 0.0f;
@@ -42,28 +42,28 @@ namespace ml
 					max_abs_value = std::max(max_abs_value, std::fabs(tmp.get( { i, j })));
 
 				const float channel_scale = 127.0f / max_abs_value;
-				m_channel_scales->at( { i }) = channel_scale;
+				result.channel_scales.at( { i }) = channel_scale;
 
 				int sum_q = 0;
 				for (int j = 0; j < last_dim; j++)
 				{
 					const int8_t q = symmetric_quantize(tmp.get( { i, j }), channel_scale);
 					sum_q += static_cast<int>(q);
-					quantized_weights.at( { i, j }) = q;
+					result.weights.at( { i, j }) = q;
 				}
 
-				new_bias.at( { i }) = input_quantizer.shift * sum_q * channel_scale;
+				result.bias.at( { i }) = input_quantizer.shift * sum_q * channel_scale;
 			}
 		}
-		if (mode == 1)
-		{ // per last dim
+		if (mode == "per_last_dim")
+		{
 			const int first_dim = weights.shape().volumeWithoutLastDim();
 			const int last_dim = weights.lastDim();
-			m_channel_scales = std::make_unique<Tensor>(Shape( { last_dim }), "float32", Device::cpu());
+			result.channel_scales = Tensor(Shape( { last_dim }), "float32", Device::cpu());
 			Tensor tmp = weights.view( { first_dim, last_dim });
 
-			quantized_weights = Tensor( { first_dim, last_dim }, "int8", Device::cpu());
-			new_bias = Tensor( { last_dim }, "float32", Device::cpu());
+			result.weights = Tensor( { first_dim, last_dim }, "int8", Device::cpu());
+			result.bias = Tensor( { last_dim }, "float32", Device::cpu());
 			for (int j = 0; j < last_dim; j++)
 			{
 				float max_abs_value = 0.0f;
@@ -71,28 +71,28 @@ namespace ml
 					max_abs_value = std::max(max_abs_value, std::fabs(tmp.get( { i, j })));
 
 				const float channel_scale = 127.0f / max_abs_value;
-				m_channel_scales->at( { j }) = channel_scale;
+				result.channel_scales.at( { j }) = channel_scale;
 
 				int sum_q = 0;
 				for (int i = 0; i < first_dim; i++)
 				{
 					const int8_t q = symmetric_quantize(tmp.get( { i, j }), channel_scale);
 					sum_q += static_cast<int>(q);
-					quantized_weights.at( { i, j }) = q;
+					result.weights.at( { i, j }) = q;
 				}
-				new_bias.at( { j }) = input_quantizer.shift * sum_q * channel_scale;
+				result.bias.at( { j }) = input_quantizer.shift * sum_q * channel_scale;
 			}
 		}
-		quantized_weights.reshape(weights.shape());
+		result.weights.reshape(weights.shape());
 
 		if (not bias.isEmpty())
 		{
 			assert(bias.rank() == 1);
 			for (int i = 0; i < bias.dim(0); i++)
-				new_bias.at( { i }) = new_bias.get( { i }) + bias.get( { i });
+				result.bias.at( { i }) = result.bias.get( { i }) + bias.get( { i });
 		}
 
-		return std::pair<Tensor, Tensor>(quantized_weights, new_bias);
+		return result;
 	}
 } /* namespace ml */
 
