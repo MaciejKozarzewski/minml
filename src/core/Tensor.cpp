@@ -67,6 +67,9 @@ namespace
 					case ml::DataType::INT8:
 						m_data = store(static_cast<int8_t>(value));
 						break;
+					case ml::DataType::INT16:
+						m_data = store(static_cast<int16_t>(value));
+						break;
 					case ml::DataType::INT32:
 						m_data = store(static_cast<int32_t>(value));
 						break;
@@ -88,6 +91,8 @@ namespace
 						return load<uint8_t>(m_data);
 					case ml::DataType::INT8:
 						return load<int8_t>(m_data);
+					case ml::DataType::INT16:
+						return load<int16_t>(m_data);
 					case ml::DataType::INT32:
 						return load<int32_t>(m_data);
 					default:
@@ -139,6 +144,12 @@ namespace
 				std::memcpy(&x, ptr, sizeof(int8_t));
 				return static_cast<T>(x);
 			}
+			case ml::DataType::INT16:
+			{
+				int16_t x;
+				std::memcpy(&x, ptr, sizeof(int16_t));
+				return static_cast<T>(x);
+			}
 			case ml::DataType::INT32:
 			{
 				int32_t x;
@@ -184,6 +195,12 @@ namespace
 				std::memcpy(ptr, &value, sizeof(int8_t));
 				break;
 			}
+			case ml::DataType::INT16:
+			{
+				const int16_t value = static_cast<int16_t>(x);
+				std::memcpy(ptr, &value, sizeof(int16_t));
+				break;
+			}
 			case ml::DataType::INT32:
 			{
 				const int value = static_cast<int>(x);
@@ -198,11 +215,59 @@ namespace
 
 namespace ml
 {
+	/*
+	 * const tensor reference
+	 */
+	Tensor::const_reference::const_reference(void *ptr, size_t offset, Device d, DataType dtype) :
+			m_dtype(dtype)
+	{
+		ml::memcpy(Device::cpu(), &m_data, 0, d, ptr, sizeOf(dtype) * offset, sizeOf(dtype));
+	}
+	Tensor::const_reference::operator float() const
+	{
+		return load<float>(&m_data, m_dtype);
+	}
+	Tensor::const_reference::operator double() const
+	{
+		return load<double>(&m_data, m_dtype);
+	}
+	Tensor::const_reference::operator uint8_t() const
+	{
+		return load<uint8_t>(&m_data, m_dtype);
+	}
+	Tensor::const_reference::operator int8_t() const
+	{
+		return load<int8_t>(&m_data, m_dtype);
+	}
+	Tensor::const_reference::operator int16_t() const
+	{
+		return load<int16_t>(&m_data, m_dtype);
+	}
+	Tensor::const_reference::operator int32_t() const
+	{
+		return load<int32_t>(&m_data, m_dtype);
+	}
+
+	/*
+	 * tensor reference
+	 */
 	Tensor::reference::reference(void *ptr, size_t offset, Device d, DataType dtype) :
 			m_ptr(reinterpret_cast<uint8_t*>(ptr) + offset * sizeOf(dtype)),
 			m_device(d),
 			m_dtype(dtype)
 	{
+	}
+	Tensor::reference& Tensor::reference::operator=(Tensor::const_reference x)
+	{
+		assert(m_dtype == x.m_dtype);
+		ml::memcpy(m_device, m_ptr, 0, Device::cpu(), &(x.m_data), 0, sizeOf(m_dtype));
+		return *this;
+	}
+	Tensor::reference& Tensor::reference::operator=(Tensor::reference x)
+	{
+		assert(m_dtype == x.m_dtype);
+		ml::memcpy(m_device, m_ptr, 0, x.m_device, x.m_ptr, 0, sizeOf(m_dtype));
+		return *this;
 	}
 	Tensor::reference& Tensor::reference::operator=(float x)
 	{
@@ -218,7 +283,28 @@ namespace ml
 		ml::memcpy(m_device, m_ptr, 0, Device::cpu(), &tmp, 0, sizeOf(m_dtype));
 		return *this;
 	}
-	Tensor::reference& Tensor::reference::operator=(int x)
+	Tensor::reference& Tensor::reference::operator=(uint8_t x)
+	{
+		uint64_t tmp;
+		store(x, &tmp, m_dtype);
+		ml::memcpy(m_device, m_ptr, 0, Device::cpu(), &tmp, 0, sizeOf(m_dtype));
+		return *this;
+	}
+	Tensor::reference& Tensor::reference::operator=(int8_t x)
+	{
+		uint64_t tmp;
+		store(x, &tmp, m_dtype);
+		ml::memcpy(m_device, m_ptr, 0, Device::cpu(), &tmp, 0, sizeOf(m_dtype));
+		return *this;
+	}
+	Tensor::reference& Tensor::reference::operator=(int16_t x)
+	{
+		uint64_t tmp;
+		store(x, &tmp, m_dtype);
+		ml::memcpy(m_device, m_ptr, 0, Device::cpu(), &tmp, 0, sizeOf(m_dtype));
+		return *this;
+	}
+	Tensor::reference& Tensor::reference::operator=(int32_t x)
 	{
 		uint64_t tmp;
 		store(x, &tmp, m_dtype);
@@ -235,33 +321,36 @@ namespace ml
 	{
 		uint64_t tmp;
 		ml::memcpy(Device::cpu(), &tmp, 0, m_device, m_ptr, 0, sizeOf(m_dtype));
-		return load<float>(&tmp, m_dtype);
+		return load<double>(&tmp, m_dtype);
 	}
-	Tensor::reference::operator int() const
+	Tensor::reference::operator uint8_t() const
 	{
 		uint64_t tmp;
 		ml::memcpy(Device::cpu(), &tmp, 0, m_device, m_ptr, 0, sizeOf(m_dtype));
-		return load<float>(&tmp, m_dtype);
+		return load<uint8_t>(&tmp, m_dtype);
+	}
+	Tensor::reference::operator int8_t() const
+	{
+		uint64_t tmp;
+		ml::memcpy(Device::cpu(), &tmp, 0, m_device, m_ptr, 0, sizeOf(m_dtype));
+		return load<int8_t>(&tmp, m_dtype);
+	}
+	Tensor::reference::operator int16_t() const
+	{
+		uint64_t tmp;
+		ml::memcpy(Device::cpu(), &tmp, 0, m_device, m_ptr, 0, sizeOf(m_dtype));
+		return load<int16_t>(&tmp, m_dtype);
+	}
+	Tensor::reference::operator int32_t() const
+	{
+		uint64_t tmp;
+		ml::memcpy(Device::cpu(), &tmp, 0, m_device, m_ptr, 0, sizeOf(m_dtype));
+		return load<int32_t>(&tmp, m_dtype);
 	}
 
-	Tensor::const_reference::const_reference(void *ptr, size_t offset, Device d, DataType dtype) :
-			m_dtype(dtype)
-	{
-		ml::memcpy(Device::cpu(), &m_data, 0, d, ptr, sizeOf(dtype) * offset, sizeOf(dtype));
-	}
-	Tensor::const_reference::operator float() const
-	{
-		return load<float>(&m_data, m_dtype);
-	}
-	Tensor::const_reference::operator double() const
-	{
-		return load<double>(&m_data, m_dtype);
-	}
-	Tensor::const_reference::operator int() const
-	{
-		return load<int>(&m_data, m_dtype);
-	}
-
+	/*
+	 * Tensor
+	 */
 	Tensor::Tensor() noexcept
 	{
 		std::memset(m_stride, 0, sizeof(m_stride));

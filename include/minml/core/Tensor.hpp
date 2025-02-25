@@ -38,21 +38,6 @@ namespace ml
 
 			uint32_t m_stride[Shape::max_dimension];
 		public:
-			class reference
-			{
-					friend class Tensor;
-					void *m_ptr = nullptr;
-					Device m_device = Device::cpu();
-					DataType m_dtype = DataType::UNKNOWN;
-					reference(void *ptr, size_t offset, Device d, DataType dtype);
-				public:
-					reference& operator=(float x);
-					reference& operator=(double x);
-					reference& operator=(int x);
-					operator float() const;
-					operator double() const;
-					operator int() const;
-			};
 			class const_reference
 			{
 					friend class Tensor;
@@ -62,7 +47,33 @@ namespace ml
 				public:
 					operator float() const;
 					operator double() const;
-					operator int() const;
+					operator uint8_t() const;
+					operator int8_t() const;
+					operator int16_t() const;
+					operator int32_t() const;
+			};
+			class reference
+			{
+					friend class Tensor;
+					void *m_ptr = nullptr;
+					Device m_device = Device::cpu();
+					DataType m_dtype = DataType::UNKNOWN;
+					reference(void *ptr, size_t offset, Device d, DataType dtype);
+				public:
+					reference& operator=(const_reference x);
+					reference& operator=(reference x);
+					reference& operator=(float x);
+					reference& operator=(double x);
+					reference& operator=(uint8_t x);
+					reference& operator=(int8_t x);
+					reference& operator=(int16_t x);
+					reference& operator=(int32_t x);
+					operator float() const;
+					operator double() const;
+					operator uint8_t() const;
+					operator int8_t() const;
+					operator int16_t() const;
+					operator int32_t() const;
 			};
 
 			Tensor() noexcept;
