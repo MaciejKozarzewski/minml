@@ -160,8 +160,7 @@ namespace ml
 		m_context = std::make_shared<Context>(newDevice);
 		for (size_t i = 0; i < m_nodes.size(); i++)
 			m_nodes[i]->changeContext(m_context);
-		if (m_workspace != nullptr)
-			m_workspace->moveTo(newDevice);
+		m_workspace = nullptr;
 		if (m_backup_tensor != nullptr)
 			m_backup_tensor->moveTo(newDevice);
 		for (size_t i = 0; i < m_targets.size(); i++)
@@ -303,25 +302,30 @@ namespace ml
 		for (size_t i = 0; i < m_output_nodes.size(); i++)
 			std::cout << "Output:" << i << " : {" << index_of_node(m_output_nodes[i]) << "} : " << m_output_nodes[i]->getOutputShape() << std::endl;
 	}
-	void Graph::makeNonTrainable()
+	void Graph::makeTrainable(bool b)
 	{
-		m_targets.clear();
-		m_losses.clear();
+		if (not b)
+		{
+			m_targets.clear();
+			m_losses.clear();
+		}
 		for (int i = 0; i < numberOfNodes(); i++)
-			getNode(i).makeNonTrainable();
-		m_is_trainable = false;
+			getNode(i).makeTrainable(b);
+		m_is_trainable = b;
 	}
 	bool Graph::isTrainable() const noexcept
 	{
 		return m_is_trainable;
 	}
-	void Graph::calibrate(CalibrationTable &table) const
+	void Graph::calibrate(CalibrationTable &table)
 	{
 		for (size_t i = 0; i < m_nodes.size(); i++)
 		{
 			if (m_nodes[i]->getLayer().isQuantizable())
 			{
-				if (not table.getHistogram(i).isReady())
+				if (table.getHistogram(i).isReady())
+					m_nodes[i]->setOutputTransform(table.getHistogram(i).getTransform());
+				else
 					table.getHistogram(i).collectStatistics(m_nodes[i]->getOutputTensor());
 			}
 			else

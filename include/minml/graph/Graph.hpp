@@ -99,9 +99,9 @@ namespace ml
 			void setLearningRate(float lr);
 
 			void print() const;
-			void makeNonTrainable();
+			void makeTrainable(bool b);
 			bool isTrainable() const noexcept;
-			void calibrate(CalibrationTable &table) const;
+			void calibrate(CalibrationTable &table);
 
 			int numberOfNodes() const noexcept;
 			const GraphNode& getNode(int index) const;

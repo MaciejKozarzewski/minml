@@ -117,10 +117,10 @@ namespace
 		tensor.copyToHost(result.data(), tensor.sizeInBytes());
 		return result;
 	}
-	double get_quantization_l2_error(float x, std::pair<float, float> scale_and_shift) noexcept
+	double get_quantization_l2_error(float x, ml::AffineTransform scale_and_shift) noexcept
 	{
-		const int8_t quantized = std::max(-128.0f, std::min(127.0f, x * scale_and_shift.first + scale_and_shift.second));
-		const float recovered = (static_cast<float>(quantized) - scale_and_shift.second) / scale_and_shift.first;
+		const int8_t quantized = std::max(-128.0f, std::min(127.0f, x * scale_and_shift.scale() + scale_and_shift.shift()));
+		const float recovered = (static_cast<float>(quantized) - scale_and_shift.shift()) / scale_and_shift.scale();
 		return square(x - recovered);
 	}
 }
@@ -200,7 +200,7 @@ namespace ml
 				update_histogram(runtime_data);
 				const double diff = histogram_l1_diff(previous_histogram, m_data) / pow(tensor.firstDim(), 0.666f);
 
-				std::cout << "difference = " << diff << " (" << m_accuracy << ")\n";
+//				std::cout << "difference = " << diff << " (" << m_accuracy << ")\n";
 				if (diff < m_accuracy)
 					m_is_ready = true;
 			}
@@ -208,9 +208,9 @@ namespace ml
 			// now find optimal range for quantization
 			if (m_is_ready)
 			{
-				std::cout << getInfo() << '\n';
+//				std::cout << getInfo() << '\n';
 				m_optimal_range = find_coarse_range();
-				std::cout << "found coarse range of [" << m_optimal_range.first << ", " << m_optimal_range.second << "]\n";
+//				std::cout << "found coarse range of [" << m_optimal_range.first << ", " << m_optimal_range.second << "]\n";
 
 //				for (int step = m_target_bins / 4; step >= 16; step /= 4)
 //				const int step = m_target_bins / 4;
@@ -230,9 +230,9 @@ namespace ml
 //					m_optimal_range = fine_tune_range(candidate_ranges, runtime_data);
 //					std::cout << "tuned range to [" << m_optimal_range.first << ", " << m_optimal_range.second << "]\n";
 //				}
-				const std::pair<float, float> scale_and_shift = get_scale_and_shift(m_optimal_range);
-				int8_to_fp32_scale = scale_and_shift.first;
-				int8_to_fp32_shift = scale_and_shift.second;
+				const AffineTransform scale_and_shift = calculate_transform(m_optimal_range);
+				int8_to_fp32_scale = scale_and_shift.scale();
+				int8_to_fp32_shift = scale_and_shift.shift();
 
 //				std::cout << getInfo() << '\n';
 //				exit(0);
@@ -270,8 +270,6 @@ namespace ml
 		result["scale"] = int8_to_fp32_scale;
 		result["shift"] = int8_to_fp32_shift;
 		result["binary_offset"] = binary_data.size();
-		std::cout << m_min_value << " " << m_max_value << ", samples = " << m_collected_samples << ", " << int8_to_fp32_scale << " "
-				<< int8_to_fp32_shift << '\n';
 		binary_data.save(m_data.data(), sizeof(double) * m_data.size());
 		return result;
 	}
@@ -289,18 +287,12 @@ namespace ml
 		m_target_bins = json["target_bins"].getInt();
 		int8_to_fp32_scale = json["scale"].getDouble();
 		int8_to_fp32_shift = json["shift"].getDouble();
-		std::cout << m_min_value << " " << m_max_value << ", samples = " << m_collected_samples << ", " << int8_to_fp32_scale << " "
-				<< int8_to_fp32_shift << '\n';
 		const size_t offset = json["binary_offset"].getLong();
 		binary_data.load(m_data.data(), offset, sizeof(double) * m_data.size());
 	}
-	float Histogram::getScale() const noexcept
+	AffineTransform Histogram::getTransform() const noexcept
 	{
-		return int8_to_fp32_scale;
-	}
-	float Histogram::getShift() const noexcept
-	{
-		return int8_to_fp32_shift;
+		return AffineTransform(int8_to_fp32_scale, int8_to_fp32_shift);
 	}
 	void Histogram::find_min_max(const std::vector<float> &data)
 	{
@@ -347,21 +339,21 @@ namespace ml
 				resize_histogram(candidate, i, j, m_target_bins);
 				const double kld = histogram_kl_divergence(reference, candidate);
 
-				std::cout << "[" << i << ", " << j << "] = " << kld << '\n';
+//				std::cout << "[" << i << ", " << j << "] = " << kld << '\n';
 				if (kld <= best_value)
 				{
 					result = std::pair<int, int>(i, j);
 					best_value = kld;
-					std::cout << "-->new best range\n";
+//					std::cout << "-->new best range\n";
 				}
 			}
 		return result;
 	}
 	std::pair<int, int> Histogram::fine_tune_range(const std::vector<std::pair<int, int>> &candidates, const std::vector<float> &data)
 	{
-		std::vector<std::pair<float, float>> scales_and_shifts;
+		std::vector<AffineTransform> scales_and_shifts;
 		for (size_t i = 0; i < candidates.size(); i++)
-			scales_and_shifts.push_back(get_scale_and_shift(candidates[i]));
+			scales_and_shifts.push_back(calculate_transform(candidates[i]));
 
 		std::cout << "got following candidates\n";
 		for (size_t i = 0; i < candidates.size(); i++)
@@ -393,7 +385,7 @@ namespace ml
 	{
 		return (static_cast<double>(m_outliers_count) / m_collected_samples) < m_accuracy;
 	}
-	std::pair<float, float> Histogram::get_scale_and_shift(std::pair<int, int> range)
+	AffineTransform Histogram::calculate_transform(std::pair<int, int> range)
 	{
 		const float step = static_cast<float>(m_max_value - m_min_value) / m_data.size();
 		const float start_value = m_min_value + range.first * step;
@@ -405,7 +397,7 @@ namespace ml
 		// we must fine tune the shift to ensure that zero in fp32 is an integer value after quantization
 		const int int8_zero = round(-shift / scale); // round to the nearest integer
 
-		return std::pair<float, float>(scale, -int8_zero * scale);
+		return AffineTransform(scale, -int8_zero * scale);
 	}
 
 } /* namespace libml */

@@ -18,8 +18,8 @@ class SerializedObject;
 namespace ml
 {
 	class Tensor;
-	enum class ActivationType
-	;
+	enum class ActivationType;
+	class AffineTransform;
 }
 
 namespace ml
@@ -57,15 +57,14 @@ namespace ml
 			std::string getInfo() const;
 			Json serialize(SerializedObject &binary_data) const;
 			void unserialize(const Json &json, const SerializedObject &binary_data);
-			float getScale() const noexcept;
-			float getShift() const noexcept;
+			AffineTransform getTransform() const noexcept;
 		private:
 			void find_min_max(const std::vector<float> &tensor);
 			void update_histogram(const std::vector<float> &tensor);
 			std::pair<int, int> find_coarse_range();
 			std::pair<int, int> fine_tune_range(const std::vector<std::pair<int, int>> &candidates, const std::vector<float> &data);
 			bool has_enough_samples_for_min_max() const noexcept;
-			std::pair<float, float> get_scale_and_shift(std::pair<int, int> range);
+			AffineTransform calculate_transform(std::pair<int, int> range);
 	};
 
 } /* namespace ml */

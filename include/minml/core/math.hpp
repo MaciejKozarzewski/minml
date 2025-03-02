@@ -15,6 +15,7 @@ namespace ml
 	class Context;
 	class Shape;
 	class Tensor;
+	class AffineTransform;
 	enum class DataType;
 	enum class ActivationType;
 }
@@ -106,7 +107,7 @@ namespace ml
 	void softmaxForward(const Context &context, Tensor &output, const Tensor &input);
 	void geluBackward(const Context &context, Tensor &gradient_prev, const Tensor &gradient_next, const Tensor &input);
 
-	void emulateLowPrecision(const Context &context, Tensor &dst, const Tensor &src);
+	void emulateLowPrecision(const Context &context, Tensor &dst, const Tensor &src, DataType dtype, AffineTransform transform);
 	void sumOverFirstDim(const Context &context, Tensor &dst, const Tensor &src, float beta);
 	void multiplyTensors(const Context &context, Tensor &dst, const Tensor &lhs, const Tensor &rhs);
 	void addTensors(const Context &context, Tensor &dst, const Tensor &src1, const Tensor &src2);
@@ -125,6 +126,15 @@ namespace ml
 
 	void l2Regularization(const Context &context, Tensor &gradient, const Tensor &param, float coefficient, float offset);
 
+	/*
+	 * quantized
+	 */
+	void dequantize(const Context &context, const Tensor &input, Tensor &output, AffineTransform transform);
+	void quantized_depthwise_conv_forward(const Context &context, const Tensor &input, const Tensor &weights, const Tensor &scales,
+			const Tensor &bias, Tensor &output, AffineTransform output_transform, int padding_value);
+	void quantized_scale_shift_act(const Context &context, Tensor &output, AffineTransform output_transform, const Tensor &input,
+			const Tensor &scales, const Tensor &bias, ActivationType act, const Tensor &ext, AffineTransform ext_transform);
+	void create_receptive_fields(const Context &context, Tensor &output, const Tensor &input, int kernel_size, const void *padding = nullptr);
 } /* namespace ml */
 
 #endif /* MINML_MATH_HPP_ */

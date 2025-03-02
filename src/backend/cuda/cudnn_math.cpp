@@ -511,7 +511,6 @@ namespace ml
 				const float alpha2 = (add == nullptr) ? 0.0f : 1.0f;
 				cudnnStatus_t status = cudnnConvolutionBiasActivationForward(handle, &alpha1, xDesc, input, wDesc, weights, convDesc, perf.algo,
 						workspace, workspace_size, &alpha2, zDesc, zData, biasDesc, bias, activationDesc, yDesc, output);
-				std::cout << cudnnGetErrorString(status) << '\n';
 				assert(status == CUDNN_STATUS_SUCCESS);
 			}
 		}

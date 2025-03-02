@@ -20,6 +20,7 @@ namespace ml
 
 			void setInputShape(const std::vector<Shape> &shapes);
 			Shape getOutputShape() const;
+			void setupQuantization(const std::vector<AffineTransform> &input_transforms, const AffineTransform &output_transform);
 
 			std::string name() const;
 			Json getConfig() const;

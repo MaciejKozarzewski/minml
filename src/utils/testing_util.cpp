@@ -27,6 +27,16 @@ namespace
 		return x * x;
 	}
 
+	void init_for_test_int32(int32_t *ptr, size_t length, float shift, float scale)
+	{
+		for (size_t i = 0; i < length; i++)
+			ptr[i] = std::sin(i / 10.0 + shift) * scale;
+	}
+	void init_for_test_int8(int8_t *ptr, size_t length, float shift)
+	{
+		for (size_t i = 0; i < length; i++)
+			ptr[i] = 255 * std::sin(i / 10.0 + shift) - 128;
+	}
 	void init_for_test_fp64(double *ptr, size_t length, float shift, float scale)
 	{
 		for (size_t i = 0; i < length; i++)
@@ -59,6 +69,20 @@ namespace
 			ptr[i] = convert_fp32_to_fp16(2 * randFloat() - 1);
 	}
 
+	double diff_for_test_int32(const int32_t *ptr1, const int32_t *ptr2, size_t length)
+	{
+		double result = 0.0;
+		for (size_t i = 0; i < length; i++)
+			result += std::abs(ptr1[i] - ptr2[i]);
+		return result / length;
+	}
+	double diff_for_test_int8(const int8_t *ptr1, const int8_t *ptr2, size_t length)
+	{
+		double result = 0.0;
+		for (size_t i = 0; i < length; i++)
+			result += std::abs(ptr1[i] - ptr2[i]);
+		return result / length;
+	}
 	double diff_for_test_fp64(const double *ptr1, const double *ptr2, size_t length)
 	{
 		double result = 0.0;
@@ -190,6 +214,12 @@ namespace ml
 				case DataType::FLOAT64:
 					init_for_test_fp64(reinterpret_cast<double*>(tmp.data()), tmp.volume(), shift, scale);
 					break;
+				case DataType::INT32:
+					init_for_test_int32(reinterpret_cast<int32_t*>(tmp.data()), tmp.volume(), shift, scale);
+					break;
+				case DataType::INT8:
+					init_for_test_int8(reinterpret_cast<int8_t*>(tmp.data()), tmp.volume(), shift);
+					break;
 				default:
 					throw DataTypeNotSupported(METHOD_NAME, tmp.dtype());
 			}
@@ -237,6 +267,11 @@ namespace ml
 					return diff_for_test_fp32(reinterpret_cast<float*>(tmp_lhs.data()), reinterpret_cast<float*>(tmp_rhs.data()), tmp_lhs.volume());
 				case DataType::FLOAT64:
 					return diff_for_test_fp64(reinterpret_cast<double*>(tmp_lhs.data()), reinterpret_cast<double*>(tmp_rhs.data()), tmp_lhs.volume());
+				case DataType::INT32:
+					return diff_for_test_int32(reinterpret_cast<int32_t*>(tmp_lhs.data()), reinterpret_cast<int32_t*>(tmp_rhs.data()),
+							tmp_lhs.volume());
+				case DataType::INT8:
+					return diff_for_test_int8(reinterpret_cast<int8_t*>(tmp_lhs.data()), reinterpret_cast<int8_t*>(tmp_rhs.data()), tmp_lhs.volume());
 				default:
 					throw DataTypeNotSupported(METHOD_NAME, lhs.dtype());
 			}

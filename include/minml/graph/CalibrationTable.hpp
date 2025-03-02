@@ -24,7 +24,7 @@ namespace ml
 			void init(int size);
 			Histogram& getHistogram(size_t index);
 			const Histogram& getHistogram(size_t index) const;
-			size_t size() const noexcept;
+			int size() const noexcept;
 
 			bool isReady() const noexcept;
 			double getCompletionFactor() const noexcept;

@@ -11,30 +11,62 @@
 #include <minml/core/Tensor.hpp>
 
 #include <string>
+#include <limits>
+#include <cmath>
 
 namespace ml
 {
-	class TensorQuantizer
-	{
-		public:
-			float scale = 1.0f;
-			float shift = 0.0f;
 
-			TensorQuantizer() noexcept = default;
-			TensorQuantizer(float scale, float shift) noexcept :
-					scale(scale),
-					shift(shift)
+	class AffineTransform
+	{
+			float m_scale = 1.0f;
+			float m_shift = 0.0f;
+		public:
+			AffineTransform() noexcept = default;
+			AffineTransform(float scale, float shift) noexcept :
+					m_scale(scale),
+					m_shift(shift)
 			{
 			}
-			float to_fp32(int8_t x) const noexcept
+			float scale() const noexcept
 			{
-				return static_cast<float>(x) * scale + shift;
+				return m_scale;
 			}
-			int8_t to_int8(float x) const noexcept
+			float shift() const noexcept
 			{
-				return std::max(-128.0f, std::min(127.0f, (x - shift) / scale));
+				return m_shift;
+			}
+			template<typename T>
+			T operator()(T x) const noexcept
+			{
+				return static_cast<T>(static_cast<float>(x) * scale() + shift());
+			}
+			AffineTransform get_inverse() const noexcept
+			{
+				return AffineTransform(1.0f / scale(), -shift() / scale());
+			}
+			/*
+			 * Returns combined transform of outer(inner())
+			 */
+			static AffineTransform combine(const AffineTransform &outer, const AffineTransform &inner) noexcept
+			{
+				return AffineTransform(outer.scale() * inner.scale(), outer.scale() * inner.shift() + outer.shift());
 			}
 	};
+
+	template<typename T>
+	T get_zero(const AffineTransform &t) noexcept
+	{
+		return static_cast<T>(std::round(t.get_inverse()(0.0f)));
+	}
+
+	template<typename T>
+	T quantize_to(float x) noexcept
+	{
+		const float min_value = std::numeric_limits<T>::lowest();
+		const float max_value = std::numeric_limits<T>::max();
+		return std::max(min_value, std::min(max_value, std::round(x)));
+	}
 
 	class WeightQuantizer
 	{
@@ -44,7 +76,7 @@ namespace ml
 			Tensor channel_scales;
 	};
 
-	WeightQuantizer quantize_weights(const Tensor &weights, const Tensor &bias, const TensorQuantizer &input_quantizer, const std::string &mode);
+	WeightQuantizer quantize_weights(const Tensor &weights, const Tensor &bias, const AffineTransform &input_transform, const std::string &mode);
 
 } /* namespace ml */
 

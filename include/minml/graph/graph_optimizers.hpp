@@ -36,9 +36,7 @@ namespace ml
 
 	class Quantize
 	{
-			const CalibrationTable &m_table;
 		public:
-			Quantize(const CalibrationTable &table);
 			bool optimize(Graph &graph) const;
 	};
 

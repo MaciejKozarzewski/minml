@@ -232,12 +232,6 @@ namespace
 #endif
 	}
 
-	__global__ void kernel_emulate_low_precision(uint32_t *dst, const uint32_t *src, int elements)
-	{
-		for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < elements; i += gridDim.x * blockDim.x)
-			dst[i] = src[i] & 0xFFFFF000u;
-	}
-
 	template<typename T>
 	__global__ void kernel_window_partition(T *output, const T *input, int batch_size, int height, int width, int channels, int2 window_size,
 			int2 offset)
@@ -294,16 +288,6 @@ namespace
 
 namespace ml
 {
-	void cuda_emulate_low_precision(mlContext_t context, mlShape_t shape, void *dst, const void *src)
-	{
-		const int length = volume(shape);
-		dim3 blockDim(256);
-		dim3 gridDim = cuda::gridSize<1024>(length, blockDim.x);
-
-		kernel_emulate_low_precision<<<gridDim, blockDim, 0, cuda::Context::getStream(context)>>>(getPointer<uint32_t>(dst),
-				getPointer<uint32_t>(src), length);
-		assert(cudaGetLastError() == cudaSuccess);
-	}
 	void cuda_multiply_tensors(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *dst, const void *src1, const void *src2)
 	{
 		assert(dst != nullptr);

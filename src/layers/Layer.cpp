@@ -49,13 +49,13 @@ namespace
 {
 	using namespace ml;
 
-	Json to_json(const TensorQuantizer &tq)
+	Json to_json(const AffineTransform &tq)
 	{
-		return Json( { { "scale", tq.scale }, { "shift", tq.shift } });
+		return Json( { { "scale", tq.scale() }, { "shift", tq.shift() } });
 	}
-	TensorQuantizer tensor_quantizer_from_json(const Json &json)
+	AffineTransform tensor_quantizer_from_json(const Json &json)
 	{
-		return TensorQuantizer(json["scale"].getDouble(), json["shift"].getDouble());
+		return AffineTransform(json["scale"].getDouble(), json["shift"].getDouble());
 	}
 }
 
@@ -129,14 +129,14 @@ namespace ml
 		m_is_quantizable = b;
 		return *this;
 	}
-	void Layer::setupQuantization(const std::vector<TensorQuantizer> &input_quantizers, const TensorQuantizer &output_quantizer)
+	void Layer::setupQuantization(const std::vector<AffineTransform> &input_transforms, const AffineTransform &output_transform)
 	{
-		m_input_quantizers = input_quantizers;
-		m_output_quantizer = output_quantizer;
+		m_input_transforms = input_transforms;
+		m_output_transform = output_transform;
 		if (isQuantizable())
 		{
 			const std::string mode = (name() == "DepthwiseConv2D") ? "per_last_dim" : "per_first_dim";
-			const WeightQuantizer tmp = quantize_weights(getWeights().getParam(), getBias().getParam(), input_quantizers.at(0), mode);
+			const WeightQuantizer tmp = quantize_weights(getWeights().getParam(), getBias().getParam(), input_transforms.at(0), mode);
 			m_channel_scales = tmp.channel_scales;
 			getWeights().getParam() = tmp.weights;
 			getBias().getParam() = tmp.bias;
@@ -150,10 +150,10 @@ namespace ml
 		result["nonlinearity"] = toString(m_activation);
 		result["dtype"] = toString(m_dtype);
 		result["is_quantizable"] = m_is_quantizable;
-		result["input_quantizers"] = Json::array();
-		for (size_t i = 0; i < m_input_quantizers.size(); i++)
-			result["input_quantizers"][i] = to_json(m_input_quantizers[i]);
-		result["output_quantizer"] = to_json(m_output_quantizer);
+		result["input_transforms"] = Json::array();
+		for (size_t i = 0; i < m_input_transforms.size(); i++)
+			result["input_transforms"][i] = to_json(m_input_transforms[i]);
+		result["output_transform"] = to_json(m_output_transform);
 		return result;
 	}
 	void Layer::loadConfig(const Json &config)
@@ -161,13 +161,13 @@ namespace ml
 		this->m_dtype = typeFromString(config["dtype"].getString());
 		if (config.hasKey("is_quantizable"))
 			this->m_is_quantizable = config["is_quantizable"].getBool();
-		if (config.hasKey("input_quantizers"))
+		if (config.hasKey("input_transforms"))
 		{
-			for (int i = 0; i < config["input_quantizers"].size(); i++)
-				m_input_quantizers.push_back(tensor_quantizer_from_json(config["input_quantizers"][i]));
+			for (int i = 0; i < config["input_transforms"].size(); i++)
+				m_input_transforms.push_back(tensor_quantizer_from_json(config["input_transforms"][i]));
 		}
-		if (config.hasKey("output_quantizer"))
-			m_output_quantizer = tensor_quantizer_from_json(config["output_quantizer"]);
+		if (config.hasKey("output_transform"))
+			m_output_transform = tensor_quantizer_from_json(config["output_transform"]);
 	}
 	Json Layer::saveParameters(SerializedObject &binary_data) const
 	{
@@ -260,8 +260,11 @@ namespace ml
 
 	void Layer::convertTo(DataType newType)
 	{
-		getWeights().getParam().convertTo(context(), newType);
-		getBias().getParam().convertTo(context(), newType);
+		if (newType != DataType::INT8 and dtype() != DataType::INT8)
+		{
+			getWeights().getParam().convertTo(context(), newType);
+			getBias().getParam().convertTo(context(), newType);
+		}
 		m_dtype = newType;
 	}
 
@@ -278,6 +281,7 @@ namespace ml
 	void Layer::changeContext(std::shared_ptr<Context> &context)
 	{
 		this->m_context = context;
+		m_channel_scales.moveTo(device());
 		if (m_weights != nullptr)
 			getWeights().moveTo(device());
 		if (m_bias != nullptr)

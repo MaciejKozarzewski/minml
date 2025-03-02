@@ -219,6 +219,12 @@ namespace ml
 			case DTYPE_INT8:
 				kernel_unpack_input<<<gridDim, blockDim, 0, stream>>>(getPointer<int8_t>(dst), getPointer<uint32_t>(src), first_dim, last_dim);
 				break;
+			case DTYPE_INT16:
+				kernel_unpack_input<<<gridDim, blockDim, 0, stream>>>(getPointer<int16_t>(dst), getPointer<uint32_t>(src), first_dim, last_dim);
+				break;
+			case DTYPE_INT32:
+				kernel_unpack_input<<<gridDim, blockDim, 0, stream>>>(getPointer<int32_t>(dst), getPointer<uint32_t>(src), first_dim, last_dim);
+				break;
 		}
 		assert(cudaGetLastError() == cudaSuccess);
 	}
@@ -269,6 +275,15 @@ namespace ml
 
 		switch (dtype)
 		{
+			case DTYPE_INT8:
+			case DTYPE_UINT8:
+			{
+				dim3 gridDim(shape.dim[0], (shape.dim[1] + 128 - 1) / 128, (shape.dim[2] + 128 - 1) / 128);
+				kernel_transpose_021<uint8_t, 128, 128> <<<gridDim, blockDim, 0, stream>>>(getPointer<uint8_t>(output), getPointer<uint8_t>(input),
+						shape.dim[0], shape.dim[1], shape.dim[2]);
+				break;
+			}
+			case DTYPE_INT16:
 			case DTYPE_FLOAT16:
 			{
 				dim3 gridDim(shape.dim[0], (shape.dim[1] + 128 - 1) / 128, (shape.dim[2] + 64 - 1) / 64);

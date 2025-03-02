@@ -92,7 +92,55 @@ namespace ml
 	void DepthwiseConv2D::forward(const std::vector<Tensor> &input, Tensor &output)
 	{
 		assert(input.size() == 1);
-		depthwiseConvForward(context(), input[0], getWeights().getParam(), output, getBias().getParam());
+		if (input[0].dtype() == DataType::INT8)
+		{
+			assert(output.dtype() == dtype());
+			if (device().isCUDA())
+			{
+				const int32_t input_zero = get_zero<int8_t>(m_input_transforms[0]);
+				quantized_depthwise_conv_forward(context(), input[0], getWeights().getParam(), m_channel_scales, getBias().getParam(), output,
+						m_output_transform, input_zero);
+			}
+			if (device().isCPU())
+			{
+				const int batch = input[0].dim(0);
+				const int height = input[0].dim(1);
+				const int width = input[0].dim(2);
+				const int filters = input[0].dim(3);
+
+				const int pad_h = -(m_kernel_size - 1) / 2;
+				const int pad_w = -(m_kernel_size - 1) / 2;
+
+				const int32_t input_zero = get_zero<int8_t>(m_input_transforms[0]);
+				const AffineTransform output_to_int8 = m_output_transform.get_inverse();
+
+				for (int b = 0; b < batch; b++)
+					for (int f = 0; f < filters; f++)
+						for (int h = 0; h < height; h++)
+							for (int w = 0; w < width; w++)
+							{
+								int32_t acc = 0;
+								for (int i = 0; i < m_kernel_size; i++)
+									for (int j = 0; j < m_kernel_size; j++)
+									{
+										const int x = pad_h + h + i;
+										const int y = pad_w + w + j;
+										if (0 <= x and x < height and 0 <= y and y < width)
+											acc += (int) getWeights().getParam().at( { i, j, f }) * (int) input[0].at( { b, x, y, f });
+										else
+											acc += (int) getWeights().getParam().at( { i, j, f }) * input_zero;
+									}
+								float tmp = static_cast<float>(acc) * (float) m_channel_scales.at( { f }) + (float) getBias().getParam().at( { f });
+
+								if (output.dtype() == DataType::INT8)
+									output.at( { b, h, w, f }) = quantize_to<int8_t>(output_to_int8(tmp));
+								if (output.dtype() == DataType::FLOAT32)
+									output.at( { b, h, w, f }) = tmp;
+							}
+			}
+		}
+		else
+			depthwiseConvForward(context(), input[0], getWeights().getParam(), output, getBias().getParam());
 	}
 	void DepthwiseConv2D::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next)
 	{

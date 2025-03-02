@@ -143,6 +143,13 @@ namespace
 	{
 		return get(tensor.shape());
 	}
+	mlQuantizationData_t get(const AffineTransform &transform) noexcept
+	{
+		mlQuantizationData_t result;
+		result.scale = transform.scale();
+		result.shift = transform.shift();
+		return result;
+	}
 }
 
 namespace ml
@@ -382,9 +389,33 @@ namespace ml
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
-				cpu_depthwise_conv_forward(get(context), get(input.dtype()), get_shape(input), get_shape(weights), input.data(), weights.data(),
-						bias.data(), output.data());
+			{
+				const int batch = input.dim(0);
+				const int height = input.dim(1);
+				const int width = input.dim(2);
+				const int filters = input.dim(3);
+
+				const int kernel_height = weights.dim(0);
+				const int kernel_width = weights.dim(1);
+
+				const int pad_h = -(kernel_height - 1) / 2;
+				const int pad_w = -(kernel_width - 1) / 2;
+
+				output.zeroall();
+				for (int b = 0; b < batch; b++)
+					for (int f = 0; f < filters; f++)
+						for (int h = 0; h < height; h++)
+							for (int w = 0; w < width; w++)
+							{
+								float tmp = bias.isEmpty() ? 0.0f : bias.get( { f });
+								for (int i = 0; i < kernel_height; i++)
+									for (int j = 0; j < kernel_width; j++)
+										if ((pad_h + h + i) >= 0 and (pad_h + h + i) < height and (pad_w + w + j) >= 0 and (pad_w + w + j) < width)
+											tmp += weights.get( { i, j, f }) * input.get( { b, pad_h + h + i, pad_w + w + j, f });
+								output.at( { b, h, w, f }) = tmp;
+							}
 				break;
+			}
 			case DeviceType::CUDA:
 				cuda_depthwise_conv_forward(get(context), get(input.dtype()), get_shape(input), get_shape(weights), input.data(), weights.data(),
 						bias.data(), output.data());
@@ -976,20 +1007,18 @@ namespace ml
 		}
 	}
 
-	void emulateLowPrecision(const Context &context, Tensor &dst, const Tensor &src)
+	void emulateLowPrecision(const Context &context, Tensor &dst, const Tensor &src, DataType dtype, AffineTransform transform)
 	{
-		if (dst.dtype() != DataType::FLOAT32 or src.dtype() != DataType::FLOAT32)
-			return;
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
-				cpu_emulate_low_precision(get(context), get_shape(dst), dst.data(), src.data());
+				cpu_emulate_low_precision(get(context), get_shape(dst), get(dtype), dst.data(), src.data(), get(transform));
 				break;
 			case DeviceType::CUDA:
-				cuda_emulate_low_precision(get(context), get_shape(dst), dst.data(), src.data());
+				cuda_emulate_low_precision(get(context), get_shape(dst), get(dtype), dst.data(), src.data(), get(transform));
 				break;
 			case DeviceType::OPENCL:
-				opencl_emulate_low_precision(get(context), get_shape(dst), dst.data(), src.data());
+				opencl_emulate_low_precision(get(context), get_shape(dst), get(dtype), dst.data(), src.data(), get(transform));
 				break;
 		}
 	}
@@ -1163,5 +1192,68 @@ namespace ml
 		}
 	}
 
-}
+	/*
+	 * quantization
+	 */
+	void dequantize(const Context &context, const Tensor &input, Tensor &output, AffineTransform transform)
+	{
+		switch (context.device().type())
+		{
+			case DeviceType::CPU:
+				break;
+			case DeviceType::CUDA:
+				break;
+			case DeviceType::OPENCL:
+				break;
+		}
+	}
+	void quantized_depthwise_conv_forward(const Context &context, const Tensor &input, const Tensor &weights, const Tensor &scales,
+			const Tensor &bias, Tensor &output, AffineTransform output_transform, int padding_value)
+	{
+		switch (context.device().type())
+		{
+			case DeviceType::CPU:
+				break;
+			case DeviceType::CUDA:
+				cuda_quantized_depthwise_conv_forward(get(context), get(output.dtype()), get_shape(input), get_shape(weights), input.data(),
+						weights.data(), scales.data(), bias.data(), output.data(), get(output_transform), padding_value);
+				break;
+			case DeviceType::OPENCL:
+				break;
+		}
+	}
+	void quantized_scale_shift_act(const Context &context, Tensor &output, AffineTransform output_transform, const Tensor &input,
+			const Tensor &scales, const Tensor &bias, ActivationType act, const Tensor &ext, AffineTransform ext_transform)
+	{
+		assert(output.dtype() == DataType::FLOAT32 || output.dtype() == DataType::INT8);
+		assert(input.dtype() == DataType::INT32);
+		assert(scales.dtype() == DataType::FLOAT32);
+		assert(bias.dtype() == DataType::FLOAT32);
+		switch (context.device().type())
+		{
+			case DeviceType::CPU:
+				break;
+			case DeviceType::CUDA:
+				cuda_quantized_scale_shift_act(get(context), get(output.dtype()), get_shape(output), output.data(), get(output_transform),
+						input.data(), scales.data(), bias.data(), get(act), ext.data(), get(ext_transform));
+				break;
+			case DeviceType::OPENCL:
+				break;
+		}
+	}
+	void create_receptive_fields(const Context &context, Tensor &output, const Tensor &input, int kernel_size, const void *padding)
+	{
+		switch (context.device().type())
+		{
+			case DeviceType::CPU:
+				break;
+			case DeviceType::CUDA:
+				cuda_create_receptive_fields(get(context), get(input.dtype()), get_shape(input), output.data(), input.data(), kernel_size, padding);
+				break;
+			case DeviceType::OPENCL:
+				break;
+		}
+	}
+
+} /* namespace ml */
 

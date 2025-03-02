@@ -59,8 +59,8 @@ namespace ml
 			ActivationType m_activation;
 
 			bool m_is_quantizable = true;
-			std::vector<TensorQuantizer> m_input_quantizers;
-			TensorQuantizer m_output_quantizer;
+			std::vector<AffineTransform> m_input_transforms;
+			AffineTransform m_output_transform;
 			Tensor m_channel_scales;
 		public:
 			Layer(std::string activation = "linear", DataType dtype = DataType::FLOAT32);
@@ -78,7 +78,7 @@ namespace ml
 			void setActivationType(ActivationType act) noexcept;
 
 			virtual Layer& quantizable(bool b) noexcept;
-			virtual void setupQuantization(const std::vector<TensorQuantizer> &input_quantizers, const TensorQuantizer &output_quantizer);
+			virtual void setupQuantization(const std::vector<AffineTransform> &input_transforms, const AffineTransform &output_transform);
 			/**
 			 * documentation
 			 */

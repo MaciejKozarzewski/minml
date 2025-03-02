@@ -112,6 +112,7 @@ namespace ml
 			void reshape(const Shape &newShape);
 
 			void convertTo(const Context &context, DataType newType);
+			void reinterpretAs(DataType newType);
 			void zeroall();
 			void zeroall(const Context &context);
 			void setall(float value);

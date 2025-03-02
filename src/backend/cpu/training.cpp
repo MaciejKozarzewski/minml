@@ -68,7 +68,7 @@ namespace
 
 namespace ml
 {
-	void cpu_emulate_low_precision(mlContext_t context, mlShape_t shape, void *dst, const void *src)
+	void cpu_emulate_low_precision(mlContext_t context, mlShape_t shape, mlDataType_t dtype, void *dst, const void *src, mlQuantizationData_t qd)
 	{
 		const int elements = volume(shape);
 		for (int i = 0; i < elements; i++)

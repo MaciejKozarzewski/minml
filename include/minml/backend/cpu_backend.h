@@ -161,7 +161,7 @@ namespace ml
 				const void *gradient_next, const void *input_0, const void *input_1);
 
 		// used for training
-		void cpu_emulate_low_precision(mlContext_t context, mlShape_t shape, void *dst, const void *src);
+		void cpu_emulate_low_precision(mlContext_t context, mlShape_t shape, mlDataType_t dtype, void *dst, const void *src, mlQuantizationData_t qd);
 		void cpu_multiply_tensors(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *dst, const void *src1, const void *src2);
 		void cpu_add_tensors(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *dst, float alpha1, const void *src1, float alpha2,
 				const void *src2);

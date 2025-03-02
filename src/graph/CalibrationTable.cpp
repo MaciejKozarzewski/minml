@@ -37,7 +37,7 @@ namespace ml
 	{
 		return m_histograms.at(index);
 	}
-	size_t CalibrationTable::size() const noexcept
+	int CalibrationTable::size() const noexcept
 	{
 		return m_histograms.size();
 	}

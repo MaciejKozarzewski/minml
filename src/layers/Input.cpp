@@ -29,6 +29,16 @@ namespace ml
 	{
 		return m_input_shapes[0];
 	}
+	void Input::setupQuantization(const std::vector<AffineTransform> &input_transforms, const AffineTransform &output_transform)
+	{
+		m_input_transforms = input_transforms;
+		m_output_transform = output_transform;
+		if (isQuantizable())
+		{
+			getWeights().getParam() = Tensor(Shape(), "int8", device());
+			getBias().getParam() = Tensor(Shape(), "int8", device());
+		}
+	}
 
 	std::string Input::name() const
 	{

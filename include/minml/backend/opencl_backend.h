@@ -145,7 +145,7 @@ namespace ml
 		void opencl_gelu_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next, const void *input);
 
 		// implemented in 'training.cpp'
-		void opencl_emulate_low_precision(mlContext_t context, mlShape_t shape, void *dst, const void *src);
+		void opencl_emulate_low_precision(mlContext_t context, mlShape_t shape, mlDataType_t dtype, void *dst, const void *src, mlQuantizationData_t qd);
 		void opencl_multiply_tensors(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *dst, const void *src1, const void *src2);
 		void opencl_add_tensors(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *dst, float alpha1, const void *src1, float alpha2,
 				const void *src2);

@@ -19,28 +19,31 @@ namespace cg = cooperative_groups;
 
 #include <cinttypes>
 #include <iostream>
+#include <cstring>
+#include <type_traits>
 
 namespace
 {
-	template<typename T>
-	__device__ T quantize(float x)
-	{
-	}
-	template<>
-	__device__ float quantize(float x)
-	{
-		return x;
-	}
-	template<>
-	__device__ int8_t quantize(float x)
-	{
-		return static_cast<int8_t>(max(-128.0f, min(127.0f, x)));
-	}
+	using namespace vectors2;
 
-	struct Index2D
+	struct Quantizer
 	{
-			int8_t x = 0;
-			int8_t y = 0;
+			float scale = 1.0f;
+			float shift = 0.0f;
+
+			__host__ Quantizer(const ml::mlQuantizationData_t &qd) :
+					scale(qd.scale),
+					shift(qd.shift)
+			{
+			}
+			__device__ float to_fp32(int8_t x) const
+			{
+				return static_cast<float>(x) * scale + shift;
+			}
+			__device__ int8_t to_int8(float x) const
+			{
+				return static_cast<int8_t>(max(-128.0f, min(127.0f, round((x - shift) / scale))));
+			}
 	};
 
 	__device__ bool is_inside(int h, int w, int height, int width)
@@ -157,21 +160,17 @@ namespace
 	};
 
 	template<int TileSize, int KernelSize>
-	__global__ void kernel_depthwise_conv_forward_int8(int8_t *output, const int8_t *input, const int8_t *weights, int height, int width,
-			int channels, const float *scales, const float *bias)
+	__global__ void kernel_depthwise_conv_forward_int8(int8_t *output, Quantizer output_quantizer, const int8_t *input, const int8_t *weights,
+			int height, int width, int channels, const float *scales, const float *bias, int32_t padding_value)
 	{
 		assert(blockDim.x == 32);
 		assert(blockDim.y == TileSize);
 		constexpr int InputSize = TileSize + KernelSize - 1;
 		constexpr int Padding = (KernelSize - 1) / 2;
-		__shared__ int32_t input_tile[InputSize * InputSize * 32];
 		__shared__ int32_t filter_tile[KernelSize * KernelSize * 32];
-		__shared__ int32_t output_tile[TileSize * TileSize * 32];
 		__shared__ float scale_tile[32];
 		__shared__ float bias_tile[32];
-		__shared__ Index2D indices[InputSize * InputSize];
 
-		// load filters into shared memory
 		const int f = blockIdx.z * blockDim.x + threadIdx.x;
 
 		if (threadIdx.y == 0 and f < channels)
@@ -183,75 +182,81 @@ namespace
 		for (int i = threadIdx.y; i < KernelSize * KernelSize; i += blockDim.y)
 			if (f < channels)
 				filter_tile[i * 32 + threadIdx.x] = weights[i * channels + f];
-		// prepare indices table
-		const int tid = threadIdx.y * blockDim.x + threadIdx.x;
-		for (int i = tid; i < InputSize * InputSize; i += blockDim.x * blockDim.y)
-		{
-			indices[i].x = i / InputSize;
-			indices[i].y = i - indices[i].x * InputSize;
-		}
-
 		__syncthreads();
 
 		const Convolution1D<KernelSize, TileSize> convolution;
+		const Indexer<4> input_indexer(gridDim.y, height, width, channels);
 
 		for (int origin_w = 0; origin_w < width; origin_w += TileSize)
 		{
 			const int origin_h = TileSize * blockIdx.x;
-
-			const Indexer<4> input_indexer(gridDim.y, height, width, channels);
-			for (int i = threadIdx.y; i < InputSize * InputSize; i += blockDim.y)
+			Line<int32_t, TileSize> acc = convolution.set(bias_tile[threadIdx.x]);
+			for (int k = 0; k < KernelSize; k++)
 			{
-				const int h = origin_h + indices[i].x - Padding;
-				const int w = origin_w + indices[i].y - Padding;
-				if (f < channels && is_inside(h, w, height, width))
-					input_tile[i * 32 + threadIdx.x] = input[input_indexer.at(blockIdx.y, h, w, f)];
-				else
-					input_tile[i * 32 + threadIdx.x] = 0;
-			}
-			__syncthreads();
+				Line<int32_t, InputSize> inp;
+				for (int i = 0; i < InputSize; i++)
+				{
+					const int h = origin_h + threadIdx.y + k - Padding;
+					const int w = origin_w + i - Padding;
+					if (f < channels && is_inside(h, w, height, width))
+						inp[i] = input[input_indexer.at(blockIdx.y, h, w, f)];
+					else
+						inp[i] = padding_value;
+				}
 
-			Line<int32_t, TileSize> acc = convolution.set(0);
-			for (int i = 0; i < KernelSize; i++)
-			{
-				const Line<int32_t, InputSize> inp = convolution.load_input(input_tile, i + threadIdx.y);
-				const Line<int32_t, KernelSize> fil = convolution.load_filter(filter_tile, i);
+				const Line<int32_t, KernelSize> fil = convolution.load_filter(filter_tile, k);
 				convolution.accumulate(acc, inp, fil);
 			}
-			convolution.store_output(output_tile, threadIdx.y, acc);
-
 			for (int i = 0; i < TileSize; i++)
 			{
 				const int h = origin_h + threadIdx.y;
 				const int w = origin_w + i;
 				if (f < channels && is_inside(h, w, height, width))
 				{
-					const float tmp = static_cast<float>(output_tile[(threadIdx.y * TileSize + i) * 32 + threadIdx.x]);
-					output[input_indexer.at(blockIdx.y, h, w, f)] = quantize<int8_t>(tmp * scale_tile[threadIdx.x] + bias_tile[threadIdx.x]);
+					const float tmp = acc[i] * scale_tile[threadIdx.x] + bias_tile[threadIdx.x];
+					output[input_indexer.at(blockIdx.y, h, w, f)] = output_quantizer.to_int8(tmp);
 				}
 			}
 		}
 	}
 
 	template<typename T>
-	__global__ void kernel_scale_shift_act(T *output, const int32_t *input, const float *scales, const float *bias, int first_dim, int last_dim,
-			ml::mlActivationType_t act, const int8_t *ext, float ext_scale, float ext_shift)
+	__global__ void kernel_scale_shift_act(T *output, Quantizer output_quantizer, const int32_t *input, const float *scales, const float *bias,
+			int first_dim, int last_dim, ml::mlActivationType_t act, const int8_t *ext, Quantizer ext_quantizer)
 	{
 		const int tid_x = blockIdx.x * blockDim.x + threadIdx.x;
 		const int tid_y = blockIdx.y * blockDim.y + threadIdx.y;
-		const float scale = scales[tid_x];
-		const float shift = bias[tid_x];
-
-		for (int i = tid_y; i < first_dim; i += gridDim.y * blockDim.y)
+		if (tid_x < last_dim)
 		{
-			float x = static_cast<float>(input[i * last_dim + tid_x]) * scale + shift;
-			if (ext != nullptr)
-				x += static_cast<float>(ext[i * last_dim + tid_x]) * ext_scale + ext_shift;
+			const float scale = scales[tid_x];
+			const float shift = bias[tid_x];
 
-			if (act == ml::ACTIVATION_RELU)
-				x = max(0.0f, x);
+			for (int i = tid_y; i < first_dim; i += gridDim.y * blockDim.y)
+			{
+				float x = input[i * last_dim + tid_x] * scale + shift;
+				if (ext != nullptr)
+					x += ext_quantizer.to_fp32(ext[i * last_dim + tid_x]);
 
-			output[i * last_dim + tid_x] = quantize<T>(x);
+				switch (act)
+				{
+					case ml::ACTIVATION_LINEAR:
+						break;
+					case ml::ACTIVATION_SIGMOID:
+						x = 1.0f / (1.0f + expf(-x));
+						break;
+					case ml::ACTIVATION_TANH:
+						x = tanhf(x);
+						break;
+					case ml::ACTIVATION_RELU:
+						x = max(0.0f, x);
+						break;
+				}
+
+				if (std::is_same<T, float>::value)
+					output[i * last_dim + tid_x] = x;
+				if (std::is_same<T, int8_t>::value)
+					output[i * last_dim + tid_x] = output_quantizer.to_int8(x);
+			}
 		}
 	}
 	template<typename T>
@@ -261,16 +266,7 @@ namespace
 			output[i] = static_cast<T>(static_cast<float>(input[i]) * scale + shift);
 	}
 
-	int get_block_size(int size) noexcept
-	{
-		for (int i = 16; i >= 1; i /= 2)
-			if (size % i == 0)
-				return i;
-		return 1;
-	}
-
 	template<typename T>
-	__launch_bounds__(256, 8)
 	__global__ void kernel_receptive_fields(const void *input, void *output, int4 input_shape, int kernel_size, T padding_value)
 	{
 		int input_height = input_shape.y + kernel_size - 1;
@@ -288,8 +284,8 @@ namespace
 			int in_w = in_f / filters;
 			in_f -= in_w * filters;
 
-			in_h = in_h - kernel_size / 2;
-			in_w = in_w - kernel_size / 2;
+			in_h = in_h - (kernel_size - 1) / 2;
+			in_w = in_w - (kernel_size - 1) / 2;
 
 			T loaded = padding_value;
 			const int idx = ((in_b * input_shape.y + in_h) * input_shape.z + in_w) * filters + in_f;
@@ -309,10 +305,111 @@ namespace
 				}
 		}
 	}
+
+	__device__ vec<float, 1> emulate_fp16(vec<float, 1> x)
+	{
+		x.x0 = static_cast<float>(static_cast<half>(x.x0));
+		return x;
+	}
+	__device__ vec<float, 4> emulate_fp16(vec<float, 4> x)
+	{
+		x.x0 = static_cast<float>(static_cast<half>(x.x0));
+		x.x1 = static_cast<float>(static_cast<half>(x.x1));
+		x.x2 = static_cast<float>(static_cast<half>(x.x2));
+		x.x3 = static_cast<float>(static_cast<half>(x.x3));
+		return x;
+	}
+	__device__ vec<float, 1> emulate_int8(vec<float, 1> x, Quantizer q)
+	{
+		x.x0 = q.to_fp32(q.to_int8(x.x0));
+		return x;
+	}
+	__device__ vec<float, 4> emulate_int8(vec<float, 4> x, Quantizer q)
+	{
+		x.x0 = q.to_fp32(q.to_int8(x.x0));
+		x.x1 = q.to_fp32(q.to_int8(x.x1));
+		x.x2 = q.to_fp32(q.to_int8(x.x2));
+		x.x3 = q.to_fp32(q.to_int8(x.x3));
+		return x;
+	}
+
+	template<int N>
+	__global__ void kernel_emulate_low_precision_fp16(float *dst, const float *src, int elements)
+	{
+		assert(elements % N == 0);
+		const int tid = blockIdx.x * blockDim.x + threadIdx.x;
+		const int stride = gridDim.x * blockDim.x;
+
+		for (int i = tid * N; i < elements; i += stride * N)
+		{
+			const vec<float, N> x(src + i);
+			const vec<float, N> y = emulate_fp16(x);
+			y.store(dst + i);
+		}
+	}
+	template<int N>
+	__global__ void kernel_emulate_low_precision_int8(float *dst, const float *src, int elements, Quantizer q)
+	{
+		assert(elements % N == 0);
+		const int tid = blockIdx.x * blockDim.x + threadIdx.x;
+		const int stride = gridDim.x * blockDim.x;
+
+		for (int i = tid * N; i < elements; i += stride * N)
+		{
+			const vec<float, N> x(src + i);
+			const vec<float, N> y = emulate_int8(x, q);
+			y.store(dst + i);
+		}
+	}
+
+	template<typename T>
+	T get_padding(const void *ptr)
+	{
+		if (ptr == nullptr)
+			return T { };
+		else
+		{
+			T result;
+			std::memcpy(&result, ptr, sizeof(T));
+			return result;
+		}
+	}
 }
 
 namespace ml
 {
+	void cuda_emulate_low_precision(mlContext_t context, mlShape_t shape, mlDataType_t dtype, void *dst, const void *src, mlQuantizationData_t qd)
+	{
+		const int elements = volume(shape);
+		const int vect = (elements % 4 == 0) ? 4 : 1;
+		dim3 blockDim(256);
+		dim3 gridDim = cuda::gridSize<1024>(elements, blockDim.x * vect);
+
+		cudaStream_t stream = cuda::Context::getStream(context);
+
+		switch (dtype)
+		{
+			case DTYPE_FLOAT16:
+				if (vect == 4)
+					kernel_emulate_low_precision_fp16<4> <<<gridDim, blockDim, 0, stream>>>(getPointer<float>(dst), getPointer<float>(src), elements);
+				else
+					kernel_emulate_low_precision_fp16<1> <<<gridDim, blockDim, 0, stream>>>(getPointer<float>(dst), getPointer<float>(src), elements);
+				break;
+			case DTYPE_INT8:
+				if (vect == 4)
+					kernel_emulate_low_precision_int8<4> <<<gridDim, blockDim, 0, stream>>>(getPointer<float>(dst), getPointer<float>(src), elements,
+							Quantizer(qd));
+				else
+					kernel_emulate_low_precision_int8<1> <<<gridDim, blockDim, 0, stream>>>(getPointer<float>(dst), getPointer<float>(src), elements,
+							Quantizer(qd));
+				break;
+			default:
+				const cudaError_t err = cudaMemcpyAsync(dst, src, elements * sizeof(float), cudaMemcpyDeviceToDevice, stream);
+				assert(err == cudaSuccess);
+				break;
+		}
+		assert(cudaGetLastError() == cudaSuccess);
+	}
 	void cuda_dequantize(mlContext_t context, mlDataType_t dtype, const void *input, void *output, int elements, float scale, float shift)
 	{
 		cudaStream_t stream = cuda::Context::getStream(context);
@@ -333,9 +430,9 @@ namespace ml
 		}
 		assert(cudaGetLastError() == cudaSuccess);
 	}
-
 	void cuda_quantized_depthwise_conv_forward(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, mlShape_t weights_shape,
-			const void *input, const void *weights, const void *scales, const void *bias, void *output)
+			const void *input, const void *weights, const void *scales, const void *bias, void *output, mlQuantizationData_t output_qd,
+			int padding_value)
 	{
 		assert(input_shape.rank == 4);
 		assert(weights_shape.rank == 3);
@@ -355,24 +452,24 @@ namespace ml
 		dim3 blockDim(32, TileSize);
 		dim3 gridDim(num_tiles_h, batch_size, (channels + 31) / 32);
 
-		if (dtype == DTYPE_INT32)
+		if (dtype == DTYPE_INT8)
 		{
 			switch (filter_size)
 			{
 				case 3:
 					kernel_depthwise_conv_forward_int8<TileSize, 3> <<<gridDim, blockDim, 0, stream>>>(getPointer<int8_t>(output),
-							getPointer<int8_t>(input), getPointer<int8_t>(weights), height, width, channels, getPointer<float>(scales),
-							getPointer<float>(bias));
+							Quantizer(output_qd), getPointer<int8_t>(input), getPointer<int8_t>(weights), height, width, channels,
+							getPointer<float>(scales), getPointer<float>(bias), padding_value);
 					break;
 				case 5:
 					kernel_depthwise_conv_forward_int8<TileSize, 5> <<<gridDim, blockDim, 0, stream>>>(getPointer<int8_t>(output),
-							getPointer<int8_t>(input), getPointer<int8_t>(weights), height, width, channels, getPointer<float>(scales),
-							getPointer<float>(bias));
+							Quantizer(output_qd), getPointer<int8_t>(input), getPointer<int8_t>(weights), height, width, channels,
+							getPointer<float>(scales), getPointer<float>(bias), padding_value);
 					break;
 				case 7:
 					kernel_depthwise_conv_forward_int8<TileSize, 7> <<<gridDim, blockDim, 0, stream>>>(getPointer<int8_t>(output),
-							getPointer<int8_t>(input), getPointer<int8_t>(weights), height, width, channels, getPointer<float>(scales),
-							getPointer<float>(bias));
+							Quantizer(output_qd), getPointer<int8_t>(input), getPointer<int8_t>(weights), height, width, channels,
+							getPointer<float>(scales), getPointer<float>(bias), padding_value);
 					break;
 				default:
 					break;
@@ -381,9 +478,8 @@ namespace ml
 
 		assert(cudaGetLastError() == cudaSuccess);
 	}
-
-	void cuda_quantized_scale_shift_act(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input, const void *scales,
-			const void *bias, mlActivationType_t act, const void *ext, float ext_scale, float ext_shift)
+	void cuda_quantized_scale_shift_act(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, mlQuantizationData_t output_qd,
+			const void *input, const void *scales, const void *bias, mlActivationType_t act, const void *ext, mlQuantizationData_t ext_qd)
 	{
 		cudaStream_t stream = cuda::Context::getStream(context);
 
@@ -396,56 +492,65 @@ namespace ml
 		switch (dtype)
 		{
 			case DTYPE_FLOAT16:
-				kernel_scale_shift_act<<<gridDim, blockDim, 0, stream>>>(getPointer<half>(output), getPointer<int32_t>(input),
-						getPointer<float>(scales), getPointer<float>(bias), first_dim, last_dim, act, getPointer<int8_t>(ext), ext_scale, ext_shift);
+				kernel_scale_shift_act<<<gridDim, blockDim, 0, stream>>>(getPointer<half>(output), Quantizer(output_qd), getPointer<int32_t>(input),
+						getPointer<float>(scales), getPointer<float>(bias), first_dim, last_dim, act, getPointer<int8_t>(ext), Quantizer(ext_qd));
 				break;
 			case DTYPE_FLOAT32:
-				kernel_scale_shift_act<<<gridDim, blockDim, 0, stream>>>(getPointer<float>(output), getPointer<int32_t>(input),
-						getPointer<float>(scales), getPointer<float>(bias), first_dim, last_dim, act, getPointer<int8_t>(ext), ext_scale, ext_shift);
+				kernel_scale_shift_act<<<gridDim, blockDim, 0, stream>>>(getPointer<float>(output), Quantizer(output_qd), getPointer<int32_t>(input),
+						getPointer<float>(scales), getPointer<float>(bias), first_dim, last_dim, act, getPointer<int8_t>(ext), Quantizer(ext_qd));
 				break;
 			case DTYPE_FLOAT64:
-				kernel_scale_shift_act<<<gridDim, blockDim, 0, stream>>>(getPointer<double>(output), getPointer<int32_t>(input),
-						getPointer<float>(scales), getPointer<float>(bias), first_dim, last_dim, act, getPointer<int8_t>(ext), ext_scale, ext_shift);
+				kernel_scale_shift_act<<<gridDim, blockDim, 0, stream>>>(getPointer<double>(output), Quantizer(output_qd), getPointer<int32_t>(input),
+						getPointer<float>(scales), getPointer<float>(bias), first_dim, last_dim, act, getPointer<int8_t>(ext), Quantizer(ext_qd));
 				break;
 			case DTYPE_INT8:
-				kernel_scale_shift_act<<<gridDim, blockDim, 0, stream>>>(getPointer<int8_t>(output), getPointer<int32_t>(input),
-						getPointer<float>(scales), getPointer<float>(bias), first_dim, last_dim, act, getPointer<int8_t>(ext), ext_scale, ext_shift);
+				kernel_scale_shift_act<<<gridDim, blockDim, 0, stream>>>(getPointer<int8_t>(output), Quantizer(output_qd), getPointer<int32_t>(input),
+						getPointer<float>(scales), getPointer<float>(bias), first_dim, last_dim, act, getPointer<int8_t>(ext), Quantizer(ext_qd));
 				break;
 
 		}
 		assert(cudaGetLastError() == cudaSuccess);
 	}
-
 	void cuda_create_receptive_fields(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, void *output, const void *input,
-			int kernel_size)
+			int kernel_size, const void *padding_value)
 	{
-		const int last_dim = get_last_dim(input_shape) * size_of(dtype);
+		const int last_dim = get_last_dim(input_shape);
 
 		cudaStream_t stream = cuda::Context::getStream(context);
 		dim3 blockSize(256);
 		dim3 gridSize(std::min(2048, (volume(input_shape) + 255) / 256));
 
-		const int block_size = get_block_size(last_dim);
+		const int4 shape { input_shape.dim[0], input_shape.dim[1], input_shape.dim[2], last_dim };
 
-		const int4 shape { input_shape.dim[0], input_shape.dim[1], input_shape.dim[2], last_dim / block_size };
-
-		switch (block_size)
+		switch (dtype)
 		{
-			default:
-			case 1:
-				kernel_receptive_fields<int8_t> <<<gridSize, blockSize, 0, stream>>>(input, output, shape, kernel_size, 0);
+			case DTYPE_FLOAT16:
+				kernel_receptive_fields<half> <<<gridSize, blockSize, 0, stream>>>(input, output, shape, kernel_size,
+						get_padding<half>(padding_value));
 				break;
-			case 2:
-				kernel_receptive_fields<int16_t> <<<gridSize, blockSize, 0, stream>>>(input, output, shape, kernel_size, 0);
+			case DTYPE_FLOAT32:
+				kernel_receptive_fields<float> <<<gridSize, blockSize, 0, stream>>>(input, output, shape, kernel_size,
+						get_padding<float>(padding_value));
 				break;
-			case 4:
-				kernel_receptive_fields<int32_t> <<<gridSize, blockSize, 0, stream>>>(input, output, shape, kernel_size, 0);
+			case DTYPE_FLOAT64:
+				kernel_receptive_fields<double> <<<gridSize, blockSize, 0, stream>>>(input, output, shape, kernel_size,
+						get_padding<double>(padding_value));
 				break;
-			case 8:
-				kernel_receptive_fields<int2> <<<gridSize, blockSize, 0, stream>>>(input, output, shape, kernel_size, int2 { 0, 0 });
+			case DTYPE_UINT8:
+				kernel_receptive_fields<uint8_t> <<<gridSize, blockSize, 0, stream>>>(input, output, shape, kernel_size,
+						get_padding<uint8_t>(padding_value));
 				break;
-			case 16:
-				kernel_receptive_fields<int4> <<<gridSize, blockSize, 0, stream>>>(input, output, shape, kernel_size, int4 { 0, 0, 0, 0 });
+			case DTYPE_INT8:
+				kernel_receptive_fields<int8_t> <<<gridSize, blockSize, 0, stream>>>(input, output, shape, kernel_size,
+						get_padding<int8_t>(padding_value));
+				break;
+			case DTYPE_INT16:
+				kernel_receptive_fields<int16_t> <<<gridSize, blockSize, 0, stream>>>(input, output, shape, kernel_size,
+						get_padding<int16_t>(padding_value));
+				break;
+			case DTYPE_INT32:
+				kernel_receptive_fields<int32_t> <<<gridSize, blockSize, 0, stream>>>(input, output, shape, kernel_size,
+						get_padding<int32_t>(padding_value));
 				break;
 		}
 		assert(cudaGetLastError() == cudaSuccess);

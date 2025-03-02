@@ -583,6 +583,10 @@ namespace ml
 		}
 		m_dtype = newType;
 	}
+	void Tensor::reinterpretAs(DataType newType)
+	{
+		m_dtype = newType;
+	}
 	void Tensor::zeroall()
 	{
 		ml::memzero(device(), data(), 0, sizeInBytes());
@@ -776,22 +780,14 @@ namespace ml
 	}
 	void Tensor::unserialize(const Json &json, const SerializedObject &binary_data)
 	{
-		if (isEmpty())
-		{
-			m_shape = Shape(json["shape"]);
-			m_dtype = typeFromString(json["dtype"]);
-			m_device = Device::cpu();
-			m_is_owning = true;
-			m_is_page_locked = false;
-			m_data = ml::malloc(device(), sizeInBytes());
-		}
-		else
-		{
-			if (shape() != Shape(json["shape"]))
-				throw ShapeMismatch(METHOD_NAME, shape(), Shape(json["shape"]));
-			if (dtype() != typeFromString(json["dtype"]))
-				throw DataTypeMismatch(METHOD_NAME, dtype(), typeFromString(json["dtype"]));
-		}
+		if (shape() != Shape(json["shape"]) or dtype() != typeFromString(json["dtype"]))
+			ml::free(device(), m_data);
+
+		m_shape = Shape(json["shape"]);
+		m_dtype = typeFromString(json["dtype"]);
+		m_is_owning = true;
+		m_is_page_locked = false;
+		m_data = ml::malloc(device(), sizeInBytes());
 
 		if (device().isCPU())
 			binary_data.load(data(), json["binary_offset"].getLong(), sizeInBytes());

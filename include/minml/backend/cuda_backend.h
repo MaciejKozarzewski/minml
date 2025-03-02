@@ -185,7 +185,7 @@ namespace ml
 		DLL_PUBLIC void cuda_gelu_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next, const void *input);
 
 		// implemented in 'training.cu'
-		DLL_PUBLIC void cuda_emulate_low_precision(mlContext_t context, mlShape_t shape, void *dst, const void *src);
+		DLL_PUBLIC void cuda_emulate_low_precision(mlContext_t context, mlShape_t shape, mlDataType_t dtype, void *dst, const void *src, mlQuantizationData_t qd);
 		DLL_PUBLIC void cuda_multiply_tensors(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *dst, const void *src1,
 				const void *src2);
 		DLL_PUBLIC void cuda_add_tensors(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *dst, float alpha1, const void *src1,
@@ -207,6 +207,18 @@ namespace ml
 
 		DLL_PUBLIC void cuda_l2_regularization(mlContext_t context, mlShape_t shape, void *gradient, const void *param, float coefficient,
 				float offset);
+
+		// implemented in quantized.cu
+		DLL_PUBLIC void cuda_dequantize(mlContext_t context, mlDataType_t dtype, const void *input, void *output, int elements, float scale,
+				float shift);
+		DLL_PUBLIC void cuda_quantized_depthwise_conv_forward(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, mlShape_t weights_shape,
+				const void *input, const void *weights, const void *scales, const void *bias, void *output, mlQuantizationData_t output_qd,
+				int padding_value);
+		DLL_PUBLIC void cuda_quantized_scale_shift_act(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output,
+				mlQuantizationData_t output_qd, const void *input, const void *scales, const void *bias, mlActivationType_t act, const void *ext,
+				mlQuantizationData_t ext_qd);
+		DLL_PUBLIC void cuda_create_receptive_fields(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, void *output, const void *input,
+				int kernel_size, const void *padding_value);
 
 #ifdef __cplusplus
 	}

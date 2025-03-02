@@ -10,6 +10,7 @@
 
 #include <minml/core/DataType.hpp>
 #include <minml/core/Shape.hpp>
+#include <minml/layers/quantization.hpp>
 
 #include <memory>
 #include <vector>
@@ -70,6 +71,7 @@ namespace ml
 			Shape m_output_shape;
 
 			bool m_done_backward = false;
+			AffineTransform m_output_transform;
 			TimedStat m_timer;
 		public:
 			GraphNode(std::unique_ptr<Layer> &layer, const std::vector<GraphNode*> input_nodes);
@@ -80,6 +82,7 @@ namespace ml
 			Shape getOutputShape() const;
 			void resolveInputShapes();
 			int getBackupStorage();
+			AffineTransform getOutputTransform() const noexcept;
 
 			int numberOfInputs() const noexcept;
 			int numberOfOutputs() const noexcept;
@@ -103,7 +106,8 @@ namespace ml
 
 			void changeContext(std::shared_ptr<Context> &context);
 			void convertTo(DataType newType);
-			void makeNonTrainable();
+			void makeTrainable(bool b);
+			void setOutputTransform(const AffineTransform &t) noexcept;
 
 			static void link(GraphNode *prev, GraphNode *next);
 			static void link(const std::vector<GraphNode*> &prev, GraphNode *next);

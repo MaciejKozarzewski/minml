@@ -241,6 +241,12 @@ namespace ml
 					return cuda::get_compute_capability(index) >= 53;
 				case DTYPE_FLOAT32:
 					return true;
+				case DTYPE_FLOAT64:
+					return cuda::get_compute_capability(index) >= 50;
+				case DTYPE_INT32:
+					return true;
+				case DTYPE_INT8:
+					return cuda::get_compute_capability(index) >= 61;
 			}
 		}
 		return false;

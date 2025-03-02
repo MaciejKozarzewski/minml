@@ -98,6 +98,8 @@ namespace ml
 			getLayer().setInputShape(input_shapes);
 		}
 		m_output_shape = getLayer().getOutputShape();
+		m_output_tensor = nullptr;
+		m_gradient_tensor = nullptr;
 	}
 	int GraphNode::getBackupStorage()
 	{
@@ -110,6 +112,10 @@ namespace ml
 				getInputNode(i)->m_done_backward = true;
 		}
 		return tmp_size;
+	}
+	AffineTransform GraphNode::getOutputTransform() const noexcept
+	{
+		return m_output_transform;
 	}
 
 	int GraphNode::numberOfInputs() const noexcept
@@ -170,9 +176,9 @@ namespace ml
 //				<< " = " << testing::normForTest(output) << '\n';
 //		m_timer.stop();
 
-		const bool emulate_low_precision = false; // getLayer().isTrainable() and getLayer().dtype() == DataType::FLOAT32;
-		if (emulate_low_precision)
-			emulateLowPrecision(getLayer().context(), output, output);
+//		const bool emulate_low_precision = false; // getLayer().isTrainable() and getLayer().dtype() == DataType::FLOAT32;
+//		if (emulate_low_precision)
+//			emulateLowPrecision(getLayer().context(), output, output);
 	}
 	void GraphNode::backward(int batchSize, Tensor &backup_tensor)
 	{
@@ -263,11 +269,16 @@ namespace ml
 		m_output_tensor = nullptr;
 		m_gradient_tensor = nullptr;
 	}
-	void GraphNode::makeNonTrainable()
+	void GraphNode::makeTrainable(bool b)
 	{
-		m_gradient_tensor = nullptr;
-		getLayer().getWeights().setTrainable(false);
-		getLayer().getBias().setTrainable(false);
+		if (not b)
+			m_gradient_tensor = nullptr;
+		getLayer().getWeights().setTrainable(b);
+		getLayer().getBias().setTrainable(b);
+	}
+	void GraphNode::setOutputTransform(const AffineTransform &t) noexcept
+	{
+		m_output_transform = t;
 	}
 
 	void GraphNode::link(GraphNode *prev, GraphNode *next)

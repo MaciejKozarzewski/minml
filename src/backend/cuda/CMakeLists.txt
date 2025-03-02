@@ -11,6 +11,7 @@ else()
 		kernels/depthwise_conv.cu
 		kernels/global_pooling.cu
 		kernels/normalization.cu
+		kernels/quantized.cu
 		kernels/softmax.cu
 		kernels/tensor_op.cu
 		kernels/training.cu

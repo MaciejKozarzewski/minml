@@ -57,10 +57,14 @@ namespace
 	{
 		switch (src)
 		{
+			default:
+				throw std::logic_error("unsupported conversion");
 			case ml::DTYPE_FLOAT16:
 			{
 				switch (dst)
 				{
+					default:
+						throw std::logic_error("unsupported conversion");
 					case ml::DTYPE_FLOAT32:
 						return get_conversion_function_fp16_to_fp32(context);
 					case ml::DTYPE_FLOAT64:
@@ -71,6 +75,8 @@ namespace
 			{
 				switch (dst)
 				{
+					default:
+						throw std::logic_error("unsupported conversion");
 					case ml::DTYPE_FLOAT16:
 						return get_conversion_function_fp32_to_fp16(context);
 					case ml::DTYPE_FLOAT64:
@@ -81,6 +87,8 @@ namespace
 			{
 				switch (dst)
 				{
+					default:
+						throw std::logic_error("unsupported conversion");
 					case ml::DTYPE_FLOAT16:
 						return get_conversion_function_fp64_to_fp16(context);
 					case ml::DTYPE_FLOAT64:
@@ -91,17 +99,9 @@ namespace
 	}
 
 	template<typename T>
-	T one_or_zero(bool b) noexcept;
-
-	template<>
-	double one_or_zero(bool b) noexcept
+	T one_or_zero(bool b) noexcept
 	{
-		return b ? 1.0 : 0.0;
-	}
-	template<>
-	float one_or_zero(bool b) noexcept
-	{
-		return b ? 1.0f : 0.0f;
+		return b ? static_cast<T>(1) : static_cast<T>(0);
 	}
 	template<>
 	ml::cpu::float16 one_or_zero(bool b) noexcept
@@ -152,6 +152,21 @@ namespace ml
 				break;
 			case DTYPE_FLOAT32:
 				kernel_unpack_input(getPointer<float>(dst), getPointer<uint32_t>(src), first_dim, last_dim);
+				break;
+			case DTYPE_FLOAT64:
+				kernel_unpack_input(getPointer<double>(dst), getPointer<uint32_t>(src), first_dim, last_dim);
+				break;
+			case DTYPE_UINT8:
+				kernel_unpack_input(getPointer<uint8_t>(dst), getPointer<uint32_t>(src), first_dim, last_dim);
+				break;
+			case DTYPE_INT8:
+				kernel_unpack_input(getPointer<int8_t>(dst), getPointer<uint32_t>(src), first_dim, last_dim);
+				break;
+			case DTYPE_INT16:
+				kernel_unpack_input(getPointer<int16_t>(dst), getPointer<uint32_t>(src), first_dim, last_dim);
+				break;
+			case DTYPE_INT32:
+				kernel_unpack_input(getPointer<int32_t>(dst), getPointer<uint32_t>(src), first_dim, last_dim);
 				break;
 			default:
 				break;
@@ -311,7 +326,7 @@ namespace ml
 		const int hw = shape.dim[1] * shape.dim[2];
 		const int channels = shape.dim[3];
 
-		for(int b=0;b<batch_size;b++)
+		for (int b = 0; b < batch_size; b++)
 		{
 
 		}

@@ -39,6 +39,10 @@ namespace
 		return Shape( { square(tile_size + kernel_size - 1), shape[0] * get_tiles_count(shape[1], tile_size) * get_tiles_count(shape[2], tile_size),
 				shape[3] });
 	}
+	std::string to_string(const AffineTransform &t)
+	{
+		return std::to_string(t.scale()) + " * x + " + std::to_string(t.shift());
+	}
 }
 
 namespace ml
@@ -124,6 +128,18 @@ namespace ml
 
 	int Conv2D::getWorkspaceSize() const noexcept
 	{
+		if (dtype() == DataType::INT8)
+		{
+			const int tmp_output_size = getOutputShape().volume() * sizeOf(DataType::INT32);
+			if (m_kernel_size == 1)
+				return tmp_output_size;
+			else
+			{
+				const int tmp_input_size = (getInputShape().volume() * square(m_kernel_size) * sizeOf(DataType::INT8) + 3) / 4;
+				return tmp_output_size + tmp_input_size;
+			}
+		}
+
 		if (m_kernel_size == 1)
 			return 0;
 		else
@@ -166,6 +182,110 @@ namespace ml
 
 	void Conv2D::forward(const std::vector<Tensor> &input, Tensor &output)
 	{
+		if (input[0].dtype() == DataType::INT8)
+		{
+			assert(output.dtype() == dtype());
+			if (device().isCUDA())
+			{
+				Tensor input_matrix;
+				Tensor output_matrix = m_workspace.lock()->view( { output.shape().volumeWithoutLastDim(), output.lastDim() });
+				Tensor weight_matrix = getWeights().getParam().view( { getWeightShape().firstDim(), getWeightShape().volumeWithoutFirstDim() });
+				if (m_kernel_size == 1)
+					input_matrix = input[0].view( { input[0].shape().volumeWithoutLastDim(), input[0].lastDim() });
+				else
+				{
+					input_matrix = m_workspace.lock()->view( { input[0].shape().volumeWithoutLastDim(), weight_matrix.lastDim() },
+							output_matrix.volume());
+					input_matrix.reinterpretAs(DataType::INT8);
+
+					const int8_t input_padding = m_input_transforms.at(0).get_inverse()(0.0f);
+					create_receptive_fields(context(), input_matrix, input[0], m_kernel_size, &input_padding);
+				}
+				output_matrix.reinterpretAs(DataType::INT32);
+
+				gemm(context(), 'n', 't', output_matrix, input_matrix, weight_matrix, 1, 0);
+				if (input.size() == 1)
+					quantized_scale_shift_act(context(), output, m_output_transform, output_matrix, m_channel_scales, getBias().getParam(),
+							m_activation, Tensor(), AffineTransform());
+				else
+					quantized_scale_shift_act(context(), output, m_output_transform, output_matrix, m_channel_scales, getBias().getParam(),
+							m_activation, input[1], m_input_transforms[1]);
+			}
+			if (device().isCPU())
+			{
+				const int pad_h = -(m_kernel_size - 1) / 2;
+				const int pad_w = -(m_kernel_size - 1) / 2;
+
+				const int32_t input_zero = get_zero<int8_t>(m_input_transforms[0]);
+				const AffineTransform output_to_int8 = m_output_transform.get_inverse();
+
+//				std::cout << input[0].info() << '\n';
+//				std::cout << "m_input_transforms[0] " << to_string(m_input_transforms[0]) << '\n';
+//				std::cout << "m_output_transform " << to_string(m_output_transform) << '\n';
+//				std::cout << "output_to_int8 " << to_string(output_to_int8) << '\n';
+//				std::cout << "channel scale = " << (float) m_channel_scales.at( { 10 }) << '\n';
+//				std::cout << "bias = " << (float) getBias().getParam().at( { 10 }) << '\n';
+
+				for (int b = 0; b < input[0].dim(0); b++)
+					for (int h = 0; h < input[0].dim(1); h++)
+						for (int w = 0; w < input[0].dim(2); w++)
+							for (int out = 0; out < output.dim(3); out++)
+							{
+								int32_t acc = 0;
+								for (int i = 0; i < m_kernel_size; i++)
+									for (int j = 0; j < m_kernel_size; j++)
+									{
+										const int x = pad_h + h + i;
+										const int y = pad_w + w + j;
+										if (0 <= x and x < input[0].dim(1) and 0 <= y and y < input[0].dim(2))
+										{
+											for (int in = 0; in < input[0].dim(3); in++)
+												acc += (int) getWeights().getParam().at( { out, i, j, in }) * (int) input[0].at( { b, x, y, in });
+										}
+										else
+										{
+											for (int in = 0; in < input[0].dim(3); in++)
+												acc += (int) getWeights().getParam().at( { out, i, j, in }) * input_zero;
+										}
+									}
+								// quantization shift of the input tensor is absorbed into the bias
+								float tmp = static_cast<float>(acc) * (float) m_channel_scales.at( { out })
+										+ (float) getBias().getParam().at( { out });
+
+								if (input.size() == 2)
+									tmp += m_input_transforms[1]((float) input[1].at( { b, h, w, out }));
+
+								switch (m_activation)
+								{
+									default:
+									case ActivationType::LINEAR:
+										break;
+									case ActivationType::SIGMOID:
+										tmp = 1.0f / (1.0f + std::exp(-tmp));
+										break;
+									case ActivationType::TANH:
+										tmp = std::tanh(tmp);
+										break;
+									case ActivationType::RELU:
+										tmp = std::max(0.0f, tmp);
+										break;
+									case ActivationType::GELU:
+										tmp = 0.5f * tmp * (1.0f + std::erf(tmp / std::sqrt(2.0f)));
+										break;
+									case ActivationType::EXP:
+										tmp = std::exp(tmp);
+										break;
+								}
+
+								if (output.dtype() == DataType::INT8)
+									output.at( { b, h, w, out }) = quantize_to<int8_t>(output_to_int8(tmp));
+								if (output.dtype() == DataType::FLOAT32)
+									output.at( { b, h, w, out }) = tmp;
+							}
+			}
+			return;
+		}
+
 		choose_algorithm();
 
 		switch (m_algorithm)
