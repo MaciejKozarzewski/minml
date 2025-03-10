@@ -152,9 +152,10 @@ namespace
 	{
 		return cpu::convert_fp16_to_fp32(x);
 	}
-	float relu(float x) noexcept
+	template<typename T>
+	T relu(T x) noexcept
 	{
-		return (x > 0.0f) ? x : 0.0f;
+		return (x > static_cast<T>(0)) ? x : static_cast<T>(0);
 	}
 
 	float as_float(const int32_t x) noexcept
@@ -207,7 +208,10 @@ namespace
 		return (s * x) / (s + t);
 	}
 
-	template<typename DT, typename AT, typename BT, typename CT>
+	/*
+	 * computes D = optional_relu(alpha * op(A) * op(B) + beta * C + broadcast(bias))
+	 */
+	template<typename DT, typename AT, typename BT, typename CT, typename ComputeType>
 	void kernel_gemm(Fragment &D, const Fragment &alpha, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,
 			const Fragment &bias, bool use_relu) noexcept
 	{
@@ -218,30 +222,30 @@ namespace
 		const int N = B.columns();
 		const int K = A.rows();
 
-		std::unique_ptr<float[]> acc = std::make_unique<float[]>(M * N);
+		std::unique_ptr<ComputeType[]> acc = std::make_unique<ComputeType[]>(M * N);
 		for (int i = 0; i < M * N; i++)
 			acc[i] = 0.0f;
 
 		for (int k = 0; k < K; k++)
 			for (int m = 0; m < M; m++)
 			{
-				const float tmp = convert<AT, float>(A.at<AT>(k, m));
+				const ComputeType tmp = convert<AT, ComputeType>(A.at<AT>(k, m));
 				for (int n = 0; n < N; n++)
-					acc[m * N + n] += tmp * convert<BT, float>(B.at<BT>(k, n));
+					acc[m * N + n] += tmp * convert<BT, ComputeType>(B.at<BT>(k, n));
 			}
 
 		assert(alpha.is_packed());
-		assert(alpha.is_fp32());
+		assert(alpha.is_fp32() || alpha.is_fp64());
 		if (alpha.rows() == 1 and alpha.columns() == 1)
 		{
 			for (int i = 0; i < M * N; i++)
-				acc[i] *= alpha.at<float>(0, 0);
+				acc[i] *= alpha.at<ComputeType>(0, 0);
 		}
 		if (alpha.rows() == M and alpha.columns() == 1)
 		{
 			for (int m = 0; m < M; m++)
 				for (int n = 0; n < N; n++)
-					acc[m * N + n] *= alpha.at<float>(m, 0);
+					acc[m * N + n] *= alpha.at<ComputeType>(m, 0);
 		}
 
 		if (bias.is_packed())
@@ -252,17 +256,17 @@ namespace
 			assert(bias.dtype() == B.dtype());
 			for (int m = 0; m < M; m++)
 				for (int n = 0; n < N; n++)
-					acc[m * N + n] += convert<BT, float>(bias.at<BT>(0, n));
+					acc[m * N + n] += convert<BT, ComputeType>(bias.at<BT>(0, n));
 		}
 
 		assert(beta_ptr != nullptr);
-		const float beta = reinterpret_cast<const float*>(beta_ptr)[0];
+		const ComputeType beta = reinterpret_cast<const ComputeType*>(beta_ptr)[0];
 		if (beta != 0.0f)
 		{
 			assert(C.size() == D.size());
 			for (int m = 0; m < M; m++)
 				for (int n = 0; n < N; n++)
-					acc[m * N + n] += beta * convert<DT, float>(C.at<DT>(m, n));
+					acc[m * N + n] += beta * convert<DT, ComputeType>(C.at<DT>(m, n));
 		}
 		if (use_relu)
 		{
@@ -274,73 +278,7 @@ namespace
 		assert(D.columns() == N);
 		for (int m = 0; m < M; m++)
 			for (int n = 0; n < N; n++)
-				D.at<DT>(m, n) = convert<float, DT>(acc[m * N + n]);
-	}
-
-	/*
-	 * computes D = optional_relu(alpha * op(A) * op(B) + beta * C + broadcast(bias))
-	 */
-	template<typename DT, typename AT, typename BT, typename CT>
-	void kernel_gemm(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,
-			const Fragment &bias, bool use_relu) noexcept
-	{
-		assert(A.is_packed() && A.data() != nullptr);
-		assert(B.is_packed() && B.data() != nullptr);
-		assert(A.rows() == B.rows());
-		const int M = A.columns();
-		const int N = B.columns();
-		const int K = A.rows();
-
-		std::unique_ptr<float[]> acc = std::make_unique<float[]>(M * N);
-		for (int i = 0; i < M * N; i++)
-			acc[i] = 0.0f;
-
-		for (int k = 0; k < K; k++)
-			for (int m = 0; m < M; m++)
-			{
-				const float tmp = convert<AT, float>(A.at<AT>(k, m));
-				for (int n = 0; n < N; n++)
-					acc[m * N + n] += tmp * convert<BT, float>(B.at<BT>(k, n));
-			}
-
-		assert(alpha_ptr != nullptr);
-		const float alpha = reinterpret_cast<const float*>(alpha_ptr)[0];
-		if (alpha != 1.0f)
-		{
-			for (int i = 0; i < M * N; i++)
-				acc[i] *= alpha;
-		}
-		if (bias.is_packed())
-		{
-			assert(bias.data() != nullptr);
-			assert(bias.rows() == 1);
-			assert(bias.columns() == N);
-			assert(bias.dtype() == B.dtype());
-			for (int m = 0; m < M; m++)
-				for (int n = 0; n < N; n++)
-					acc[m * N + n] += convert<BT, float>(bias.at<BT>(0, n));
-		}
-
-		assert(beta_ptr != nullptr);
-		const float beta = reinterpret_cast<const float*>(beta_ptr)[0];
-		if (beta != 0.0f)
-		{
-			assert(C.size() == D.size());
-			for (int m = 0; m < M; m++)
-				for (int n = 0; n < N; n++)
-					acc[m * N + n] += beta * convert<DT, float>(C.at<DT>(m, n));
-		}
-		if (use_relu)
-		{
-			for (int i = 0; i < M * N; i++)
-				acc[i] = relu(acc[i]);
-		}
-
-		assert(D.rows() == M);
-		assert(D.columns() == N);
-		for (int m = 0; m < M; m++)
-			for (int n = 0; n < N; n++)
-				D.at<DT>(m, n) = convert<float, DT>(acc[m * N + n]);
+				D.at<DT>(m, n) = convert<ComputeType, DT>(acc[m * N + n]);
 	}
 
 	template<typename SrcT, typename DstT>
@@ -550,36 +488,18 @@ namespace
 
 namespace ml
 {
-	void gemm_def_MxN(Fragment &D, const Fragment &alpha, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,
-			const Fragment &bias, bool use_relu) noexcept
-	{
-		assert(A.is_fp32());
-		assert(B.is_fp32());
-		assert(C.is_fp32() || C.is_fp16());
-		assert(D.is_fp32() || D.is_fp16());
-		if (C.is_fp32())
-		{
-			if (D.is_fp32())
-				kernel_gemm<float, float, float, float>(D, alpha, A, B, beta_ptr, C, bias, use_relu);
-			else
-				kernel_gemm<float16, float, float, float>(D, alpha, A, B, beta_ptr, C, bias, use_relu);
-		}
-		else
-		{
-			if (D.is_fp32())
-				kernel_gemm<float, float, float, float16>(D, alpha, A, B, beta_ptr, C, bias, use_relu);
-			else
-				kernel_gemm<float16, float, float, float16>(D, alpha, A, B, beta_ptr, C, bias, use_relu);
-		}
-	}
-
 	/*
 	 * Computes D = alpha * A * B + beta * C
 	 * C and D may point to the same object
 	 */
-	void gemm_def_MxN(Fragment &D, const void *alpha_ptr, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,
+	void gemm_def_MxN(Fragment &D, const Fragment &alpha, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,
 			const Fragment &bias, bool use_relu) noexcept
 	{
+		if (A.is_fp64() and B.is_fp64() and C.is_fp64() and D.is_fp64())
+		{
+			kernel_gemm<double, double, double, double, double>(D, alpha, A, B, beta_ptr, C, bias, use_relu);
+			return;
+		}
 		assert(A.is_fp32());
 		assert(B.is_fp32());
 		assert(C.is_fp32() || C.is_fp16());
@@ -587,20 +507,26 @@ namespace ml
 		if (C.is_fp32())
 		{
 			if (D.is_fp32())
-				kernel_gemm<float, float, float, float>(D, alpha_ptr, A, B, beta_ptr, C, bias, use_relu);
+				kernel_gemm<float, float, float, float, float>(D, alpha, A, B, beta_ptr, C, bias, use_relu);
 			else
-				kernel_gemm<float16, float, float, float>(D, alpha_ptr, A, B, beta_ptr, C, bias, use_relu);
+				kernel_gemm<float16, float, float, float, float>(D, alpha, A, B, beta_ptr, C, bias, use_relu);
 		}
 		else
 		{
 			if (D.is_fp32())
-				kernel_gemm<float, float, float, float16>(D, alpha_ptr, A, B, beta_ptr, C, bias, use_relu);
+				kernel_gemm<float, float, float, float16, float>(D, alpha, A, B, beta_ptr, C, bias, use_relu);
 			else
-				kernel_gemm<float16, float, float, float16>(D, alpha_ptr, A, B, beta_ptr, C, bias, use_relu);
+				kernel_gemm<float16, float, float, float16, float>(D, alpha, A, B, beta_ptr, C, bias, use_relu);
 		}
 	}
+
 	void pack_def_MxK(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept
 	{
+		if (dst.is_fp64() and src.is_fp64())
+		{
+			kernel_pack<double, double>(dst, src, src_pos.row, src_pos.column, src_op);
+			return;
+		}
 		assert(dst.is_fp32() || dst.is_fp16());
 		assert(src.is_fp32() || src.is_fp16());
 		if (src.is_fp32())
@@ -620,6 +546,11 @@ namespace ml
 	}
 	void unpack_def_MxK(Matrix &dst, const Position2D &dst_pos, const Fragment &src) noexcept
 	{
+		if (dst.is_fp64() and src.is_fp64())
+		{
+			kernel_unpack<double, double>(dst, dst_pos.row, dst_pos.column, src);
+			return;
+		}
 		assert(dst.is_fp32() || dst.is_fp16());
 		assert(src.is_fp32() || src.is_fp16());
 		if (src.is_fp32())

@@ -72,6 +72,10 @@ namespace ml
 			{
 				return dtype() == DTYPE_FLOAT32;
 			}
+			bool is_fp64() const noexcept
+			{
+				return dtype() == DTYPE_FLOAT64;
+			}
 			uint64_t stride_in_bytes() const noexcept
 			{
 				return stride() * size_of(dtype());
