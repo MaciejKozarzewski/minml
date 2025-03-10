@@ -5,6 +5,7 @@ target_sources(${LibName} PRIVATE 	Add.cpp
 								Dense.cpp
 								DepthToSpace.cpp
 								DepthwiseConv2D.cpp
+								FusedConvBlock.cpp
 								Gelu.cpp
 								GlobalAveragePooling.cpp
 								GlobalBroadcastHW.cpp
@@ -12,6 +13,7 @@ target_sources(${LibName} PRIVATE 	Add.cpp
 								Input.cpp
 								Layer.cpp
 								LayerNormalization.cpp
+								LearnableGlobalPooling.cpp
 								MultiHeadAttention.cpp
 								Multiply.cpp
 								Parameter.cpp

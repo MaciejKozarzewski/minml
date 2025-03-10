@@ -155,6 +155,52 @@ namespace
 	}
 
 	template<typename T = float>
+	void baseline_learnable_pooling_forward(const Tensor &input, const Tensor &weights, Tensor &output)
+	{
+		for (int i = 0; i < input.firstDim(); i++)
+			for (int l = 0; l < input.lastDim(); l++)
+				for (int out = 0; out < weights.firstDim(); out++)
+				{
+					T acc = 0.0;
+					int m = 0;
+					for (int j = 0; j < input.dim(1); j++)
+						for (int k = 0; k < input.dim(2); k++, m++)
+							acc += (T) input.at( { i, j, k, l }) * (T) weights.at( { out, m });
+					output.at( { i, l * weights.firstDim() + out }) = acc;
+				}
+	}
+	template<typename T = float>
+	void baseline_learnable_pooling_backward(Tensor &gradient_prev, const Tensor &weights, const Tensor &gradient_next)
+	{
+		gradient_prev.zeroall();
+		for (int i = 0; i < gradient_prev.firstDim(); i++)
+			for (int l = 0; l < gradient_prev.lastDim(); l++)
+				for (int out = 0; out < weights.firstDim(); out++)
+				{
+					const T grad = (T) gradient_next.at( { i, l * weights.firstDim() + out });
+					int m = 0;
+					for (int j = 0; j < gradient_prev.dim(1); j++)
+						for (int k = 0; k < gradient_prev.dim(2); k++, m++)
+							gradient_prev.at( { i, j, k, l }) = (T) gradient_prev.at( { i, j, k, l }) + grad * (T) weights.at( { out, m });
+				}
+	}
+	template<typename T = float>
+	void baseline_learnable_pooling_update(const Tensor &input, Tensor &weights_update, const Tensor &gradient_next)
+	{
+		weights_update.zeroall();
+		for (int i = 0; i < input.firstDim(); i++)
+			for (int l = 0; l < input.lastDim(); l++)
+				for (int out = 0; out < weights_update.firstDim(); out++)
+				{
+					const T grad = (T) gradient_next.at( { i, l * weights_update.firstDim() + out });
+					int m = 0;
+					for (int j = 0; j < input.dim(1); j++)
+						for (int k = 0; k < input.dim(2); k++, m++)
+							weights_update.at( { out, m }) = (T) weights_update.at( { out, m }) + grad * (T) input.at( { i, j, k, l });
+				}
+	}
+
+	template<typename T = float>
 	void baseline_channel_scaling_forward(const Tensor &input, Tensor &output, const Tensor &scales)
 	{
 		assert(input.rank() == 4);
@@ -276,6 +322,66 @@ namespace
 					baseline_average_pooling_backward<double>(gradient_prev[0], gradient_next);
 			}
 	};
+	class BaselineLearbableGlobalPooling: public Layer
+	{
+			int m_dim = 0;
+		public:
+			BaselineLearbableGlobalPooling(int dim) :
+					Layer("linear"),
+					m_dim(dim)
+			{
+			}
+			void setInputShape(const std::vector<Shape> &shapes)
+			{
+				m_input_shapes = shapes;
+			}
+			Shape getOutputShape() const
+			{
+				const int batch_size = getInputShape().firstDim();
+				const int channels = getInputShape().lastDim();
+				return Shape( { batch_size, m_dim * channels });
+			}
+			Shape getWeightShape() const
+			{
+				return Shape( { m_dim, getInputShape().dim(1) * getInputShape().dim(2) });
+			}
+			std::string name() const
+			{
+				return "BaselineLearbableGlobalPooling";
+			}
+			Json getConfig() const
+			{
+				Json result = Layer::getConfig();
+				result["dim"] = m_dim;
+				return result;
+			}
+			std::unique_ptr<Layer> clone(const Json &config) const
+			{
+				std::unique_ptr<BaselineLearbableGlobalPooling> result = std::make_unique<BaselineLearbableGlobalPooling>(config["dim"].getInt());
+				result->loadConfig(config);
+				return result;
+			}
+			void forward(const std::vector<Tensor> &input, Tensor &output)
+			{
+				if (input[0].dtype() == DataType::FLOAT32)
+					baseline_learnable_pooling_forward<float>(input[0], getWeights().getParam(), output);
+				if (input[0].dtype() == DataType::FLOAT64)
+					baseline_learnable_pooling_forward<double>(input[0], getWeights().getParam(), output);
+			}
+			void backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next)
+			{
+				if (input[0].dtype() == DataType::FLOAT32)
+				{
+					baseline_learnable_pooling_backward<float>(gradient_prev[0], getWeights().getParam(), gradient_next);
+					baseline_learnable_pooling_update<float>(input[0], getWeights().getGradient(), gradient_next);
+				}
+				if (input[0].dtype() == DataType::FLOAT64)
+				{
+					baseline_learnable_pooling_backward<double>(gradient_prev[0], getWeights().getParam(), gradient_next);
+					baseline_learnable_pooling_update<double>(input[0], getWeights().getGradient(), gradient_next);
+				}
+			}
+	};
 	class BaselineChannelScaling: public Layer
 	{
 		public:
@@ -339,6 +445,15 @@ namespace ml
 //
 //		exit(0);
 //	}
+	TEST(TestLearnableGlobalPooling, baseline)
+	{
+		testing::GradientCheck gradcheck { BaselineLearbableGlobalPooling(1) };
+		gradcheck.setInputShape(Shape( { 13, 7, 8, 34 }));
+
+		gradcheck.check(100, 1.0e-4, "all", true);
+
+		exit(0);
+	}
 //	TEST(TestChannelScaling, baseline)
 //	{
 //		testing::GradientCheck gradcheck { BaselineChannelScaling() };

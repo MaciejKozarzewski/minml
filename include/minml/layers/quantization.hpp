@@ -60,14 +60,6 @@ namespace ml
 		return static_cast<T>(std::round(t.get_inverse()(0.0f)));
 	}
 
-	template<typename T>
-	T quantize_to(float x) noexcept
-	{
-		const float min_value = std::numeric_limits<T>::lowest();
-		const float max_value = std::numeric_limits<T>::max();
-		return std::max(min_value, std::min(max_value, std::round(x)));
-	}
-
 	class WeightQuantizer
 	{
 		public:
@@ -76,7 +68,11 @@ namespace ml
 			Tensor channel_scales;
 	};
 
-	WeightQuantizer quantize_weights(const Tensor &weights, const Tensor &bias, const AffineTransform &input_transform, const std::string &mode);
+	int32_t quantize(float x, int bits) noexcept;
+	DataType get_quantized_dtype(int bits) noexcept;
+
+	WeightQuantizer quantize_weights(const Tensor &weights, const Tensor &bias, const AffineTransform &input_transform, const std::string &mode,
+			int bits = 8);
 
 } /* namespace ml */
 

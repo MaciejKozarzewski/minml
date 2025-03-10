@@ -59,6 +59,7 @@ namespace ml
 			ActivationType m_activation;
 
 			bool m_is_quantizable = true;
+			int m_quantization_bits = 0;
 			std::vector<AffineTransform> m_input_transforms;
 			AffineTransform m_output_transform;
 			Tensor m_channel_scales;
@@ -78,7 +79,7 @@ namespace ml
 			void setActivationType(ActivationType act) noexcept;
 
 			virtual Layer& quantizable(bool b) noexcept;
-			virtual void setupQuantization(const std::vector<AffineTransform> &input_transforms, const AffineTransform &output_transform);
+			virtual void setupQuantization(const std::vector<AffineTransform> &input_transforms, const AffineTransform &output_transform, int bits);
 			/**
 			 * documentation
 			 */

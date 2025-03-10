@@ -174,13 +174,6 @@ namespace ml
 		std::memcpy(&result, &tmp, sizeof(result));
 		return result;
 	}
-	float convert_bf16_to_fp32(uint16_t x)
-	{
-		uint16_t tmp[2] = { 0u, x };
-		float result;
-		std::memcpy(&result, tmp, sizeof(float));
-		return result;
-	}
 
 	size_t sizeOf(DataType t) noexcept
 	{
@@ -199,6 +192,38 @@ namespace ml
 				return 8;
 			default:
 				return 0;
+		}
+	}
+	bool isFloatingPoint(DataType t) noexcept
+	{
+		switch (t)
+		{
+			case DataType::FLOAT16:
+			case DataType::FLOAT32:
+			case DataType::FLOAT64:
+				return true;
+			case DataType::UINT8:
+			case DataType::INT8:
+			case DataType::INT16:
+			case DataType::INT32:
+			default:
+				return false;
+		}
+	}
+	bool isInteger(DataType t) noexcept
+	{
+		switch (t)
+		{
+			case DataType::FLOAT16:
+			case DataType::FLOAT32:
+			case DataType::FLOAT64:
+			default:
+				return false;
+			case DataType::UINT8:
+			case DataType::INT8:
+			case DataType::INT16:
+			case DataType::INT32:
+				return true;
 		}
 	}
 
@@ -231,7 +256,7 @@ namespace ml
 			case DataType::FLOAT64:
 				return std::string("FLOAT64");
 			case DataType::UINT8:
-				return std::string("INT8");
+				return std::string("UINT8");
 			case DataType::INT8:
 				return std::string("INT8");
 			case DataType::INT16:

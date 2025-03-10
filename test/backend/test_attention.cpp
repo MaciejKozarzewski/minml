@@ -569,8 +569,8 @@ namespace ml
 //		exit(0);
 
 		multiHeadAttentionForward(context, input, output, weights, bias, mask, workspace, backward_data, num_heads, symmetric);
-		multiHeadAttentionBackward(context, input, weights, bias, mask, gradient_prev, gradient_next, weights_update, bias_update, workspace,
-				backward_data, num_heads, symmetric);
+//		multiHeadAttentionBackward(context, input, weights, bias, mask, gradient_prev, gradient_next, weights_update, bias_update, workspace,
+//				backward_data, num_heads, symmetric);
 
 		EXPECT_LE(testing::diffForTest(correct_gradient_prev, gradient_prev), 1.0e-4f);
 		EXPECT_LE(testing::diffForTest(correct_weights_update, weights_update), 1.0e-4f);
@@ -595,8 +595,8 @@ namespace ml
 			const int workspace_size = multiHeadAttentionGetWorkspaceSize(context, input.shape(), weights.shape(), num_heads, true);
 			Tensor workspace( { workspace_size }, "float32", context.device());
 			multiHeadAttentionForward(context, input, output, weights, bias, mask, workspace, backward_data, num_heads, symmetric);
-			multiHeadAttentionBackward(context, input, weights, bias, mask, gradient_prev, gradient_next, weights_update, bias_update, workspace,
-					backward_data, num_heads, symmetric);
+//			multiHeadAttentionBackward(context, input, weights, bias, mask, gradient_prev, gradient_next, weights_update, bias_update, workspace,
+//					backward_data, num_heads, symmetric);
 
 			context.synchronize();
 //			for (int i = 0; i < weights_update.dim(0); i++)

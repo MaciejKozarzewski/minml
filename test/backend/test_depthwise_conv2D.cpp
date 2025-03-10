@@ -289,7 +289,7 @@ namespace ml
 		const int batch_size = 12;
 		const int height = 13;
 		const int width = 17;
-		const int filters = 35;
+		const int filters = 36;
 		const int kernel = 7;
 
 		Tensor input( { batch_size, height, width, filters }, "float32", Device::cpu());

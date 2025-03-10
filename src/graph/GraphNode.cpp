@@ -280,6 +280,10 @@ namespace ml
 	{
 		m_output_transform = t;
 	}
+	void GraphNode::replaceLayer(Layer *layer)
+	{
+		m_layer.reset(layer);
+	}
 
 	void GraphNode::link(GraphNode *prev, GraphNode *next)
 	{

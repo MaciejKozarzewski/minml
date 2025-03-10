@@ -109,6 +109,8 @@ namespace ml
 			void makeTrainable(bool b);
 			void setOutputTransform(const AffineTransform &t) noexcept;
 
+			void replaceLayer(Layer *layer);
+
 			static void link(GraphNode *prev, GraphNode *next);
 			static void link(const std::vector<GraphNode*> &prev, GraphNode *next);
 			static void link(GraphNode *prev, const std::vector<GraphNode*> &next);

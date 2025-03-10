@@ -182,7 +182,7 @@ namespace ml
 
 	void Conv2D::forward(const std::vector<Tensor> &input, Tensor &output)
 	{
-		if (input[0].dtype() == DataType::INT8)
+		if (isInteger(input[0].dtype()))
 		{
 			assert(output.dtype() == dtype());
 			if (device().isCUDA())
@@ -216,8 +216,8 @@ namespace ml
 				const int pad_h = -(m_kernel_size - 1) / 2;
 				const int pad_w = -(m_kernel_size - 1) / 2;
 
-				const int32_t input_zero = get_zero<int8_t>(m_input_transforms[0]);
-				const AffineTransform output_to_int8 = m_output_transform.get_inverse();
+				const int32_t input_zero = get_zero<int32_t>(m_input_transforms[0]);
+				const AffineTransform output_to_int = m_output_transform.get_inverse();
 
 //				std::cout << input[0].info() << '\n';
 //				std::cout << "m_input_transforms[0] " << to_string(m_input_transforms[0]) << '\n';
@@ -277,8 +277,8 @@ namespace ml
 										break;
 								}
 
-								if (output.dtype() == DataType::INT8)
-									output.at( { b, h, w, out }) = quantize_to<int8_t>(output_to_int8(tmp));
+								if (isInteger(output.dtype()))
+									output.at( { b, h, w, out }) = quantize(output_to_int(tmp), m_quantization_bits);
 								if (output.dtype() == DataType::FLOAT32)
 									output.at( { b, h, w, out }) = tmp;
 							}

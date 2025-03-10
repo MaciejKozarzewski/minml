@@ -18,8 +18,9 @@ namespace ml
 			std::vector<Histogram> m_histograms;
 			int m_number_of_bins;
 			float m_accuracy;
+			int m_target_bins;
 		public:
-			explicit CalibrationTable(int numberOfBins = 2048, float accuracy = 1.0e-3f) noexcept;
+			explicit CalibrationTable(int numberOfBins = 2048, float accuracy = 1.0e-3f, int targetBins = 256) noexcept;
 
 			void init(int size);
 			Histogram& getHistogram(size_t index);

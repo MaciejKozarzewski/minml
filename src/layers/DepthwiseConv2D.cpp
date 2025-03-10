@@ -92,12 +92,12 @@ namespace ml
 	void DepthwiseConv2D::forward(const std::vector<Tensor> &input, Tensor &output)
 	{
 		assert(input.size() == 1);
-		if (input[0].dtype() == DataType::INT8)
+		if (isInteger(input[0].dtype()))
 		{
 			assert(output.dtype() == dtype());
 			if (device().isCUDA())
 			{
-				const int32_t input_zero = get_zero<int8_t>(m_input_transforms[0]);
+				const int32_t input_zero = get_zero<int32_t>(m_input_transforms[0]);
 				quantized_depthwise_conv_forward(context(), input[0], getWeights().getParam(), m_channel_scales, getBias().getParam(), output,
 						m_output_transform, input_zero);
 			}
@@ -111,8 +111,8 @@ namespace ml
 				const int pad_h = -(m_kernel_size - 1) / 2;
 				const int pad_w = -(m_kernel_size - 1) / 2;
 
-				const int32_t input_zero = get_zero<int8_t>(m_input_transforms[0]);
-				const AffineTransform output_to_int8 = m_output_transform.get_inverse();
+				const int32_t input_zero = get_zero<int32_t>(m_input_transforms[0]);
+				const AffineTransform output_to_int = m_output_transform.get_inverse();
 
 				for (int b = 0; b < batch; b++)
 					for (int f = 0; f < filters; f++)
@@ -132,8 +132,8 @@ namespace ml
 									}
 								float tmp = static_cast<float>(acc) * (float) m_channel_scales.at( { f }) + (float) getBias().getParam().at( { f });
 
-								if (output.dtype() == DataType::INT8)
-									output.at( { b, h, w, f }) = quantize_to<int8_t>(output_to_int8(tmp));
+								if (isInteger(output.dtype()))
+									output.at( { b, h, w, f }) = quantize(output_to_int(tmp), m_quantization_bits);
 								if (output.dtype() == DataType::FLOAT32)
 									output.at( { b, h, w, f }) = tmp;
 							}

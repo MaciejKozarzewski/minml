@@ -25,10 +25,12 @@
 #include <minml/layers/Dense.hpp>
 #include <minml/layers/DepthToSpace.hpp>
 #include <minml/layers/DepthwiseConv2D.hpp>
+#include <minml/layers/FusedConvBlock.hpp>
 #include <minml/layers/Input.hpp>
 #include <minml/layers/Add.hpp>
 #include <minml/layers/BatchNormalization.hpp>
 #include <minml/layers/LayerNormalization.hpp>
+#include <minml/layers/LearnableGlobalPooling.hpp>
 #include <minml/layers/Gelu.hpp>
 #include <minml/layers/GlobalAveragePooling.hpp>
 #include <minml/layers/GlobalBroadcastHW.hpp>
@@ -129,17 +131,18 @@ namespace ml
 		m_is_quantizable = b;
 		return *this;
 	}
-	void Layer::setupQuantization(const std::vector<AffineTransform> &input_transforms, const AffineTransform &output_transform)
+	void Layer::setupQuantization(const std::vector<AffineTransform> &input_transforms, const AffineTransform &output_transform, int bits)
 	{
 		m_input_transforms = input_transforms;
 		m_output_transform = output_transform;
 		if (isQuantizable())
 		{
 			const std::string mode = (name() == "DepthwiseConv2D") ? "per_last_dim" : "per_first_dim";
-			const WeightQuantizer tmp = quantize_weights(getWeights().getParam(), getBias().getParam(), input_transforms.at(0), mode);
+			const WeightQuantizer tmp = quantize_weights(getWeights().getParam(), getBias().getParam(), input_transforms.at(0), mode, bits);
 			m_channel_scales = tmp.channel_scales;
 			getWeights().getParam() = tmp.weights;
 			getBias().getParam() = tmp.bias;
+			m_quantization_bits = bits;
 		}
 	}
 
@@ -260,7 +263,7 @@ namespace ml
 
 	void Layer::convertTo(DataType newType)
 	{
-		if (newType != DataType::INT8 and dtype() != DataType::INT8)
+		if (isInteger(newType) == false and isInteger(dtype()) == false)
 		{
 			getWeights().getParam().convertTo(context(), newType);
 			getBias().getParam().convertTo(context(), newType);
@@ -319,11 +322,13 @@ namespace ml
 		static const Dense dense(0);
 		static const DepthToSpace depth_to_space(0, { 0, 0 });
 		static const DepthwiseConv2D depthwise_conv2d(0, 0);
+		static const FusedConvBlock fused_conv_block;
 		static const Gelu gelu;
 		static const GlobalAveragePooling global_average_pooling;
 		static const GlobalBroadcastHW global_broadcast;
 		static const GlobalPooling global_pooling;
 		static const LayerNormalization layernorm;
+		static const LearnableGlobalPooling learnable_global_pooling(0);
 		static const MultiHeadAttention mha(0, 0, false);
 		static const Input input;
 		static const RMSNormalization rmsnorm;
@@ -351,6 +356,8 @@ namespace ml
 			result = depth_to_space.clone(json);
 		if (name == depthwise_conv2d.name())
 			result = depthwise_conv2d.clone(json);
+		if (name == fused_conv_block.name())
+			result = fused_conv_block.clone(json);
 		if (name == gelu.name())
 			result = gelu.clone(json);
 		if (name == global_average_pooling.name())
@@ -361,6 +368,8 @@ namespace ml
 			result = global_pooling.clone(json);
 		if (name == layernorm.name())
 			result = layernorm.clone(json);
+		if (name == learnable_global_pooling.name())
+			result = learnable_global_pooling.clone(json);
 		if (name == mha.name())
 			result = mha.clone(json);
 		if (name == input.name())

@@ -36,8 +36,24 @@ namespace
 
 namespace ml
 {
+	int32_t quantize(float x, int bits) noexcept
+	{
+		const float tmp = 1 << (bits - 1);
+		return std::max(-tmp, std::min(tmp - 1.0f, std::round(x)));
+	}
+	DataType get_quantized_dtype(int bits) noexcept
+	{
+		if (bits <= 8)
+			return DataType::INT8;
+		if (bits <= 16)
+			return DataType::INT16;
+		if (bits <= 32)
+			return DataType::INT32;
+		return DataType::UNKNOWN;
+	}
 
-	WeightQuantizer quantize_weights(const Tensor &weights, const Tensor &bias, const AffineTransform &input_transform, const std::string &mode)
+	WeightQuantizer quantize_weights(const Tensor &weights, const Tensor &bias, const AffineTransform &input_transform, const std::string &mode,
+			int bits)
 	{
 		assert(mode == "per_first_dim" || mode == "per_last_dim");
 		WeightQuantizer result;
@@ -48,19 +64,19 @@ namespace ml
 		else
 			tmp = weights.view( { weights.firstDim(), weights.shape().volumeWithoutFirstDim() });
 
-		result.weights = Tensor( { tmp.firstDim(), tmp.lastDim() }, "int8", Device::cpu());
+		result.weights = Tensor( { tmp.firstDim(), tmp.lastDim() }, get_quantized_dtype(bits), Device::cpu());
 		result.channel_scales = Tensor( { tmp.firstDim() }, "float32", Device::cpu());
 		result.bias = zeros_like(result.channel_scales);
 
 		for (int i = 0; i < tmp.firstDim(); i++)
 		{
-			const float channel_scale = 127.0f / get_max_abs_value(tmp, i);
+			const float channel_scale = static_cast<float>((1 << (bits - 1)) - 1) / get_max_abs_value(tmp, i);
 			result.channel_scales.at( { i }) = input_transform.scale() / channel_scale;
 
 			int32_t sum_q = 0;
 			for (int j = 0; j < tmp.lastDim(); j++)
 			{
-				const int8_t q = quantize_to<int8_t>((float) tmp.at( { i, j }) * channel_scale);
+				const int32_t q = quantize((float) tmp.at( { i, j }) * channel_scale, bits);
 				sum_q += static_cast<int32_t>(q);
 				result.weights.at( { i, j }) = q;
 			}
@@ -68,64 +84,6 @@ namespace ml
 			const float b = bias.isEmpty() ? 0.0f : bias.at( { i });
 			result.bias.at( { i }) = input_transform.shift() / channel_scale * sum_q + b;
 		}
-
-//		if (mode == "per_first_dim")
-//		{
-//			const int first_dim = weights.firstDim();
-//			const int last_dim = weights.shape().volumeWithoutFirstDim();
-//			result.channel_scales = Tensor(Shape( { first_dim }), "float32", Device::cpu());
-//			Tensor tmp = weights.view( { first_dim, last_dim });
-//
-//			result.weights = Tensor( { first_dim, last_dim }, "int8", Device::cpu());
-//			result.bias = Tensor( { first_dim }, "float32", Device::cpu());
-//			for (int i = 0; i < first_dim; i++)
-//			{
-//				float max_abs_value = 0.0f;
-//				for (int j = 0; j < last_dim; j++)
-//					max_abs_value = std::max(max_abs_value, std::fabs(tmp.get( { i, j })));
-//
-//				const float channel_scale = 127.0f / max_abs_value;
-//				result.channel_scales.at( { i }) = channel_scale;
-//
-//				int sum_q = 0;
-//				for (int j = 0; j < last_dim; j++)
-//				{
-//					const int8_t q = symmetric_quantize(tmp.get( { i, j }), channel_scale);
-//					sum_q += static_cast<int>(q);
-//					result.weights.at( { i, j }) = q;
-//				}
-//
-//				result.bias.at( { i }) = input_quantizer.shift * sum_q * channel_scale;
-//			}
-//		}
-//		if (mode == "per_last_dim")
-//		{
-//			const int first_dim = weights.shape().volumeWithoutLastDim();
-//			const int last_dim = weights.lastDim();
-//			result.channel_scales = Tensor(Shape( { last_dim }), "float32", Device::cpu());
-//			Tensor tmp = weights.view( { first_dim, last_dim });
-//
-//			result.weights = Tensor( { first_dim, last_dim }, "int8", Device::cpu());
-//			result.bias = Tensor( { last_dim }, "float32", Device::cpu());
-//			for (int j = 0; j < last_dim; j++)
-//			{
-//				float max_abs_value = 0.0f;
-//				for (int i = 0; i < first_dim; i++)
-//					max_abs_value = std::max(max_abs_value, std::fabs(tmp.get( { i, j })));
-//
-//				const float channel_scale = 127.0f / max_abs_value;
-//				result.channel_scales.at( { j }) = channel_scale;
-//
-//				int sum_q = 0;
-//				for (int i = 0; i < first_dim; i++)
-//				{
-//					const int8_t q = symmetric_quantize(tmp.get( { i, j }), channel_scale);
-//					sum_q += static_cast<int>(q);
-//					result.weights.at( { i, j }) = q;
-//				}
-//				result.bias.at( { j }) = input_quantizer.shift * sum_q * channel_scale;
-//			}
-//		}
 
 		if (mode == "per_last_dim")
 			result.weights = transpose(result.weights);

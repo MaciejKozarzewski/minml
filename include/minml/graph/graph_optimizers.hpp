@@ -37,6 +37,12 @@ namespace ml
 	class Quantize
 	{
 		public:
+			bool optimize(Graph &graph, int bits) const;
+	};
+
+	class FuseConvBlock
+	{
+		public:
 			bool optimize(Graph &graph) const;
 	};
 

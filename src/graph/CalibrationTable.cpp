@@ -18,16 +18,17 @@
 
 namespace ml
 {
-	CalibrationTable::CalibrationTable(int numberOfBins, float accuracy) noexcept :
+	CalibrationTable::CalibrationTable(int numberOfBins, float accuracy, int targetBins) noexcept :
 			m_number_of_bins(numberOfBins),
-			m_accuracy(accuracy)
+			m_accuracy(accuracy),
+			m_target_bins(targetBins)
 	{
 	}
 	void CalibrationTable::init(int size)
 	{
 		m_histograms.clear();
 		for (int i = 0; i < size; i++)
-			m_histograms.emplace_back(m_number_of_bins, m_accuracy);
+			m_histograms.emplace_back(m_number_of_bins, m_accuracy, m_target_bins);
 	}
 	Histogram& CalibrationTable::getHistogram(size_t index)
 	{

@@ -29,6 +29,8 @@ namespace ml
 	float convert_fp16_to_fp32(uint16_t x);
 
 	size_t sizeOf(DataType t) noexcept;
+	bool isFloatingPoint(DataType t) noexcept;
+	bool isInteger(DataType t) noexcept;
 
 	DataType typeFromString(const std::string &str);
 	std::string toString(DataType t);

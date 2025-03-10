@@ -123,12 +123,12 @@ namespace ml
 		const bool emulate_low_precision = false; //isTrainable() and dtype() == DataType::FLOAT32;
 
 		Tensor tmp_w;
-		if (emulate_low_precision)
-		{
-			tmp_w = m_workspace.lock()->view(getWeightShape());
-			emulateLowPrecision(context(), tmp_w, getWeights().getParam());
-		}
-		else
+//		if (emulate_low_precision)
+//		{
+//			tmp_w = m_workspace.lock()->view(getWeightShape());
+//			emulateLowPrecision(context(), tmp_w, getWeights().getParam());
+//		}
+//		else
 			tmp_w = getWeights().getParam().view();
 
 		const int batch_size = input[0].dim(0);
@@ -179,12 +179,12 @@ namespace ml
 			sumOverFirstDim(context(), getBias().getGradient(), gradient_next, 0.0f);
 
 		Tensor tmp_w;
-		if (emulate_low_precision)
-		{
-			tmp_w = m_workspace.lock()->view(getWeightShape());
-			emulateLowPrecision(context(), tmp_w, getWeights().getParam());
-		}
-		else
+//		if (emulate_low_precision)
+//		{
+//			tmp_w = m_workspace.lock()->view(getWeightShape());
+//			emulateLowPrecision(context(), tmp_w, getWeights().getParam());
+//		}
+//		else
 			tmp_w = getWeights().getParam().view();
 
 		const int batch_size = input[0].dim(0);
