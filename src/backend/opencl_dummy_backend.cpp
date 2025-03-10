@@ -317,19 +317,19 @@ namespace ml
 		throw NotImplemented(METHOD_NAME);
 	}
 
-	float opencl_mean_squared_loss(mlContext_t context, mlShape_t shape, const void *output, const void *target)
+	float opencl_mean_squared_loss(mlContext_t context, mlShape_t shape, const void *output, const void *target, const void *mask)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
-	void opencl_mean_squared_gradient(mlContext_t context, mlShape_t shape, void *gradient, const void *output, const void *target, float weight)
+	void opencl_mean_squared_gradient(mlContext_t context, mlShape_t shape, void *gradient, const void *output, const void *target, const void *mask, float weight)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
-	float opencl_cross_entropy_loss(mlContext_t context, mlShape_t shape, const void *output, const void *target)
+	float opencl_cross_entropy_loss(mlContext_t context, mlShape_t shape, const void *output, const void *target, const void *mask)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
-	void opencl_cross_entropy_gradient(mlContext_t context, mlShape_t shape, void *gradient, const void *output, const void *target, float weight)
+	void opencl_cross_entropy_gradient(mlContext_t context, mlShape_t shape, void *gradient, const void *output, const void *target, const void *mask, float weight)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}

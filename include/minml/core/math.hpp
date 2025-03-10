@@ -114,10 +114,12 @@ namespace ml
 	// computes dst = alpha1 * src1 + alpha2 * src2
 	void addTensors(const Context &context, Tensor &dst, float alpha1, const Tensor &src1, float alpha2, const Tensor &src2);
 
-	float meanSquaredLoss(const Context &context, const Tensor &output, const Tensor &target);
-	void meanSquaredGradient(const Context &context, Tensor &gradient, const Tensor &output, const Tensor &target, float weight = 1.0f);
-	float crossEntropyLoss(const Context &context, const Tensor &output, const Tensor &target);
-	void crossEntropyGradient(const Context &context, Tensor &gradient, const Tensor &output, const Tensor &target, float weight = 1.0f);
+	float meanSquaredLoss(const Context &context, const Tensor &output, const Tensor &target, const Tensor &mask);
+	void meanSquaredGradient(const Context &context, Tensor &gradient, const Tensor &output, const Tensor &target, const Tensor &mask, float weight =
+			1.0f);
+	float crossEntropyLoss(const Context &context, const Tensor &output, const Tensor &target, const Tensor &mask);
+	void crossEntropyGradient(const Context &context, Tensor &gradient, const Tensor &output, const Tensor &target, const Tensor &mask, float weight =
+			1.0f);
 	float valueHeadLoss(const Context &context, const Tensor &output, const Tensor &target);
 	void valueHeadGradient(const Context &context, Tensor &gradient, const Tensor &output, const Tensor &target, float weight = 1.0f);
 

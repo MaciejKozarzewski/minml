@@ -542,7 +542,19 @@ namespace ml
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
+			{
+				const float inv = 1.0f / (input.dim(1) * input.dim(2));
+				for (int i = 0; i < input.firstDim(); i++)
+					for (int l = 0; l < input.lastDim(); l++)
+					{
+						float avg_value = 0.0f;
+						for (int j = 0; j < input.dim(1); j++)
+							for (int k = 0; k < input.dim(2); k++)
+								avg_value += (float) input.at( { i, j, k, l });
+						output.at( { i, l }) = avg_value * inv;
+					}
 				break;
+			}
 			case DeviceType::CUDA:
 				cuda_global_average_pooling_forward(get(context), get(input.dtype()), get(output.dtype()), get_shape(input), output.data(),
 						input.data(), 1.0f, 0.0f);
@@ -1071,59 +1083,59 @@ namespace ml
 				break;
 		}
 	}
-	float meanSquaredLoss(const Context &context, const Tensor &output, const Tensor &target)
+	float meanSquaredLoss(const Context &context, const Tensor &output, const Tensor &target, const Tensor &mask)
 	{
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
-				return cpu_mean_squared_loss(get(context), get_shape(output), output.data(), target.data());
+				return cpu_mean_squared_loss(get(context), get_shape(output), output.data(), target.data(), mask.data());
 			case DeviceType::CUDA:
-				return cuda_mean_squared_loss(get(context), get_shape(output), output.data(), target.data());
+				return cuda_mean_squared_loss(get(context), get_shape(output), output.data(), target.data(), mask.data());
 			case DeviceType::OPENCL:
-				return opencl_mean_squared_loss(get(context), get_shape(output), output.data(), target.data());
+				return opencl_mean_squared_loss(get(context), get_shape(output), output.data(), target.data(), mask.data());
 		}
 		return 0.0f;
 	}
-	void meanSquaredGradient(const Context &context, Tensor &gradient, const Tensor &output, const Tensor &target, float weight)
+	void meanSquaredGradient(const Context &context, Tensor &gradient, const Tensor &output, const Tensor &target, const Tensor &mask, float weight)
 	{
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
-				cpu_mean_squared_gradient(get(context), get_shape(output), gradient.data(), output.data(), target.data(), weight);
+				cpu_mean_squared_gradient(get(context), get_shape(output), gradient.data(), output.data(), target.data(), mask.data(), weight);
 				break;
 			case DeviceType::CUDA:
-				cuda_mean_squared_gradient(get(context), get_shape(output), gradient.data(), output.data(), target.data(), weight);
+				cuda_mean_squared_gradient(get(context), get_shape(output), gradient.data(), output.data(), target.data(), mask.data(), weight);
 				break;
 			case DeviceType::OPENCL:
-				opencl_mean_squared_gradient(get(context), get_shape(output), gradient.data(), output.data(), target.data(), weight);
+				opencl_mean_squared_gradient(get(context), get_shape(output), gradient.data(), output.data(), target.data(), mask.data(), weight);
 				break;
 		}
 	}
-	float crossEntropyLoss(const Context &context, const Tensor &output, const Tensor &target)
+	float crossEntropyLoss(const Context &context, const Tensor &output, const Tensor &target, const Tensor &mask)
 	{
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
-				return cpu_cross_entropy_loss(get(context), get_shape(output), output.data(), target.data());
+				return cpu_cross_entropy_loss(get(context), get_shape(output), output.data(), target.data(), mask.data());
 			case DeviceType::CUDA:
-				return cuda_cross_entropy_loss(get(context), get_shape(output), output.data(), target.data());
+				return cuda_cross_entropy_loss(get(context), get_shape(output), output.data(), target.data(), mask.data());
 			case DeviceType::OPENCL:
-				return opencl_cross_entropy_loss(get(context), get_shape(output), output.data(), target.data());
+				return opencl_cross_entropy_loss(get(context), get_shape(output), output.data(), target.data(), mask.data());
 		}
 		return 0.0f;
 	}
-	void crossEntropyGradient(const Context &context, Tensor &gradient, const Tensor &output, const Tensor &target, float weight)
+	void crossEntropyGradient(const Context &context, Tensor &gradient, const Tensor &output, const Tensor &target, const Tensor &mask, float weight)
 	{
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
-				cpu_cross_entropy_gradient(get(context), get_shape(output), gradient.data(), output.data(), target.data(), weight);
+				cpu_cross_entropy_gradient(get(context), get_shape(output), gradient.data(), output.data(), target.data(), mask.data(), weight);
 				break;
 			case DeviceType::CUDA:
-				cuda_cross_entropy_gradient(get(context), get_shape(output), gradient.data(), output.data(), target.data(), weight);
+				cuda_cross_entropy_gradient(get(context), get_shape(output), gradient.data(), output.data(), target.data(), mask.data(), weight);
 				break;
 			case DeviceType::OPENCL:
-				opencl_cross_entropy_gradient(get(context), get_shape(output), gradient.data(), output.data(), target.data(), weight);
+				opencl_cross_entropy_gradient(get(context), get_shape(output), gradient.data(), output.data(), target.data(), mask.data(), weight);
 				break;
 		}
 	}

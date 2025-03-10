@@ -17,13 +17,13 @@ namespace ml
 			m_weight(weight)
 	{
 	}
-	float CrossEntropyLoss::getLoss(const Context &context, const Tensor &output, const Tensor &target) const
+	float CrossEntropyLoss::getLoss(const Context &context, const Tensor &output, const Tensor &target, const Tensor &mask) const
 	{
-		return m_weight * crossEntropyLoss(context, output, target);
+		return m_weight * crossEntropyLoss(context, output, target, mask);
 	}
-	void CrossEntropyLoss::getGradient(const Context &context, Tensor &gradient, const Tensor &output, const Tensor &target) const
+	void CrossEntropyLoss::getGradient(const Context &context, Tensor &gradient, const Tensor &output, const Tensor &target, const Tensor &mask) const
 	{
-		crossEntropyGradient(context, gradient, output, target, m_weight);
+		crossEntropyGradient(context, gradient, output, target, mask, m_weight);
 	}
 	Json CrossEntropyLoss::serialize(SerializedObject &binary_data) const
 	{
@@ -43,13 +43,13 @@ namespace ml
 			m_weight(weight)
 	{
 	}
-	float MeanSquaredLoss::getLoss(const Context &context, const Tensor &output, const Tensor &target) const
+	float MeanSquaredLoss::getLoss(const Context &context, const Tensor &output, const Tensor &target, const Tensor &mask) const
 	{
-		return m_weight * meanSquaredLoss(context, output, target);
+		return m_weight * meanSquaredLoss(context, output, target, mask);
 	}
-	void MeanSquaredLoss::getGradient(const Context &context, Tensor &gradient, const Tensor &output, const Tensor &target) const
+	void MeanSquaredLoss::getGradient(const Context &context, Tensor &gradient, const Tensor &output, const Tensor &target, const Tensor &mask) const
 	{
-		meanSquaredGradient(context, gradient, output, target, m_weight);
+		meanSquaredGradient(context, gradient, output, target, mask, m_weight);
 	}
 	Json MeanSquaredLoss::serialize(SerializedObject &binary_data) const
 	{
@@ -69,11 +69,11 @@ namespace ml
 			m_weight(weight)
 	{
 	}
-	float ValueHeadLoss::getLoss(const Context &context, const Tensor &output, const Tensor &target) const
+	float ValueHeadLoss::getLoss(const Context &context, const Tensor &output, const Tensor &target, const Tensor &mask) const
 	{
 		return m_weight * valueHeadLoss(context, output, target);
 	}
-	void ValueHeadLoss::getGradient(const Context &context, Tensor &gradient, const Tensor &output, const Tensor &target) const
+	void ValueHeadLoss::getGradient(const Context &context, Tensor &gradient, const Tensor &output, const Tensor &target, const Tensor &mask) const
 	{
 		valueHeadGradient(context, gradient, output, target, m_weight);
 	}

@@ -133,7 +133,7 @@ namespace ml
 			opencl::runKernel(context, kernel, global, local);
 		}
 	}
-	float opencl_mean_squared_loss(mlContext_t context, mlShape_t shape, const void *output, const void *target)
+	float opencl_mean_squared_loss(mlContext_t context, mlShape_t shape, const void *output, const void *target, const void *mask)
 	{
 		cl::Buffer &workspace = opencl::Context::getWorkspace(context);
 		assert(opencl::Context::getWorkspaceSize(context) >= 1024 * sizeof(float));
@@ -146,7 +146,8 @@ namespace ml
 			kernel.setArg(0, workspace);
 			kernel.setArg(1, opencl::getMemoryObject(output).buffer());
 			kernel.setArg(2, opencl::getMemoryObject(target).buffer());
-			kernel.setArg(3, elements);
+			kernel.setArg(3, opencl::getMemoryObject(mask).buffer());
+			kernel.setArg(4, elements);
 
 			opencl::runKernel(context, kernel, global, local);
 		}
@@ -167,11 +168,11 @@ namespace ml
 		opencl_synchronize_with_context(context);
 		return result / get_first_dim(shape);
 	}
-	void opencl_mean_squared_gradient(mlContext_t context, mlShape_t shape, void *gradient, const void *output, const void *target, float weight)
+	void opencl_mean_squared_gradient(mlContext_t context, mlShape_t shape, void *gradient, const void *output, const void *target, const void *mask, float weight)
 	{
-		opencl_cross_entropy_gradient(context, shape, gradient, output, target, weight); // in this case both gradients are the same
+		opencl_cross_entropy_gradient(context, shape, gradient, output, target, mask, weight); // in this case both gradients are the same
 	}
-	float opencl_cross_entropy_loss(mlContext_t context, mlShape_t shape, const void *output, const void *target)
+	float opencl_cross_entropy_loss(mlContext_t context, mlShape_t shape, const void *output, const void *target, const void *mask)
 	{
 		cl::Buffer &workspace = opencl::Context::getWorkspace(context);
 		assert(opencl::Context::getWorkspaceSize(context) >= 1024 * sizeof(float));
@@ -184,7 +185,8 @@ namespace ml
 			kernel.setArg(0, workspace);
 			kernel.setArg(1, opencl::getMemoryObject(output).buffer());
 			kernel.setArg(2, opencl::getMemoryObject(target).buffer());
-			kernel.setArg(3, elements);
+			kernel.setArg(3, opencl::getMemoryObject(mask).buffer());
+			kernel.setArg(4, elements);
 
 			opencl::runKernel(context, kernel, global, local);
 		}
@@ -205,7 +207,7 @@ namespace ml
 		opencl_synchronize_with_context(context);
 		return result / get_first_dim(shape);
 	}
-	void opencl_cross_entropy_gradient(mlContext_t context, mlShape_t shape, void *gradient, const void *output, const void *target, float weight)
+	void opencl_cross_entropy_gradient(mlContext_t context, mlShape_t shape, void *gradient, const void *output, const void *target, const void *mask, float weight)
 	{
 		const int elements = volume(shape);
 		cl::Kernel kernel = get_kernel(context, "loss_gradient");
@@ -215,8 +217,9 @@ namespace ml
 		kernel.setArg(0, opencl::getMemoryObject(gradient).buffer());
 		kernel.setArg(1, opencl::getMemoryObject(output).buffer());
 		kernel.setArg(2, opencl::getMemoryObject(target).buffer());
-		kernel.setArg(3, elements);
-		kernel.setArg(4, weight / get_first_dim(shape));
+		kernel.setArg(3, opencl::getMemoryObject(mask).buffer());
+		kernel.setArg(4, elements);
+		kernel.setArg(5, weight / get_first_dim(shape));
 
 		opencl::runKernel(context, kernel, global, local);
 	}

@@ -27,7 +27,7 @@ namespace ml
 			reinterpret_cast<float*>(target.data())[i] = randFloat();
 		}
 
-		const float cpu_loss = crossEntropyLoss(Context(), output, target);
+		const float cpu_loss = crossEntropyLoss(Context(), output, target, Tensor());
 
 		if (testing::has_device_supporting(DataType::FLOAT32))
 		{
@@ -36,7 +36,7 @@ namespace ml
 			Context context(device);
 			output.moveTo(device);
 			target.moveTo(device);
-			const float device_loss = crossEntropyLoss(context, output, target);
+			const float device_loss = crossEntropyLoss(context, output, target, Tensor());
 			context.synchronize();
 
 			const float diff = std::abs(cpu_loss - device_loss) / output.volume();
@@ -55,7 +55,7 @@ namespace ml
 		}
 
 		Tensor cpu_gradient(output.shape(), "float32", Device::cpu());
-		crossEntropyGradient(Context(), cpu_gradient, output, target, 1.23f);
+		crossEntropyGradient(Context(), cpu_gradient, output, target, Tensor(), 1.23f);
 
 		if (testing::has_device_supporting(DataType::FLOAT32))
 		{
@@ -65,7 +65,7 @@ namespace ml
 			output.moveTo(device);
 			target.moveTo(device);
 			Tensor device_gradient(output.shape(), "float32", device);
-			crossEntropyGradient(context, device_gradient, output, target, 1.23f);
+			crossEntropyGradient(context, device_gradient, output, target, Tensor(), 1.23f);
 			context.synchronize();
 
 			EXPECT_LE(testing::diffForTest(cpu_gradient, device_gradient), 1.0e-4f);

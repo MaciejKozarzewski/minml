@@ -66,10 +66,14 @@ namespace
 		return (y >= max_y) ? 0.0f : std::pow(x, y);
 	}
 
-	__global__ void kernel_loss_gradient(float *gradient, const float *output, const float *target, int elements, float inv_batch_size)
+	__global__ void kernel_loss_gradient(float *gradient, const float *output, const float *target, const float *mask, int elements,
+			float inv_batch_size)
 	{
 		for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < elements; i += gridDim.x * blockDim.x)
-			gradient[i] = inv_batch_size * (output[i] - target[i]);
+		{
+			const float m = (mask == nullptr) ? 1.0f : mask[i];
+			gradient[i] = m * inv_batch_size * (output[i] - target[i]);
+		}
 	}
 	__global__ void kernel_value_head_loss_gradient(float *gradient, const float *output, const float *target, int first_dim, float inv_batch_size)
 	{
@@ -83,30 +87,39 @@ namespace
 			gradient[i * 2 + 1] = 0.0f; //inv_batch_size * (variance - square(mean - Q)) / square(variance);
 		}
 	}
-	__global__ void kernel_CE_loss_step_1(float *workspace, const float *output, const float *target, int elements)
+	__global__ void kernel_CE_loss_step_1(float *workspace, const float *output, const float *target, const float *mask, int elements)
 	{
 		assert(blockDim.x == 256);
 		__shared__ cg::block_tile_memory<256> btm;
 		cg::thread_block thb = cg::this_thread_block(btm);
-		cg::thread_block_tile < 256 > tile = cg::tiled_partition<256>(thb);
+		cg::thread_block_tile<256> tile = cg::tiled_partition<256>(thb);
+
+		const int tid = blockIdx.x * blockDim.x + threadIdx.x;
+		const int stride = gridDim.x * blockDim.x;
 
 		float acc = 0.0f;
-		for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < elements; i += gridDim.x * blockDim.x)
-			acc += max(0.0f, cross_entropy(output[i], target[i]) - cross_entropy(target[i], target[i]));
+		for (int i = tid; i < elements; i += stride)
+		{
+			const float m = (mask == nullptr) ? 1.0f : mask[i];
+			acc += m * max(0.0f, cross_entropy(output[i], target[i]) - cross_entropy(target[i], target[i]));
+		}
 		const float sum = cg::reduce(tile, acc, cg::plus<float>());
 		if (threadIdx.x == 0)
 			workspace[blockIdx.x] = sum;
 	}
-	__global__ void kernel_MSE_loss_step_1(float *workspace, const float *output, const float *target, int elements)
+	__global__ void kernel_MSE_loss_step_1(float *workspace, const float *output, const float *target, const float *mask, int elements)
 	{
 		assert(blockDim.x == 256);
 		__shared__ cg::block_tile_memory<256> btm;
 		cg::thread_block thb = cg::this_thread_block(btm);
-		cg::thread_block_tile < 256 > tile = cg::tiled_partition<256>(thb);
+		cg::thread_block_tile<256> tile = cg::tiled_partition<256>(thb);
 
 		float acc = 0.0f;
 		for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < elements; i += gridDim.x * blockDim.x)
-			acc += square(output[i] - target[i]);
+		{
+			const float m = (mask == nullptr) ? 1.0f : mask[i];
+			acc += m * square(output[i] - target[i]);
+		}
 		const float sum = cg::reduce(tile, acc, cg::plus<float>());
 		if (threadIdx.x == 0)
 			workspace[blockIdx.x] = sum;
@@ -116,7 +129,7 @@ namespace
 		assert(blockDim.x == 256);
 		__shared__ cg::block_tile_memory<256> btm;
 		cg::thread_block thb = cg::this_thread_block(btm);
-		cg::thread_block_tile < 256 > tile = cg::tiled_partition<256>(thb);
+		cg::thread_block_tile<256> tile = cg::tiled_partition<256>(thb);
 
 		float acc = 0.0f;
 		for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < first_dim; i += gridDim.x * blockDim.x)
@@ -135,7 +148,7 @@ namespace
 		assert(blockDim.x == 256);
 		__shared__ cg::block_tile_memory<256> btm;
 		cg::thread_block thb = cg::this_thread_block(btm);
-		cg::thread_block_tile < 256 > tile = cg::tiled_partition<256>(thb);
+		cg::thread_block_tile<256> tile = cg::tiled_partition<256>(thb);
 
 		float acc = 0.0f;
 		for (int i = threadIdx.x; i < elements; i += blockDim.x)
@@ -201,7 +214,7 @@ namespace
 
 namespace ml
 {
-	float cuda_mean_squared_loss(mlContext_t context, mlShape_t shape, const void *output, const void *target)
+	float cuda_mean_squared_loss(mlContext_t context, mlShape_t shape, const void *output, const void *target, const float *mask)
 	{
 		assert(output != nullptr);
 		assert(target != nullptr);
@@ -216,7 +229,8 @@ namespace ml
 		dim3 gridDim = cuda::gridSize<4096>(length, blockDim.x);
 		cudaStream_t stream = cuda::Context::getStream(context);
 
-		kernel_MSE_loss_step_1<<<gridDim, blockDim, 0, stream>>>(workspace, getPointer<float>(output), getPointer<float>(target), length);
+		kernel_MSE_loss_step_1<<<gridDim, blockDim, 0, stream>>>(workspace, getPointer<float>(output), getPointer<float>(target),
+				getPointer<float>(mask), length);
 		assert(cudaGetLastError() == cudaSuccess);
 
 		kernel_loss_step_2<<<1, blockDim, 0, stream>>>(workspace, gridDim.x);
@@ -228,11 +242,12 @@ namespace ml
 		assert(status == cudaSuccess);
 		return result / get_first_dim(shape);
 	}
-	void cuda_mean_squared_gradient(mlContext_t context, mlShape_t shape, void *gradient, const void *output, const void *target, float weight)
+	void cuda_mean_squared_gradient(mlContext_t context, mlShape_t shape, void *gradient, const void *output, const void *target, const float *mask,
+			float weight)
 	{
-		cuda_cross_entropy_gradient(context, shape, gradient, output, target, weight); // in this case both gradients are the same
+		cuda_cross_entropy_gradient(context, shape, gradient, output, target, mask, weight); // in this case both gradients are the same
 	}
-	float cuda_cross_entropy_loss(mlContext_t context, mlShape_t shape, const void *output, const void *target)
+	float cuda_cross_entropy_loss(mlContext_t context, mlShape_t shape, const void *output, const void *target, const void *mask)
 	{
 		assert(output != nullptr);
 		assert(target != nullptr);
@@ -247,7 +262,8 @@ namespace ml
 		dim3 gridDim = cuda::gridSize<4096>(length, blockDim.x);
 		cudaStream_t stream = cuda::Context::getStream(context);
 
-		kernel_CE_loss_step_1<<<gridDim, blockDim, 0, stream>>>(workspace, getPointer<float>(output), getPointer<float>(target), length);
+		kernel_CE_loss_step_1<<<gridDim, blockDim, 0, stream>>>(workspace, getPointer<float>(output), getPointer<float>(target),
+				getPointer<float>(mask), length);
 		assert(cudaGetLastError() == cudaSuccess);
 
 		kernel_loss_step_2<<<1, blockDim, 0, stream>>>(workspace, gridDim.x);
@@ -259,7 +275,8 @@ namespace ml
 		assert(status == cudaSuccess);
 		return result / get_first_dim(shape);
 	}
-	void cuda_cross_entropy_gradient(mlContext_t context, mlShape_t shape, void *gradient, const void *output, const void *target, float weight)
+	void cuda_cross_entropy_gradient(mlContext_t context, mlShape_t shape, void *gradient, const void *output, const void *target, const void *mask,
+			float weight)
 	{
 		assert(output != nullptr);
 		assert(target != nullptr);
@@ -277,7 +294,7 @@ namespace ml
 		cudaStream_t stream = cuda::Context::getStream(context);
 
 		kernel_loss_gradient<<<gridDim, blockDim, 0, stream>>>(getPointer<float>(gradient), getPointer<float>(output), getPointer<float>(target),
-				length, inv_batch_size);
+				getPointer<float>(mask), length, inv_batch_size);
 		assert(cudaGetLastError() == cudaSuccess);
 	}
 	float cuda_value_head_loss(mlContext_t context, mlShape_t shape, const void *output, const void *target)

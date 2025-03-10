@@ -9,31 +9,46 @@ float cross_entropy(float output, float target)
 	return -target * safe_log(output) - (1.0f - target) * safe_log(1.0f - output);
 }
 
-__kernel void loss_gradient(__global float *gradient, const __global float *output, const __global float *target, int elements, float inv_batch_size)
+__kernel void loss_gradient(__global float *gradient, const __global float *output, const __global float *target, const __global float *mask, int elements, float inv_batch_size)
 {
 	for (int i = get_global_id(0); i < elements; i += get_global_size(0))
-		gradient[i] = inv_batch_size * (output[i] - target[i]);
+	{
+		float m = 1.0f;
+		if (mask != 0)
+			m = mask[i];
+		gradient[i] = m * inv_batch_size * (output[i] - target[i]);
+	}
 }
-__kernel void CE_loss_step1(__global float *workspace, const __global float *output, const __global float *target, int elements)
+__kernel void CE_loss_step1(__global float *workspace, const __global float *output, const __global float *target, const __global float *mask, int elements)
 {
 	local float reduction_storage[256]; 
 
 	float acc = 0.0f;
 	for (int i = get_global_id(0); i < elements; i += get_global_size(0))
-		acc += max(0.0f, cross_entropy(output[i], target[i]) - cross_entropy(target[i], target[i]));
+	{
+		float m = 1.0f;
+		if (mask != 0)
+			m = mask[i];
+		acc += m * max(0.0f, cross_entropy(output[i], target[i]) - cross_entropy(target[i], target[i]));
+	}
 	reduction_storage[get_local_id(0)] = acc;
 
 	const float sum = reduce_add(reduction_storage);
 	if (get_local_id(0) == 0)
 		workspace[get_group_id(0)] = sum;
 }
-__kernel void MSE_loss_step1(__global float *workspace, const __global float *output, const __global float *target, int elements)
+__kernel void MSE_loss_step1(__global float *workspace, const __global float *output, const __global float *target, const __global float *mask, int elements)
 {
 	local float reduction_storage[256]; 
 
 	float acc = 0.0f;
 	for (int i = get_global_id(0); i < elements; i += get_global_size(0))
-		acc += square(output[i] - target[i]);
+	{
+		float m = 1.0f;
+		if (mask != 0)
+			m = mask[i];
+		acc += m * square(output[i] - target[i]);
+	}
 	reduction_storage[get_local_id(0)] = acc;
 
 	const float sum = reduce_add(reduction_storage);

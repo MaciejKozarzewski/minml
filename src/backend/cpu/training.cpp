@@ -87,6 +87,8 @@ namespace ml
 
 		switch (dtype)
 		{
+			default:
+				break;
 			case DTYPE_FLOAT32:
 				multiply_kernel(getPointer<float>(dst), getPointer<float>(src1), getPointer<float>(src2), elements);
 				break;
@@ -107,6 +109,8 @@ namespace ml
 
 		switch (dtype)
 		{
+			default:
+				break;
 			case DTYPE_FLOAT32:
 				add_kernel(getPointer<float>(dst), alpha1, getPointer<float>(src1), alpha2, getPointer<float>(src2), elements);
 				break;
@@ -143,7 +147,7 @@ namespace ml
 			for (int j = 0; j < last_dim; j++)
 				dst_ptr[j] = dst_ptr[j] * beta + tmp_ptr[j];
 	}
-	float cpu_mean_squared_loss(mlContext_t context, mlShape_t shape, const void *output, const void *target)
+	float cpu_mean_squared_loss(mlContext_t context, mlShape_t shape, const void *output, const void *target, const void *mask)
 	{
 		assert(output != nullptr);
 		assert(target != nullptr);
@@ -153,17 +157,22 @@ namespace ml
 
 		const float *output_ptr = getPointer<float>(output);
 		const float *target_ptr = getPointer<float>(target);
+		const float *mask_ptr = getPointer<float>(mask);
 
 		float result = 0.0f;
 		for (int i = 0; i < elements; i++)
-			result += square(output_ptr[i] - target_ptr[i]);
+		{
+			const float m = (mask == nullptr) ? 1.0f : mask_ptr[i];
+			result += m * square(output_ptr[i] - target_ptr[i]);
+		}
 		return 0.5f * result * inv_batch_size;
 	}
-	void cpu_mean_squared_gradient(mlContext_t context, mlShape_t shape, void *gradient, const void *output, const void *target, float weight)
+	void cpu_mean_squared_gradient(mlContext_t context, mlShape_t shape, void *gradient, const void *output, const void *target, const void *mask,
+			float weight)
 	{
-		cpu_cross_entropy_gradient(context, shape, gradient, output, target, weight); // in this case both gradients are the same
+		cpu_cross_entropy_gradient(context, shape, gradient, output, target, mask, weight); // in this case both gradients are the same
 	}
-	float cpu_cross_entropy_loss(mlContext_t context, mlShape_t shape, const void *output, const void *target)
+	float cpu_cross_entropy_loss(mlContext_t context, mlShape_t shape, const void *output, const void *target, const void *mask)
 	{
 		assert(output != nullptr);
 		assert(target != nullptr);
@@ -172,15 +181,20 @@ namespace ml
 
 		const float *output_ptr = getPointer<float>(output);
 		const float *target_ptr = getPointer<float>(target);
+		const float *mask_ptr = getPointer<float>(mask);
 
 		const float inv_batch_size = 1.0f / get_first_dim(shape);
 
 		float result = 0.0f;
 		for (int i = 0; i < elements; i++)
-			result += std::max(0.0f, cross_entropy(output_ptr[i], target_ptr[i]) - cross_entropy(target_ptr[i], target_ptr[i]));
+		{
+			const float m = (mask == nullptr) ? 1.0f : mask_ptr[i];
+			result += m * std::max(0.0f, cross_entropy(output_ptr[i], target_ptr[i]) - cross_entropy(target_ptr[i], target_ptr[i]));
+		}
 		return result * inv_batch_size;
 	}
-	void cpu_cross_entropy_gradient(mlContext_t context, mlShape_t shape, void *gradient, const void *output, const void *target, float weight)
+	void cpu_cross_entropy_gradient(mlContext_t context, mlShape_t shape, void *gradient, const void *output, const void *target, const void *mask,
+			float weight)
 	{
 		assert(output != nullptr);
 		assert(target != nullptr);
@@ -191,11 +205,15 @@ namespace ml
 		float *gradient_ptr = getPointer<float>(gradient);
 		const float *output_ptr = getPointer<float>(output);
 		const float *target_ptr = getPointer<float>(target);
+		const float *mask_ptr = getPointer<float>(mask);
 
 		const float inv_batch_size = weight / get_first_dim(shape);
 
 		for (int i = 0; i < elements; i++)
-			gradient_ptr[i] = inv_batch_size * (output_ptr[i] - target_ptr[i]);
+		{
+			const float m = (mask == nullptr) ? 1.0f : mask_ptr[i];
+			gradient_ptr[i] = m * inv_batch_size * (output_ptr[i] - target_ptr[i]);
+		}
 	}
 	float cpu_value_head_loss(mlContext_t context, mlShape_t shape, const void *output, const void *target)
 	{

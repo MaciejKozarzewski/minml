@@ -40,7 +40,8 @@ namespace ml
 			std::shared_ptr<Context> m_context;
 
 			std::vector<std::unique_ptr<GraphNode>> m_nodes;
-			std::vector<std::unique_ptr<Tensor>> m_targets;
+			std::vector<Tensor> m_targets;
+			std::vector<Tensor> m_masks;
 			std::vector<std::unique_ptr<LossFunction>> m_losses;
 
 			std::vector<GraphNode*> m_input_nodes; // non-owning
@@ -73,10 +74,12 @@ namespace ml
 			const Tensor& getOutput(int index = 0) const;
 			const Tensor& getGradient(int index = 0) const;
 			const Tensor& getTarget(int index = 0) const;
+			const Tensor& getMask(int index = 0) const;
 			Tensor& getInput(int index = 0);
 			Tensor& getOutput(int index = 0);
 			Tensor& getGradient(int index = 0);
 			Tensor& getTarget(int index = 0);
+			Tensor& getMask(int index = 0);
 
 			Shape getInputShape(int index = 0) const;
 			Shape getOutputShape(int index = 0) const;

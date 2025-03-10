@@ -80,7 +80,8 @@ namespace ml
 	void Graph::addOutput(GraphNodeID node, const LossFunction &loss)
 	{
 		m_output_nodes.push_back(get_node(node));
-		m_targets.push_back(nullptr);
+		m_targets.push_back(Tensor());
+		m_masks.push_back(Tensor());
 		m_losses.push_back(loss.clone());
 	}
 	void Graph::addOutput(GraphNodeID node, float weight)
@@ -105,9 +106,13 @@ namespace ml
 	{
 		if (not isTrainable())
 			throw LogicError(METHOD_NAME, "Graph is not trainable");
-		if (m_targets.at(index) == nullptr)
-			throw UninitializedObject(METHOD_NAME, "target tensor was not initialized");
-		return *(m_targets.at(index));
+		return m_targets.at(index);
+	}
+	const Tensor& Graph::getMask(int index) const
+	{
+		if (not isTrainable())
+			throw LogicError(METHOD_NAME, "Graph is not trainable");
+		return m_masks.at(index);
 	}
 	Tensor& Graph::getInput(int index)
 	{
@@ -123,9 +128,15 @@ namespace ml
 	}
 	Tensor& Graph::getTarget(int index)
 	{
-		if (m_targets.at(index) == nullptr)
-			m_targets.at(index) = std::make_unique<Tensor>(getOutput(index).shape(), dtype(), device());
-		return *(m_targets.at(index));
+		if (m_targets.at(index).isEmpty())
+			m_targets.at(index) = Tensor(getOutput(index).shape(), dtype(), device());
+		return m_targets.at(index);
+	}
+	Tensor& Graph::getMask(int index)
+	{
+		if (m_masks.at(index).isEmpty())
+			m_masks.at(index) = Tensor(getOutput(index).shape(), dtype(), device());
+		return m_masks.at(index);
 	}
 
 	Shape Graph::getInputShape(int index) const
@@ -164,8 +175,9 @@ namespace ml
 		if (m_backup_tensor != nullptr)
 			m_backup_tensor->moveTo(newDevice);
 		for (size_t i = 0; i < m_targets.size(); i++)
-			if (m_targets[i] != nullptr)
-				m_targets[i]->moveTo(newDevice);
+			m_targets[i].moveTo(newDevice);
+		for (size_t i = 0; i < m_masks.size(); i++)
+			m_masks[i].moveTo(newDevice);
 	}
 	void Graph::convertTo(DataType newType)
 	{
@@ -234,7 +246,8 @@ namespace ml
 			Tensor gradient = getGradient(i).view(tmp);
 			Tensor output = getOutput(i).view(tmp);
 			Tensor target = getTarget(i).view(tmp);
-			m_losses.at(i)->getGradient(context(), gradient, output, target);
+			Tensor mask = getMask(i).view(tmp);
+			m_losses.at(i)->getGradient(context(), gradient, output, target, mask);
 		}
 
 		for (int i = static_cast<int>(m_nodes.size()) - 1; i >= 0; i--)
@@ -254,7 +267,8 @@ namespace ml
 			tmp[0] = batchSize;
 			Tensor output = getOutput(i).view(tmp);
 			Tensor target = getTarget(i).view(tmp);
-			result[i] = m_losses.at(i)->getLoss(context(), output, target);
+			Tensor mask = getMask(i).view(tmp);
+			result[i] = m_losses.at(i)->getLoss(context(), output, target, mask);
 		}
 		return result;
 	}
@@ -307,6 +321,7 @@ namespace ml
 		if (not b)
 		{
 			m_targets.clear();
+			m_masks.clear();
 			m_losses.clear();
 		}
 		for (int i = 0; i < numberOfNodes(); i++)
@@ -359,6 +374,7 @@ namespace ml
 		m_context = std::make_shared<Context>();
 		m_nodes.clear();
 		m_targets.clear();
+		m_masks.clear();
 
 		m_input_nodes.clear();
 		m_output_nodes.clear();
@@ -388,7 +404,10 @@ namespace ml
 			m_is_trainable |= getNode(i).getLayer().isTrainable();
 		}
 		if (isTrainable())
-			m_targets = std::vector<std::unique_ptr<Tensor>>(numberOfOutputs());
+		{
+			m_targets = std::vector<Tensor>(numberOfOutputs());
+			m_masks = std::vector<Tensor>(numberOfOutputs());
+		}
 	}
 
 	GraphNodeID Graph::add_node(const Layer &layer, const std::vector<GraphNodeID> &inputs)
