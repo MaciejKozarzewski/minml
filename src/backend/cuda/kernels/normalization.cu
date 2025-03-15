@@ -26,22 +26,26 @@ namespace
 {
 	using namespace vectors2;
 
-	__device__ float get_mean(const float *ptr, int idx, int last_dim)
+	template<typename T>
+	__device__ float get_mean(const T *ptr, int idx, int last_dim)
 	{
 		assert(idx >= 0 && idx < last_dim);
 		return ptr[idx];
 	}
-	__device__ float get_stddev(const float *ptr, int idx, int last_dim)
+	template<typename T>
+	__device__ float get_stddev(const T *ptr, int idx, int last_dim)
 	{
 		assert(idx >= 0 && idx < last_dim);
-		return std::sqrt(ptr[last_dim + idx] + 1.0e-6f);
+		return sqrt(static_cast<float>(ptr[last_dim + idx]) + 1.0e-6f);
 	}
-	__device__ float get_gamma(const float *ptr, int idx, int last_dim)
+	template<typename T>
+	__device__ float get_gamma(const T *ptr, int idx, int last_dim)
 	{
 		assert(idx >= 0 && idx < last_dim);
 		return ptr[2 * last_dim + idx];
 	}
-	__device__ float get_beta(const float *ptr, int idx, int last_dim)
+	template<typename T>
+	__device__ float get_beta(const T *ptr, int idx, int last_dim)
 	{
 		assert(idx >= 0 && idx < last_dim);
 		return ptr[3 * last_dim + idx];
@@ -197,7 +201,8 @@ namespace
 		}
 	}
 
-	__global__ void kernel_batchnorm_inference(const float *weights, const float *input, float *output, int2 shape, ml::mlActivationType_t act)
+	template<typename T>
+	__global__ void kernel_batchnorm_inference(const T *weights, const T *input, T *output, int2 shape, ml::mlActivationType_t act)
 	{
 		const int tid = blockIdx.x * blockDim.x + threadIdx.x;
 		if (tid < shape.y)
@@ -212,7 +217,7 @@ namespace
 
 			for (int i = blockIdx.y * blockDim.y + threadIdx.y; i < shape.x; i += gridDim.y * blockDim.y)
 			{
-				float tmp = input[i * shape.y + tid] * scale + shift;
+				float tmp = static_cast<float>(input[i * shape.y + tid]) * scale + shift;
 				if (act == ml::ACTIVATION_RELU)
 					tmp = max(0.0f, tmp);
 				if (act == ml::ACTIVATION_TANH)
@@ -490,9 +495,9 @@ namespace
 		}
 		__syncthreads();
 
-		__shared__ cg::block_tile_memory < 256 > btm;
+		__shared__ cg::block_tile_memory<256> btm;
 		cg::thread_block thb = cg::this_thread_block(btm);
-		cg::thread_block_tile < 256 > tile = cg::tiled_partition<256>(thb);
+		cg::thread_block_tile<256> tile = cg::tiled_partition<256>(thb);
 
 		for (int i = blockIdx.x; i < first_dim; i += gridDim.x)
 		{
@@ -544,9 +549,9 @@ namespace
 		}
 		__syncthreads();
 
-		__shared__ cg::block_tile_memory < 256 > btm;
+		__shared__ cg::block_tile_memory<256> btm;
 		cg::thread_block thb = cg::this_thread_block(btm);
-		cg::thread_block_tile < 256 > tile = cg::tiled_partition<256>(thb);
+		cg::thread_block_tile<256> tile = cg::tiled_partition<256>(thb);
 
 		for (int i = blockIdx.x; i < first_dim; i += gridDim.x)
 		{
@@ -732,9 +737,9 @@ namespace
 		float *shared_weights_update = shared_weights + last_dim;
 		float *shared_bias_update = shared_weights_update + last_dim;
 
-		__shared__ cg::block_tile_memory < 256 > btm;
+		__shared__ cg::block_tile_memory<256> btm;
 		cg::thread_block thb = cg::this_thread_block(btm);
-		cg::thread_block_tile < 256 > tile = cg::tiled_partition<256>(thb);
+		cg::thread_block_tile<256> tile = cg::tiled_partition<256>(thb);
 
 		vec<float, N> thread_weights_update = 0.0f;
 		vec<float, N> thread_bias_update = 0.0f;
@@ -892,9 +897,9 @@ namespace
 			__syncthreads();
 		}
 
-		__shared__ cg::block_tile_memory < 256 > btm;
+		__shared__ cg::block_tile_memory<256> btm;
 		cg::thread_block thb = cg::this_thread_block(btm);
-		cg::thread_block_tile < 256 > tile = cg::tiled_partition<256>(thb);
+		cg::thread_block_tile<256> tile = cg::tiled_partition<256>(thb);
 
 		for (int i = blockIdx.x; i < first_dim; i += gridDim.x)
 		{
@@ -1062,7 +1067,8 @@ namespace
 
 namespace ml
 {
-	void cuda_batchnorm_inference(mlContext_t context, mlShape_t shape, const void *input, void *output, const void *weights, mlActivationType_t act)
+	void cuda_batchnorm_inference(mlContext_t context, mlDataType_t dtype, mlShape_t shape, const void *input, void *output, const void *weights,
+			mlActivationType_t act)
 	{
 		const int first_dim = volume_without_last_dim(shape);
 		const int last_dim = get_last_dim(shape);
@@ -1070,8 +1076,22 @@ namespace ml
 
 		dim3 blockDim(32, 8);
 		dim3 gridDim((last_dim + 31) / 32, std::min(1024, (first_dim + 7) / 8));
-		kernel_batchnorm_inference<<<gridDim, blockDim, 0, cuda::Context::getStream(context)>>>(getPointer<float>(weights), getPointer<float>(input),
-				getPointer<float>(output), dim, act);
+
+		cudaStream_t stream = cuda::Context::getStream(context);
+		switch (dtype)
+		{
+			case DTYPE_FLOAT16:
+				kernel_batchnorm_inference<<<gridDim, blockDim, 0, stream>>>(getPointer<half>(weights), getPointer<half>(input),
+						getPointer<half>(output), dim, act);
+				break;
+			case DTYPE_FLOAT32:
+				kernel_batchnorm_inference<<<gridDim, blockDim, 0, stream>>>(getPointer<float>(weights), getPointer<float>(input),
+						getPointer<float>(output), dim, act);
+				break;
+			default:
+				break;
+		}
+
 		assert(cudaGetLastError() == cudaSuccess);
 	}
 	void cuda_batchnorm_forward(mlContext_t context, mlShape_t shape, const void *input, void *output, void *weights, void *running_stats,
@@ -1091,7 +1111,6 @@ namespace ml
 
 		int2 shape1 { first_dim, last_dim };
 		dim3 gridDim2(gridDim1.x);
-//		int2 shape2 { workspace_first_dim, last_dim };
 		cudaStream_t stream = cuda::Context::getStream(context);
 
 		kernel_batchnorm_forward_avg_var_1<<<gridDim1, blockDim, 0,stream >>>(workspace, getPointer<float>(input), first_dim, last_dim);

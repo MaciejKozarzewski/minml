@@ -283,7 +283,7 @@ namespace ml
 	}
 
 	// batchnorm
-	void cuda_batchnorm_inference(mlContext_t context, mlShape_t shape, const void *input, void *output, const void *weights, mlActivationType_t act)
+	void cuda_batchnorm_inference(mlContext_t context, mlDataType_t dtype, mlShape_t shape, const void *input, void *output, const void *weights, mlActivationType_t act)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}

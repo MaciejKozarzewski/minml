@@ -583,7 +583,14 @@ namespace ml
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
+			{
+				for (int i = 0; i < input.dim(0); i++)
+					for (int j = 0; j < input.dim(1); j++)
+						for (int k = 0; k < input.dim(2); k++)
+							for (int l = 0; l < input.dim(3); l++)
+								output.at( { i, j, k, l }) = (float) input.at( { i, j, k, l }) * (float) scales.at( { i, l });
 				break;
+			}
 			case DeviceType::CUDA:
 				cuda_channel_scaling_forward(get(context), get(input.dtype()), get_shape(input), output.data(), input.data(), scales.data());
 				break;
@@ -692,13 +699,13 @@ namespace ml
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
-				cpu_batchnorm_inference(get(context), get_shape(input), input.data(), output.data(), weights.data(), get(act));
+				cpu_batchnorm_inference(get(context), get(input.dtype()), get_shape(input), input.data(), output.data(), weights.data(), get(act));
 				break;
 			case DeviceType::CUDA:
-				cuda_batchnorm_inference(get(context), get_shape(input), input.data(), output.data(), weights.data(), get(act));
+				cuda_batchnorm_inference(get(context), get(input.dtype()), get_shape(input), input.data(), output.data(), weights.data(), get(act));
 				break;
 			case DeviceType::OPENCL:
-				opencl_batchnorm_inference(get(context), get_shape(input), input.data(), output.data(), weights.data(), get(act));
+				opencl_batchnorm_inference(get(context), get(input.dtype()), get_shape(input), input.data(), output.data(), weights.data(), get(act));
 				break;
 		}
 	}

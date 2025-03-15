@@ -103,7 +103,7 @@ namespace ml
 				mlActivationType_t act);
 
 		// batchnorm
-		void opencl_batchnorm_inference(mlContext_t context, mlShape_t shape, const void *input, void *output, const void *weights,
+		void opencl_batchnorm_inference(mlContext_t context, mlDataType_t dtype, mlShape_t shape, const void *input, void *output, const void *weights,
 				mlActivationType_t act);
 		void opencl_batchnorm_forward(mlContext_t context, mlShape_t shape, const void *input, void *output, void *weights, void *running_stats,
 				int running_stat_idx, mlActivationType_t act);

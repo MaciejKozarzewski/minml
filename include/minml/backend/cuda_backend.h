@@ -131,8 +131,8 @@ namespace ml
 				mlActivationType_t act);
 
 		// batchnorm
-		DLL_PUBLIC void cuda_batchnorm_inference(mlContext_t context, mlShape_t shape, const void *input, void *output, const void *weights,
-				mlActivationType_t act);
+		DLL_PUBLIC void cuda_batchnorm_inference(mlContext_t context, mlDataType_t dtype, mlShape_t shape, const void *input, void *output,
+				const void *weights, mlActivationType_t act);
 		DLL_PUBLIC void cuda_batchnorm_forward(mlContext_t context, mlShape_t shape, const void *input, void *output, void *weights,
 				void *running_stats, int running_stat_idx, mlActivationType_t act);
 		DLL_PUBLIC void cuda_batchnorm_backward(mlContext_t context, mlShape_t shape, const void *input, const void *output, void *gradient_prev,

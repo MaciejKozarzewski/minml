@@ -32,7 +32,7 @@ namespace
 
 namespace ml
 {
-	void opencl_batchnorm_inference(mlContext_t context, mlShape_t shape, const void *input, void *output, const void *weights,
+	void opencl_batchnorm_inference(mlContext_t context, mlDataType_t dtype, mlShape_t shape, const void *input, void *output, const void *weights,
 			mlActivationType_t act)
 	{
 		const int first_dim = volume_without_last_dim(shape);
