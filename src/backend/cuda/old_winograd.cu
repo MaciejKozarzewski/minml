@@ -77,7 +77,6 @@ namespace
 		}
 	}
 	template<int tile_length, typename T>
-	__launch_bounds__(384, 5)
 	__global__ void kernel_conv3x3_4x4_input_transform(T *matrices, const T *input, int3 shape)
 	{
 		__shared__ float data[36][tile_length];
@@ -156,7 +155,6 @@ namespace
 		}
 	}
 	template<int tile_length, typename T>
-	__launch_bounds__(384, 5)
 	__global__ void kernel_conv3x3_4x4_output_transform(const T *matrices, T *output, int3 shape, const T *biases, const T *add)
 	{
 		__shared__ float data[36][tile_length];

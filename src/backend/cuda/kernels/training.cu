@@ -29,10 +29,6 @@ namespace
 	using namespace vectors;
 	using namespace vectors2;
 
-//	__device__ float round_small_to_zero(float x)
-//	{
-//		return (fabsf(x) < 1.0e-6f) ? 0.0f : x;
-//	}
 	__device__ vec4f round_small_to_zero(vec4f x)
 	{
 		vec4f result;
@@ -214,7 +210,7 @@ namespace
 
 namespace ml
 {
-	float cuda_mean_squared_loss(mlContext_t context, mlShape_t shape, const void *output, const void *target, const float *mask)
+	float cuda_mean_squared_loss(mlContext_t context, mlShape_t shape, const void *output, const void *target, const void *mask)
 	{
 		assert(output != nullptr);
 		assert(target != nullptr);
@@ -242,7 +238,7 @@ namespace ml
 		assert(status == cudaSuccess);
 		return result / get_first_dim(shape);
 	}
-	void cuda_mean_squared_gradient(mlContext_t context, mlShape_t shape, void *gradient, const void *output, const void *target, const float *mask,
+	void cuda_mean_squared_gradient(mlContext_t context, mlShape_t shape, void *gradient, const void *output, const void *target, const void *mask,
 			float weight)
 	{
 		cuda_cross_entropy_gradient(context, shape, gradient, output, target, mask, weight); // in this case both gradients are the same
@@ -284,10 +280,6 @@ namespace ml
 
 		const int length = volume(shape);
 		const float inv_batch_size = weight / get_first_dim(shape);
-
-		assert(cuda::Context::getWorkspaceSize(context) >= 4096 * sizeof(float));
-
-		float *workspace = cuda::Context::getWorkspace<float>(context);
 
 		dim3 blockDim(256);
 		dim3 gridDim = cuda::gridSize<1024>(length, blockDim.x);
@@ -332,10 +324,6 @@ namespace ml
 
 		const int first_dim = get_first_dim(shape);
 		const float inv_batch_size = weight / get_first_dim(shape);
-
-		assert(cuda::Context::getWorkspaceSize(context) >= 4096 * sizeof(float));
-
-		float *workspace = cuda::Context::getWorkspace<float>(context);
 
 		dim3 blockDim(256);
 		dim3 gridDim = cuda::gridSize<1024>(first_dim, blockDim.x);

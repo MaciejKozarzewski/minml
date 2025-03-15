@@ -129,13 +129,13 @@ namespace ml
 	Tensor& Graph::getTarget(int index)
 	{
 		if (m_targets.at(index).isEmpty())
-			m_targets.at(index) = Tensor(getOutput(index).shape(), dtype(), device());
+			m_targets.at(index) = zeros_like(getOutput(index));
 		return m_targets.at(index);
 	}
 	Tensor& Graph::getMask(int index)
 	{
 		if (m_masks.at(index).isEmpty())
-			m_masks.at(index) = Tensor(getOutput(index).shape(), dtype(), device());
+			m_masks.at(index) = ones_like(getOutput(index));
 		return m_masks.at(index);
 	}
 
