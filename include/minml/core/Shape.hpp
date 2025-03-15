@@ -49,6 +49,8 @@ namespace ml
 			int volume(const std::vector<int> &dims) const;
 
 			void removeDim(int index);
+			void insertDim(int index, int dim);
+			void squeeze();
 
 			friend bool operator==(const Shape &lhs, const Shape &rhs) noexcept;
 			friend bool operator!=(const Shape &lhs, const Shape &rhs) noexcept;

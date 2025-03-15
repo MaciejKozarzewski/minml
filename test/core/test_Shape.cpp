@@ -89,6 +89,89 @@ namespace ml
 		Shape loaded(j);
 		EXPECT_EQ(shape, loaded);
 	}
+	TEST(TestShape, remove_dim)
+	{
+		Shape s1( { 4, 5, 6, 7 });
+		s1.removeDim(0);
+		EXPECT_EQ(s1.rank(), 3);
+		EXPECT_EQ(s1[0], 5);
+		EXPECT_EQ(s1[1], 6);
+		EXPECT_EQ(s1[2], 7);
+
+		Shape s2( { 4, 5, 6, 7 });
+		s2.removeDim(1);
+		EXPECT_EQ(s2.rank(), 3);
+		EXPECT_EQ(s2[0], 4);
+		EXPECT_EQ(s2[1], 6);
+		EXPECT_EQ(s2[2], 7);
+
+		Shape s3( { 4, 5, 6, 7 });
+		s3.removeDim(3);
+		EXPECT_EQ(s3.rank(), 3);
+		EXPECT_EQ(s3[0], 4);
+		EXPECT_EQ(s3[1], 5);
+		EXPECT_EQ(s3[2], 6);
+
+		Shape s4( { 4 });
+		s4.removeDim(0);
+		EXPECT_EQ(s4.rank(), 0);
+	}
+	TEST(TestShape, insert_dim)
+	{
+		Shape s1( { 4, 5, 6, 7 });
+		s1.insertDim(0, 1);
+		EXPECT_EQ(s1.rank(), 5);
+		EXPECT_EQ(s1[0], 1);
+		EXPECT_EQ(s1[1], 4);
+		EXPECT_EQ(s1[2], 5);
+		EXPECT_EQ(s1[3], 6);
+		EXPECT_EQ(s1[4], 7);
+
+		Shape s2( { 4, 7 });
+		s2.insertDim(1, 1);
+		EXPECT_EQ(s2.rank(), 3);
+		EXPECT_EQ(s2[0], 4);
+		EXPECT_EQ(s2[1], 1);
+		EXPECT_EQ(s2[2], 7);
+
+		Shape s3( { 4, 5, 6, 7 });
+		s3.insertDim(4, 1);
+		EXPECT_EQ(s3.rank(), 5);
+		EXPECT_EQ(s3[0], 4);
+		EXPECT_EQ(s3[1], 5);
+		EXPECT_EQ(s3[2], 6);
+		EXPECT_EQ(s3[3], 7);
+		EXPECT_EQ(s3[4], 1);
+
+		Shape s4;
+		s4.insertDim(0, 1);
+		EXPECT_EQ(s4.rank(), 1);
+		EXPECT_EQ(s4[0], 1);
+	}
+	TEST(TestShape, squeeze)
+	{
+		Shape s1( { 4, 5, 6, 7 });
+		s1.squeeze();
+		EXPECT_EQ(s1.rank(), 4);
+		EXPECT_EQ(s1[0], 4);
+		EXPECT_EQ(s1[1], 5);
+		EXPECT_EQ(s1[2], 6);
+		EXPECT_EQ(s1[3], 7);
+
+		Shape s2( { 1, 5, 1, 6, 1 });
+		s2.squeeze();
+		EXPECT_EQ(s2.rank(), 2);
+		EXPECT_EQ(s2[0], 5);
+		EXPECT_EQ(s2[1], 6);
+
+		Shape s3( { 1, 1, 1, 1, 1, 1 });
+		s3.squeeze();
+		EXPECT_EQ(s3.rank(), 0);
+
+		Shape s4;
+		s4.squeeze();
+		EXPECT_EQ(s4.rank(), 0);
+	}
 
 } /* namespace ml */
 

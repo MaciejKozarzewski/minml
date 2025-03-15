@@ -41,9 +41,18 @@ namespace ml
 		const int last_dim = getInputShape().volume(m_axis);
 		if (last_dim == 0)
 			throw LogicError(METHOD_NAME, "softmax cannot be calculated over zero volume dimensions");
-		const int first_dim = getInputShape().volume() / last_dim;
+		Shape result = getInputShape();
 
-		return Shape( { first_dim, last_dim });
+		for (size_t i = 0; i < m_axis.size(); i++)
+		{
+			result.removeDim(m_axis[i]);
+			result.insertDim(m_axis[i], 1);
+		}
+		result.insertDim(result.rank(), last_dim);
+		result.removeDim(0); // remove batch dimension
+		result.squeeze();
+		result.insertDim(0, getInputShape().firstDim()); // restore batch dimension
+		return result;
 	}
 
 	std::string Softmax::name() const
@@ -71,8 +80,12 @@ namespace ml
 	{
 		assert(input.size() == 1);
 
-		const Tensor in = input[0].view(output.shape());
-		softmaxForward(context(), output, in);
+		const int first_dim = output.shape().volumeWithoutLastDim();
+		const int last_dim = output.shape().lastDim();
+
+		const Tensor in = input[0].view( { first_dim, last_dim });
+		Tensor out = output.view( { first_dim, last_dim });
+		softmaxForward(context(), out, in);
 	}
 	void Softmax::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next)
 	{

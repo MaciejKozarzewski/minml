@@ -36,6 +36,12 @@ namespace ml
 		std::memset(m_dim, 0, sizeof(m_dim));
 		std::memcpy(m_dim, dims.begin(), sizeof(int) * m_rank);
 	}
+	Shape::Shape(const std::vector<int> &dims) :
+			m_rank(dims.size())
+	{
+		std::memset(m_dim, 0, sizeof(m_dim));
+		std::memcpy(m_dim, dims.data(), sizeof(int) * m_rank);
+	}
 
 	std::string Shape::toString() const
 	{
@@ -152,12 +158,38 @@ namespace ml
 
 	void Shape::removeDim(int index)
 	{
-		if (index < 0 or index >= m_rank)
+		if (index < 0 or index >= rank())
 			throw IndexOutOfBounds(METHOD_NAME, "index", index, m_rank);
 
 		for (int i = index; i < rank() - 1; i++)
 			m_dim[i] = m_dim[i + 1];
 		m_rank--;
+	}
+	void Shape::insertDim(int index, int dim)
+	{
+		if (index < 0 or index > rank())
+			throw IndexOutOfBounds(METHOD_NAME, "index", index, m_rank);
+		if (rank() == max_dimension)
+			throw IllegalArgument(METHOD_NAME, "cannot expand");
+
+		m_rank++;
+		for (int i = rank() - 1; i > index; i--)
+			m_dim[i] = m_dim[i - 1];
+		m_dim[index] = dim;
+	}
+	void Shape::squeeze()
+	{
+		int new_dim[max_dimension];
+		std::memset(new_dim, 0, sizeof(new_dim));
+		int new_rank = 0;
+		for (int i = 0; i < rank(); i++)
+			if (m_dim[i] != 1)
+			{
+				new_dim[new_rank] = m_dim[i];
+				new_rank++;
+			}
+		std::memcpy(m_dim, new_dim, sizeof(int) * new_rank);
+		m_rank = new_rank;
 	}
 
 	bool operator==(const Shape &lhs, const Shape &rhs) noexcept
