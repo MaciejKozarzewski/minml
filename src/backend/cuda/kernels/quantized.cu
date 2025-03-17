@@ -267,7 +267,7 @@ namespace
 	}
 
 	template<typename T>
-	__global__ void kernel_receptive_fields(const void *input, void *output, int4 input_shape, int kernel_size, T padding_value)
+	__global__ void kernel_receptive_fields(const void *input, void *output, int4 input_shape, int kernel_size, bool invert, T padding_value)
 	{
 		int input_height = input_shape.y + kernel_size - 1;
 		int input_width = input_shape.z + kernel_size - 1;
@@ -298,7 +298,8 @@ namespace
 					const int x = in_h + i - kernel_size / 2;
 					const int y = in_w + j - kernel_size / 2;
 					int offset = i * kernel_size + j;
-					offset = (kernel_size * kernel_size - 1) - offset;
+					if (invert == false)
+						offset = (kernel_size * kernel_size - 1) - offset;
 					if (x >= 0 && x < input_shape.y && y >= 0 && y < input_shape.z)
 						reinterpret_cast<T*>(output)[(((in_b * input_shape.y + x) * input_shape.z + y) * kernel_size * kernel_size + offset) * filters
 								+ in_f] = loaded;
@@ -306,6 +307,25 @@ namespace
 		}
 	}
 
+	__device__ float to_fp8_and_back(float x)
+	{
+		const uint32_t tmp = reinterpret_cast<uint32_t*>(&x)[0] & 0xFFF00000u;
+		return reinterpret_cast<const float*>(&tmp)[0];
+	}
+
+	__device__ vec<float, 1> emulate_fp8(vec<float, 1> x)
+	{
+		x.x0 = to_fp8_and_back(x.x0);
+		return x;
+	}
+	__device__ vec<float, 4> emulate_fp8(vec<float, 4> x)
+	{
+		x.x0 = to_fp8_and_back(x.x0);
+		x.x1 = to_fp8_and_back(x.x1);
+		x.x2 = to_fp8_and_back(x.x2);
+		x.x3 = to_fp8_and_back(x.x3);
+		return x;
+	}
 	__device__ vec<float, 1> emulate_fp16(vec<float, 1> x)
 	{
 		x.x0 = static_cast<float>(static_cast<half>(x.x0));
@@ -333,6 +353,20 @@ namespace
 		return x;
 	}
 
+	template<int N>
+	__global__ void kernel_emulate_low_precision_fp8(float *dst, const float *src, int elements)
+	{
+		assert(elements % N == 0);
+		const int tid = blockIdx.x * blockDim.x + threadIdx.x;
+		const int stride = gridDim.x * blockDim.x;
+
+		for (int i = tid * N; i < elements; i += stride * N)
+		{
+			const vec<float, N> x(src + i);
+			const vec<float, N> y = emulate_fp8(x);
+			y.store(dst + i);
+		}
+	}
 	template<int N>
 	__global__ void kernel_emulate_low_precision_fp16(float *dst, const float *src, int elements)
 	{
@@ -389,6 +423,12 @@ namespace ml
 
 		switch (dtype)
 		{
+			case DTYPE_FLOAT8:
+				if (vect == 4)
+					kernel_emulate_low_precision_fp8<4> <<<gridDim, blockDim, 0, stream>>>(getPointer<float>(dst), getPointer<float>(src), elements);
+				else
+					kernel_emulate_low_precision_fp8<1> <<<gridDim, blockDim, 0, stream>>>(getPointer<float>(dst), getPointer<float>(src), elements);
+				break;
 			case DTYPE_FLOAT16:
 				if (vect == 4)
 					kernel_emulate_low_precision_fp16<4> <<<gridDim, blockDim, 0, stream>>>(getPointer<float>(dst), getPointer<float>(src), elements);
@@ -511,8 +551,8 @@ namespace ml
 		}
 		assert(cudaGetLastError() == cudaSuccess);
 	}
-	void cuda_create_receptive_fields(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, void *output, const void *input,
-			int kernel_size, const void *padding_value)
+	void cuda_im2row(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, void *output, const void *input, int kernel_size, bool invert,
+			const void *padding)
 	{
 		const int last_dim = get_last_dim(input_shape);
 
@@ -525,32 +565,32 @@ namespace ml
 		switch (dtype)
 		{
 			case DTYPE_FLOAT16:
-				kernel_receptive_fields<half> <<<gridSize, blockSize, 0, stream>>>(input, output, shape, kernel_size,
-						get_padding<half>(padding_value));
+				kernel_receptive_fields<half> <<<gridSize, blockSize, 0, stream>>>(input, output, shape, kernel_size, invert,
+						get_padding<half>(padding));
 				break;
 			case DTYPE_FLOAT32:
-				kernel_receptive_fields<float> <<<gridSize, blockSize, 0, stream>>>(input, output, shape, kernel_size,
-						get_padding<float>(padding_value));
+				kernel_receptive_fields<float> <<<gridSize, blockSize, 0, stream>>>(input, output, shape, kernel_size, invert,
+						get_padding<float>(padding));
 				break;
 			case DTYPE_FLOAT64:
-				kernel_receptive_fields<double> <<<gridSize, blockSize, 0, stream>>>(input, output, shape, kernel_size,
-						get_padding<double>(padding_value));
+				kernel_receptive_fields<double> <<<gridSize, blockSize, 0, stream>>>(input, output, shape, kernel_size, invert,
+						get_padding<double>(padding));
 				break;
 			case DTYPE_UINT8:
-				kernel_receptive_fields<uint8_t> <<<gridSize, blockSize, 0, stream>>>(input, output, shape, kernel_size,
-						get_padding<uint8_t>(padding_value));
+				kernel_receptive_fields<uint8_t> <<<gridSize, blockSize, 0, stream>>>(input, output, shape, kernel_size, invert,
+						get_padding<uint8_t>(padding));
 				break;
 			case DTYPE_INT8:
-				kernel_receptive_fields<int8_t> <<<gridSize, blockSize, 0, stream>>>(input, output, shape, kernel_size,
-						get_padding<int8_t>(padding_value));
+				kernel_receptive_fields<int8_t> <<<gridSize, blockSize, 0, stream>>>(input, output, shape, kernel_size, invert,
+						get_padding<int8_t>(padding));
 				break;
 			case DTYPE_INT16:
-				kernel_receptive_fields<int16_t> <<<gridSize, blockSize, 0, stream>>>(input, output, shape, kernel_size,
-						get_padding<int16_t>(padding_value));
+				kernel_receptive_fields<int16_t> <<<gridSize, blockSize, 0, stream>>>(input, output, shape, kernel_size, invert,
+						get_padding<int16_t>(padding));
 				break;
 			case DTYPE_INT32:
-				kernel_receptive_fields<int32_t> <<<gridSize, blockSize, 0, stream>>>(input, output, shape, kernel_size,
-						get_padding<int32_t>(padding_value));
+				kernel_receptive_fields<int32_t> <<<gridSize, blockSize, 0, stream>>>(input, output, shape, kernel_size, invert,
+						get_padding<int32_t>(padding));
 				break;
 		}
 		assert(cudaGetLastError() == cudaSuccess);

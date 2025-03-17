@@ -9,6 +9,8 @@
 #define MINML_MATH_HPP_
 
 #include <cstddef>
+#include <initializer_list>
+#include <array>
 
 namespace ml
 {
@@ -33,7 +35,7 @@ namespace ml
 	void winogradGradientTransform(const Context &context, const Shape &weight_shape, const Tensor &gradient, Tensor &matrices);
 	void winogradUpdateTransform(const Context &context, const Tensor &matrices, Tensor &update);
 
-	void im2row(const Context &context, const Shape &weight_shape, const Tensor &input, Tensor &matrix);
+	void im2row(const Context &context, Tensor &output, const Tensor &input, int kernel_size, bool invert, const void *padding);
 	void depthToSpace(const Context &context, const Tensor &input, Tensor &output);
 	void spaceToDepth(const Context &context, const Tensor &input, Tensor &output);
 
@@ -136,7 +138,15 @@ namespace ml
 			const Tensor &bias, Tensor &output, AffineTransform output_transform, int padding_value);
 	void quantized_scale_shift_act(const Context &context, Tensor &output, AffineTransform output_transform, const Tensor &input,
 			const Tensor &scales, const Tensor &bias, ActivationType act, const Tensor &ext, AffineTransform ext_transform);
-	void create_receptive_fields(const Context &context, Tensor &output, const Tensor &input, int kernel_size, const void *padding = nullptr);
+	void transpose(const Context &context, Tensor &output, const Tensor &input, std::initializer_list<int> ordering);
+
+	std::array<int, 3> explicit_gemm_workspace(const Shape &inputShape, const Shape &outputShape, const Shape &weightShape);
+	void explicit_gemm_forward(const Context &context, const Tensor &input, Tensor &output, const Tensor &weights, const Tensor &bias,
+			Tensor &workspace, ActivationType activation, const Tensor &add);
+	void explicit_gemm_backward(const Context &context, Tensor &gradient_prev, Tensor &gradient_next, const Tensor &output, const Tensor &weights,
+			Tensor &workspace);
+	void explicit_gemm_update(const Context &context, const Tensor &input, const Tensor &gradient_next, Tensor &weight_update, Tensor &workspace);
+
 } /* namespace ml */
 
 #endif /* MINML_MATH_HPP_ */

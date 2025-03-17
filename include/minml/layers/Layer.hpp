@@ -124,6 +124,7 @@ namespace ml
 					Tensor &gradient_next) = 0;
 
 			virtual void learn();
+			std::shared_ptr<Context> get_context();
 	};
 
 	std::unique_ptr<Layer> loadLayer(const Json &json, const SerializedObject &binary_data);

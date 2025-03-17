@@ -324,6 +324,110 @@ namespace ml
 			EXPECT_LE(ml::testing::diffForTest(correct_weight_update, weight_update), 1.0e-4f);
 		}
 	}
+	TEST(TestConv2D, explicit_gemm_conv2D_5x5_forward_fp32)
+	{
+		Context context(Device::cpu());
+		Tensor input( { 2, 13, 17, 35 });
+		Tensor output( { 2, 13, 17, 21 });
+		Tensor weights( { 21, 5, 5, 35 });
+		Tensor bias( { 21 });
+		ml::testing::initForTest(weights, 0.0f);
+		ml::testing::initForTest(input, 1.0f);
+		ml::testing::initForTest(bias, 1.0f);
+
+		Tensor correct_output = zeros_like(output);
+		baseline_conv2D_forward(input, correct_output, weights, bias, Tensor(), ActivationType::RELU);
+
+		std::array<int, 3> workspace_size = explicit_gemm_workspace(input.shape(), output.shape(), weights.shape());
+		Tensor workspace( { workspace_size[0] });
+
+		explicit_gemm_forward(context, input, output, weights, bias, workspace, ActivationType::RELU, Tensor());
+		EXPECT_LE(ml::testing::diffForTest(correct_output, output), 1.0e-4f);
+
+		if (ml::testing::has_device_supporting(DataType::FLOAT32))
+		{
+			const Device device = ml::testing::get_device_for_test();
+			Context context(device);
+			input.moveTo(device);
+			output.moveTo(device);
+			weights.moveTo(device);
+			bias.moveTo(device);
+			workspace.moveTo(device);
+
+			output.zeroall();
+
+			explicit_gemm_forward(context, input, output, weights, bias, workspace, ActivationType::RELU, Tensor());
+			context.synchronize();
+			EXPECT_LE(ml::testing::diffForTest(correct_output, output), 1.0e-4f);
+		}
+	}
+	TEST(TestConv2D, explicit_gemm_conv2D_5x5_backward)
+	{
+		Context context(Device::cpu());
+		Tensor gradient_prev( { 12, 13, 17, 35 });
+		Tensor output( { 12, 13, 17, 21 });
+		Tensor gradient_next(output.shape());
+		Tensor weights( { output.lastDim(), 5, 5, gradient_prev.lastDim() });
+		ml::testing::initForTest(output, 0.0f);
+		ml::testing::initForTest(gradient_next, 1.0f);
+		ml::testing::initForTest(weights, 1.57f);
+
+		Tensor correct_gradient_prev = zeros_like(gradient_prev);
+		baseline_conv2D_backward(output, correct_gradient_prev, gradient_next, weights, ActivationType::LINEAR);
+
+		std::array<int, 3> workspace_size = explicit_gemm_workspace(gradient_prev.shape(), output.shape(), weights.shape());
+		Tensor workspace( { workspace_size[1] });
+
+//		EXPECT_LE(ml::testing::diffForTest(correct_gradient_prev, gradient_prev), 1.0e-4f);
+
+		if (ml::testing::has_device_supporting(DataType::FLOAT32))
+		{
+			const Device device = ml::testing::get_device_for_test();
+			Context context(device);
+			gradient_prev.moveTo(device);
+			output.moveTo(device);
+			gradient_next.moveTo(device);
+			weights.moveTo(device);
+			workspace.moveTo(device);
+
+			gradient_prev.zeroall();
+
+			explicit_gemm_backward(context, gradient_prev, gradient_next, output, weights, workspace);
+			context.synchronize();
+			EXPECT_LE(ml::testing::diffForTest(correct_gradient_prev, gradient_prev), 1.0e-4f);
+		}
+	}
+	TEST(TestConv2D, explicit_gemm_conv2D_5x5_update)
+	{
+		Context context(Device::cpu());
+		Tensor input( { 12, 13, 17, 35 });
+		Tensor gradient_next( { 12, 13, 17, 21 });
+		Tensor weight_update( { 21, 5, 5, 35 });
+		ml::testing::initForTest(input, 0.0f);
+		ml::testing::initForTest(gradient_next, 1.0f);
+
+		Tensor correct_weight_update = zeros_like(weight_update);
+		baseline_conv2D_update(input, gradient_next, correct_weight_update);
+
+		std::array<int, 3> workspace_size = explicit_gemm_workspace(input.shape(), gradient_next.shape(), weight_update.shape());
+		Tensor workspace( { workspace_size[2] });
+
+//		EXPECT_LE(ml::testing::diffForTest(correct_weight_update, weight_update), 1.0e-4f);
+
+		if (ml::testing::has_device_supporting(DataType::FLOAT32))
+		{
+			const Device device = ml::testing::get_device_for_test();
+			Context context(device);
+			input.moveTo(device);
+			gradient_next.moveTo(device);
+			weight_update.moveTo(device);
+			workspace.moveTo(device);
+
+			explicit_gemm_update(context, input, gradient_next, weight_update, workspace);
+			context.synchronize();
+			EXPECT_LE(ml::testing::diffForTest(correct_weight_update, weight_update), 1.0e-4f);
+		}
+	}
 
 #ifdef USE_CUDNN
 	TEST(TestConv2D, implicit_gemm_conv2D_1x1_forward_fp16)
@@ -335,15 +439,11 @@ namespace ml
 		const int filter_in = 35;
 		const int filter_out = 21;
 
-		Tensor input(
-				{	batch_size, height, width, filter_in}, "float16", Device::cpu());
-		Tensor output(
-				{	batch_size, height, width, filter_out}, "float16", Device::cpu());
+		Tensor input( { batch_size, height, width, filter_in }, "float16", Device::cpu());
+		Tensor output( { batch_size, height, width, filter_out }, "float16", Device::cpu());
 		Tensor add(output.shape(), "float16", Device::cpu());
-		Tensor weights(
-				{	filter_out, 1, 1, filter_in}, "float16", Device::cpu());
-		Tensor bias(
-				{	filter_out}, "float16", Device::cpu());
+		Tensor weights( { filter_out, 1, 1, filter_in }, "float16", Device::cpu());
+		Tensor bias( { filter_out }, "float16", Device::cpu());
 		ml::testing::initForTest(weights, 0.0f);
 		ml::testing::initForTest(input, 1.0f);
 		ml::testing::initForTest(bias, 1.0f);
@@ -395,15 +495,11 @@ namespace ml
 		const int filter_in = 35;
 		const int filter_out = 21;
 
-		Tensor input(
-				{	batch_size, height, width, filter_in}, "float16", Device::cpu());
-		Tensor output(
-				{	batch_size, height, width, filter_out}, "float16", Device::cpu());
+		Tensor input( { batch_size, height, width, filter_in }, "float16", Device::cpu());
+		Tensor output( { batch_size, height, width, filter_out }, "float16", Device::cpu());
 		Tensor add(output.shape(), "float16", Device::cpu());
-		Tensor weights(
-				{	filter_out, 3, 3, filter_in}, "float16", Device::cpu());
-		Tensor bias(
-				{	filter_out}, "float16", Device::cpu());
+		Tensor weights( { filter_out, 3, 3, filter_in }, "float16", Device::cpu());
+		Tensor bias( { filter_out }, "float16", Device::cpu());
 		ml::testing::initForTest(weights, 0.0f);
 		ml::testing::initForTest(input, 1.0f);
 		ml::testing::initForTest(bias, 1.0f);
@@ -441,15 +537,11 @@ namespace ml
 		const int filter_in = 35;
 		const int filter_out = 21;
 
-		Tensor input(
-				{	batch_size, height, width, filter_in}, "float16", Device::cpu());
-		Tensor output(
-				{	batch_size, height, width, filter_out}, "float16", Device::cpu());
+		Tensor input( { batch_size, height, width, filter_in }, "float16", Device::cpu());
+		Tensor output( { batch_size, height, width, filter_out }, "float16", Device::cpu());
 		Tensor add(output.shape(), "float16", Device::cpu());
-		Tensor weights(
-				{	filter_out, 5, 5, filter_in}, "float16", Device::cpu());
-		Tensor bias(
-				{	filter_out}, "float16", Device::cpu());
+		Tensor weights( { filter_out, 5, 5, filter_in }, "float16", Device::cpu());
+		Tensor bias( { filter_out }, "float16", Device::cpu());
 		ml::testing::initForTest(weights, 0.0f);
 		ml::testing::initForTest(input, 1.0f);
 		ml::testing::initForTest(bias, 1.0f);

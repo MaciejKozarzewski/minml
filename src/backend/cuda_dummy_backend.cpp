@@ -447,8 +447,13 @@ namespace ml
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
-	void cuda_create_receptive_fields(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, void *output, const void *input,
-			int kernel_size, const void *padding_value)
+	void cuda_im2row(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, void *output, const void *input,
+			int kernel_size, bool invert, const void *padding_value)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+	void cuda_transpose(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, mlShape_t output_shape, void *output,
+			const void *input, const int *ordering)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}

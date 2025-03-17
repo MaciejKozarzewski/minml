@@ -14,10 +14,8 @@ namespace ml
 {
 	enum class ConvolutionAlgorithm
 	{
-		DIRECT,
 		EXPLICIT_GEMM,
 		IMPLICIT_GEMM,
-		WINOGRAD_FUSED,
 		WINOGRAD_NON_FUSED
 	};
 
@@ -29,7 +27,7 @@ namespace ml
 			int m_width = 0;
 			int m_input_filters = 0;
 			int m_kernel_size = 0;
-			mutable ConvolutionAlgorithm m_algorithm = ConvolutionAlgorithm::DIRECT;
+			mutable ConvolutionAlgorithm m_algorithm = ConvolutionAlgorithm::EXPLICIT_GEMM;
 			mutable int m_winograd_tile_size = 0;
 			std::unique_ptr<Tensor> m_transformed_weights;
 			bool m_use_bias = true;

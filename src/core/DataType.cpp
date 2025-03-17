@@ -179,6 +179,7 @@ namespace ml
 	{
 		switch (t)
 		{
+			case DataType::FLOAT8:
 			case DataType::UINT8:
 			case DataType::INT8:
 				return 1;
@@ -198,6 +199,7 @@ namespace ml
 	{
 		switch (t)
 		{
+			case DataType::FLOAT8:
 			case DataType::FLOAT16:
 			case DataType::FLOAT32:
 			case DataType::FLOAT64:
@@ -214,6 +216,7 @@ namespace ml
 	{
 		switch (t)
 		{
+			case DataType::FLOAT8:
 			case DataType::FLOAT16:
 			case DataType::FLOAT32:
 			case DataType::FLOAT64:
@@ -229,6 +232,8 @@ namespace ml
 
 	DataType typeFromString(const std::string &str)
 	{
+		if (str == "fp8" or str == "float8" or str == "FLOAT8")
+			return DataType::FLOAT8;
 		if (str == "fp16" or str == "float16" or str == "FLOAT16")
 			return DataType::FLOAT16;
 		if (str == "fp32" or str == "float32" or str == "FLOAT32")
@@ -249,6 +254,8 @@ namespace ml
 	{
 		switch (t)
 		{
+			case DataType::FLOAT8:
+				return std::string("FLOAT8");
 			case DataType::FLOAT16:
 				return std::string("FLOAT16");
 			case DataType::FLOAT32:

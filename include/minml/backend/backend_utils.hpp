@@ -52,7 +52,12 @@ namespace ml
 			default:
 			case DTYPE_UNKNOWN:
 				return 0;
+			case DTYPE_FLOAT8:
+			case DTYPE_UINT8:
+			case DTYPE_INT8:
+				return 1;
 			case DTYPE_FLOAT16:
+			case DTYPE_INT16:
 				return 2;
 			case DTYPE_FLOAT32:
 			case DTYPE_INT32:

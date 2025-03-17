@@ -225,6 +225,7 @@ namespace ml
 	{
 		if (m_workspace == nullptr)
 			create_workspace();
+
 		for (size_t i = 0; i < m_nodes.size(); i++)
 			m_nodes[i]->forward(batchSize);
 	}

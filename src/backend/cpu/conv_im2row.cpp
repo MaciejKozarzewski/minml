@@ -27,8 +27,8 @@ namespace
 
 		const int kernel_height = weights_shape.dim[1];
 		const int kernel_width = weights_shape.dim[2];
-		const int pad_h = kernel_height / 2;
-		const int pad_w = kernel_width / 2;
+		const int pad_h = (kernel_height - 1) / 2;
+		const int pad_w = (kernel_width - 1) / 2;
 
 		const Indexer<4> input_indexer(batch_size, height, width, filters);
 		const Indexer<4> matrix_indexer(batch_size, height, width, kernel_height * kernel_width * filters);
@@ -62,21 +62,23 @@ namespace
 namespace ml
 {
 
-	void cpu_im2row(mlContext_t context, mlDataType_t dtype, mlShape_t weights_shape, mlShape_t input_shape, const void *input, void *matrix)
+	void cpu_im2row(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, void *output, const void *input, int kernel_size, bool invert,
+			const void *padding)
 	{
+		mlShape_t weights_shape = make_shape( { 0, kernel_size, kernel_size, 0 });
 		switch (size_of(dtype))
 		{
 			case 1:
-				create_receptive_fields(getPointer<int8_t>(input), getPointer<int8_t>(matrix), weights_shape, input_shape);
+				create_receptive_fields(getPointer<int8_t>(input), getPointer<int8_t>(output), weights_shape, input_shape);
 				break;
 			case 2:
-				create_receptive_fields(getPointer<int16_t>(input), getPointer<int16_t>(matrix), weights_shape, input_shape);
+				create_receptive_fields(getPointer<int16_t>(input), getPointer<int16_t>(output), weights_shape, input_shape);
 				break;
 			case 4:
-				create_receptive_fields(getPointer<int32_t>(input), getPointer<int32_t>(matrix), weights_shape, input_shape);
+				create_receptive_fields(getPointer<int32_t>(input), getPointer<int32_t>(output), weights_shape, input_shape);
 				break;
 			case 8:
-				create_receptive_fields(getPointer<int64_t>(input), getPointer<int64_t>(matrix), weights_shape, input_shape);
+				create_receptive_fields(getPointer<int64_t>(input), getPointer<int64_t>(output), weights_shape, input_shape);
 				break;
 		}
 	}

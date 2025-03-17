@@ -450,6 +450,91 @@ namespace ml
 		}
 	}
 
+	TEST(TestTensorOp, transpose2D)
+	{
+		Tensor input( { 10, 23 });
+		Tensor output( { 23, 10 });
+		testing::initForTest(input, 0.0f);
+
+		Tensor correct_output = zeros_like(output);
+		for (int i = 0; i < input.dim(0); i++)
+			for (int j = 0; j < input.dim(1); j++)
+				correct_output.at( { j, i }) = (float) input.at( { i, j });
+
+//		transpose(Context(), output, input, { 1, 0 });
+//		EXPECT_EQ(testing::diffForTest(correct_output, output), 0.0);
+
+		if (Device::numberOfCudaDevices() > 0)
+		{
+			const Device device = testing::get_device_for_test();
+			Context context(device);
+			input.moveTo(device);
+			output.moveTo(device);
+			output.zeroall();
+
+			transpose(context, output, input, { 1, 0 });
+			context.synchronize();
+			EXPECT_EQ(testing::diffForTest(correct_output, output), 0.0);
+		}
+	}
+	TEST(TestTensorOp, transpose3D)
+	{
+		Tensor input( { 10, 15, 23 });
+		Tensor output( { 23, 10, 15 });
+		testing::initForTest(input, 0.0f);
+
+		Tensor correct_output = zeros_like(output);
+		for (int i = 0; i < input.dim(0); i++)
+			for (int j = 0; j < input.dim(1); j++)
+				for (int k = 0; k < input.dim(2); k++)
+					correct_output.at( { k, i, j }) = (float) input.at( { i, j, k });
+
+//		transpose(Context(), output, input, { 2, 0, 1 });
+//		EXPECT_EQ(testing::diffForTest(correct_output, output), 0.0);
+
+		if (Device::numberOfCudaDevices() > 0)
+		{
+			const Device device = testing::get_device_for_test();
+			Context context(device);
+			input.moveTo(device);
+			output.moveTo(device);
+			output.zeroall();
+
+			transpose(context, output, input, { 2, 0, 1 });
+			context.synchronize();
+			EXPECT_EQ(testing::diffForTest(correct_output, output), 0.0);
+		}
+	}
+	TEST(TestTensorOp, transpose4D)
+	{
+		Tensor input( { 10, 15, 20, 23 });
+		Tensor output( { 20, 10, 23, 15 });
+		testing::initForTest(input, 0.0f);
+
+		Tensor correct_output = zeros_like(output);
+		for (int i = 0; i < input.dim(0); i++)
+			for (int j = 0; j < input.dim(1); j++)
+				for (int k = 0; k < input.dim(2); k++)
+					for (int l = 0; l < input.dim(3); l++)
+						correct_output.at( { k, i, l, j }) = (float) input.at( { i, j, k, l });
+
+//		transpose(Context(), output, input, { 2, 0, 3, 1 });
+//		EXPECT_EQ(testing::diffForTest(correct_output, output), 0.0);
+
+		if (Device::numberOfCudaDevices() > 0)
+		{
+			const Device device = testing::get_device_for_test();
+			Context context(device);
+			input.moveTo(device);
+			output.moveTo(device);
+			output.zeroall();
+
+			transpose(context, output, input, { 2, 0, 3, 1 });
+			context.synchronize();
+			EXPECT_EQ(testing::diffForTest(correct_output, output), 0.0);
+		}
+	}
+
 }
 /* namespace ml */
 

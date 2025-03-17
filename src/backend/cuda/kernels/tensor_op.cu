@@ -284,6 +284,48 @@ namespace
 		for (int c = threadIdx.x; c < channels; c += blockDim.x)
 			output[output_indexer.at(b, h, w, c)] = input[input_indexer.at(b, window_idx_h, window_idx_w, idx_h, idx_w, c)];
 	}
+	template<typename T>
+	__global__ void kernel_transpose(T *dst, const T *src, int4 src_shape, int4 ordering, int rank, int volume)
+	{
+		__shared__ int shape[4];
+		__shared__ int order[4];
+
+		__shared__ int src_stride[4];
+		__shared__ int dst_stride[4];
+		if (threadIdx.x == 0)
+		{
+			shape[0] = src_shape.x;
+			shape[1] = src_shape.y;
+			shape[2] = src_shape.z;
+			shape[3] = src_shape.w;
+
+			order[0] = ordering.x;
+			order[1] = ordering.y;
+			order[2] = ordering.z;
+			order[3] = ordering.w;
+			int tmp_src = 1, tmp_dst = 1;
+			for (int i = rank - 1; i >= 0; i--)
+			{
+				src_stride[i] = tmp_src;
+				dst_stride[order[i]] = tmp_dst;
+				tmp_src *= shape[i];
+				tmp_dst *= shape[order[i]];
+			}
+		}
+		__syncthreads();
+
+		for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < volume; i += gridDim.x * blockDim.x)
+		{
+			int tmp = i, dst_idx = 0;
+			for (int j = 0; j < rank; j++)
+			{
+				int idx = tmp / src_stride[j];
+				dst_idx += idx * dst_stride[j];
+				tmp -= idx * src_stride[j];
+			}
+			dst[dst_idx] = src[i];
+		}
+	}
 }
 
 namespace ml
@@ -448,6 +490,42 @@ namespace ml
 			case DTYPE_FLOAT64:
 				kernel_window_merging<<<gridDim, blockDim, 0, stream>>>(getPointer<double>(output), getPointer<double>(input), batch_size, height,
 						width, channels, window_size, window_offset);
+				break;
+		}
+		assert(cudaGetLastError() == cudaSuccess);
+	}
+
+	void cuda_transpose(mlContext_t context, mlDataType_t dtype, mlShape_t dst_shape, mlShape_t src_shape, void *dst, const void *src,
+			const int *ordering)
+	{
+		assert(volume(src_shape) == volume(dst_shape));
+		assert(src_shape.rank == dst_shape.rank);
+
+		const int4 shape { src_shape.dim[0], src_shape.dim[1], src_shape.dim[2], src_shape.dim[3] };
+		const int4 order { ordering[0], ordering[1], ordering[2], ordering[3] };
+
+		const int elements = volume(src_shape);
+		const int rank = src_shape.rank;
+		dim3 blockDim(256);
+		dim3 gridDim(512);
+
+		cudaStream_t stream = cuda::Context::getStream(context);
+		switch (size_of(dtype))
+		{
+			case 1:
+				kernel_transpose<<<gridDim, blockDim, 0, stream>>>(getPointer<int8_t>(dst), getPointer<int8_t>(src), shape, order, rank, elements);
+				break;
+			case 2:
+				kernel_transpose<<<gridDim, blockDim, 0, stream>>>(getPointer<int16_t>(dst), getPointer<int16_t>(src), shape, order, rank, elements);
+				break;
+			case 4:
+				kernel_transpose<<<gridDim, blockDim, 0, stream>>>(getPointer<int32_t>(dst), getPointer<int32_t>(src), shape, order, rank, elements);
+				break;
+			case 8:
+				kernel_transpose<<<gridDim, blockDim, 0, stream>>>(getPointer<int2>(dst), getPointer<int2>(src), shape, order, rank, elements);
+				break;
+			case 16:
+				kernel_transpose<<<gridDim, blockDim, 0, stream>>>(getPointer<int4>(dst), getPointer<int4>(src), shape, order, rank, elements);
 				break;
 		}
 		assert(cudaGetLastError() == cudaSuccess);

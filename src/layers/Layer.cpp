@@ -312,6 +312,10 @@ namespace ml
 		getWeights().learn(context());
 		getBias().learn(context());
 	}
+	std::shared_ptr<Context> Layer::get_context()
+	{
+		return m_context.lock();
+	}
 
 	std::unique_ptr<Layer> loadLayer(const Json &json, const SerializedObject &binary_data)
 	{

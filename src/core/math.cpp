@@ -319,15 +319,15 @@ namespace ml
 		}
 	}
 
-	void im2row(const Context &context, const Shape &weight_shape, const Tensor &input, Tensor &matrix)
+	void im2row(const Context &context, Tensor &output, const Tensor &input, int kernel_size, bool invert, const void *padding)
 	{
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
-				cpu_im2row(get(context), get(input.dtype()), get(weight_shape), get_shape(input), input.data(), matrix.data());
+				cpu_im2row(get(context), get(input.dtype()), get_shape(input), output.data(), input.data(), kernel_size, invert, padding);
 				break;
 			case DeviceType::CUDA:
-				// TODO
+				cuda_im2row(get(context), get(input.dtype()), get_shape(input), output.data(), input.data(), kernel_size, invert, padding);
 				break;
 			case DeviceType::OPENCL:
 				// TODO
@@ -1260,18 +1260,100 @@ namespace ml
 				break;
 		}
 	}
-	void create_receptive_fields(const Context &context, Tensor &output, const Tensor &input, int kernel_size, const void *padding)
+	void transpose(const Context &context, Tensor &output, const Tensor &input, std::initializer_list<int> ordering)
 	{
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
 				break;
 			case DeviceType::CUDA:
-				cuda_create_receptive_fields(get(context), get(input.dtype()), get_shape(input), output.data(), input.data(), kernel_size, padding);
+				cuda_transpose(get(context), get(input.dtype()), get_shape(output), get_shape(input), output.data(), input.data(), ordering.begin());
 				break;
 			case DeviceType::OPENCL:
 				break;
 		}
+	}
+	std::array<int, 3> explicit_gemm_workspace(const Shape &inputShape, const Shape &outputShape, const Shape &weightShape)
+	{
+		int forward_workspace = inputShape.volumeWithoutLastDim() * weightShape.volumeWithoutFirstDim();
+		int backward_workspace = weightShape.volume() + outputShape.volumeWithoutLastDim() * weightShape.volumeWithoutLastDim();
+		int update_workspace = inputShape.volumeWithoutLastDim() * weightShape.volumeWithoutFirstDim();
+		return std::array<int, 3> { forward_workspace, backward_workspace, update_workspace };
+	}
+	void explicit_gemm_forward(const Context &context, const Tensor &input, Tensor &output, const Tensor &weights, const Tensor &bias,
+			Tensor &workspace, ActivationType activation, const Tensor &add)
+	{
+		assert(same_device(context, input, output, weights, bias, workspace));
+		if (add.isEmpty() == false)
+		{
+			assert(same_device(context, add));
+			assert(same_shape(output, add));
+		}
+
+		assert(weights.dim(1) == weights.dim(2));
+		const int kernel_size = weights.dim(1);
+
+		Tensor input_matrix;
+		if (kernel_size == 1)
+			input_matrix = input.view( { input.shape().volumeWithoutLastDim(), input.lastDim() });
+		else
+		{
+			input_matrix = workspace.view( { input.shape().volumeWithoutLastDim(), weights.shape().volumeWithoutFirstDim() });
+			im2row(context, input_matrix, input, kernel_size, false, nullptr);
+		}
+
+		Tensor output_matrix = output.view( { output.shape().volumeWithoutLastDim(), output.lastDim() });
+		Tensor weight_matrix = weights.view( { weights.firstDim(), weights.shape().volumeWithoutFirstDim() });
+		const float beta = add.isEmpty() ? 0.0f : 1.0f;
+		const Tensor ext = add.isEmpty() ? output_matrix : add.view(output_matrix.shape());
+		gemm_ex(context, output_matrix, 1.0f, 'n', input_matrix, 't', weight_matrix, beta, ext, bias, activation);
+	}
+	void explicit_gemm_backward(const Context &context, Tensor &gradient_prev, Tensor &gradient_next, const Tensor &output, const Tensor &weights,
+			Tensor &workspace)
+	{
+		assert(same_device(context, gradient_prev, gradient_next, weights, workspace));
+		assert(weights.dim(1) == weights.dim(2));
+		const int kernel_size = weights.dim(1);
+
+		Tensor gradient_prev_matrix = gradient_prev.view( { gradient_prev.shape().volumeWithoutLastDim(), gradient_prev.lastDim() });
+		if (kernel_size == 1)
+		{
+			Tensor weight_matrix = weights.view( { weights.firstDim(), weights.shape().volumeWithoutFirstDim() });
+			Tensor gradient_next_matrix = gradient_next.view(
+					{ gradient_next.shape().volumeWithoutLastDim(), weights.shape().volumeWithoutLastDim() });
+
+			gemm(context, 'n', 'n', gradient_prev_matrix, gradient_next_matrix, weight_matrix, 1, 0);
+		}
+		else
+		{
+			Tensor inv_weight = workspace.view( { weights.dim(3), kernel_size, kernel_size, weights.dim(0) });
+			transpose(context, inv_weight, weights, { 3, 1, 2, 0 });
+			Tensor weight_matrix = inv_weight.view( { inv_weight.firstDim(), inv_weight.shape().volumeWithoutFirstDim() });
+
+			Tensor gradient_next_matrix = workspace.view( { gradient_next.shape().volumeWithoutLastDim(), weights.shape().volumeWithoutLastDim() },
+					inv_weight.volume());
+			im2row(context, gradient_next_matrix, gradient_next, kernel_size, true, nullptr);
+
+			gemm(context, 'n', 't', gradient_prev_matrix, gradient_next_matrix, weight_matrix, 1, 0);
+		}
+	}
+	void explicit_gemm_update(const Context &context, const Tensor &input, const Tensor &gradient_next, Tensor &weight_update, Tensor &workspace)
+	{
+		assert(same_device(context, input, gradient_next, weight_update, workspace));
+		assert(weight_update.dim(1) == weight_update.dim(2));
+		const int kernel_size = weight_update.dim(1);
+
+		Tensor input_matrix;
+		if (kernel_size == 1)
+			input_matrix = input.view( { input.shape().volumeWithoutLastDim(), input.lastDim() });
+		else
+		{
+			input_matrix = workspace.view( { input.shape().volumeWithoutLastDim(), weight_update.shape().volumeWithoutFirstDim() });
+			im2row(context, input_matrix, input, kernel_size, false, nullptr);
+		}
+		Tensor weight_update_matrix = weight_update.view( { weight_update.firstDim(), weight_update.shape().volumeWithoutFirstDim() });
+		Tensor gradient_matrix = gradient_next.view( { gradient_next.shape().volumeWithoutLastDim(), gradient_next.lastDim() });
+		gemm(context, 't', 'n', weight_update_matrix, gradient_matrix, input_matrix, 1, 0);
 	}
 
 } /* namespace ml */

@@ -218,8 +218,10 @@ namespace ml
 		DLL_PUBLIC void cuda_quantized_scale_shift_act(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output,
 				mlQuantizationData_t output_qd, const void *input, const void *scales, const void *bias, mlActivationType_t act, const void *ext,
 				mlQuantizationData_t ext_qd);
-		DLL_PUBLIC void cuda_create_receptive_fields(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, void *output, const void *input,
-				int kernel_size, const void *padding_value);
+		DLL_PUBLIC void cuda_im2row(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, void *output, const void *input, int kernel_size,
+				bool invert, const void *padding);
+		DLL_PUBLIC void cuda_transpose(mlContext_t context, mlDataType_t dtype, mlShape_t output_shape, mlShape_t input_shape, void *output,
+				const void *input, const int *ordering);
 
 #ifdef __cplusplus
 	}

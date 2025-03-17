@@ -34,7 +34,6 @@ namespace ml
 			std::string name() const;
 			Json getConfig() const;
 
-			int getWorkspaceSize() const noexcept;
 			std::unique_ptr<Layer> clone(const Json &config) const;
 
 			void forward(const std::vector<Tensor> &input, Tensor &output);

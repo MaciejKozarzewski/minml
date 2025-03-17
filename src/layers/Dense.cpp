@@ -98,13 +98,6 @@ namespace ml
 		return result;
 	}
 
-	int Dense::getWorkspaceSize() const noexcept
-	{
-		if (isUsingWeights())
-			return getWeightShape().volume();
-		else
-			return 0;
-	}
 	std::unique_ptr<Layer> Dense::clone(const Json &config) const
 	{
 		std::unique_ptr<Dense> result = std::make_unique<Dense>(config["neurons"], config["nonlinearity"]);

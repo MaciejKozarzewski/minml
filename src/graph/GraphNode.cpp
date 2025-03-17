@@ -177,8 +177,7 @@ namespace ml
 //		m_timer.stop();
 
 //		const bool emulate_low_precision = false; // getLayer().isTrainable() and getLayer().dtype() == DataType::FLOAT32;
-//		if (emulate_low_precision)
-//			emulateLowPrecision(getLayer().context(), output, output);
+//		emulateLowPrecision(getLayer().context(), output, output, DataType::FLOAT8, AffineTransform());
 	}
 	void GraphNode::backward(int batchSize, Tensor &backup_tensor)
 	{
@@ -282,6 +281,8 @@ namespace ml
 	}
 	void GraphNode::replaceLayer(Layer *layer)
 	{
+		std::shared_ptr<Context> context = m_layer->get_context();
+		layer->changeContext(context);
 		m_layer.reset(layer);
 	}
 

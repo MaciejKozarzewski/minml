@@ -40,6 +40,7 @@ namespace ml
 		typedef enum
 		{
 			DTYPE_UNKNOWN,
+			DTYPE_FLOAT8,
 			DTYPE_FLOAT16,
 			DTYPE_FLOAT32,
 			DTYPE_FLOAT64,

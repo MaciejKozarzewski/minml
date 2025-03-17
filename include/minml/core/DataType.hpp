@@ -16,6 +16,7 @@ namespace ml
 	enum class DataType
 	{
 		UNKNOWN,
+		FLOAT8,
 		FLOAT16,
 		FLOAT32,
 		FLOAT64,

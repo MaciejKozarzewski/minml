@@ -43,6 +43,7 @@ namespace
 	{
 		return std::to_string(t.scale()) + " * x + " + std::to_string(t.shift());
 	}
+
 }
 
 namespace ml
@@ -149,8 +150,11 @@ namespace ml
 			{
 				case ConvolutionAlgorithm::EXPLICIT_GEMM:
 				{
-					const Shape tmp( { getInputShape().volumeWithoutLastDim(), getWeightShape().volumeWithoutFirstDim() });
-					return tmp.volume();
+					const std::array<int, 3> tmp = explicit_gemm_workspace(getInputShape(), getOutputShape(), getWeightShape());
+					if (isTrainable())
+						return std::max(tmp[0], std::max(tmp[1], tmp[2]));
+					else
+						return tmp[0];
 				}
 				case ConvolutionAlgorithm::WINOGRAD_NON_FUSED:
 				{
@@ -199,7 +203,7 @@ namespace ml
 					input_matrix.reinterpretAs(DataType::INT8);
 
 					const int8_t input_padding = m_input_transforms.at(0).get_inverse()(0.0f);
-					create_receptive_fields(context(), input_matrix, input[0], m_kernel_size, &input_padding);
+					im2row(context(), input_matrix, input[0], m_kernel_size, false, &input_padding);
 				}
 				output_matrix.reinterpretAs(DataType::INT32);
 
@@ -290,8 +294,6 @@ namespace ml
 
 		switch (m_algorithm)
 		{
-			case ConvolutionAlgorithm::DIRECT:
-				break;
 			case ConvolutionAlgorithm::IMPLICIT_GEMM:
 			{
 				if (device().isCUDA())
@@ -307,25 +309,32 @@ namespace ml
 			}
 			case ConvolutionAlgorithm::EXPLICIT_GEMM:
 			{
-				Tensor input_matrix;
-				Tensor output_matrix = output.view( { output.shape().volumeWithoutLastDim(), output.lastDim() });
-				Tensor weight_matrix = getWeights().getParam().view( { getWeightShape().firstDim(), getWeightShape().volumeWithoutFirstDim() });
-				if (m_kernel_size == 1)
-					input_matrix = input[0].view( { input[0].shape().volumeWithoutLastDim(), input[0].lastDim() });
-				else
-				{
-					assert(device().isCPU());
-					input_matrix = m_workspace.lock()->view( { input[0].shape().volumeWithoutLastDim(), getWeightShape().volumeWithoutFirstDim() });
-					im2row(context(), getWeightShape(), input[0], input_matrix);
-				}
-
 				if (input.size() == 2)
-				{
-					const Tensor add = input[1].view(output_matrix.shape());
-					gemm_ex(context(), output_matrix, 1, 'n', input_matrix, 't', weight_matrix, 1, add, getBias().getParam(), m_activation);
-				}
+					explicit_gemm_forward(context(), input[0], output, getWeights().getParam(), getBias().getParam(), *m_workspace.lock(),
+							m_activation, input[1]);
 				else
-					gemm_ex(context(), output_matrix, 1, 'n', input_matrix, 't', weight_matrix, 0, output_matrix, getBias().getParam(), m_activation);
+					explicit_gemm_forward(context(), input[0], output, getWeights().getParam(), getBias().getParam(), *m_workspace.lock(),
+							m_activation, Tensor());
+
+//				Tensor input_matrix;
+//				Tensor output_matrix = output.view( { output.shape().volumeWithoutLastDim(), output.lastDim() });
+//				Tensor weight_matrix = getWeights().getParam().view( { getWeightShape().firstDim(), getWeightShape().volumeWithoutFirstDim() });
+//				if (m_kernel_size == 1)
+//					input_matrix = input[0].view( { input[0].shape().volumeWithoutLastDim(), input[0].lastDim() });
+//				else
+//				{
+//					assert(device().isCPU());
+//					input_matrix = m_workspace.lock()->view( { input[0].shape().volumeWithoutLastDim(), getWeightShape().volumeWithoutFirstDim() });
+//					im2row(context(), input_matrix, input[0], m_kernel_size, true, nullptr);
+//				}
+//
+//				if (input.size() == 2)
+//				{
+//					const Tensor add = input[1].view(output_matrix.shape());
+//					gemm_ex(context(), output_matrix, 1, 'n', input_matrix, 't', weight_matrix, 1, add, getBias().getParam(), m_activation);
+//				}
+//				else
+//					gemm_ex(context(), output_matrix, 1, 'n', input_matrix, 't', weight_matrix, 0, output_matrix, getBias().getParam(), m_activation);
 
 				break;
 			}
@@ -356,10 +365,6 @@ namespace ml
 
 				break;
 			}
-			case ConvolutionAlgorithm::WINOGRAD_FUSED:
-			{
-				break;
-			}
 		}
 	}
 	void Conv2D::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next)
@@ -375,19 +380,22 @@ namespace ml
 				throw NotImplemented(METHOD_NAME, "");
 			case ConvolutionAlgorithm::EXPLICIT_GEMM:
 			{
-				assert(m_kernel_size == 1);
+				explicit_gemm_backward(context(), gradient_prev[0], gradient_next, output, getWeights().getParam(), *m_workspace.lock());
+				explicit_gemm_update(context(), input[0], gradient_next, getWeights().getGradient(), *m_workspace.lock());
 
-				Tensor gradient_prev_matrix = gradient_prev[0].view( { gradient_prev[0].shape().volumeWithoutLastDim(), gradient_prev[0].lastDim() });
-				Tensor weight_matrix = getWeights().getParam().view( { getWeightShape().firstDim(), getWeightShape().volumeWithoutFirstDim() });
-				Tensor gradient_next_matrix = gradient_next.view(
-						{ gradient_next.shape().volumeWithoutLastDim(), getWeightShape().volumeWithoutLastDim() });
-				gemm(context(), 'n', 'n', gradient_prev_matrix, gradient_next_matrix, weight_matrix, 1, 0);
-
-				Tensor input_matrix = input[0].view( { input[0].shape().volumeWithoutLastDim(), input[0].lastDim() });
-				Tensor weight_update_matrix = getWeights().getGradient().view(
-						{ getWeightShape().firstDim(), getWeightShape().volumeWithoutFirstDim() });
-				Tensor gradient_matrix = gradient_next.view( { gradient_next.shape().volumeWithoutLastDim(), gradient_next.lastDim() });
-				gemm(context(), 't', 'n', weight_update_matrix, gradient_matrix, input_matrix, 1, 0);
+//				assert(m_kernel_size == 1);
+//
+//				Tensor gradient_prev_matrix = gradient_prev[0].view( { gradient_prev[0].shape().volumeWithoutLastDim(), gradient_prev[0].lastDim() });
+//				Tensor weight_matrix = getWeights().getParam().view( { getWeightShape().firstDim(), getWeightShape().volumeWithoutFirstDim() });
+//				Tensor gradient_next_matrix = gradient_next.view(
+//						{ gradient_next.shape().volumeWithoutLastDim(), getWeightShape().volumeWithoutLastDim() });
+//				gemm(context(), 'n', 'n', gradient_prev_matrix, gradient_next_matrix, weight_matrix, 1, 0);
+//
+//				Tensor input_matrix = input[0].view( { input[0].shape().volumeWithoutLastDim(), input[0].lastDim() });
+//				Tensor weight_update_matrix = getWeights().getGradient().view(
+//						{ getWeightShape().firstDim(), getWeightShape().volumeWithoutFirstDim() });
+//				Tensor gradient_matrix = gradient_next.view( { gradient_next.shape().volumeWithoutLastDim(), gradient_next.lastDim() });
+//				gemm(context(), 't', 'n', weight_update_matrix, gradient_matrix, input_matrix, 1, 0);
 
 				break;
 			}
