@@ -17,12 +17,20 @@
 #include "vec2h.cuh"
 #include "vec4h.cuh"
 #include "vec8h.cuh"
+#include "vector_load.cuh"
+#include "vector_store.cuh"
 
 #include <cuda_runtime_api.h>
 #include <cuda_fp16.h>
 
 namespace vectors
 {
+	template<int N, typename T, typename U>
+	__device__ void vector_copy(T *dst, const U *src)
+	{
+		store_vec(dst, load_vec<U, N>(src));
+	}
+
 	template<typename T, int N>
 	__device__ vec<T, N> zero()
 	{
