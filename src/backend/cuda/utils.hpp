@@ -33,6 +33,7 @@ namespace ml
 				size_t m_workspace_size = default_workspace_size;
 				cudaStream_t m_cuda_stream = nullptr;
 				cublasHandle_t m_cublas_handle = nullptr;
+				std::unique_ptr<uint8_t[]> m_cpu_workspace;
 #ifdef USE_CUDNN
 				cudnnHandle_t m_cudnn_handle = nullptr;
 				cublasLtHandle_t m_cublas_lt_handle = nullptr;
@@ -56,6 +57,7 @@ namespace ml
 				static cublasHandle_t getHandle(mlContext_t context);
 				static void enableTF32(mlContext_t context, bool b);
 				static bool allowsTF32(mlContext_t context);
+				static void* getCpuWorkspace(mlContext_t context);
 #ifdef USE_CUDNN
 				static cudnnHandle_t getCudnnHandle(mlContext_t context);
 				static cublasLtHandle_t getCublasLtHandle(mlContext_t context);
@@ -70,7 +72,6 @@ namespace ml
 
 		int get_compute_capability(int device_index);
 
-		bool has_fp16_math(mlContext_t context);
 		bool has_tensor_cores(mlContext_t context);
 		bool allows_tf32(mlContext_t context);
 

@@ -28,12 +28,6 @@ namespace ml
 			bool optimize(Graph &graph) const;
 	};
 
-	class FoldGelu
-	{
-		public:
-			bool optimize(Graph &graph) const;
-	};
-
 	class Quantize
 	{
 		public:
@@ -41,6 +35,12 @@ namespace ml
 	};
 
 	class FuseConvBlock
+	{
+		public:
+			bool optimize(Graph &graph) const;
+	};
+
+	class FuseSEBlock
 	{
 		public:
 			bool optimize(Graph &graph) const;

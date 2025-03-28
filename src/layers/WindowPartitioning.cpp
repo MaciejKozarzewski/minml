@@ -62,9 +62,9 @@ namespace ml
 		windowPartitioning(context(), input[0], output, Shape( { m_window_shift, m_window_shift }));
 	}
 	void WindowPartitioning::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev,
-			Tensor &gradient_next)
+			Tensor &gradient_next, const std::vector<float> &beta)
 	{
-		windowMerging(context(), gradient_next, gradient_prev[0],  Shape( { m_window_shift, m_window_shift }));
+		windowMerging(context(), gradient_next, gradient_prev[0], Shape( { m_window_shift, m_window_shift }));
 	}
 }
 

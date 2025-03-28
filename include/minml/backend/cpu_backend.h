@@ -101,11 +101,10 @@ namespace ml
 		 */
 		void cpu_batchnorm_inference(mlContext_t context, mlDataType_t dtype, mlShape_t shape, const void *input, void *output, const void *weights,
 				mlActivationType_t act);
-		void cpu_batchnorm_forward(mlContext_t context, mlShape_t shape, const void *input, void *output, void *weights, void *running_stats,
-				int running_stat_idx, mlActivationType_t act);
-		void cpu_batchnorm_backward(mlContext_t context, mlShape_t shape, const void *input, const void *output, void *gradient_prev,
-				void *gradient_next, const void *weights, void *weights_update, const void *running_stats, int running_stat_idx,
+		void cpu_batchnorm_forward(mlContext_t context, mlShape_t shape, const void *input, void *output, const void *weights, void *running_stats,
 				mlActivationType_t act);
+		void cpu_batchnorm_backward(mlContext_t context, mlShape_t shape, const void *input, const void *output, void *gradient_prev,
+				void *gradient_next, const void *weights, void *weights_update, const void *running_stats, mlActivationType_t act);
 		void cpu_batchnorm_update(mlContext_t context, mlShape_t shape, const void *running_stat, void *weights, bool use_gamma, bool use_beta);
 		void cpu_fold_batchnorm(mlContext_t context, mlShape_t shape, void *layer_weights, void *layer_bias, const void *batchnorm_weights);
 
@@ -143,7 +142,8 @@ namespace ml
 		void cpu_activation_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next, const void *output,
 				mlActivationType_t act);
 		void cpu_softmax_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input);
-		void cpu_gelu_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next, const void *input);
+		void cpu_fused_bias_and_activation_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, void *gradient_next,
+				const void *output, void *bias_gradient, mlActivationType_t act, float beta_prev, float beta_bias);
 
 		// implemented in 'global_pooling.cu'
 		void cpu_global_avg_and_max_pooling_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input);
@@ -164,18 +164,16 @@ namespace ml
 		// used for training
 		void cpu_emulate_low_precision(mlContext_t context, mlShape_t shape, mlDataType_t dtype, void *dst, const void *src, mlQuantizationData_t qd);
 		void cpu_multiply_tensors(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *dst, const void *src1, const void *src2);
-		void cpu_add_tensors(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *dst, float alpha1, const void *src1, float alpha2,
-				const void *src2);
+		void cpu_add_tensors(mlContext_t context, mlDataType_t dtype, mlShape_t shape, float beta, void *dst, float alpha1, const void *src1,
+				float alpha2, const void *src2);
 		void cpu_sum_over_first_dim(mlContext_t context, mlShape_t shape, void *dst, const void *src, float beta);
 
 		float cpu_mean_squared_loss(mlContext_t context, mlShape_t shape, const void *output, const void *target, const void *mask);
-		void cpu_mean_squared_gradient(mlContext_t context, mlShape_t shape, void *gradient, const void *output, const void *target, const void *mask, float weight);
+		void cpu_mean_squared_gradient(mlContext_t context, mlShape_t shape, void *gradient, const void *output, const void *target, const void *mask,
+				float weight);
 		float cpu_cross_entropy_loss(mlContext_t context, mlShape_t shape, const void *output, const void *target, const void *mask);
 		void cpu_cross_entropy_gradient(mlContext_t context, mlShape_t shape, void *gradient, const void *output, const void *target,
 				const void *mask, float weight);
-		float cpu_value_head_loss(mlContext_t context, mlShape_t shape, const void *output, const void *target);
-		void cpu_value_head_gradient(mlContext_t context, mlShape_t shape, void *gradient, const void *output, const void *target, float weight);
-
 		void cpu_radam_optimize(mlContext_t context, mlShape_t shape, void *weight, const void *update, void *momentum, void *variance,
 				float learning_rate, float beta1, float beta2, int step, float weight_decay);
 

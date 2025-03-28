@@ -17,7 +17,7 @@
 #include <cassert>
 #include <cmath>
 
-namespace vectors2
+namespace vectors
 {
 	using vec4f = vec<float, 4>;
 
@@ -30,14 +30,14 @@ namespace vectors2
 			HOST_DEVICE vec() // @suppress("Class members should be properly initialized")
 			{
 			}
-			HOST_DEVICE vec(float f0, float f1, float f2, float f3) :
+			explicit HOST_DEVICE vec(float f0, float f1, float f2, float f3) :
 					x0(f0),
 					x1(f1),
 					x2(f2),
 					x3(f3)
 			{
 			}
-			HOST_DEVICE vec(float f) :
+			explicit HOST_DEVICE vec(float f) :
 					vec(f, f, f, f)
 			{
 			}
@@ -135,7 +135,73 @@ namespace vectors2
 			{
 				return 4;
 			}
+			HOST_DEVICE float operator[](int idx) const
+			{
+				assert(0 <= idx && idx < size());
+				switch (idx)
+				{
+					default:
+					case 0:
+						return x0;
+					case 1:
+						return x1;
+					case 2:
+						return x2;
+					case 3:
+						return x3;
+				}
+			}
+			HOST_DEVICE float& operator[](int idx)
+			{
+				assert(0 <= idx && idx < size());
+				switch (idx)
+				{
+					default:
+					case 0:
+						return x0;
+					case 1:
+						return x1;
+					case 2:
+						return x2;
+					case 3:
+						return x3;
+				}
+			}
 	};
+
+	/*
+	 * comparison operators
+	 */
+	DEVICE_INLINE vec4f operator==(const vec4f &lhs, const vec4f &rhs)
+	{
+		return vec4f(to_mask<float>(lhs.x0 == rhs.x0), to_mask<float>(lhs.x1 == rhs.x1), to_mask<float>(lhs.x2 == rhs.x2),
+				to_mask<float>(lhs.x3 == rhs.x3));
+	}
+	DEVICE_INLINE vec4f operator!=(const vec4f &lhs, const vec4f &rhs)
+	{
+		return vec4f(to_mask<float>(lhs.x0 != rhs.x0), to_mask<float>(lhs.x1 != rhs.x1), to_mask<float>(lhs.x2 != rhs.x2),
+				to_mask<float>(lhs.x3 != rhs.x3));
+	}
+	DEVICE_INLINE vec4f operator>(const vec4f &lhs, const vec4f &rhs)
+	{
+		return vec4f(to_mask<float>(lhs.x0 > rhs.x0), to_mask<float>(lhs.x1 > rhs.x1), to_mask<float>(lhs.x2 > rhs.x2),
+				to_mask<float>(lhs.x3 > rhs.x3));
+	}
+	DEVICE_INLINE vec4f operator>=(const vec4f &lhs, const vec4f &rhs)
+	{
+		return vec4f(to_mask<float>(lhs.x0 >= rhs.x0), to_mask<float>(lhs.x1 >= rhs.x1), to_mask<float>(lhs.x2 >= rhs.x2),
+				to_mask<float>(lhs.x3 >= rhs.x3));
+	}
+	DEVICE_INLINE vec4f operator<(const vec4f &lhs, const vec4f &rhs)
+	{
+		return vec4f(to_mask<float>(lhs.x0 < rhs.x0), to_mask<float>(lhs.x1 < rhs.x1), to_mask<float>(lhs.x2 < rhs.x2),
+				to_mask<float>(lhs.x3 < rhs.x3));
+	}
+	DEVICE_INLINE vec4f operator<=(const vec4f &lhs, const vec4f &rhs)
+	{
+		return vec4f(to_mask<float>(lhs.x0 < rhs.x0), to_mask<float>(lhs.x1 < rhs.x1), to_mask<float>(lhs.x2 < rhs.x2),
+				to_mask<float>(lhs.x3 < rhs.x3));
+	}
 
 	DEVICE_INLINE vec4f operator+(const vec4f &lhs, const vec4f &rhs)
 	{

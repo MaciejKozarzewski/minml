@@ -15,7 +15,7 @@ namespace ml
 
 	class BatchNormalization: public Layer
 	{
-			std::unique_ptr<Tensor> m_running_stats;
+			Tensor m_running_stats;
 			int m_running_id = 0;
 			int m_total_steps = 0;
 			int m_history_size = 100;
@@ -45,10 +45,9 @@ namespace ml
 			void changeContext(std::shared_ptr<Context> &context);
 
 			void init();
-			void setRegularizer(const Regularizer &regularizer);
 			void forward(const std::vector<Tensor> &input, Tensor &output);
-			void backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next);
-			void learn();
+			void backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next,
+					const std::vector<float> &beta);
 			void updateStatistics();
 	};
 

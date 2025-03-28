@@ -104,7 +104,7 @@ namespace ml
 				m_backward_data, m_number_of_heads, m_symmetric);
 	}
 	void MultiHeadAttention::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev,
-			Tensor &gradient_next)
+			Tensor &gradient_next, const std::vector<float> &beta)
 	{
 		assert(input.size() == 1);
 		assert(gradient_prev.size() == 1);
@@ -118,7 +118,7 @@ namespace ml
 
 		multiHeadAttentionBackward(context(), input.at(0), getWeights().getParam(), getBias().getParam(), mask, gradient_prev.at(0), gradient_next,
 				getWeights().getGradient(), getBias().getGradient(), mask_gradient, *m_workspace.lock(), m_backward_data, m_number_of_heads,
-				m_symmetric);
+				m_symmetric, beta[0]);
 	}
 
 } /* namespace ml */

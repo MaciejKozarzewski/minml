@@ -394,10 +394,12 @@ namespace ml
 
 			input = std::vector<Tensor>(m_layer->numberOfInputs());
 			gradient_prev = std::vector<Tensor>(m_layer->numberOfInputs());
+			std::vector<float> beta(m_layer->numberOfInputs());
 			for (size_t i = 0; i < input.size(); i++)
 			{
 				input[i] = Tensor(m_layer->getInputShape(i), m_layer->dtype(), m_layer->device());
 				gradient_prev[i] = zeros_like(input[i]);
+				beta[i] = 0.0f;
 			}
 			output = Tensor(m_layer->getOutputShape(), m_layer->dtype(), m_layer->device());
 			target = zeros_like(output);
@@ -409,7 +411,7 @@ namespace ml
 
 			m_layer->forward(input, output);
 			l2_grad_fp64(gradient_next, output, target);
-			m_layer->backward(input, output, gradient_prev, gradient_next);
+			m_layer->backward(input, output, gradient_prev, gradient_next, beta);
 
 			double max_diff = 0.0;
 			if (mode == "input" or mode == "all")

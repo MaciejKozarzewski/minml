@@ -11,12 +11,14 @@
 #include <minml/graph/CalibrationTable.hpp>
 #include <minml/layers/Add.hpp>
 #include <minml/layers/BatchNormalization.hpp>
+#include <minml/layers/ChannelScaling.hpp>
 #include <minml/layers/Conv2D.hpp>
 #include <minml/layers/Dense.hpp>
 #include <minml/layers/DepthwiseConv2D.hpp>
 #include <minml/layers/FusedConvBlock.hpp>
-#include <minml/layers/Gelu.hpp>
+#include <minml/layers/SqueezeAndExcitation.hpp>
 #include <minml/layers/GlobalBroadcastHW.hpp>
+#include <minml/layers/GlobalAveragePooling.hpp>
 #include <minml/layers/Input.hpp>
 #include <minml/layers/Parameter.hpp>
 #include <minml/core/Shape.hpp>
@@ -40,21 +42,35 @@ namespace
 	{
 		return (node == nullptr) ? false : node->getLayer().getActivationType() == ActivationType::RELU;
 	}
+	bool is_sigmoid(const GraphNode *node) noexcept
+	{
+		return (node == nullptr) ? false : node->getLayer().getActivationType() == ActivationType::SIGMOID;
+	}
 
 	bool is_dense(const GraphNode *node) noexcept
 	{
-		static const Dense dense(0);
-		return (node == nullptr) ? false : node->getLayer().name() == dense.name();
+		static const Dense layer(0);
+		return (node == nullptr) ? false : node->getLayer().name() == layer.name();
 	}
 	bool is_conv2d(const GraphNode *node) noexcept
 	{
-		static const Conv2D conv2d(0, 0);
-		return (node == nullptr) ? false : node->getLayer().name() == conv2d.name();
+		static const Conv2D layer(0, 0);
+		return (node == nullptr) ? false : node->getLayer().name() == layer.name();
 	}
 	bool is_depthwise_conv2d(const GraphNode *node) noexcept
 	{
-		static const DepthwiseConv2D depthwise_conv2d(0, 0);
-		return (node == nullptr) ? false : node->getLayer().name() == depthwise_conv2d.name();
+		static const DepthwiseConv2D layer(0, 0);
+		return (node == nullptr) ? false : node->getLayer().name() == layer.name();
+	}
+	bool is_global_average_pooling(const GraphNode *node) noexcept
+	{
+		static const GlobalAveragePooling layer;
+		return (node == nullptr) ? false : node->getLayer().name() == layer.name();
+	}
+	bool is_channel_scaling(const GraphNode *node) noexcept
+	{
+		static const ChannelScaling layer;
+		return (node == nullptr) ? false : node->getLayer().name() == layer.name();
 	}
 
 	bool can_merge_activations(const GraphNode *prev, const GraphNode *next)
@@ -91,7 +107,7 @@ namespace ml
 			{
 				GraphNode *next = &(graph.getNode(i));
 				GraphNode *prev = next->getInputNode(0); // BatchNorm can have only one input
-				if (can_merge_activations(prev, next))
+				if (can_merge_activations(prev, next) and prev->numberOfInputs() == 1)
 				{
 					if (is_conv2d(prev))
 					{
@@ -102,7 +118,6 @@ namespace ml
 						static_cast<DepthwiseConv2D&>(prev->getLayer()).useBias(true);
 					if (is_dense(prev))
 						static_cast<Dense&>(prev->getLayer()).useBias(true);
-					prev->getLayer().getBias().setTrainable(false);
 
 					if (is_conv2d(prev) or is_depthwise_conv2d(prev) or is_dense(prev))
 					{
@@ -163,44 +178,6 @@ namespace ml
 		return has_anything_changed;
 	}
 
-	bool FoldGelu::optimize(Graph &graph) const
-	{
-		static const Conv2D conv2d(0, 0);
-		static const Dense dense(0);
-		static const Gelu gelu_layer;
-		static const GlobalBroadcastHW broadcast;
-
-		bool has_anything_changed = false;
-		for (int i = 0; i < graph.numberOfNodes(); i++)
-			if (graph.getNode(i).getLayer().name() == gelu_layer.name())
-			{
-				GraphNode *next = &(graph.getNode(i));
-				GraphNodeID input_index = -1;
-				if (next->getInputNode(0)->getLayer().name() == conv2d.name() or next->getInputNode(0)->getLayer().name() == dense.name())
-					input_index = std::max(input_index, graph.getNodeID(next->getInputNode(0)));
-				if (next->getInputNode(1)->getLayer().name() == conv2d.name() or next->getInputNode(1)->getLayer().name() == dense.name())
-					input_index = std::max(input_index, graph.getNodeID(next->getInputNode(1)));
-
-				if (next->getInputNode(0)->getLayer().name() == broadcast.name() or next->getInputNode(1)->getLayer().name() == broadcast.name())
-					input_index = -1;
-
-				if (input_index != -1 and not next->isOutputNode())
-				{
-					GraphNode *prev = &(graph.getNode(input_index));
-					if (can_merge_activations(prev, next))
-					{
-						prev->getLayer().setActivationType(next->getLayer().getActivationType());
-						GraphNode::removeLink(prev, next);
-						GraphNode::link(prev, next->getOutputs());
-						GraphNode::link(next->getInputNode(0), prev); // only one input of Add is left now
-						graph.remove_node(next);
-						has_anything_changed = true;
-					}
-				}
-			}
-		return has_anything_changed;
-	}
-
 	bool Quantize::optimize(Graph &graph, int bits) const
 	{
 		for (int n = 0; n < graph.numberOfNodes(); n++)
@@ -242,11 +219,42 @@ namespace ml
 						(Conv2D&) nodes[1]->getLayer(), (Conv2D&) nodes[2]->getLayer());
 				nodes[0]->replaceLayer(fused_block.release());
 
-				for (int j = 0; j < nodes[2]->numberOfOutputs(); j++)
-					GraphNode::link(nodes[0], nodes[2]->getOutputNode(j));
+				while (nodes[2]->numberOfOutputs() > 0)
+					GraphNode::replaceInputLink(nodes[2], nodes[0], nodes[2]->getOutputNode(0));
 
 				graph.remove_node(nodes[1]);
 				graph.remove_node(nodes[2]);
+
+				has_anything_changed = true;
+			}
+		}
+		return has_anything_changed;
+	}
+
+	bool FuseSEBlock::optimize(Graph &graph) const
+	{
+		bool has_anything_changed = false;
+		for (int i = 0; i < graph.numberOfNodes(); i++)
+		{
+			const std::array<GraphNode*, 4> nodes = get_consecutive_nodes<4>(graph.getNode(i));
+
+			const bool first_node_match = is_global_average_pooling(nodes[0]);
+			const bool second_node_match = is_dense(nodes[1]) and is_relu(nodes[1]);
+			const bool third_node_match = is_dense(nodes[2]) and is_sigmoid(nodes[2]);
+			const bool fourth_node_match = is_channel_scaling(nodes[3]);
+
+			if (first_node_match and second_node_match and third_node_match and fourth_node_match)
+			{
+				std::unique_ptr<SqueezeAndExcitation> fused_block = std::make_unique<SqueezeAndExcitation>((Dense&) nodes[1]->getLayer(),
+						(Dense&) nodes[2]->getLayer());
+				nodes[0]->replaceLayer(fused_block.release());
+
+				while (nodes[3]->numberOfOutputs() > 0)
+					GraphNode::replaceInputLink(nodes[3], nodes[0], nodes[3]->getOutputNode(0));
+
+				graph.remove_node(nodes[1]);
+				graph.remove_node(nodes[2]);
+				graph.remove_node(nodes[3]);
 
 				has_anything_changed = true;
 			}

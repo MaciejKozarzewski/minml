@@ -140,16 +140,17 @@ namespace ml
 			}
 		}
 		else
-			depthwiseConvForward(context(), input[0], getWeights().getParam(), output, getBias().getParam());
+			depthwiseConvForward(context(), 1.0f, input[0], getWeights().getParam(), 0.0f, output, getBias().getParam());
 	}
-	void DepthwiseConv2D::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next)
+	void DepthwiseConv2D::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next,
+			const std::vector<float> &beta)
 	{
 		assert(input.size() == 1 && gradient_prev.size() == 1);
-		depthwiseConvBackward(context(), gradient_next, getWeights().getParam(), gradient_prev[0]);
-		depthwiseConvUpdate(context(), input[0], gradient_next, getWeights().getGradient());
+		depthwiseConvBackward(context(), 1.0f, gradient_next, getWeights().getParam(), beta[0], gradient_prev[0]);
+		depthwiseConvUpdate(context(), 1.0f, input[0], gradient_next, 0.0f, getWeights().getGradient());
 
 		if (isUsingBias())
-			sumOverFirstDim(context(), getBias().getGradient(), gradient_next, 0);
+			sumOverFirstDim(context(), 1.0f, gradient_next, 0.0f, getBias().getGradient());
 	}
 
 } /* namespace ml */

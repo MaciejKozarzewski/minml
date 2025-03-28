@@ -92,25 +92,12 @@ namespace ml
 			}
 			case DTYPE_FLOAT16: // ABC [float16]
 			{
-				if (cuda::has_fp16_math(context))
-				{
-					const half _alpha = alpha;
-					const half _beta = beta;
-					cublasStatus_t status = cublasHgemm(handle, op_B, op_A, M, N, K, &_alpha, getPointer<half>(B), LDB, getPointer<half>(A), LDA,
-							&_beta, getPointer<half>(C), LDC);
-					assert(status == CUBLAS_STATUS_SUCCESS);
-					break;
-				}
-				else
-				{
-					const float _alpha = alpha;
-					const float _beta = beta;
-					cublasStatus_t status = cublasGemmEx(handle, op_B, op_A, M, N, K, &_alpha, getPointer<void>(B), CUDA_R_16F, LDB,
-							getPointer<void>(A), CUDA_R_16F, LDA, &_beta, getPointer<void>(C), CUDA_R_16F, LDC, CUBLAS_COMPUTE_32F,
-							CUBLAS_GEMM_DEFAULT);
-					assert(status == CUBLAS_STATUS_SUCCESS);
-					break;
-				}
+				const half _alpha = alpha;
+				const half _beta = beta;
+				cublasStatus_t status = cublasHgemm(handle, op_B, op_A, M, N, K, &_alpha, getPointer<half>(B), LDB, getPointer<half>(A), LDA, &_beta,
+						getPointer<half>(C), LDC);
+				assert(status == CUBLAS_STATUS_SUCCESS);
+				break;
 			}
 			case DTYPE_FLOAT32: // ABC [float32]
 			{
@@ -171,25 +158,12 @@ namespace ml
 		{
 			case DTYPE_FLOAT16:
 			{
-				if (cuda::has_fp16_math(context))
-				{
-					const half _alpha = alpha;
-					const half _beta = beta;
-					cublasStatus_t status = cublasHgemmStridedBatched(handle, op_B, op_A, M, N, K, &_alpha, getPointer<half>(B), LDB, strideB,
-							getPointer<half>(A), LDA, strideA, &_beta, getPointer<half>(C), LDC, strideC, batch);
-					assert(status == CUBLAS_STATUS_SUCCESS);
-					break;
-				}
-				else
-				{
-					const float _alpha = alpha;
-					const float _beta = beta;
-					cublasStatus_t status = cublasGemmStridedBatchedEx(handle, op_B, op_A, M, N, K, &_alpha, getPointer<void>(B), CUDA_R_16F, LDB,
-							strideB, getPointer<void>(A), CUDA_R_16F, LDA, strideA, &_beta, getPointer<void>(C), CUDA_R_16F, LDC, strideC, batch,
-							CUBLAS_COMPUTE_32F, CUBLAS_GEMM_DEFAULT);
-					assert(status == CUBLAS_STATUS_SUCCESS);
-					break;
-				}
+				const half _alpha = alpha;
+				const half _beta = beta;
+				cublasStatus_t status = cublasHgemmStridedBatched(handle, op_B, op_A, M, N, K, &_alpha, getPointer<half>(B), LDB, strideB,
+						getPointer<half>(A), LDA, strideA, &_beta, getPointer<half>(C), LDC, strideC, batch);
+				assert(status == CUBLAS_STATUS_SUCCESS);
+				break;
 			}
 			case DTYPE_FLOAT32:
 			{

@@ -17,7 +17,7 @@
 #include <cassert>
 #include <cmath>
 
-namespace vectors2
+namespace vectors
 {
 	using vec1f = vec<float, 1>;
 
@@ -30,7 +30,7 @@ namespace vectors2
 			HOST_DEVICE vec() // @suppress("Class members should be properly initialized")
 			{
 			}
-			HOST_DEVICE vec(float f) :
+			explicit HOST_DEVICE vec(float f) :
 					x0(f)
 			{
 			}
@@ -83,6 +83,16 @@ namespace vectors2
 			{
 				return 1;
 			}
+			HOST_DEVICE float operator[](int idx) const
+			{
+				assert(0 <= idx && idx < size());
+				return x0;
+			}
+			HOST_DEVICE float& operator[](int idx)
+			{
+				assert(0 <= idx && idx < size());
+				return x0;
+			}
 	};
 
 	DEVICE_INLINE vec1f operator+(const vec1f &lhs, const vec1f &rhs)
@@ -107,27 +117,27 @@ namespace vectors2
 	 */
 	DEVICE_INLINE vec1f operator==(const vec1f &lhs, const vec1f &rhs)
 	{
-		return to_mask<float>(lhs.x0 == rhs.x0);
+		return vec1f(to_mask<float>(lhs.x0 == rhs.x0));
 	}
 	DEVICE_INLINE vec1f operator!=(const vec1f &lhs, const vec1f &rhs)
 	{
-		return to_mask<float>(lhs.x0 != rhs.x0);
+		return vec1f(to_mask<float>(lhs.x0 != rhs.x0));
 	}
 	DEVICE_INLINE vec1f operator>(const vec1f &lhs, const vec1f &rhs)
 	{
-		return to_mask<float>(lhs.x0 > rhs.x0);
+		return vec1f(to_mask<float>(lhs.x0 > rhs.x0));
 	}
 	DEVICE_INLINE vec1f operator>=(const vec1f &lhs, const vec1f &rhs)
 	{
-		return to_mask<float>(lhs.x0 >= rhs.x0);
+		return vec1f(to_mask<float>(lhs.x0 >= rhs.x0));
 	}
 	DEVICE_INLINE vec1f operator<(const vec1f &lhs, const vec1f &rhs)
 	{
-		return to_mask<float>(lhs.x0 < rhs.x0);
+		return vec1f(to_mask<float>(lhs.x0 < rhs.x0));
 	}
 	DEVICE_INLINE vec1f operator<=(const vec1f &lhs, const vec1f &rhs)
 	{
-		return to_mask<float>(lhs.x0 < rhs.x0);
+		return vec1f(to_mask<float>(lhs.x0 < rhs.x0));
 	}
 
 	DEVICE_INLINE vec1f abs(const vec1f &a)

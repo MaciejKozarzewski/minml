@@ -28,9 +28,9 @@ namespace ml
 				throw ShapeMismatch(__FUNCTION__, dst.getBiasShape(), src.getBiasShape());
 
 			if (not src.getWeights().getParam().isEmpty())
-				addTensors(model.context(), dst.getWeights().getParam(), alpha, src.getWeights().getParam(), beta, dst.getWeights().getParam());
+				addTensors(model.context(), 0.0f, dst.getWeights().getParam(), alpha, src.getWeights().getParam(), beta, dst.getWeights().getParam());
 			if (not src.getBias().getParam().isEmpty())
-				addTensors(model.context(), dst.getBias().getParam(), alpha, src.getBias().getParam(), beta, dst.getBias().getParam());
+				addTensors(model.context(), 0.0f, dst.getBias().getParam(), alpha, src.getBias().getParam(), beta, dst.getBias().getParam());
 		}
 	}
 	void updateBatchNormStats(Graph &model)

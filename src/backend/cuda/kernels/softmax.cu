@@ -22,7 +22,7 @@ namespace cg = cooperative_groups;
 
 namespace
 {
-	using namespace vectors2;
+	using namespace vectors;
 
 	template<typename T>
 	__global__ void kernel_softmax_3_channels(T *output, const T *input, int first_dim)

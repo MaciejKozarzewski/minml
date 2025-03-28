@@ -16,14 +16,11 @@ namespace ml
 	class Dense: public Layer
 	{
 			int m_neurons = 0;
-			bool m_use_weights = true;
 			bool m_use_bias = true;
 		public:
 			Dense(int neurons, std::string activation = "linear");
 
-			Dense& useWeights(bool b) noexcept;
 			Dense& useBias(bool b) noexcept;
-			bool isUsingWeights() const noexcept;
 			bool isUsingBias() const noexcept;
 
 			void setInputShape(const std::vector<Shape> &shapes);
@@ -37,7 +34,8 @@ namespace ml
 			std::unique_ptr<Layer> clone(const Json &config) const;
 
 			void forward(const std::vector<Tensor> &input, Tensor &output);
-			void backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next);
+			void backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next,
+					const std::vector<float> &beta);
 	};
 
 } /* namespace ml */

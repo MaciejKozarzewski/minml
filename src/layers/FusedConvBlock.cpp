@@ -183,7 +183,7 @@ namespace ml
 							}
 
 							const float scale_w = 2047.0f;
-							const float scale_o = 4095.0f;
+							const float scale_o = 2047.0f;
 							int32_t acc = 0;
 							for (int in = 0; in < filters; in++)
 							{
@@ -202,7 +202,7 @@ namespace ml
 			const int width = input[0].dim(2);
 			const int channels = input[0].dim(3);
 
-			depthwiseConvForward(context(), input[0], m_depthwise_conv_weights, output, m_depthwise_conv_bias);
+			depthwiseConvForward(context(), 1.0f, input[0], m_depthwise_conv_weights, 0.0f, output, m_depthwise_conv_bias);
 
 			Tensor tmp1_matrix = output.view( { batch * height * width, channels });
 			Tensor tmp2_matrix = m_workspace.lock()->view( { batch * height * width, channels });
@@ -217,7 +217,8 @@ namespace ml
 			gemm_ex(context(), output_matrix, 1, 'n', tmp2_matrix, 't', weight_matrix, 1, input_matrix, m_conv_2_bias, ActivationType::LINEAR);
 		}
 	}
-	void FusedConvBlock::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next)
+	void FusedConvBlock::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next,
+			const std::vector<float> &beta)
 	{
 		throw LogicError(METHOD_NAME, "FusedConvBlock is not a trainable layer");
 	}

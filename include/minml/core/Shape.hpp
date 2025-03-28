@@ -62,6 +62,14 @@ namespace ml
 			size_t getMemory() const noexcept;
 	};
 
+	template<int N>
+	Shape change_dim(const Shape &shape, int new_dim)
+	{
+		Shape result = shape;
+		result[N] = new_dim;
+		return result;
+	}
+
 	std::ostream& operator<<(std::ostream &stream, const Shape &s);
 	std::string operator+(const std::string &lhs, const Shape &rhs);
 	std::string operator+(const Shape &lhs, const std::string &rhs);

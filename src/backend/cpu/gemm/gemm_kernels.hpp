@@ -57,6 +57,8 @@ namespace ml
 	 */
 	void gemm_avx_10x8(Fragment &D, const Fragment &alpha, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,
 			const Fragment &bias, bool use_relu) noexcept;
+	void gemm_avx_8x8(Fragment &D, const Fragment &alpha, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,
+			const Fragment &bias, bool use_relu) noexcept;
 	void pack_avx_10xK(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept;
 	void pack_avx_8xK(Fragment &dst, const Matrix &src, const Position2D &src_pos, MatrixOp src_op) noexcept;
 	// multi-head attention (MHA) kernel

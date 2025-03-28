@@ -21,7 +21,7 @@ namespace cg = cooperative_groups;
 
 namespace
 {
-	using namespace vectors2;
+	using namespace vectors;
 
 	struct Index2D
 	{
@@ -399,25 +399,12 @@ namespace
 		{
 			case ml::DTYPE_FLOAT16:
 			{
-				if (ml::cuda::has_fp16_math(context))
-				{
-					const half _alpha = alpha;
-					const half _beta = beta;
-					cublasStatus_t status = cublasHgemmBatched(handle, transb, transa, N, M, K, &_alpha, ml::getPointer<half*>(B), ldb,
-							ml::getPointer<half*>(A), lda, &_beta, ml::getPointer<half*>(C), ldc, batch_count);
-					assert(status == CUBLAS_STATUS_SUCCESS);
-					break;
-				}
-				else
-				{
-					const float _alpha = alpha;
-					const float _beta = beta;
-					cublasStatus_t status = cublasGemmBatchedEx(handle, transb, transa, N, M, K, &_alpha, ml::getPointer<void*>(B), CUDA_R_16F, ldb,
-							ml::getPointer<void*>(A), CUDA_R_16F, lda, &_beta, ml::getPointer<void*>(C), CUDA_R_16F, ldc, batch_count,
-							CUBLAS_COMPUTE_32F, CUBLAS_GEMM_DEFAULT);
-					assert(status == CUBLAS_STATUS_SUCCESS);
-					break;
-				}
+				const half _alpha = alpha;
+				const half _beta = beta;
+				cublasStatus_t status = cublasHgemmBatched(handle, transb, transa, N, M, K, &_alpha, ml::getPointer<half*>(B), ldb,
+						ml::getPointer<half*>(A), lda, &_beta, ml::getPointer<half*>(C), ldc, batch_count);
+				assert(status == CUBLAS_STATUS_SUCCESS);
+				break;
 			}
 			case ml::DTYPE_FLOAT32:
 			{

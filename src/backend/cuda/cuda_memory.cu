@@ -132,7 +132,7 @@ namespace ml
 		}
 	}
 
-	void* cuda_malloc(int device_index, int count)
+	void* cuda_malloc(int device_index, size_t count)
 	{
 		void *result = nullptr;
 		if (count > 0)
@@ -144,7 +144,7 @@ namespace ml
 		}
 		return result;
 	}
-	void cuda_page_lock(void *ptr, int count)
+	void cuda_page_lock(void *ptr, size_t count)
 	{
 		if (ptr != nullptr)
 		{
@@ -168,7 +168,7 @@ namespace ml
 			assert(status == cudaSuccess);
 		}
 	}
-	void* cuda_create_view(void *src, int offset, int count)
+	void* cuda_create_view(void *src, size_t offset, size_t count)
 	{
 		if (src == nullptr)
 			return nullptr;
@@ -179,7 +179,7 @@ namespace ml
 	{
 	}
 
-	void cuda_memset(mlContext_t context, void *dst, int dst_offset, int dst_count, const void *src, int src_count)
+	void cuda_memset(mlContext_t context, void *dst, size_t dst_offset, size_t dst_count, const void *src, size_t src_count)
 	{
 		assert(dst != nullptr);
 		void *tmp_dst = getPointer<uint8_t>(dst) + dst_offset;
@@ -206,16 +206,22 @@ namespace ml
 
 			switch (src_count)
 			{
+				case 1:
+					setall_launcher<uint8_t>(cuda::Context::getStream(context), tmp_dst, dst_count, src);
+					break;
 				case 2:
 					setall_launcher<uint16_t>(cuda::Context::getStream(context), tmp_dst, dst_count, src);
 					break;
 				case 4:
 					setall_launcher<uint32_t>(cuda::Context::getStream(context), tmp_dst, dst_count, src);
 					break;
+				case 8:
+					setall_launcher<uint64_t>(cuda::Context::getStream(context), tmp_dst, dst_count, src);
+					break;
 			}
 		}
 	}
-	void cuda_memcpy_within_device(mlContext_t context, void *dst, int dst_offset, const void *src, int src_offset, int count)
+	void cuda_memcpy_within_device(mlContext_t context, void *dst, size_t dst_offset, const void *src, size_t src_offset, size_t count)
 	{
 		assert(dst != nullptr);
 		assert(src != nullptr);
@@ -233,7 +239,7 @@ namespace ml
 
 		}
 	}
-	void cuda_memcpy_from_host(mlContext_t context, void *dst, int dst_offset, const void *src, int count)
+	void cuda_memcpy_from_host(mlContext_t context, void *dst, size_t dst_offset, const void *src, size_t count)
 	{
 		assert(dst != nullptr);
 		assert(src != nullptr);
@@ -250,7 +256,7 @@ namespace ml
 
 		}
 	}
-	void cuda_memcpy_to_host(mlContext_t context, void *dst, const void *src, int src_offset, int count)
+	void cuda_memcpy_to_host(mlContext_t context, void *dst, const void *src, size_t src_offset, size_t count)
 	{
 		assert(dst != nullptr);
 		assert(src != nullptr);

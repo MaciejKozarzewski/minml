@@ -297,6 +297,11 @@ namespace ml
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
+	void opencl_fused_bias_and_activation_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next,
+			const void *output, void *bias_gradient, mlActivationType_t act, float beta_prev, float beta_bias)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
 
 	// implemented in 'training.cpp'
 	void opencl_emulate_low_precision(mlContext_t context, mlShape_t shape, mlDataType_t dtype, void *dst, const void *src, mlQuantizationData_t qd)
@@ -307,8 +312,8 @@ namespace ml
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
-	void opencl_add_tensors(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *dst, float alpha1, const void *src1, float alpha2,
-			const void *src2)
+	void opencl_add_tensors(mlContext_t context, mlDataType_t dtype, mlShape_t shape, float beta, void *dst, float alpha1, const void *src1,
+			float alpha2, const void *src2)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
@@ -321,7 +326,8 @@ namespace ml
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
-	void opencl_mean_squared_gradient(mlContext_t context, mlShape_t shape, void *gradient, const void *output, const void *target, const void *mask, float weight)
+	void opencl_mean_squared_gradient(mlContext_t context, mlShape_t shape, void *gradient, const void *output, const void *target, const void *mask,
+			float weight)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
@@ -329,7 +335,8 @@ namespace ml
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
-	void opencl_cross_entropy_gradient(mlContext_t context, mlShape_t shape, void *gradient, const void *output, const void *target, const void *mask, float weight)
+	void opencl_cross_entropy_gradient(mlContext_t context, mlShape_t shape, void *gradient, const void *output, const void *target, const void *mask,
+			float weight)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}

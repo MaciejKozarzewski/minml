@@ -46,7 +46,8 @@ namespace ml
 			void convertTo(DataType newType);
 
 			void forward(const std::vector<Tensor> &input, Tensor &output);
-			void backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next);
+			void backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next,
+					const std::vector<float> &beta);
 	};
 
 } /* namespace ml */

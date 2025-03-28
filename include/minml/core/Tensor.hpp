@@ -129,7 +129,9 @@ namespace ml
 			void pageUnlock();
 
 			Tensor view() const;
-			Tensor view(const Shape &shape, size_t offsetInElements = 0) const;
+			Tensor view(const Shape &shape) const;
+			Tensor view(const Shape &shape, size_t offsetInElements) const;
+			Tensor view(const Shape &shape, std::initializer_list<int> position) const;
 
 			const void* data() const noexcept;
 			void* data() noexcept;

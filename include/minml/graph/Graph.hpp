@@ -10,6 +10,9 @@
 
 #include <minml/layers/Layer.hpp>
 #include <minml/training/LossFunction.hpp>
+#include <minml/training/GradientScaler.hpp>
+#include <minml/training/Optimizer.hpp>
+#include <minml/training/Regularizer.hpp>
 #include <minml/core/DataType.hpp>
 #include <minml/core/Context.hpp>
 #include <minml/core/Shape.hpp>
@@ -40,15 +43,19 @@ namespace ml
 			std::shared_ptr<Context> m_context;
 
 			std::vector<std::unique_ptr<GraphNode>> m_nodes;
-			std::vector<Tensor> m_targets;
-			std::vector<Tensor> m_masks;
-			std::vector<std::unique_ptr<LossFunction>> m_losses;
-
 			std::vector<GraphNode*> m_input_nodes; // non-owning
 			std::vector<GraphNode*> m_output_nodes; // non-owning
 
 			std::shared_ptr<Tensor> m_workspace;
-			std::unique_ptr<Tensor> m_backup_tensor;
+
+			std::vector<Tensor> m_targets;
+			std::vector<Tensor> m_masks;
+			std::vector<std::unique_ptr<LossFunction>> m_losses;
+			std::vector<float> m_loss_weights;
+			RAdam m_optimizer;
+			RegularizerL2 m_regularizer;
+			GradientScaler m_gradient_scaler;
+			std::vector<Tensor> m_fp32_weights_copy;
 
 			DataType m_datatype = DataType::FLOAT32;
 			bool m_is_trainable = true;
@@ -67,8 +74,7 @@ namespace ml
 			GraphNodeID addInput(const Shape &shape);
 			GraphNodeID add(const Layer &layer, GraphNodeID node);
 			GraphNodeID add(const Layer &layer, std::initializer_list<GraphNodeID> nodes);
-			void addOutput(GraphNodeID node, const LossFunction &loss);
-			void addOutput(GraphNodeID node, float weight = 1.0f);
+			void addOutput(GraphNodeID node, const LossFunction &loss, float weight = 1.0f);
 
 			const Tensor& getInput(int index = 0) const;
 			const Tensor& getOutput(int index = 0) const;
@@ -92,14 +98,15 @@ namespace ml
 			void setInputShape(const Shape &shape);
 			void setInputShape(const std::vector<Shape> &list);
 
-			void setRegularizer(const Regularizer &regularizer);
-			void setOptimizer(const Optimizer &optimizer);
 			void init();
-			void forward(int batchSize);
-			void backward(int batchSize);
+			void setOptimizer(const RAdam &opt);
+			void setRegularizer(const RegularizerL2 &reg);
+			void setGradientScaler(const GradientScaler &scaler);
+			void predict(int batchSize);
+			void train(int batchSize);
 			std::vector<float> getLoss(int batchSize);
-			void learn();
-			void setLearningRate(float lr);
+			std::vector<Tensor> getParameters();
+			std::vector<Tensor> getParameterGradients();
 
 			void print() const;
 			void makeTrainable(bool b);
@@ -121,7 +128,6 @@ namespace ml
 			GraphNodeID add_node(const Layer &layer, const std::vector<GraphNodeID> &inputs);
 
 			void create_workspace();
-			void create_backup_tensor();
 
 			Json save_node(const GraphNode *node, SerializedObject &binary_data) const;
 			void load_node(const Json &json, const SerializedObject &binary_data);

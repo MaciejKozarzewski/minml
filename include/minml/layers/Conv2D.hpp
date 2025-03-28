@@ -27,8 +27,9 @@ namespace ml
 			int m_width = 0;
 			int m_input_filters = 0;
 			int m_kernel_size = 0;
-			mutable ConvolutionAlgorithm m_algorithm = ConvolutionAlgorithm::EXPLICIT_GEMM;
-			mutable int m_winograd_tile_size = 0;
+			mutable ConvolutionAlgorithm m_forward_algorithm = ConvolutionAlgorithm::EXPLICIT_GEMM;
+			mutable ConvolutionAlgorithm m_backward_algorithm = ConvolutionAlgorithm::EXPLICIT_GEMM;
+			mutable int m_winograd_tile_size = 1;
 			std::unique_ptr<Tensor> m_transformed_weights;
 			bool m_use_bias = true;
 			bool m_are_weights_transformed = false;
@@ -56,7 +57,8 @@ namespace ml
 			void convertTo(DataType newType);
 
 			void forward(const std::vector<Tensor> &input, Tensor &output);
-			void backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next);
+			void backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next,
+					const std::vector<float> &beta);
 
 		private:
 			void choose_algorithm() const;

@@ -13,83 +13,48 @@
 
 namespace ml
 {
-	CrossEntropyLoss::CrossEntropyLoss(float weight) :
-			m_weight(weight)
-	{
-	}
 	float CrossEntropyLoss::getLoss(const Context &context, const Tensor &output, const Tensor &target, const Tensor &mask) const
 	{
-		return m_weight * crossEntropyLoss(context, output, target, mask);
+		return crossEntropyLoss(context, output, target, mask);
 	}
-	void CrossEntropyLoss::getGradient(const Context &context, Tensor &gradient, const Tensor &output, const Tensor &target, const Tensor &mask) const
+	void CrossEntropyLoss::getGradient(const Context &context, float scale, Tensor &gradient, const Tensor &output, const Tensor &target, const Tensor &mask) const
 	{
-		crossEntropyGradient(context, gradient, output, target, mask, m_weight);
+		crossEntropyGradient(context, scale, output, target, mask, 0.0f, gradient);
 	}
 	Json CrossEntropyLoss::serialize(SerializedObject &binary_data) const
 	{
-		return Json( { { "name", "CrossEntropyLoss" }, { "weight", m_weight } });
+		return Json( { { "name", "CrossEntropyLoss" } });
 	}
 	void CrossEntropyLoss::unserialize(const Json &json, const SerializedObject &binary_data)
 	{
 		assert(json["name"].getString() == "CrossEntropyLoss");
-		m_weight = json["weight"].getDouble();
 	}
 	std::unique_ptr<LossFunction> CrossEntropyLoss::clone() const
 	{
-		return std::make_unique<CrossEntropyLoss>(m_weight);
+		return std::make_unique<CrossEntropyLoss>();
 	}
 
-	MeanSquaredLoss::MeanSquaredLoss(float weight) :
-			m_weight(weight)
-	{
-	}
 	float MeanSquaredLoss::getLoss(const Context &context, const Tensor &output, const Tensor &target, const Tensor &mask) const
 	{
-		return m_weight * meanSquaredLoss(context, output, target, mask);
+		return meanSquaredLoss(context, output, target, mask);
 	}
-	void MeanSquaredLoss::getGradient(const Context &context, Tensor &gradient, const Tensor &output, const Tensor &target, const Tensor &mask) const
+	void MeanSquaredLoss::getGradient(const Context &context, float scale, Tensor &gradient, const Tensor &output, const Tensor &target, const Tensor &mask) const
 	{
-		meanSquaredGradient(context, gradient, output, target, mask, m_weight);
+		meanSquaredGradient(context, scale, output, target, mask, 0.0f, gradient);
 	}
 	Json MeanSquaredLoss::serialize(SerializedObject &binary_data) const
 	{
-		return Json( { { "name", "MeanSquaredLoss" }, { "weight", m_weight } });
+		return Json( { { "name", "MeanSquaredLoss" } });
 	}
 	void MeanSquaredLoss::unserialize(const Json &json, const SerializedObject &binary_data)
 	{
 		assert(json["name"].getString() == "MeanSquaredLoss");
-		m_weight = json["weight"].getDouble();
 	}
 	std::unique_ptr<LossFunction> MeanSquaredLoss::clone() const
 	{
-		return std::make_unique<MeanSquaredLoss>(m_weight);
+		return std::make_unique<MeanSquaredLoss>();
 	}
 
-	ValueHeadLoss::ValueHeadLoss(float weight) :
-			m_weight(weight)
-	{
-	}
-	float ValueHeadLoss::getLoss(const Context &context, const Tensor &output, const Tensor &target, const Tensor &mask) const
-	{
-		return m_weight * valueHeadLoss(context, output, target);
-	}
-	void ValueHeadLoss::getGradient(const Context &context, Tensor &gradient, const Tensor &output, const Tensor &target, const Tensor &mask) const
-	{
-		valueHeadGradient(context, gradient, output, target, m_weight);
-	}
-	Json ValueHeadLoss::serialize(SerializedObject &binary_data) const
-	{
-		return Json( { { "name", "ValueHeadLoss" }, { "weight", m_weight } });
-	}
-	void ValueHeadLoss::unserialize(const Json &json, const SerializedObject &binary_data)
-	{
-		assert(json["name"].getString() == "ValueHeadLoss");
-		m_weight = json["weight"].getDouble();
-	}
-	std::unique_ptr<LossFunction> ValueHeadLoss::clone() const
-	{
-		return std::make_unique<ValueHeadLoss>(m_weight);
-	}
 
 } /* namespace ml */
 

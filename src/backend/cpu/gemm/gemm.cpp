@@ -48,7 +48,7 @@ namespace ml
 		const int stride_C = size_of(dtype) * get_batch_stride(shape_C);
 		const int stride_D = size_of(dtype) * get_batch_stride(shape_C);
 
-		for (int i = 0; i < shape_A.dim[0]; i++)
+		for (int i = 0; i < shape_C.dim[0]; i++)
 		{
 			rt.setMatrixA(getPointer<uint8_t>(A) + i * stride_A, shape_A, dtype, opA);
 			rt.setMatrixB(getPointer<uint8_t>(B) + i * stride_B, shape_B, dtype, opB);

@@ -94,7 +94,7 @@ namespace ml
 			std::vector<GraphNode*> getOutputs() const;
 
 			void forward(int batch_size);
-			void backward(int batch_size, Tensor &backup_tensor);
+			void backward(int batch_size);
 			void prepareForBackward();
 
 			const Layer& getLayer() const;

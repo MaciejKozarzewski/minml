@@ -293,33 +293,17 @@ namespace
 				{
 					status = cublasLtMatmulDescSetAttribute(m_desc, CUBLASLT_MATMUL_DESC_BIAS_POINTER, &bias, sizeof(bias));
 					assert(status == CUBLAS_STATUS_SUCCESS);
-					switch (act)
-					{
-						case ACTIVATION_RELU:
-							epilogue = CUBLASLT_EPILOGUE_RELU_BIAS;
-							break;
-						case ACTIVATION_GELU:
-							epilogue = CUBLASLT_EPILOGUE_GELU_BIAS;
-							break;
-						default:
-							epilogue = CUBLASLT_EPILOGUE_BIAS;
-							break;
-					}
+					if (act == ACTIVATION_RELU)
+						epilogue = CUBLASLT_EPILOGUE_RELU_BIAS;
+					else
+						epilogue = CUBLASLT_EPILOGUE_BIAS;
 				}
 				else
 				{
-					switch (act)
-					{
-						case ACTIVATION_RELU:
-							epilogue = CUBLASLT_EPILOGUE_RELU;
-							break;
-						case ACTIVATION_GELU:
-							epilogue = CUBLASLT_EPILOGUE_GELU;
-							break;
-						default:
-							epilogue = CUBLASLT_EPILOGUE_DEFAULT;
-							break;
-					}
+					if (act == ACTIVATION_RELU)
+						epilogue = CUBLASLT_EPILOGUE_RELU;
+					else
+						epilogue = CUBLASLT_EPILOGUE_DEFAULT;
 				}
 
 				status = cublasLtMatmulDescSetAttribute(m_desc, CUBLASLT_MATMUL_DESC_EPILOGUE, &epilogue, sizeof(epilogue));
@@ -363,32 +347,6 @@ namespace
 				return m_desc;
 			}
 	};
-
-	mlDataType_t get_compute_dtype(mlContext_t context, mlDataType_t x_dtype, mlDataType_t w_dtype, mlDataType_t y_dtype) noexcept
-	{
-		assert(x_dtype == w_dtype);
-		switch (x_dtype)
-		{
-			default:
-			case DTYPE_UNKNOWN:
-				return DTYPE_UNKNOWN;
-			case DTYPE_FLOAT16:
-			{
-				assert(y_dtype == DTYPE_FLOAT16);
-				return cuda::has_fp16_math(context) ? DTYPE_FLOAT16 : DTYPE_FLOAT32;
-			}
-			case DTYPE_FLOAT32:
-			{
-				assert(y_dtype == DTYPE_FLOAT32);
-				return DTYPE_FLOAT32;
-			}
-			case DTYPE_FLOAT64:
-			{
-				assert(y_dtype == DTYPE_FLOAT64);
-				return DTYPE_FLOAT64;
-			}
-		}
-	}
 
 	void transpose_matrix(mlContext_t context, mlDataType_t dtype, void *output, const void *input, int rows, int columns)
 	{
@@ -477,8 +435,7 @@ namespace ml
 			const FilterDescriptor wDesc(weights_shape, dtype);
 			const TensorDescriptor yDesc(output_shape, dtype);
 
-			const mlDataType_t compute_type = get_compute_dtype(context, dtype, dtype, dtype);
-			const ConvolutionDescriptor convDesc(cuda::Context::getCudnnHandle(context), xDesc, wDesc, yDesc, compute_type, weights_shape.dim[1], 1);
+			const ConvolutionDescriptor convDesc(cuda::Context::getCudnnHandle(context), xDesc, wDesc, yDesc, dtype, weights_shape.dim[1], 1);
 
 			const cudnnConvolutionFwdAlgoPerfStruct perf = get_conv_forward_algo(handle, xDesc, wDesc, yDesc, convDesc);
 
@@ -497,7 +454,8 @@ namespace ml
 						workspace_size, &beta, yDesc, output);
 				assert(status == CUDNN_STATUS_SUCCESS);
 
-				ml::cuda_activation_forward(context, dtype, output_shape, output, output, act);
+				const mlTensor_t xy = ml::make_tensor(output, dtype, output_shape);
+				ml::cuda_activation_forward(context, 1.0f, xy, 0.0f, xy, act);
 			}
 			else
 			{
@@ -562,8 +520,11 @@ namespace ml
 					workspace_size, stream);
 			assert(status == CUBLAS_STATUS_SUCCESS);
 
-			if (act != ACTIVATION_LINEAR && act != ACTIVATION_RELU && act != ACTIVATION_GELU)
-				cuda_activation_forward(context, dtype, shape_D, D, D, act);
+			if (act != ACTIVATION_LINEAR && act != ACTIVATION_RELU)
+			{
+				const mlTensor_t xy = ml::make_tensor(D, dtype, shape_D);
+				ml::cuda_activation_forward(context, 1.0f, xy, 0.0f, xy, act);
+			}
 		}
 		else
 		{
@@ -573,9 +534,16 @@ namespace ml
 			cuda_gemm(context, dtype, shape_D, D, shape_A, A, shape_B, B, opA, opB, alpha, beta);
 
 			if (bias == nullptr)
-				cuda_activation_forward(context, dtype, shape_D, D, D, act);
+			{
+				const mlTensor_t xy = ml::make_tensor(D, dtype, shape_D);
+				ml::cuda_activation_forward(context, 1.0f, xy, 0.0f, xy, act);
+			}
 			else
-				cuda_add_bias_act(context, dtype, shape_D, D, D, bias, act);
+			{
+				const mlTensor_t xy = ml::make_tensor(D, dtype, shape_D);
+				const mlTensor_t b = ml::make_tensor(bias, dtype, make_shape( { get_last_dim(shape_D) }));
+				cuda_add_bias_act(context, 1.0f, xy, b, 0.0f, xy, act);
+			}
 		}
 	}
 
@@ -599,8 +567,7 @@ namespace ml
 		const FilterDescriptor wDesc(make_shape( { channels, filter_size, filter_size, 1 }), dtype);
 		const TensorDescriptor yDesc(output_shape, dtype);
 
-		const mlDataType_t compute_type = get_compute_dtype(context, dtype, dtype, dtype);
-		const ConvolutionDescriptor convDesc(handle, xDesc, wDesc, yDesc, compute_type, filter_size, channels);
+		const ConvolutionDescriptor convDesc(handle, xDesc, wDesc, yDesc, dtype, filter_size, channels);
 
 		const cudnnConvolutionFwdAlgoPerfStruct perf = get_conv_forward_algo(handle, xDesc, wDesc, yDesc, convDesc);
 
@@ -734,9 +701,16 @@ namespace ml
 		cuda_gemm(context, dtype, shape_D, D, shape_A, A, shape_B, B, opA, opB, alpha, beta);
 
 		if (bias == nullptr)
-			cuda_activation_forward(context, dtype, shape_D, D, D, act);
+		{
+			const mlTensor_t xy = ml::make_tensor(D, dtype, shape_D);
+			ml::cuda_activation_forward(context, 1.0f, xy, 0.0f, xy, act);
+		}
 		else
-			cuda_add_bias_act(context, dtype, shape_D, D, D, bias, act);
+		{
+			const mlTensor_t xy = ml::make_tensor(D, dtype, shape_D);
+			const mlTensor_t b = ml::make_tensor(bias, dtype, make_shape( { get_last_dim(shape_D) }));
+			cuda_add_bias_act(context, 1.0f, xy, b, 0.0f, xy, act);
+		}
 	}
 
 	void cudnn_depthwise_conv_forward(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, mlShape_t weights_shape, const void *input,

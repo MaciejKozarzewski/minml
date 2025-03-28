@@ -239,7 +239,7 @@ namespace ml
 						std::cout << "  Allocated bias=" << bias.info() << std::endl;
 
 						std::cout << "  Running output transform" << std::endl;
-						winogradOutputTransform(context, weight_shape, output_matrices, output, bias, output, ActivationType::RELU);
+						winogradOutputTransform(context, weight_shape, output_matrices, output, bias, output, ActivationType::RELU, 0.0f);
 						std::cout << "    WORKS" << std::endl;
 					}
 				}

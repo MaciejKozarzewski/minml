@@ -21,7 +21,7 @@
 
 #define FP16_MIN_ARCH 700
 
-namespace vectors2
+namespace vectors
 {
 	template<int N>
 	HOST_DEVICE bool is_aligned(const void *ptr)
@@ -187,6 +187,42 @@ namespace vectors2
 	HOST_DEVICE_INLINE bool is_false(T b)
 	{
 		return as_uint(b) == 0;
+	}
+
+	/*
+	 * comparison operators
+	 */
+	HOST_DEVICE_INLINE half2 half2_to_mask(bool bx, bool by)
+	{
+		return half2(bx ? as_half(0xFFFFu) : as_half(0x0000u), by ? as_half(0xFFFFu) : as_half(0x0000u));
+	}
+	DEVICE_INLINE half2 half2_compare_eq(const half2 &lhs, const half2 &rhs)
+	{
+		return half2_to_mask(lhs.x == rhs.x, lhs.y == rhs.y);
+	}
+	DEVICE_INLINE half2 half2_compare_neq(const half2 &lhs, const half2 &rhs)
+	{
+		return half2_to_mask(lhs.x != rhs.x, lhs.y != rhs.y);
+	}
+	DEVICE_INLINE half2 half2_compare_gt(const half2 &lhs, const half2 &rhs)
+	{
+		return half2_to_mask(lhs.x > rhs.x, lhs.y > rhs.y);
+	}
+	DEVICE_INLINE half2 half2_compare_ge(const half2 &lhs, const half2 &rhs)
+	{
+		return half2_to_mask(lhs.x >= rhs.x, lhs.y >= rhs.y);
+	}
+	DEVICE_INLINE half2 half2_compare_lt(const half2 &lhs, const half2 &rhs)
+	{
+		return half2_to_mask(lhs.x < rhs.x, lhs.y < rhs.y);
+	}
+	DEVICE_INLINE half2 half2_compare_le(const half2 &lhs, const half2 &rhs)
+	{
+		return half2_to_mask(lhs.x <= rhs.x, lhs.y <= rhs.y);
+	}
+	DEVICE_INLINE half2 half2_select(const half2 &cond, const half2 &a, const half2 &b)
+	{
+		return half2(is_true(cond.x) ? a.x : b.x, is_true(cond.y) ? a.y : b.y);
 	}
 
 }

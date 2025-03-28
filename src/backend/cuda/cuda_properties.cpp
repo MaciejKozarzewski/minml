@@ -238,7 +238,10 @@ namespace ml
 			switch (dtype)
 			{
 				case DTYPE_FLOAT16:
-					return cuda::get_compute_capability(index) >= 53;
+				{
+					const int sm_ver = cuda::get_compute_capability(index);
+					return sm_ver == 53 || sm_ver == 60 || sm_ver >= 62;
+				}
 				case DTYPE_FLOAT32:
 					return true;
 				case DTYPE_FLOAT64:
@@ -277,12 +280,6 @@ namespace ml
 		int get_compute_capability(int device_index)
 		{
 			return (get_device_properties()[device_index].major * 10 + get_device_properties()[device_index].minor);
-		}
-
-		bool has_fp16_math(mlContext_t context)
-		{
-			const int sm_ver = cuda::get_compute_capability(cuda::Context::getDeviceIndex(context));
-			return sm_ver == 53 || sm_ver == 60 || sm_ver >= 62;
 		}
 
 		bool has_tensor_cores(mlContext_t context)

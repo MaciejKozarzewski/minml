@@ -17,11 +17,10 @@
 #include <cassert>
 #include <cmath>
 
-namespace vectors2
+namespace vectors
 {
 	using vec1h = vec<half, 1>;
 
-#if __CUDA_ARCH__ >= FP16_MIN_ARCH
 	template<>
 	class __builtin_align__(2) vec<half, 1>
 	{
@@ -31,11 +30,11 @@ namespace vectors2
 			HOST_DEVICE vec() // @suppress("Class members should be properly initialized")
 			{
 			}
-			HOST_DEVICE vec(float f) :
+			explicit HOST_DEVICE vec(float f) :
 					vec1h(static_cast<half>(f))
 			{
 			}
-			HOST_DEVICE vec(half h) :
+			explicit HOST_DEVICE vec(half h) :
 					x0(h)
 			{
 			}
@@ -61,7 +60,50 @@ namespace vectors2
 			{
 				return vec1h(bit_invert(x0));
 			}
+			HOST_DEVICE int size() const
+			{
+				return 1;
+			}
+			HOST_DEVICE half operator[](int idx) const
+			{
+				assert(0 <= idx && idx < size());
+				return x0;
+			}
+			HOST_DEVICE half& operator[](int idx)
+			{
+				assert(0 <= idx && idx < size());
+				return x0;
+			}
 	};
+
+#if __CUDA_ARCH__ >= FP16_MIN_ARCH
+	/*
+	 * comparison operators
+	 */
+	DEVICE_INLINE vec1h operator==(const vec1h &lhs, const vec1h &rhs)
+	{
+		return vec1h(to_mask<half>(lhs.x0 == rhs.x0));
+	}
+	DEVICE_INLINE vec1h operator!=(const vec1h &lhs, const vec1h &rhs)
+	{
+		return vec1h(to_mask<half>(lhs.x0 != rhs.x0));
+	}
+	DEVICE_INLINE vec1h operator>(const vec1h &lhs, const vec1h &rhs)
+	{
+		return vec1h(to_mask<half>(lhs.x0 > rhs.x0));
+	}
+	DEVICE_INLINE vec1h operator>=(const vec1h &lhs, const vec1h &rhs)
+	{
+		return vec1h(to_mask<half>(lhs.x0 >= rhs.x0));
+	}
+	DEVICE_INLINE vec1h operator<(const vec1h &lhs, const vec1h &rhs)
+	{
+		return vec1h(to_mask<half>(lhs.x0 < rhs.x0));
+	}
+	DEVICE_INLINE vec1h operator<=(const vec1h &lhs, const vec1h &rhs)
+	{
+		return vec1h(to_mask<half>(lhs.x0 < rhs.x0));
+	}
 
 	DEVICE_INLINE vec1h operator+(const vec1h &lhs, const vec1h &rhs)
 	{
@@ -78,34 +120,6 @@ namespace vectors2
 	DEVICE_INLINE vec1h operator/(const vec1h &lhs, const vec1h &rhs)
 	{
 		return vec1h(lhs.x0 / rhs.x0);
-	}
-
-	/*
-	 * comparison operators
-	 */
-	DEVICE_INLINE vec1h operator==(const vec1h &lhs, const vec1h &rhs)
-	{
-		return to_mask<half>(lhs.x0 == rhs.x0);
-	}
-	DEVICE_INLINE vec1h operator!=(const vec1h &lhs, const vec1h &rhs)
-	{
-		return to_mask<half>(lhs.x0 != rhs.x0);
-	}
-	DEVICE_INLINE vec1h operator>(const vec1h &lhs, const vec1h &rhs)
-	{
-		return to_mask<half>(lhs.x0 > rhs.x0);
-	}
-	DEVICE_INLINE vec1h operator>=(const vec1h &lhs, const vec1h &rhs)
-	{
-		return to_mask<half>(lhs.x0 >= rhs.x0);
-	}
-	DEVICE_INLINE vec1h operator<(const vec1h &lhs, const vec1h &rhs)
-	{
-		return to_mask<half>(lhs.x0 < rhs.x0);
-	}
-	DEVICE_INLINE vec1h operator<=(const vec1h &lhs, const vec1h &rhs)
-	{
-		return to_mask<half>(lhs.x0 < rhs.x0);
 	}
 
 	DEVICE_INLINE vec1h abs(vec1h a)
@@ -176,10 +190,120 @@ namespace vectors2
 	{
 		return vec1h(is_true(cond.x0) ? a.x0 : b.x0);
 	}
+#else
+	/*
+	 * comparison operators
+	 */
+	DEVICE_INLINE vec1h operator==(const vec1h &lhs, const vec1h &rhs)
+	{
+		return vec1h();
+	}
+	DEVICE_INLINE vec1h operator!=(const vec1h &lhs, const vec1h &rhs)
+	{
+		return vec1h();
+	}
+	DEVICE_INLINE vec1h operator>(const vec1h &lhs, const vec1h &rhs)
+	{
+		return vec1h();
+	}
+	DEVICE_INLINE vec1h operator>=(const vec1h &lhs, const vec1h &rhs)
+	{
+		return vec1h();
+	}
+	DEVICE_INLINE vec1h operator<(const vec1h &lhs, const vec1h &rhs)
+	{
+		return vec1h();
+	}
+	DEVICE_INLINE vec1h operator<=(const vec1h &lhs, const vec1h &rhs)
+	{
+		return vec1h();
+	}
+
+	DEVICE_INLINE vec1h operator+(const vec1h &lhs, const vec1h &rhs)
+	{
+		return vec1h();
+	}
+	DEVICE_INLINE vec1h operator-(const vec1h &lhs, const vec1h &rhs)
+	{
+		return vec1h();
+	}
+	DEVICE_INLINE vec1h operator*(const vec1h &lhs, const vec1h &rhs)
+	{
+		return vec1h();
+	}
+	DEVICE_INLINE vec1h operator/(const vec1h &lhs, const vec1h &rhs)
+	{
+		return vec1h();
+	}
+
+	DEVICE_INLINE vec1h abs(vec1h a)
+	{
+		return vec1h();
+	}
+	DEVICE_INLINE vec1h max(vec1h a, vec1h b)
+	{
+		return vec1h();
+	}
+	DEVICE_INLINE vec1h min(vec1h a, vec1h b)
+	{
+		return vec1h();
+	}
+	DEVICE_INLINE vec1h ceil(vec1h a)
+	{
+		return vec1h();
+	}
+	DEVICE_INLINE vec1h floor(vec1h a)
+	{
+		return vec1h();
+	}
+	DEVICE_INLINE vec1h sqrt(vec1h a)
+	{
+		return vec1h();
+	}
+	DEVICE_INLINE vec1h exp(vec1h a)
+	{
+		return vec1h();
+	}
+	DEVICE_INLINE vec1h log(vec1h a)
+	{
+		return vec1h();
+	}
+	DEVICE_INLINE vec1h tanh(vec1h a)
+	{
+		return vec1h();
+	}
+	DEVICE_INLINE vec1h sin(vec1h a)
+	{
+		return vec1h();
+	}
+	DEVICE_INLINE vec1h cos(vec1h a)
+	{
+		return vec1h();
+	}
+	DEVICE_INLINE vec1h erf(const vec1h &a)
+	{
+		return vec1h();
+	}
+
+	DEVICE_INLINE half horizontal_add(vec1h a)
+	{
+		return half { };
+	}
+	DEVICE_INLINE half horizontal_max(vec1h a)
+	{
+		return half { };
+	}
+	DEVICE_INLINE half horizontal_min(vec1h a)
+	{
+		return half { };
+	}
+
+	DEVICE_INLINE vec1h select(const vec1h &cond, const vec1h &a, const vec1h &b)
+	{
+		return vec1h();
+	}
 #endif
 
 } /* namespace vectors */
-
-
 
 #endif /* BACKEND_CUDA_VEC_VEC1H_CUH_ */

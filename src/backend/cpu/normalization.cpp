@@ -112,7 +112,8 @@ namespace
 
 namespace ml
 {
-	void cpu_batchnorm_inference(mlContext_t context, mlDataType_t dtype, mlShape_t shape, const void *input, void *output, const void *weights, mlActivationType_t act)
+	void cpu_batchnorm_inference(mlContext_t context, mlDataType_t dtype, mlShape_t shape, const void *input, void *output, const void *weights,
+			mlActivationType_t act)
 	{
 		assert(input != nullptr);
 		assert(output != nullptr);
@@ -155,22 +156,21 @@ namespace ml
 				output_ptr[i * last_dim + j] = tmp;
 			}
 	}
-	void cpu_batchnorm_forward(mlContext_t context, mlShape_t shape, const void *input, void *output, void *weights, void *running_stats,
-			int running_stat_idx, mlActivationType_t act)
+	void cpu_batchnorm_forward(mlContext_t context, mlShape_t shape, const void *input, void *output, const void *weights, void *running_stats,
+			mlActivationType_t act)
 	{
 		assert(input != nullptr);
 		assert(output != nullptr);
 		assert(weights != nullptr);
 		assert(running_stats != nullptr);
-		assert(running_stat_idx >= 0);
 
 		const int first_dim = volume_without_last_dim(shape);
 		const int last_dim = get_last_dim(shape);
 
 		const float *input_ptr = getPointer<float>(input);
 		float *output_ptr = getPointer<float>(output);
-		float *weights_ptr = getPointer<float>(weights);
-		AvgVarStats<float> *running_stat_ptr = getPointer<AvgVarStats<float>>(running_stats) + running_stat_idx * last_dim;
+		const float *weights_ptr = getPointer<float>(weights);
+		AvgVarStats<float> *running_stat_ptr = getPointer<AvgVarStats<float>>(running_stats);
 
 		for (int j = 0; j < last_dim; j++)
 			running_stat_ptr[j] = AvgVarStats<float>();
@@ -196,7 +196,7 @@ namespace ml
 			}
 	}
 	void cpu_batchnorm_backward(mlContext_t context, mlShape_t shape, const void *input, const void *output, void *gradient_prev, void *gradient_next,
-			const void *weights, void *weights_update, const void *running_stats, int running_stat_idx, mlActivationType_t act)
+			const void *weights, void *weights_update, const void *running_stats, mlActivationType_t act)
 	{
 		assert(input != nullptr);
 		assert(output != nullptr);
@@ -213,7 +213,7 @@ namespace ml
 		float *gradient_prev_ptr = getPointer<float>(gradient_prev);
 		float *gradient_next_ptr = getPointer<float>(gradient_next);
 		float *weights_update_ptr = getPointer<float>(weights_update);
-		const AvgVarStats<float> *running_stat_ptr = getPointer<AvgVarStats<float>>(running_stats) + running_stat_idx * last_dim;
+		const AvgVarStats<float> *running_stat_ptr = getPointer<AvgVarStats<float>>(running_stats);
 
 		assert(cpu::Context::getWorkspaceSize(context) >= 2 * last_dim * sizeof(float));
 

@@ -122,6 +122,103 @@ namespace ml
 		return c == 'T' || c == 't';
 	}
 
+	/*
+	 * mlTensor_t helpers
+	 */
+	template<typename T>
+	T* data(mlTensor_t &tensor) noexcept
+	{
+		return reinterpret_cast<T*>(tensor.data);
+	}
+	template<typename T>
+	const T* data(const mlTensor_t &tensor) noexcept
+	{
+		return reinterpret_cast<const T*>(tensor.data);
+	}
+	[[maybe_unused]] static bool is_fp16(const mlTensor_t &tensor) noexcept
+	{
+		return tensor.dtype == DTYPE_FLOAT16;
+	}
+	[[maybe_unused]] static bool is_fp32(const mlTensor_t &tensor) noexcept
+	{
+		return tensor.dtype == DTYPE_FLOAT32;
+	}
+	[[maybe_unused]] static int volume(const mlTensor_t &tensor) noexcept
+	{
+		if (tensor.rank == 0)
+			return 0;
+		else
+		{
+			int result = 1;
+			for (int i = 0; i < tensor.rank; i++)
+				result *= tensor.dim[i];
+			return result;
+		}
+	}
+	[[maybe_unused]] static int get_first_dim(const mlTensor_t &tensor) noexcept
+	{
+		if (tensor.rank == 0)
+			return 0;
+		else
+			return tensor.dim[0];
+	}
+	[[maybe_unused]] static int get_last_dim(const mlTensor_t &tensor) noexcept
+	{
+		if (tensor.rank == 0)
+			return 0;
+		else
+			return tensor.dim[tensor.rank - 1];
+	}
+
+	[[maybe_unused]] static int volume_without_first_dim(const mlTensor_t &tensor) noexcept
+	{
+		if (tensor.rank == 0)
+			return 0;
+		else
+		{
+			int result = 1;
+			for (int i = 1; i < tensor.rank; i++)
+				result *= tensor.dim[i];
+			return result;
+		}
+	}
+	[[maybe_unused]] static int volume_without_last_dim(const mlTensor_t &tensor) noexcept
+	{
+		if (tensor.rank == 0)
+			return 0;
+		else
+		{
+			int result = 1;
+			for (int i = 0; i < tensor.rank - 1; i++)
+				result *= tensor.dim[i];
+			return result;
+		}
+	}
+	[[maybe_unused]] static mlTensor_t empty_tensor() noexcept
+	{
+		mlTensor_t result;
+		result.data = nullptr;
+		result.dtype = DTYPE_UNKNOWN;
+		result.rank = 0;
+		for (int i = 0; i < 6; i++)
+			result.dim[i] = 0;
+		return result;
+	}
+	[[maybe_unused]] static mlTensor_t make_tensor(const void *data, mlDataType_t dtype, const mlShape_t &shape) noexcept
+	{
+		mlTensor_t result;
+		result.data = const_cast<void*>(data);
+		result.dtype = dtype;
+		result.rank = shape.rank;
+		for (int i = 0; i < 6; i++)
+			result.dim[i] = shape.dim[i];
+		return result;
+	}
+	[[maybe_unused]] static mlTensor_t make_tensor(const void *data, mlDataType_t dtype, std::initializer_list<int> dims) noexcept
+	{
+		return make_tensor(data, dtype, make_shape(dims));
+	}
+
 } /* namespace ml */
 
 #endif /* MINML_BACKEND_BACKEND_UTILS_HPP_ */

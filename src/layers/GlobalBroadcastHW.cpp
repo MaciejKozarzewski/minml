@@ -129,7 +129,7 @@ namespace ml
 //			emulateLowPrecision(context(), tmp_w, getWeights().getParam());
 //		}
 //		else
-			tmp_w = getWeights().getParam().view();
+		tmp_w = getWeights().getParam().view();
 
 		const int batch_size = input[0].dim(0);
 		const int hw = input[0].dim(1) * input[0].dim(2);
@@ -162,21 +162,21 @@ namespace ml
 		transpose.stop();
 
 		nonlinearity.start();
-		if (isUsingBias())
-			addBiasAct(context(), output, output, getBias().getParam(), m_activation);
-		else
-			activationForward(context(), output, output, m_activation);
+//		if (isUsingBias())
+//			addBiasAct(context(), output, output, getBias().getParam(), m_activation);
+//		else
+//			activationForward(context(), output, output, m_activation);
 		nonlinearity.stop();
 	}
 	void GlobalBroadcastHW::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev,
-			Tensor &gradient_next)
+			Tensor &gradient_next, const std::vector<float> &beta)
 	{
 		assert(input.size() == 1);
 		const bool emulate_low_precision = false; //isTrainable() and dtype() == DataType::FLOAT32;
 
-		activationBackward(context(), gradient_next, gradient_next, output, m_activation);
+//		activationBackward(context(), gradient_next, gradient_next, output, m_activation, 0.0f);
 		if (isUsingBias())
-			sumOverFirstDim(context(), getBias().getGradient(), gradient_next, 0.0f);
+			sumOverFirstDim(context(), 1.0f, gradient_next, 0.0f, getBias().getGradient());
 
 		Tensor tmp_w;
 //		if (emulate_low_precision)
@@ -185,7 +185,7 @@ namespace ml
 //			emulateLowPrecision(context(), tmp_w, getWeights().getParam());
 //		}
 //		else
-			tmp_w = getWeights().getParam().view();
+		tmp_w = getWeights().getParam().view();
 
 		const int batch_size = input[0].dim(0);
 		const int hw = input[0].dim(1) * input[0].dim(2);

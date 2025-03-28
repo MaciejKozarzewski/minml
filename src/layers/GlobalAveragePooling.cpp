@@ -51,12 +51,13 @@ namespace ml
 	void GlobalAveragePooling::forward(const std::vector<Tensor> &input, Tensor &output)
 	{
 		assert(input.size() == 1);
-		globalAveragePoolingForward(context(), input[0], output);
+		globalAveragePoolingForward(context(), 1.0f, input[0], 0.0f, output);
 	}
-	void GlobalAveragePooling::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next)
+	void GlobalAveragePooling::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next,
+			const std::vector<float> &beta)
 	{
 		assert(input.size() == 1);
-		globalAveragePoolingBackward(context(), gradient_prev[0], gradient_next);
+		globalAveragePoolingBackward(context(), 1.0f, gradient_next, beta[0], gradient_prev[0]);
 	}
 
 } /* namespace ml */

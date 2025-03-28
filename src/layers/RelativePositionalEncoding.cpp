@@ -71,7 +71,7 @@ namespace ml
 	{
 	}
 	void RelativePositionalEncoding::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev,
-			Tensor &gradient_next)
+			Tensor &gradient_next, const std::vector<float> &beta)
 	{
 		assert(input.size() == 1);
 		assert(gradient_prev.size() == 1);

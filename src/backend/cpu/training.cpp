@@ -27,10 +27,14 @@ namespace
 		return (y >= max_y) ? 0.0f : std::pow(x, y);
 	}
 	template<typename T>
-	void add_kernel(T *dst, T alpha1, const T *src1, T alpha2, const T *src2, int elements)
+	void add_kernel(T beta, T *dst, T alpha1, const T *src1, T alpha2, const T *src2, int elements)
 	{
-		for (int i = 0; i < elements; i++)
-			dst[i] = alpha1 * src1[i] + alpha2 * src2[i];
+		if (beta == 0.0f)
+			for (int i = 0; i < elements; i++)
+				dst[i] = alpha1 * src1[i] + alpha2 * src2[i];
+		else
+			for (int i = 0; i < elements; i++)
+				dst[i] = alpha1 * src1[i] + alpha2 * src2[i] + beta * dst[i];
 	}
 	template<typename T>
 	void multiply_kernel(T *dst, const T *src1, const T *src2, int elements)
@@ -98,8 +102,8 @@ namespace ml
 		}
 
 	}
-	void cpu_add_tensors(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *dst, float alpha1, const void *src1, float alpha2,
-			const void *src2)
+	void cpu_add_tensors(mlContext_t context, mlDataType_t dtype, mlShape_t shape, float beta, void *dst, float alpha1, const void *src1,
+			float alpha2, const void *src2)
 	{
 		assert(dst != nullptr);
 		assert(src1 != nullptr);
@@ -112,10 +116,11 @@ namespace ml
 			default:
 				break;
 			case DTYPE_FLOAT32:
-				add_kernel(getPointer<float>(dst), alpha1, getPointer<float>(src1), alpha2, getPointer<float>(src2), elements);
+				add_kernel(beta, getPointer<float>(dst), alpha1, getPointer<float>(src1), alpha2, getPointer<float>(src2), elements);
 				break;
 			case DTYPE_FLOAT64:
-				add_kernel(getPointer<double>(dst), (double) alpha1, getPointer<double>(src1), (double) alpha2, getPointer<double>(src2), elements);
+				add_kernel((double) beta, getPointer<double>(dst), (double) alpha1, getPointer<double>(src1), (double) alpha2,
+						getPointer<double>(src2), elements);
 				break;
 		}
 	}
@@ -153,7 +158,6 @@ namespace ml
 		assert(target != nullptr);
 
 		const int elements = volume(shape);
-		const float inv_batch_size = 1.0f / get_first_dim(shape);
 
 		const float *output_ptr = getPointer<float>(output);
 		const float *target_ptr = getPointer<float>(target);
@@ -165,7 +169,7 @@ namespace ml
 			const float m = (mask == nullptr) ? 1.0f : mask_ptr[i];
 			result += m * square(output_ptr[i] - target_ptr[i]);
 		}
-		return 0.5f * result * inv_batch_size;
+		return 0.5f * result ;
 	}
 	void cpu_mean_squared_gradient(mlContext_t context, mlShape_t shape, void *gradient, const void *output, const void *target, const void *mask,
 			float weight)
@@ -183,15 +187,13 @@ namespace ml
 		const float *target_ptr = getPointer<float>(target);
 		const float *mask_ptr = getPointer<float>(mask);
 
-		const float inv_batch_size = 1.0f / get_first_dim(shape);
-
 		float result = 0.0f;
 		for (int i = 0; i < elements; i++)
 		{
 			const float m = (mask == nullptr) ? 1.0f : mask_ptr[i];
 			result += m * std::max(0.0f, cross_entropy(output_ptr[i], target_ptr[i]) - cross_entropy(target_ptr[i], target_ptr[i]));
 		}
-		return result * inv_batch_size;
+		return result;
 	}
 	void cpu_cross_entropy_gradient(mlContext_t context, mlShape_t shape, void *gradient, const void *output, const void *target, const void *mask,
 			float weight)
@@ -207,12 +209,10 @@ namespace ml
 		const float *target_ptr = getPointer<float>(target);
 		const float *mask_ptr = getPointer<float>(mask);
 
-		const float inv_batch_size = weight / get_first_dim(shape);
-
 		for (int i = 0; i < elements; i++)
 		{
 			const float m = (mask == nullptr) ? 1.0f : mask_ptr[i];
-			gradient_ptr[i] = m * inv_batch_size * (output_ptr[i] - target_ptr[i]);
+			gradient_ptr[i] = m * weight * (output_ptr[i] - target_ptr[i]);
 		}
 	}
 	float cpu_value_head_loss(mlContext_t context, mlShape_t shape, const void *output, const void *target)

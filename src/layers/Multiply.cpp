@@ -54,7 +54,8 @@ namespace ml
 
 		multiplyTensors(context(), output, input[0], input[1]);
 	}
-	void Multiply::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next)
+	void Multiply::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next,
+			const std::vector<float> &beta)
 	{
 		assert(input.size() == m_input_shapes.size());
 		assert(gradient_prev.size() == m_input_shapes.size());

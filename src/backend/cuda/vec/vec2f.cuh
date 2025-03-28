@@ -17,7 +17,7 @@
 #include <cassert>
 #include <cmath>
 
-namespace vectors2
+namespace vectors
 {
 	using vec2f = vec<float, 2>;
 
@@ -30,12 +30,12 @@ namespace vectors2
 			HOST_DEVICE vec() // @suppress("Class members should be properly initialized")
 			{
 			}
-			HOST_DEVICE vec(float f0, float f1) :
+			explicit HOST_DEVICE vec(float f0, float f1) :
 					x0(f0),
 					x1(f1)
 			{
 			}
-			HOST_DEVICE vec(float f) :
+			explicit HOST_DEVICE vec(float f) :
 					vec(f, f)
 			{
 			}
@@ -109,7 +109,45 @@ namespace vectors2
 			{
 				return 2;
 			}
+			HOST_DEVICE float operator[](int idx) const
+			{
+				assert(0 <= idx && idx < size());
+				return (idx == 0) ? x0 : x1;
+			}
+			HOST_DEVICE float& operator[](int idx)
+			{
+				assert(0 <= idx && idx < size());
+				return (idx == 0) ? x0 : x1;
+			}
 	};
+
+	/*
+	 * comparison operators
+	 */
+	DEVICE_INLINE vec2f operator==(const vec2f &lhs, const vec2f &rhs)
+	{
+		return vec2f(to_mask<float>(lhs.x0 == rhs.x0), to_mask<float>(lhs.x1 == rhs.x1));
+	}
+	DEVICE_INLINE vec2f operator!=(const vec2f &lhs, const vec2f &rhs)
+	{
+		return vec2f(to_mask<float>(lhs.x0 != rhs.x0), to_mask<float>(lhs.x1 != rhs.x1));
+	}
+	DEVICE_INLINE vec2f operator>(const vec2f &lhs, const vec2f &rhs)
+	{
+		return vec2f(to_mask<float>(lhs.x0 > rhs.x0), to_mask<float>(lhs.x1 > rhs.x1));
+	}
+	DEVICE_INLINE vec2f operator>=(const vec2f &lhs, const vec2f &rhs)
+	{
+		return vec2f(to_mask<float>(lhs.x0 >= rhs.x0), to_mask<float>(lhs.x1 >= rhs.x1));
+	}
+	DEVICE_INLINE vec2f operator<(const vec2f &lhs, const vec2f &rhs)
+	{
+		return vec2f(to_mask<float>(lhs.x0 < rhs.x0), to_mask<float>(lhs.x1 < rhs.x1));
+	}
+	DEVICE_INLINE vec2f operator<=(const vec2f &lhs, const vec2f &rhs)
+	{
+		return vec2f(to_mask<float>(lhs.x0 < rhs.x0), to_mask<float>(lhs.x1 < rhs.x1));
+	}
 
 	DEVICE_INLINE vec2f operator+(const vec2f &lhs, const vec2f &rhs)
 	{

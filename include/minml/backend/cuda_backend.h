@@ -10,6 +10,8 @@
 
 #include <minml/backend/backend_types.h>
 
+#include <cstddef>
+
 namespace ml
 {
 
@@ -17,6 +19,31 @@ namespace ml
 	extern "C"
 	{
 #endif
+		/**
+		 * A few words about argument types. \n
+		 * Descriptor types are passed by value, const keyword is used as a hint that object associated with the descriptor will not change within the function.
+		 * All pointer and array types are assumed to be pointing to host memory.
+		 *
+		 * A few words about argument names. \n
+		 *
+		 * For functions for neural network layers there are 8 main types or names: \n
+		 * Argument name | Meaning
+		 * ------------- | -------------
+		 * x, dx         | input tensor, gradient at the input
+		 * y, dy         | output tensor, gradient at the output
+		 * w, dw         | weight tensor, gradient of weights
+		 * b, db         | bias tensor, gradient of bias
+		 * z             | another input to be somehow used by the function
+		 *
+		 * For other kinds of functions, letters 'a' and 'b' usually indicate inputs to the function, while letter 'c' indicates the output.
+		 *
+		 * In few functions output is named 'dst' while input is 'src'.
+		 *
+		 * Unless specified otherwise, all scaling factors are optional (can be null pointers) and will then behave as following:\n
+		 * for alpha-like types the default value is 1.
+		 * for beta-like types the default value is 0.
+		 * The type for alpha and beta parameters are expected to be fp32.
+		 */
 
 		// implemented in 'cuda_properties.cpp'
 		DLL_PUBLIC int cuda_get_number_of_devices();
@@ -43,16 +70,17 @@ namespace ml
 		DLL_PUBLIC void cuda_destroy_event(mlEvent_t event);
 
 		// implemented in 'cuda_memory.cu'
-		DLL_PUBLIC void* cuda_malloc(int device_index, int count);
-		DLL_PUBLIC void cuda_page_lock(void *ptr, int count);
+		DLL_PUBLIC void* cuda_malloc(int device_index, size_t count);
+		DLL_PUBLIC void cuda_page_lock(void *ptr, size_t count);
 		DLL_PUBLIC void cuda_page_unlock(void *ptr);
 		DLL_PUBLIC void cuda_free(void *ptr);
-		DLL_PUBLIC void* cuda_create_view(void *src, int offset, int count);
+		DLL_PUBLIC void* cuda_create_view(void *src, size_t offset, size_t count);
 		DLL_PUBLIC void cuda_destroy_view(void *ptr);
-		DLL_PUBLIC void cuda_memset(mlContext_t context, void *dst, int dst_offset, int dst_count, const void *src, int src_count);
-		DLL_PUBLIC void cuda_memcpy_within_device(mlContext_t context, void *dst, int dst_offset, const void *src, int src_offset, int count);
-		DLL_PUBLIC void cuda_memcpy_from_host(mlContext_t context, void *dst, int dst_offset, const void *src, int count);
-		DLL_PUBLIC void cuda_memcpy_to_host(mlContext_t context, void *dst, const void *src, int src_offset, int count);
+		DLL_PUBLIC void cuda_memset(mlContext_t context, void *dst, size_t dst_offset, size_t dst_count, const void *src, size_t src_count);
+		DLL_PUBLIC void cuda_memcpy_within_device(mlContext_t context, void *dst, size_t dst_offset, const void *src, size_t src_offset,
+				size_t count);
+		DLL_PUBLIC void cuda_memcpy_from_host(mlContext_t context, void *dst, size_t dst_offset, const void *src, size_t count);
+		DLL_PUBLIC void cuda_memcpy_to_host(mlContext_t context, void *dst, const void *src, size_t src_offset, size_t count);
 
 		// implemented in 'conversion.cu'
 		DLL_PUBLIC void cuda_unpack_input(mlContext_t context, mlShape_t shape, mlDataType_t dst_dtype, void *dst, const void *src);
@@ -81,15 +109,19 @@ namespace ml
 				mlShape_t weights_shape, const void *input, const void *weights, void *output, const void *bias, const void *add,
 				mlActivationType_t act);
 
-		// depthwise convolution
-		DLL_PUBLIC void cuda_depthwise_conv_forward(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, mlShape_t weights_shape,
-				const void *input, const void *weights, const void *bias, void *output);
-		DLL_PUBLIC void cuda_depthwise_conv_backward(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, const void *gradient_next,
-				const void *weights, void *gradient_prev);
-		DLL_PUBLIC void cuda_depthwise_conv_update(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, const void *input,
-				const void *gradient_next, void *weights_update);
+		/*
+		 * depthwise convolution
+		 */
+		DLL_PUBLIC void cuda_depthwise_conv_forward(mlContext_t context, float alpha, const mlTensor_t x, const mlTensor_t w, const mlTensor_t b,
+				float beta, mlTensor_t y);
+		DLL_PUBLIC void cuda_depthwise_conv_backward(mlContext_t context, float alpha, const mlTensor_t dy, const mlTensor_t w, float beta,
+				mlTensor_t dx);
+		DLL_PUBLIC void cuda_depthwise_conv_update(mlContext_t context, float alpha, const mlTensor_t x, const mlTensor_t dy, float beta,
+				mlTensor_t dw);
 
-		// implemented in 'global_pooling.cu'
+		/*
+		 * global pooling
+		 */
 		DLL_PUBLIC void cuda_global_avg_and_max_pooling_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output,
 				const void *input);
 		DLL_PUBLIC void cuda_global_avg_and_max_pooling_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next,
@@ -98,15 +130,16 @@ namespace ml
 				const void *bias, mlActivationType_t act);
 		DLL_PUBLIC void cuda_global_broadcasting_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, void *gradient_next,
 				const void *output, mlActivationType_t act);
-		DLL_PUBLIC void cuda_global_average_pooling_forward(mlContext_t context, mlDataType_t input_dtype, mlDataType_t output_dtype, mlShape_t shape,
-				void *output, const void *input, float scale, float shift);
-		DLL_PUBLIC void cuda_global_average_pooling_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next);
-		DLL_PUBLIC void cuda_channel_scaling_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input,
-				const void *scales);
-		DLL_PUBLIC void cuda_channel_scaling_backward(mlContext_t context, mlShape_t shape, void *gradient_prev_0, void *gradient_prev_1,
-				const void *gradient_next, const void *input_0, const void *input_1);
+		DLL_PUBLIC void cuda_global_average_pooling_forward(mlContext_t context, float alpha, const mlTensor_t x, float beta, mlTensor_t y);
+		DLL_PUBLIC void cuda_global_average_pooling_backward(mlContext_t context, float alpha, const mlTensor_t dy, float beta, mlTensor_t dx);
+		DLL_PUBLIC void cuda_channel_scaling_forward(mlContext_t context, float alpha, const mlTensor_t x, const mlTensor_t scales, float beta,
+				mlTensor_t y);
+		DLL_PUBLIC void cuda_channel_scaling_backward(mlContext_t context, float alpha, const mlTensor_t dy, const mlTensor_t x,
+				const mlTensor_t scales, float beta_dx, mlTensor_t dx, float beta_scales, mlTensor_t dscales);
 
-		// implemented in 'gemms.cpp'
+		/*
+		 * matrix multiplications
+		 */
 		DLL_PUBLIC void cuda_gemm(mlContext_t context, mlDataType_t dtype, mlShape_t shape_C, void *C, mlShape_t shape_A, const void *A,
 				mlShape_t shape_B, const void *B, char opA, char opB, float alpha, float beta);
 		DLL_PUBLIC void cuda_gemm_batched(mlContext_t context, mlDataType_t dtype, mlShape_t shape_C, void *C, mlShape_t shape_A, const void *A,
@@ -127,23 +160,25 @@ namespace ml
 				const void *gradient_next, void *weights_update);
 
 		// implemented in 'add_bias_act.cu'
-		DLL_PUBLIC void cuda_add_bias_act(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input, const void *bias,
+		DLL_PUBLIC void cuda_add_bias_act(mlContext_t context, float alpha, const mlTensor_t x, const mlTensor_t b, float beta, mlTensor_t y,
 				mlActivationType_t act);
 
-		// batchnorm
-		DLL_PUBLIC void cuda_batchnorm_inference(mlContext_t context, mlDataType_t dtype, mlShape_t shape, const void *input, void *output,
-				const void *weights, mlActivationType_t act);
-		DLL_PUBLIC void cuda_batchnorm_forward(mlContext_t context, mlShape_t shape, const void *input, void *output, void *weights,
-				void *running_stats, int running_stat_idx, mlActivationType_t act);
-		DLL_PUBLIC void cuda_batchnorm_backward(mlContext_t context, mlShape_t shape, const void *input, const void *output, void *gradient_prev,
-				void *gradient_next, const void *weights, void *weights_update, const void *running_stats, int running_stat_idx,
-				mlActivationType_t act);
-		DLL_PUBLIC void cuda_batchnorm_update(mlContext_t context, mlShape_t shape, const void *running_stat, void *weights, bool use_gamma,
-				bool use_beta);
+		/*
+		 * batchnorm
+		 */
+		DLL_PUBLIC void cuda_batchnorm_inference(mlContext_t context, float alpha, const mlTensor_t x, const mlTensor_t w, const mlTensor_t stats,
+				float beta, mlTensor_t y, mlActivationType_t act);
+		DLL_PUBLIC void cuda_batchnorm_forward(mlContext_t context, float alpha, const mlTensor_t x, const mlTensor_t w, float beta, mlTensor_t y,
+				mlTensor_t running_stats, mlActivationType_t act);
+		DLL_PUBLIC void cuda_batchnorm_backward(mlContext_t context, float alpha, const mlTensor_t x, mlTensor_t dy, const mlTensor_t w,
+				const mlTensor_t running_stats, float beta_dx, mlTensor_t dx, float beta_dw, mlTensor_t dw, mlActivationType_t act);
+		DLL_PUBLIC void cuda_batchnorm_update(mlContext_t context, const mlTensor_t running_stat, mlTensor_t weights, bool use_gamma, bool use_beta);
 		DLL_PUBLIC void cuda_fold_batchnorm(mlContext_t context, mlShape_t shape, void *layer_weights, void *layer_bias,
 				const void *batchnorm_weights);
 
-		// layernorm
+		/*
+		 *  layernorm
+		 */
 		DLL_PUBLIC void cuda_layernorm_forward(mlContext_t context, mlShape_t shape, mlDataType_t dtype, const void *input, void *output,
 				const void *weights, const void *bias, const void *ext);
 		DLL_PUBLIC void cuda_layernorm_backward(mlContext_t context, mlShape_t shape, const void *input, void *gradient_prev, void *gradient_next,
@@ -176,40 +211,52 @@ namespace ml
 		DLL_PUBLIC void cuda_window_merging(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, mlShape_t output_shape, const void *input,
 				void *output, mlShape_t offset);
 
-		// activations
-		DLL_PUBLIC void cuda_activation_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input,
+		/*
+		 * activations
+		 */
+		DLL_PUBLIC void cuda_activation_forward(mlContext_t context, float alpha, const mlTensor_t x, float beta, mlTensor_t y,
 				mlActivationType_t act);
-		DLL_PUBLIC void cuda_activation_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next,
-				const void *output, mlActivationType_t act);
+		DLL_PUBLIC void cuda_activation_backward(mlContext_t context, float alpha, const mlTensor_t dy, const mlTensor_t y, float beta, mlTensor_t dx,
+				mlActivationType_t act);
 		DLL_PUBLIC void cuda_softmax_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input);
-		DLL_PUBLIC void cuda_gelu_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next, const void *input);
+		DLL_PUBLIC void cuda_fused_act_bias_copy_backward(mlContext_t context, mlTensor_t dy, const mlTensor_t y, float beta_dx, mlTensor_t dx,
+				float beta_dw, mlTensor_t dw, mlActivationType_t act);
 
-		// implemented in 'training.cu'
+		/*
+		 * tensor op
+		 */
 		DLL_PUBLIC void cuda_emulate_low_precision(mlContext_t context, mlShape_t shape, mlDataType_t dtype, void *dst, const void *src,
 				mlQuantizationData_t qd);
 		DLL_PUBLIC void cuda_multiply_tensors(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *dst, const void *src1,
 				const void *src2);
-		DLL_PUBLIC void cuda_add_tensors(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *dst, float alpha1, const void *src1,
-				float alpha2, const void *src2);
-		DLL_PUBLIC void cuda_sum_over_first_dim(mlContext_t context, mlShape_t shape, void *dst, const void *src, float beta);
+		DLL_PUBLIC void cuda_add_tensors(mlContext_t context, mlDataType_t dtype, mlShape_t shape, float beta, void *dst, float alpha1,
+				const void *src1, float alpha2, const void *src2);
+		DLL_PUBLIC void cuda_sum_over_first_dim(mlContext_t context, float alpha, const mlTensor_t src, float beta, mlTensor_t dst);
 
-		DLL_PUBLIC float cuda_mean_squared_loss(mlContext_t context, mlShape_t shape, const void *output, const void *target, const void *mask);
-		DLL_PUBLIC void cuda_mean_squared_gradient(mlContext_t context, mlShape_t shape, void *gradient, const void *output, const void *target,
-				const void *mask, float weight);
-		DLL_PUBLIC float cuda_cross_entropy_loss(mlContext_t context, mlShape_t shape, const void *output, const void *target, const void *mask);
-		DLL_PUBLIC void cuda_cross_entropy_gradient(mlContext_t context, mlShape_t shape, void *gradient, const void *output, const void *target,
-				const void *mask, float weight);
-		DLL_PUBLIC float cuda_value_head_loss(mlContext_t context, mlShape_t shape, const void *output, const void *target);
-		DLL_PUBLIC void cuda_value_head_gradient(mlContext_t context, mlShape_t shape, void *gradient, const void *output, const void *target,
-				float weight);
+		/*
+		 * training
+		 */
+		DLL_PUBLIC float cuda_mean_squared_loss(mlContext_t context, const mlTensor_t output, const mlTensor_t target, const mlTensor_t mask);
+		DLL_PUBLIC float cuda_cross_entropy_loss(mlContext_t context, const mlTensor_t output, const mlTensor_t target, const mlTensor_t mask);
+		DLL_PUBLIC void cuda_mean_squared_gradient(mlContext_t context, float alpha, const mlTensor_t output, const mlTensor_t target,
+				const mlTensor_t mask, float beta, mlTensor_t gradient);
+		DLL_PUBLIC void cuda_cross_entropy_gradient(mlContext_t context, float alpha, const mlTensor_t output, const mlTensor_t target,
+				const mlTensor_t mask, float beta, mlTensor_t gradient);
 
-		DLL_PUBLIC void cuda_radam_optimize(mlContext_t context, mlShape_t shape, void *weight, const void *update, void *momentum, void *variance,
-				float learning_rate, float beta1, float beta2, int step, float weight_decay);
+		DLL_PUBLIC void cuda_radam_optimize(mlContext_t context, float scale, const mlTensor_t gradient, mlTensor_t weights, mlTensor_t momentum,
+				mlTensor_t variance, float learning_rate, float beta1, float beta2, int step);
+		DLL_PUBLIC int cuda_is_nan_or_inf(mlContext_t context, const mlTensor_t tensor);
+		DLL_PUBLIC void cuda_l2_regularization(mlContext_t context, mlTensor_t gradient, const mlTensor_t param, float coefficient, float offset);
 
-		DLL_PUBLIC void cuda_l2_regularization(mlContext_t context, mlShape_t shape, void *gradient, const void *param, float coefficient,
-				float offset);
+		DLL_PUBLIC void cuda_fused_radam_optimize(mlContext_t context, float scale, const mlTensor_t *gradients, mlTensor_t *weights,
+				mlTensor_t *momentums, mlTensor_t *variances, float learning_rate, float beta1, float beta2, int step, int num_tensors);
+		DLL_PUBLIC void cuda_fused_is_nan_or_inf(mlContext_t context, const mlTensor_t *tensors, int *result, int num_tensors);
+		DLL_PUBLIC void cuda_fused_l2_regularization(mlContext_t context, mlTensor_t *gradients, const mlTensor_t *params, float scale,
+				int num_tensors);
 
-		// implemented in quantized.cu
+		/*
+		 * quantization
+		 */
 		DLL_PUBLIC void cuda_dequantize(mlContext_t context, mlDataType_t dtype, const void *input, void *output, int elements, float scale,
 				float shift);
 		DLL_PUBLIC void cuda_quantized_depthwise_conv_forward(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, mlShape_t weights_shape,

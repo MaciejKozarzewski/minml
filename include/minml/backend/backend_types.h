@@ -56,9 +56,17 @@ namespace ml
 			ACTIVATION_SIGMOID,
 			ACTIVATION_TANH,
 			ACTIVATION_RELU,
-			ACTIVATION_GELU,
 			ACTIVATION_EXP
 		} mlActivationType_t;
+
+		typedef struct
+		{
+				void *data;
+				mlDataType_t dtype;
+				int rank;
+				int dim[6];
+
+		} mlTensor_t;
 
 		typedef void *mlContext_t;
 		typedef void *mlEvent_t;

@@ -31,7 +31,6 @@
 #include <minml/layers/BatchNormalization.hpp>
 #include <minml/layers/LayerNormalization.hpp>
 #include <minml/layers/LearnableGlobalPooling.hpp>
-#include <minml/layers/Gelu.hpp>
 #include <minml/layers/GlobalAveragePooling.hpp>
 #include <minml/layers/GlobalBroadcastHW.hpp>
 #include <minml/layers/GlobalPooling.hpp>
@@ -76,8 +75,6 @@ namespace ml
 				return "tanh";
 			case ActivationType::RELU:
 				return "relu";
-			case ActivationType::GELU:
-				return "gelu";
 			case ActivationType::EXP:
 				return "exp";
 			case ActivationType::SOFTMAX:
@@ -95,8 +92,6 @@ namespace ml
 		if (str == "relu")
 			return ActivationType::RELU;
 		if (str == "gelu")
-			return ActivationType::GELU;
-		if (str == "exp")
 			return ActivationType::EXP;
 		if (str == "softmax")
 			return ActivationType::SOFTMAX;
@@ -109,9 +104,13 @@ namespace ml
 	{
 	}
 
+	void Layer::setTrainable(bool b) noexcept
+	{
+		m_is_trainable = b;
+	}
 	bool Layer::isTrainable() const noexcept
 	{
-		return getWeights().isTrainable() or getBias().isTrainable();
+		return m_is_trainable;
 	}
 	bool Layer::isQuantizable() const noexcept
 	{
@@ -175,8 +174,8 @@ namespace ml
 	Json Layer::saveParameters(SerializedObject &binary_data) const
 	{
 		Json result;
-		result["weights"] = (m_weights == nullptr) ? Json::null() : m_weights->serialize(binary_data);
-		result["bias"] = (m_bias == nullptr) ? Json::null() : m_bias->serialize(binary_data);
+		result["weights"] = m_weights->serialize(binary_data);
+		result["bias"] = m_bias->serialize(binary_data);
 		result["channel_scales"] = m_channel_scales.isEmpty() ? Json::null() : m_channel_scales.serialize(binary_data);
 		return result;
 	}
@@ -296,22 +295,7 @@ namespace ml
 		m_initializer.init_weights(context(), getWeights(), 1.0f / std::sqrt(getWeightShape().volumeWithoutFirstDim()), 0.0f);
 		m_initializer.init_bias(context(), getBias(), 0.1f, 0.0f);
 	}
-	void Layer::setOptimizer(const Optimizer &optimizer)
-	{
-		getWeights().getOptimizer() = optimizer;
-		getBias().getOptimizer() = optimizer;
-	}
-	void Layer::setRegularizer(const Regularizer &regularizer)
-	{
-		getWeights().getRegularizer() = regularizer;
-		getBias().getRegularizer() = regularizer;
-	}
 
-	void Layer::learn()
-	{
-		getWeights().learn(context());
-		getBias().learn(context());
-	}
 	std::shared_ptr<Context> Layer::get_context()
 	{
 		return m_context.lock();
@@ -327,7 +311,6 @@ namespace ml
 		static const DepthToSpace depth_to_space(0, { 0, 0 });
 		static const DepthwiseConv2D depthwise_conv2d(0, 0);
 		static const FusedConvBlock fused_conv_block;
-		static const Gelu gelu;
 		static const GlobalAveragePooling global_average_pooling;
 		static const GlobalBroadcastHW global_broadcast;
 		static const GlobalPooling global_pooling;
@@ -362,8 +345,6 @@ namespace ml
 			result = depthwise_conv2d.clone(json);
 		if (name == fused_conv_block.name())
 			result = fused_conv_block.clone(json);
-		if (name == gelu.name())
-			result = gelu.clone(json);
 		if (name == global_average_pooling.name())
 			result = global_average_pooling.clone(json);
 		if (name == global_broadcast.name())

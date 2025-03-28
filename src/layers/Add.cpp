@@ -53,16 +53,20 @@ namespace ml
 		assert(input.size() == 2);
 
 		addTensors(context(), output, input[0], input[1]);
-		activationForward(context(), output, output, m_activation);
+		activationForward(context(), 1.0f, output, 0.0f, output, m_activation);
 	}
-	void Add::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next)
+	void Add::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next,
+			const std::vector<float> &beta)
 	{
 		assert(input.size() == m_input_shapes.size());
 		assert(gradient_prev.size() == m_input_shapes.size());
 
-		activationBackward(context(), gradient_next, gradient_next, output, m_activation);
+		activationBackward(context(), 1.0f, gradient_next, output, 0.0f, gradient_next, m_activation);
 		for (size_t i = 0; i < gradient_prev.size(); i++)
-			gradient_prev[i].copyFrom(context(), gradient_next);
+			if (beta[i] == 0.0f)
+				gradient_prev[i].copyFrom(context(), gradient_next);
+			else
+				addTensors(context(), 0.0f, gradient_prev[i], beta[i], gradient_prev[i], 1.0f, gradient_next);
 	}
 
 } /* namespace ml */

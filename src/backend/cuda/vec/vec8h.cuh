@@ -17,11 +17,10 @@
 #include <cassert>
 #include <cmath>
 
-namespace vectors2
+namespace vectors
 {
 	using vec8h = vec<half, 8>;
 
-#if __CUDA_ARCH__ >= FP16_MIN_ARCH
 	template<>
 	class __builtin_align__(16) vec<half, 8>
 	{
@@ -31,22 +30,22 @@ namespace vectors2
 			HOST_DEVICE vec() // @suppress("Class members should be properly initialized")
 			{
 			}
-			HOST_DEVICE vec(float f) :
+			explicit HOST_DEVICE vec(float f) :
 					vec8h(static_cast<half>(f))
 			{
 			}
-			HOST_DEVICE vec(half2 h0, half2 h1, half2 h2, half2 h3) :
+			explicit HOST_DEVICE vec(half2 h0, half2 h1, half2 h2, half2 h3) :
 					x0(h0),
 					x1(h1),
 					x2(h2),
 					x3(h3)
 			{
 			}
-			HOST_DEVICE vec(half h) :
+			explicit HOST_DEVICE vec(half h) :
 					vec8h(half2(h, h))
 			{
 			}
-			HOST_DEVICE vec(half2 h) :
+			explicit HOST_DEVICE vec(half2 h) :
 					vec8h(h, h, h, h)
 			{
 			}
@@ -72,7 +71,88 @@ namespace vectors2
 			{
 				return vec8h(bit_invert(x0), bit_invert(x1), bit_invert(x2), bit_invert(x3));
 			}
+			HOST_DEVICE int size() const
+			{
+				return 8;
+			}
+			HOST_DEVICE half operator[](int idx) const
+			{
+				assert(0 <= idx && idx < size());
+				switch (idx)
+				{
+					default:
+					case 0:
+						return x0.x;
+					case 1:
+						return x0.y;
+					case 2:
+						return x1.x;
+					case 3:
+						return x1.y;
+					case 4:
+						return x2.x;
+					case 5:
+						return x2.y;
+					case 6:
+						return x3.x;
+					case 7:
+						return x3.y;
+				}
+			}
+			HOST_DEVICE half& operator[](int idx)
+			{
+				assert(0 <= idx && idx < size());
+				switch (idx)
+				{
+					default:
+					case 0:
+						return x0.x;
+					case 1:
+						return x0.y;
+					case 2:
+						return x1.x;
+					case 3:
+						return x1.y;
+					case 4:
+						return x2.x;
+					case 5:
+						return x2.y;
+					case 6:
+						return x3.x;
+					case 7:
+						return x3.y;
+				}
+			}
 	};
+
+#if __CUDA_ARCH__ >= FP16_MIN_ARCH
+	/*
+	 * comparison operators
+	 */
+	DEVICE_INLINE vec8h operator==(const vec8h &lhs, const vec8h &rhs)
+	{
+		return vec8h(half2_compare_eq(lhs.x0, rhs.x0), half2_compare_eq(lhs.x1, rhs.x1), half2_compare_eq(lhs.x2, rhs.x2), half2_compare_eq(lhs.x3, rhs.x3));
+	}
+	DEVICE_INLINE vec8h operator!=(const vec8h &lhs, const vec8h &rhs)
+	{
+		return vec8h(half2_compare_neq(lhs.x0, rhs.x0), half2_compare_neq(lhs.x1, rhs.x1), half2_compare_neq(lhs.x2, rhs.x2), half2_compare_neq(lhs.x3, rhs.x3));
+	}
+	DEVICE_INLINE vec8h operator>(const vec8h &lhs, const vec8h &rhs)
+	{
+		return vec8h(half2_compare_gt(lhs.x0, rhs.x0), half2_compare_gt(lhs.x1, rhs.x1), half2_compare_gt(lhs.x2, rhs.x2), half2_compare_gt(lhs.x3, rhs.x3));
+	}
+	DEVICE_INLINE vec8h operator>=(const vec8h &lhs, const vec8h &rhs)
+	{
+		return vec8h(half2_compare_ge(lhs.x0, rhs.x0), half2_compare_ge(lhs.x1, rhs.x1), half2_compare_ge(lhs.x2, rhs.x2), half2_compare_ge(lhs.x3, rhs.x3));
+	}
+	DEVICE_INLINE vec8h operator<(const vec8h &lhs, const vec8h &rhs)
+	{
+		return vec8h(half2_compare_lt(lhs.x0, rhs.x0), half2_compare_lt(lhs.x1, rhs.x1), half2_compare_lt(lhs.x2, rhs.x2), half2_compare_lt(lhs.x3, rhs.x3));
+	}
+	DEVICE_INLINE vec8h operator<=(const vec8h &lhs, const vec8h &rhs)
+	{
+		return vec8h(half2_compare_le(lhs.x0, rhs.x0), half2_compare_le(lhs.x1, rhs.x1), half2_compare_le(lhs.x2, rhs.x2), half2_compare_le(lhs.x3, rhs.x3));
+	}
 
 	DEVICE_INLINE vec8h operator+(const vec8h &lhs, const vec8h &rhs)
 	{
@@ -160,10 +240,117 @@ namespace vectors2
 
 	DEVICE_INLINE vec8h select(const vec8h &cond, const vec8h &a, const vec8h &b)
 	{
-		return vec8h(half2{is_true(cond.x0.x) ? a.x0.x : b.x0.x, is_true(cond.x0.y) ? a.x0.y : b.x0.y},
-					half2{is_true(cond.x1.x) ? a.x1.x : b.x1.x, is_true(cond.x1.y) ? a.x1.y : b.x1.y},
-					half2{is_true(cond.x2.x) ? a.x2.x : b.x2.x, is_true(cond.x2.y) ? a.x2.y : b.x2.y},
-					half2{is_true(cond.x3.x) ? a.x3.x : b.x3.x, is_true(cond.x3.y) ? a.x3.y : b.x3.y});
+		return vec8h(half2_select(cond.x0, a.x0, b.x0), half2_select(cond.x1, a.x1, b.x1),
+				half2_select(cond.x2, a.x2, b.x2), half2_select(cond.x3, a.x3, b.x3));
+	}
+#else
+	DEVICE_INLINE vec8h operator==(const vec8h &lhs, const vec8h &rhs)
+	{
+		return vec8h();
+	}
+	DEVICE_INLINE vec8h operator!=(const vec8h &lhs, const vec8h &rhs)
+	{
+		return vec8h();
+	}
+	DEVICE_INLINE vec8h operator>(const vec8h &lhs, const vec8h &rhs)
+	{
+		return vec8h();
+	}
+	DEVICE_INLINE vec8h operator>=(const vec8h &lhs, const vec8h &rhs)
+	{
+		return vec8h();
+	}
+	DEVICE_INLINE vec8h operator<(const vec8h &lhs, const vec8h &rhs)
+	{
+		return vec8h();
+	}
+	DEVICE_INLINE vec8h operator<=(const vec8h &lhs, const vec8h &rhs)
+	{
+		return vec8h();
+	}
+
+	DEVICE_INLINE vec8h operator+(const vec8h &lhs, const vec8h &rhs)
+	{
+		return vec8h();
+	}
+	DEVICE_INLINE vec8h operator-(const vec8h &lhs, const vec8h &rhs)
+	{
+		return vec8h();
+	}
+	DEVICE_INLINE vec8h operator*(const vec8h &lhs, const vec8h &rhs)
+	{
+		return vec8h();
+	}
+	DEVICE_INLINE vec8h operator/(const vec8h &lhs, const vec8h &rhs)
+	{
+		return vec8h();
+	}
+
+	DEVICE_INLINE vec8h abs(vec8h a)
+	{
+		return vec8h();
+	}
+	DEVICE_INLINE vec8h max(vec8h a, vec8h b)
+	{
+		return vec8h();
+	}
+	DEVICE_INLINE vec8h min(vec8h a, vec8h b)
+	{
+		return vec8h();
+	}
+	DEVICE_INLINE vec8h ceil(vec8h a)
+	{
+		return vec8h();
+	}
+	DEVICE_INLINE vec8h floor(vec8h a)
+	{
+		return vec8h();
+	}
+	DEVICE_INLINE vec8h sqrt(vec8h a)
+	{
+		return vec8h();
+	}
+	DEVICE_INLINE vec8h exp(vec8h a)
+	{
+		return vec8h();
+	}
+	DEVICE_INLINE vec8h log(vec8h a)
+	{
+		return vec8h();
+	}
+	DEVICE_INLINE vec8h tanh(vec8h a)
+	{
+		return vec8h();
+	}
+	DEVICE_INLINE vec8h sin(vec8h a)
+	{
+		return vec8h();
+	}
+	DEVICE_INLINE vec8h cos(vec8h a)
+	{
+		return vec8h();
+	}
+	DEVICE_INLINE vec8h erf(const vec8h &a)
+	{
+		return vec8h();
+	}
+
+	DEVICE_INLINE half horizontal_add(vec8h a)
+	{
+		return half { };
+	}
+	DEVICE_INLINE half horizontal_max(vec8h a)
+	{
+		return half { };
+	}
+	DEVICE_INLINE half horizontal_min(vec8h a)
+	{
+		return half { };
+	}
+
+	DEVICE_INLINE vec8h select(const vec8h &cond, const vec8h &a, const vec8h &b)
+	{
+		return vec8h();
 	}
 #endif
 } /* namespace vectors */

@@ -12,6 +12,7 @@
 #include "../helpers/indexers.cuh"
 #include "../vec/vec_headers.cuh"
 #include "../helpers/lines_and_tiles.cuh"
+#include "../helpers/misc.cuh"
 #include <cuda_runtime_api.h>
 #include <cooperative_groups.h>
 #include <cooperative_groups/reduce.h>
@@ -24,7 +25,7 @@ namespace cg = cooperative_groups;
 
 namespace
 {
-	using namespace vectors2;
+	using namespace vectors;
 
 	struct Quantizer
 	{
@@ -45,11 +46,6 @@ namespace
 				return static_cast<int8_t>(max(-128.0f, min(127.0f, round((x - shift) / scale))));
 			}
 	};
-
-	__device__ bool is_inside(int h, int w, int height, int width)
-	{
-		return 0 <= h && h < height && 0 <= w && w < width;
-	}
 
 	template<int KernelSize, int OutputTile>
 	struct Convolution1D
@@ -264,6 +260,52 @@ namespace
 	{
 		for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < length; i += gridDim.x * blockDim.x)
 			output[i] = static_cast<T>(static_cast<float>(input[i]) * scale + shift);
+	}
+
+	__global__ void kernel_calculate_receptive_field_offsets(int *offsets, int height, int width, int channels, int kernel_height, int kernel_width,
+			bool invert)
+	{
+		const int padding_h = (kernel_height - 1) / 2;
+		const int padding_w = (kernel_width - 1) / 2;
+		const Indexer<5> offset_indexer(height, width, kernel_height, kernel_width, channels);
+		const Indexer<3> hw_indexer(height, width, channels);
+
+		for (int h = blockIdx.x; h < height; h += gridDim.x)
+			for (int w = blockIdx.y; w < width; w += gridDim.y)
+				for (int kh = threadIdx.y; kh < kernel_height; kh += blockDim.y)
+				{
+					for (int k = threadIdx.x; k < kernel_width * channels; k += blockDim.x)
+					{
+						const int c = k % channels;
+						const int kw = k / channels;
+						const int x = h - padding_h + (invert ? (kernel_height - 1 - kh) : kh);
+						const int y = w - padding_w + (invert ? (kernel_width - 1 - kw) : kw);
+						const int idx = offset_indexer.at(h, w, kh, kw, c);
+						if (is_inside(x, y, height, width))
+							offsets[idx] = hw_indexer.at(x, y, c);
+						else
+							offsets[idx] = -1;
+					}
+				}
+	}
+	template<typename T, int N>
+	__global__ void kernel_receptive_fields(const T *input, T *output, int batch_size, int height, int width, int channels, int kernel_height,
+			int kernel_width, const int *offsets)
+	{
+		const Indexer<3> offset_indexer(height, width, kernel_height * kernel_width * channels);
+		const Indexer<2> input_indexer(batch_size, height * width * channels);
+		const Indexer<4> output_indexer(batch_size, height, width, kernel_height * kernel_width * channels);
+		for (int b = blockIdx.x; b < batch_size; b += gridDim.x)
+			for (int h = blockIdx.y; h < height; h += gridDim.y)
+				for (int w = blockIdx.z; w < width; w += gridDim.z)
+				{
+					for (int k = threadIdx.x; k < kernel_height * kernel_width * channels; k += blockDim.x)
+					{
+						const int offset = offsets[offset_indexer.at(h, w, k)];
+						const vec<T, N> value = (offset == -1) ? vec<T, N>(0.0f) : vec<T, N>(input + N * input_indexer.at(b, offset));
+						value.store(output + N * output_indexer.at(b, h, w, k));
+					}
+				}
 	}
 
 	template<typename T>
@@ -554,46 +596,94 @@ namespace ml
 	void cuda_im2row(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, void *output, const void *input, int kernel_size, bool invert,
 			const void *padding)
 	{
-		const int last_dim = get_last_dim(input_shape);
+		const int batch_size = input_shape.dim[0];
+		const int height = input_shape.dim[1];
+		const int width = input_shape.dim[2];
+		const int channels = input_shape.dim[3];
 
 		cudaStream_t stream = cuda::Context::getStream(context);
-		dim3 blockSize(256);
-		dim3 gridSize(std::min(2048, (volume(input_shape) + 255) / 256));
+		dim3 blockSize(128);
+		dim3 gridSize(batch_size, height, width);
 
-		const int4 shape { input_shape.dim[0], input_shape.dim[1], input_shape.dim[2], last_dim };
+		int *workspace = ml::cuda::Context::getWorkspace<int>(context);
+		if ((dtype == DTYPE_FLOAT16 || dtype == DTYPE_FLOAT32) && (channels % 4 == 0))
+		{
+			assert(ml::cuda::Context::getWorkspaceSize(context) >= height * width * kernel_size * kernel_size * channels / 4 * sizeof(int));
+			kernel_calculate_receptive_field_offsets<<<dim3(height, width), dim3(32, kernel_size), 0, stream>>>(workspace, height, width,
+					channels / 4, kernel_size, kernel_size, invert);
+		}
+		else
+		{
+			assert(ml::cuda::Context::getWorkspaceSize(context) >= height * width * kernel_size * kernel_size * channels * sizeof(int));
+			kernel_calculate_receptive_field_offsets<<<dim3(height, width), dim3(32, kernel_size), 0, stream>>>(workspace, height, width, channels,
+					kernel_size, kernel_size, invert);
+		}
 
 		switch (dtype)
 		{
 			case DTYPE_FLOAT16:
-				kernel_receptive_fields<half> <<<gridSize, blockSize, 0, stream>>>(input, output, shape, kernel_size, invert,
-						get_padding<half>(padding));
+				if (channels % 4 == 0)
+					kernel_receptive_fields<half, 4> <<<gridSize, blockSize, 0, stream>>>(getPointer<half>(input), getPointer<half>(output),
+							batch_size, height, width, channels / 4, kernel_size, kernel_size, workspace);
+				else
+					kernel_receptive_fields<half, 1> <<<gridSize, blockSize, 0, stream>>>(getPointer<half>(input), getPointer<half>(output),
+							batch_size, height, width, channels, kernel_size, kernel_size, workspace);
 				break;
 			case DTYPE_FLOAT32:
-				kernel_receptive_fields<float> <<<gridSize, blockSize, 0, stream>>>(input, output, shape, kernel_size, invert,
-						get_padding<float>(padding));
+				if (channels % 4 == 0)
+					kernel_receptive_fields<float, 4> <<<gridSize, blockSize, 0, stream>>>(getPointer<float>(input), getPointer<float>(output),
+							batch_size, height, width, channels / 4, kernel_size, kernel_size, workspace);
+				else
+					kernel_receptive_fields<float, 1> <<<gridSize, blockSize, 0, stream>>>(getPointer<float>(input), getPointer<float>(output),
+							batch_size, height, width, channels, kernel_size, kernel_size, workspace);
 				break;
 			case DTYPE_FLOAT64:
-				kernel_receptive_fields<double> <<<gridSize, blockSize, 0, stream>>>(input, output, shape, kernel_size, invert,
-						get_padding<double>(padding));
-				break;
-			case DTYPE_UINT8:
-				kernel_receptive_fields<uint8_t> <<<gridSize, blockSize, 0, stream>>>(input, output, shape, kernel_size, invert,
-						get_padding<uint8_t>(padding));
-				break;
-			case DTYPE_INT8:
-				kernel_receptive_fields<int8_t> <<<gridSize, blockSize, 0, stream>>>(input, output, shape, kernel_size, invert,
-						get_padding<int8_t>(padding));
-				break;
-			case DTYPE_INT16:
-				kernel_receptive_fields<int16_t> <<<gridSize, blockSize, 0, stream>>>(input, output, shape, kernel_size, invert,
-						get_padding<int16_t>(padding));
-				break;
-			case DTYPE_INT32:
-				kernel_receptive_fields<int32_t> <<<gridSize, blockSize, 0, stream>>>(input, output, shape, kernel_size, invert,
-						get_padding<int32_t>(padding));
+				kernel_receptive_fields<double, 1> <<<gridSize, blockSize, 0, stream>>>(getPointer<double>(input), getPointer<double>(output),
+						batch_size, height, width, channels, kernel_size, kernel_size, workspace);
 				break;
 		}
 		assert(cudaGetLastError() == cudaSuccess);
+
+//		const int last_dim = get_last_dim(input_shape);
+//
+//		cudaStream_t stream = cuda::Context::getStream(context);
+//		dim3 blockSize(256);
+//		dim3 gridSize(std::min(2048, (volume(input_shape) + 255) / 256));
+//
+//		const int4 shape { input_shape.dim[0], input_shape.dim[1], input_shape.dim[2], last_dim };
+//
+//		switch (dtype)
+//		{
+//			case DTYPE_FLOAT16:
+//				kernel_receptive_fields<half> <<<gridSize, blockSize, 0, stream>>>(input, output, shape, kernel_size, invert,
+//						get_padding<half>(padding));
+//				break;
+//			case DTYPE_FLOAT32:
+//				kernel_receptive_fields<float> <<<gridSize, blockSize, 0, stream>>>(input, output, shape, kernel_size, invert,
+//						get_padding<float>(padding));
+//				break;
+//			case DTYPE_FLOAT64:
+//				kernel_receptive_fields<double> <<<gridSize, blockSize, 0, stream>>>(input, output, shape, kernel_size, invert,
+//						get_padding<double>(padding));
+//				break;
+//			case DTYPE_UINT8:
+//				kernel_receptive_fields<uint8_t> <<<gridSize, blockSize, 0, stream>>>(input, output, shape, kernel_size, invert,
+//						get_padding<uint8_t>(padding));
+//				break;
+//			case DTYPE_INT8:
+//				kernel_receptive_fields<int8_t> <<<gridSize, blockSize, 0, stream>>>(input, output, shape, kernel_size, invert,
+//						get_padding<int8_t>(padding));
+//				break;
+//			case DTYPE_INT16:
+//				kernel_receptive_fields<int16_t> <<<gridSize, blockSize, 0, stream>>>(input, output, shape, kernel_size, invert,
+//						get_padding<int16_t>(padding));
+//				break;
+//			case DTYPE_INT32:
+//				kernel_receptive_fields<int32_t> <<<gridSize, blockSize, 0, stream>>>(input, output, shape, kernel_size, invert,
+//						get_padding<int32_t>(padding));
+//				break;
+//		}
+//		assert(cudaGetLastError() == cudaSuccess);
 	}
 
 } /* namespace */

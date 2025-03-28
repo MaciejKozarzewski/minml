@@ -57,7 +57,8 @@ namespace ml
 	{
 		windowMerging(context(), input[0], output, { m_window_shift, m_window_shift });
 	}
-	void WindowMerging::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next)
+	void WindowMerging::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next,
+			const std::vector<float> &beta)
 	{
 		windowPartitioning(context(), gradient_next, gradient_prev[0], { m_window_shift, m_window_shift });
 	}

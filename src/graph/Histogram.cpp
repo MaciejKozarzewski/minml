@@ -158,9 +158,6 @@ namespace ml
 			case ActivationType::RELU:
 				m_min_value = 0.0;
 				break;
-			case ActivationType::GELU:
-				m_min_value = -0.2;
-				break;
 			case ActivationType::EXP:
 				m_min_value = 0.0;
 				break;

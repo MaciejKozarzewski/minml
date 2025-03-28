@@ -62,14 +62,15 @@ namespace ml
 	void Input::forward(const std::vector<Tensor> &input, Tensor &output)
 	{
 		assert(input.size() == 1);
-		activationForward(context(), output, output, m_activation);
+		activationForward(context(), 1.0f, output, 0.0f, output, m_activation);
 	}
-	void Input::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next)
+	void Input::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next,
+			const std::vector<float> &beta)
 	{
 		assert(input.size() == 1);
 		assert(gradient_prev.size() == 1);
 
-		activationBackward(context(), gradient_next, gradient_next, output, m_activation);
+		activationBackward(context(), 1.0f, gradient_next, output, 0.0f, gradient_next, m_activation);
 	}
 
 } /* namespace ml */

@@ -14,6 +14,16 @@
 #include <minml/utils/testing_util.hpp>
 #include <minml/utils/random.hpp>
 
+namespace
+{
+	using namespace ml;
+	Tensor get_statistics(Tensor &running_stats, int id)
+	{
+		const int channels = running_stats.lastDim();
+		return running_stats.view( { channels }, id * channels);
+	}
+}
+
 namespace ml
 {
 	BatchNormalization::BatchNormalization(std::string activation, bool useGamma, bool useBeta, int historySize) :
@@ -37,7 +47,7 @@ namespace ml
 	BatchNormalization& BatchNormalization::historySize(int s) noexcept
 	{
 		if (m_history_size != s)
-			m_running_stats = nullptr;
+			m_running_stats = Tensor();
 		m_history_size = s;
 		return *this;
 	}
@@ -46,8 +56,8 @@ namespace ml
 	{
 		if (shapes.size() != 1)
 			throw IllegalArgument(METHOD_NAME, "BatchNormalization layer expects single input shape");
-		if (m_running_stats == nullptr)
-			m_running_stats = std::make_unique<Tensor>(Shape( { m_history_size, 3 * shapes[0].lastDim() }), dtype(), device());
+		if (m_running_stats.isEmpty() and isTrainable())
+			m_running_stats = Tensor(Shape( { m_history_size, 3 * shapes[0].lastDim() }), dtype(), device());
 		m_input_shapes = shapes;
 	}
 	Shape BatchNormalization::getOutputShape() const
@@ -80,24 +90,20 @@ namespace ml
 	Json BatchNormalization::saveParameters(SerializedObject &binary_data) const
 	{
 		Json result = Layer::saveParameters(binary_data);
-		result["running_stats"] = (m_running_stats == nullptr) ? Json() : m_running_stats->serialize(binary_data);
+		result["running_stats"] = m_running_stats.serialize(binary_data);
 		return result;
 	}
 	void BatchNormalization::loadParameters(const Json &json, const SerializedObject &binary_data)
 	{
 		Layer::loadParameters(json, binary_data);
 		if (json.hasKey("running_stats") and not json["running_stats"].isNull())
-		{
-			m_running_stats = std::make_unique<Tensor>();
-			m_running_stats->unserialize(json["running_stats"], binary_data);
-		}
+			m_running_stats.unserialize(json["running_stats"], binary_data);
 	}
 
 	void BatchNormalization::changeContext(std::shared_ptr<Context> &context)
 	{
 		Layer::changeContext(context);
-		if (m_running_stats != nullptr)
-			m_running_stats->moveTo(device());
+		m_running_stats.moveTo(device());
 	}
 
 	std::unique_ptr<Layer> BatchNormalization::clone(const Json &config) const
@@ -143,47 +149,50 @@ namespace ml
 		else
 			beta.setall(context(), 0.0f);
 
-		m_running_stats->zeroall(context());
+		m_running_stats.zeroall(context());
 		m_total_steps = 0;
 		m_running_id = 0;
-	}
-	void BatchNormalization::setRegularizer(const Regularizer &regularizer)
-	{
-		getWeights().getRegularizer() = Regularizer(regularizer.getCoefficient(), 1.0f);
-		getBias().getRegularizer() = regularizer;
 	}
 	void BatchNormalization::forward(const std::vector<Tensor> &input, Tensor &output)
 	{
 		assert(input.size() == 1);
 
+		const int last_dim = getInputShape().lastDim();
+		Tensor weights = getWeights().getParam().view( { 2, last_dim }, { 2, 0 });
+
 		if (isTrainable())
 		{
 			if (input[0].shape().volumeWithoutLastDim() == 1)
 				throw LogicError(METHOD_NAME, "cannot calculate batch normalization on tensor of shape " + input[0].shape().toString());
-			batchnormForward(context(), input[0], output, getWeights().getParam(), *m_running_stats, m_running_id, m_activation);
+
+			Tensor stats = get_statistics(m_running_stats, m_running_id);
+			batchnormForward(context(), 1.0f, input[0], weights, 0.0f, output, stats, m_activation);
 		}
 		else
-			batchnormInference(context(), input[0], output, getWeights().getParam(), m_activation);
+		{
+			Tensor stats = getWeights().getParam().view( { 2, last_dim });
+			batchnormInference(context(), 1.0f, input[0], weights, stats, 0.0f, output, m_activation);
+		}
 	}
 	void BatchNormalization::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev,
-			Tensor &gradient_next)
+			Tensor &gradient_next, const std::vector<float> &beta)
 	{
 		assert(input.size() == 1);
 		assert(gradient_prev.size() == 1);
 
-		batchnormBackward(context(), input[0], output, gradient_prev[0], gradient_next, getWeights().getParam(), getWeights().getGradient(),
-				*m_running_stats, m_running_id, m_activation);
-	}
-	void BatchNormalization::learn()
-	{
-		Layer::learn();
+		const int last_dim = getInputShape().lastDim();
+
+		Tensor stats = get_statistics(m_running_stats, m_running_id);
+		Tensor weights = getWeights().getParam().view( { 2, last_dim }, { 2, 0 });
+		batchnormBackward(context(), 1.0f, input[0], output, gradient_next, weights, beta[0], gradient_prev[0], 0.0f, getWeights().getGradient(),
+				stats, m_activation);
 		updateStatistics();
 	}
 	void BatchNormalization::updateStatistics()
 	{
 		m_total_steps++;
 		m_running_id = (m_running_id + 1) % m_history_size;
-		batchnormUpdate(context(), *m_running_stats, std::min(m_history_size, m_total_steps), getWeights().getParam(), m_use_gamma, m_use_beta);
+		batchnormUpdate(context(), m_running_stats, std::min(m_history_size, m_total_steps), getWeights().getParam(), m_use_gamma, m_use_beta);
 	}
 
 } /* namespace ml */

@@ -67,7 +67,7 @@ namespace ml
 
 		opencl::runKernel(context, kernel, global, local);
 	}
-	void opencl_add_tensors(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *dst, float alpha1, const void *src1, float alpha2,
+	void opencl_add_tensors(mlContext_t context, mlDataType_t dtype, mlShape_t shape, float beta, void *dst, float alpha1, const void *src1, float alpha2,
 			const void *src2)
 	{
 		const int elements = volume(shape);

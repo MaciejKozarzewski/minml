@@ -50,11 +50,12 @@ namespace ml
 	}
 	void SpaceToDepth::forward(const std::vector<Tensor> &input, Tensor &output)
 	{
-		spaceToDepth(context(), input[0], output);
+		spaceToDepth(context(), input[0], output, 0.0f);
 	}
-	void SpaceToDepth::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next)
+	void SpaceToDepth::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next,
+			const std::vector<float> &beta)
 	{
-		depthToSpace(context(), gradient_next, gradient_prev[0]);
+		depthToSpace(context(), gradient_next, gradient_prev[0], beta[0]);
 	}
 
 } /* namespace ml */

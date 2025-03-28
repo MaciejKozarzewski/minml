@@ -10,7 +10,7 @@
 
 #include <minml/core/Tensor.hpp>
 
-#include <memory>
+#include <vector>
 
 namespace ml
 {
@@ -22,8 +22,8 @@ namespace ml
 	class Optimizer
 	{
 		private:
-			std::unique_ptr<Tensor> m_momentum;
-			std::unique_ptr<Tensor> m_variance;
+			Tensor m_momentum;
+			Tensor m_variance;
 
 			float m_learning_rate = 0.001f;
 			float m_beta1 = 0.9f;
@@ -32,10 +32,6 @@ namespace ml
 			float m_weight_decay = 0.0f;
 		public:
 			Optimizer(float learningRate = 0.001f, float beta1 = 0.9f, float beta2 = 0.999f, float weight_decay = 0.0f);
-			Optimizer(const Optimizer &other);
-			Optimizer(Optimizer &&other) = default;
-			Optimizer& operator=(const Optimizer &other);
-			Optimizer& operator=(Optimizer &&other) = default;
 
 			float getLearningRate() const noexcept;
 			void setLearningRate(float lr) noexcept;
@@ -43,7 +39,32 @@ namespace ml
 
 			void restart(const Context &context) noexcept;
 			void moveTo(Device newDevice);
-			void apply(const Context &context, Parameter &param);
+			void apply(const Context &context, Parameter &param, float scale);
+
+			Json serialize(SerializedObject &binary_data) const;
+			void unserialize(const Json &json, const SerializedObject &binary_data);
+	};
+
+	class RAdam
+	{
+		private:
+			std::vector<Tensor> m_momentums;
+			std::vector<Tensor> m_variances;
+
+			float m_learning_rate = 0.001f;
+			float m_beta1 = 0.9f;
+			float m_beta2 = 0.999f;
+			int m_steps = 0;
+		public:
+			RAdam(float learningRate = 0.001f, float beta1 = 0.9f, float beta2 = 0.999f);
+
+			float getLearningRate() const noexcept;
+			void setLearningRate(float lr) noexcept;
+			int getSteps() const noexcept;
+
+			void restart(const Context &context) noexcept;
+			void moveTo(Device newDevice);
+			void apply(const Context &context, std::vector<Tensor> &weights, const std::vector<Tensor> &gradients, float scale);
 
 			Json serialize(SerializedObject &binary_data) const;
 			void unserialize(const Json &json, const SerializedObject &binary_data);

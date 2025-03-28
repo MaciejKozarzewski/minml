@@ -53,14 +53,13 @@ namespace ml
 	void ChannelScaling::forward(const std::vector<Tensor> &input, Tensor &output)
 	{
 		assert(input.size() == 2);
-		channelScalingForward(context(), input[0], output, input[1]);
+		channelScalingForward(context(), 1.0f, input[0], input[1], 0.0f, output);
 	}
-	void ChannelScaling::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next)
+	void ChannelScaling::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next,
+			const std::vector<float> &beta)
 	{
 		assert(input.size() == 2);
-		gradient_prev[0].copyFrom(context(), gradient_next);
-		gradient_prev[1].zeroall(context());
-		channelScalingBackward(context(), gradient_prev[0], gradient_prev[1], gradient_next, input[0], input[1]);
+		channelScalingBackward(context(), 1.0f, gradient_next, input[0], input[1], beta[0], gradient_prev[0], beta[1], gradient_prev[1]);
 	}
 
 } /* namespace ml */

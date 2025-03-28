@@ -20,7 +20,7 @@ namespace
 {
 	using namespace ml;
 
-	void baseline_depthwise_conv2D_forward(const Tensor &input, Tensor &output, const Tensor &weight, const Tensor &bias)
+	void baseline_depthwise_conv2D_forward(const Tensor &input, Tensor &output, const Tensor &weight, const Tensor &bias, float alpha, float beta)
 	{
 		assert(input.device().isCPU());
 		assert(input.rank() == 4);
@@ -39,21 +39,25 @@ namespace
 		const int pad_h = -(kernel_height - 1) / 2;
 		const int pad_w = -(kernel_width - 1) / 2;
 
-		output.zeroall();
 		for (int b = 0; b < batch; b++)
 			for (int f = 0; f < filters; f++)
 				for (int h = 0; h < height; h++)
 					for (int w = 0; w < width; w++)
 					{
-						float tmp = bias.isEmpty() ? 0.0f : bias.get( { f });
+						float tmp = 0.0f;
 						for (int i = 0; i < kernel_height; i++)
 							for (int j = 0; j < kernel_width; j++)
 								if ((pad_h + h + i) >= 0 and (pad_h + h + i) < height and (pad_w + w + j) >= 0 and (pad_w + w + j) < width)
 									tmp += weight.get( { i, j, f }) * input.get( { b, pad_h + h + i, pad_w + w + j, f });
+						tmp *= alpha;
+						if (not bias.isEmpty())
+							tmp += bias.get( { f });
+						if (beta != 0.0f)
+							tmp += beta * (float) output.at( { b, h, w, f });
 						output.at( { b, h, w, f }) = tmp;
 					}
 	}
-	void baseline_depthwise_conv2D_backward(const Tensor &gradient_next, Tensor &gradient_prev, const Tensor &weight)
+	void baseline_depthwise_conv2D_backward(const Tensor &gradient_next, Tensor &gradient_prev, const Tensor &weight, float alpha, float beta)
 	{
 		assert(gradient_prev.device().isCPU());
 		assert(gradient_prev.rank() == 4);
@@ -72,7 +76,6 @@ namespace
 		const int pad_h = -(kernel_height - 1) / 2;
 		const int pad_w = -(kernel_width - 1) / 2;
 
-		gradient_prev.zeroall();
 		for (int b = 0; b < batch; b++)
 			for (int f = 0; f < filters; f++)
 				for (int h = 0; h < height; h++)
@@ -84,10 +87,14 @@ namespace
 								if ((pad_h + h + i) >= 0 and (pad_h + h + i) < height and (pad_w + w + j) >= 0 and (pad_w + w + j) < width)
 									tmp += weight.get( { kernel_height - 1 - i, kernel_width - 1 - j, f })
 											* gradient_next.get( { b, pad_h + h + i, pad_w + w + j, f });
+						tmp *= alpha;
+						if (beta != 0.0f)
+							tmp += beta * (float) gradient_prev.at( { b, h, w, f });
 						gradient_prev.at( { b, h, w, f }) = tmp;
 					}
 	}
-	void baseline_depthwise_conv2D_update(const Tensor &input, const Tensor &gradient_next, Tensor &weight_update, Tensor &bias_update)
+	void baseline_depthwise_conv2D_update(const Tensor &input, const Tensor &gradient_next, Tensor &weight_update, Tensor &bias_update, float alpha,
+			float beta)
 	{
 		assert(input.device().isCPU());
 		assert(input.rank() == 4);
@@ -106,30 +113,34 @@ namespace
 		const int pad_h = -(kernel_height - 1) / 2;
 		const int pad_w = -(kernel_width - 1) / 2;
 
-		weight_update.zeroall();
-		for (int b = 0; b < batch; b++)
-			for (int f = 0; f < filters; f++)
-				for (int i = 0; i < kernel_height; i++)
-					for (int j = 0; j < kernel_width; j++)
-					{
-						float tmp = weight_update.at( { i, j, f });
+		for (int f = 0; f < filters; f++)
+			for (int i = 0; i < kernel_height; i++)
+				for (int j = 0; j < kernel_width; j++)
+				{
+					float tmp = 0.0f;
+					for (int b = 0; b < batch; b++)
 						for (int h = 0; h < height; h++)
 							for (int w = 0; w < width; w++)
 								if ((pad_h + h + i) >= 0 and (pad_h + h + i) < height and (pad_w + w + j) >= 0 and (pad_w + w + j) < width)
 									tmp += input.get( { b, pad_h + h + i, pad_w + w + j, f }) * gradient_next.get( { b, h, w, f });
-						weight_update.at( { i, j, f }) = tmp;
-					}
+					tmp *= alpha;
+					if (beta != 0.0f)
+						tmp += beta * (float) weight_update.at( { i, j, f });
+					weight_update.at( { i, j, f }) = tmp;
+				}
 
 		if (not bias_update.isEmpty())
 		{
-			bias_update.zeroall();
 			for (int f = 0; f < filters; f++)
 			{
-				float tmp = bias_update.get( { f });
+				float tmp = 0.0f;
 				for (int b = 0; b < batch; b++)
 					for (int h = 0; h < height; h++)
 						for (int w = 0; w < width; w++)
 							tmp += gradient_next.get( { b, h, w, f });
+				tmp *= alpha;
+				if (beta != 0.0f)
+					tmp += beta * (float) bias_update.at( { f });
 				bias_update.at( { f }) = tmp;
 			}
 		}
@@ -193,13 +204,14 @@ namespace
 			void forward(const std::vector<Tensor> &input, Tensor &output)
 			{
 				assert(input.size() == 1);
-				baseline_depthwise_conv2D_forward(input[0], output, getWeights().getParam(), getBias().getParam());
+				baseline_depthwise_conv2D_forward(input[0], output, getWeights().getParam(), getBias().getParam(), 1.0f, 0.0f);
 			}
-			void backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next)
+			void backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next,
+					const std::vector<float> &beta)
 			{
 				assert(input.size() == 1 && gradient_prev.size() == 1);
-				baseline_depthwise_conv2D_backward(gradient_next, gradient_prev[0], getWeights().getParam());
-				baseline_depthwise_conv2D_update(input[0], gradient_next, getWeights().getGradient(), getBias().getGradient());
+				baseline_depthwise_conv2D_backward(gradient_next, gradient_prev[0], getWeights().getParam(), 1.0f, beta[0]);
+				baseline_depthwise_conv2D_update(input[0], gradient_next, getWeights().getGradient(), getBias().getGradient(), 1.0f, 0.0f);
 			}
 	};
 }
@@ -208,10 +220,10 @@ namespace ml
 {
 //	TEST(TestDepthwiseConv2D, baseline)
 //	{
-//		testing::GradientCheck gradcheck { BaselineDepthwiseConv2D(128, 7, false) };
-//		gradcheck.setInputShape(Shape( { 32, 15, 15, 128 }));
+//		testing::GradientCheck gradcheck { BaselineDepthwiseConv2D(32, 7, false) };
+//		gradcheck.setInputShape(Shape( { 3, 7, 9, 32 }));
 //
-//		gradcheck.check(100, 1.0e-2, "input", true);
+//		gradcheck.check(100, 1.0e-2, "all", true);
 //
 //		exit(0);
 //	}
@@ -292,6 +304,9 @@ namespace ml
 		const int filters = 36;
 		const int kernel = 7;
 
+		const float alpha = 1.1f;
+		const float beta = 0.1f;
+
 		Tensor input( { batch_size, height, width, filters }, "float32", Device::cpu());
 		Tensor output = zeros_like(input);
 		Tensor weights( { kernel, kernel, filters }, "float32", Device::cpu());
@@ -299,9 +314,10 @@ namespace ml
 		ml::testing::initForTest(weights, 0.0f);
 		ml::testing::initForTest(bias, 0.5f);
 		ml::testing::initForTest(input, 1.0f);
+		ml::testing::initForTest(output, 1.5f);
 
-		Tensor correct_output = zeros_like(output);
-		baseline_depthwise_conv2D_forward(input, correct_output, weights, bias);
+		Tensor correct_output = output;
+		baseline_depthwise_conv2D_forward(input, correct_output, weights, bias, alpha, beta);
 
 //		depthwiseConvForward(context, input, weights, output, bias);
 //		EXPECT_LE(ml::testing::diffForTest(correct_output, output), 1.0e-4f);
@@ -314,8 +330,9 @@ namespace ml
 			output.moveTo(device);
 			weights.moveTo(device);
 			bias.moveTo(device);
+			ml::testing::initForTest(output, 1.5f);
 
-			depthwiseConvForward(context, input, weights, output, bias);
+			depthwiseConvForward(context, alpha, input, weights, beta, output, bias);
 			context.synchronize();
 			EXPECT_LE(ml::testing::diffForTest(correct_output, output), 1.0e-4f);
 		}
@@ -330,14 +347,18 @@ namespace ml
 		const int filters = 35;
 		const int kernel = 7;
 
+		const float alpha = 1.1f;
+		const float beta = 0.1f;
+
 		Tensor gradient_prev( { batch_size, height, width, filters }, "float32", Device::cpu());
 		Tensor gradient_next = zeros_like(gradient_prev);
 		Tensor weights( { kernel, kernel, filters }, "float32", Device::cpu());
 		ml::testing::initForTest(weights, 0.0f);
 		ml::testing::initForTest(gradient_next, 1.0f);
+		ml::testing::initForTest(gradient_prev, 1.5f);
 
-		Tensor correct_gradient_prev = zeros_like(gradient_prev);
-		baseline_depthwise_conv2D_backward(gradient_next, correct_gradient_prev, weights);
+		Tensor correct_gradient_prev = gradient_prev;
+		baseline_depthwise_conv2D_backward(gradient_next, correct_gradient_prev, weights, alpha, beta);
 
 //		depthwiseConvBackward(context, gradient_next, weights, gradient_prev);
 //		EXPECT_LE(ml::testing::diffForTest(correct_gradient_prev, gradient_prev), 1.0e-4f);
@@ -349,8 +370,9 @@ namespace ml
 			gradient_next.moveTo(device);
 			gradient_prev.moveTo(device);
 			weights.moveTo(device);
+			ml::testing::initForTest(gradient_prev, 1.5f);
 
-			depthwiseConvBackward(context, gradient_next, weights, gradient_prev);
+			depthwiseConvBackward(context, alpha, gradient_next, weights, beta, gradient_prev);
 			context.synchronize();
 			EXPECT_LE(ml::testing::diffForTest(correct_gradient_prev, gradient_prev), 1.0e-4f);
 		}
@@ -365,15 +387,18 @@ namespace ml
 		const int filters = 35;
 		const int kernel = 7;
 
+		const float alpha = 1.1f;
+		const float beta = 0.1f;
+
 		Tensor input( { batch_size, height, width, filters }, "float32", Device::cpu());
 		Tensor gradient_next = zeros_like(input);
 		ml::testing::initForTest(input, 0.0f);
 		ml::testing::initForTest(gradient_next, 1.0);
 
-		Tensor correct_update( { kernel, kernel, filters }, "float32", Device::cpu());
-		Tensor update = zeros_like(correct_update);
+		Tensor correct_weights_update( { kernel, kernel, filters }, "float32", Device::cpu());
+		Tensor weights_update = zeros_like(correct_weights_update);
 		Tensor bias_update;
-		baseline_depthwise_conv2D_update(input, gradient_next, correct_update, bias_update);
+		baseline_depthwise_conv2D_update(input, gradient_next, correct_weights_update, bias_update, alpha, beta);
 
 //		depthwiseConvUpdate(context, input, gradient_next, update);
 //		EXPECT_LE(ml::testing::diffForTest(correct_update, update), 1.0e-4f);
@@ -384,12 +409,12 @@ namespace ml
 			Context context(device);
 			input.moveTo(device);
 			gradient_next.moveTo(device);
-			update.moveTo(device);
+			weights_update.moveTo(device);
 
-			depthwiseConvUpdate(context, input, gradient_next, update);
+			depthwiseConvUpdate(context, alpha, input, gradient_next, beta, weights_update);
 			context.synchronize();
 
-			EXPECT_LE(ml::testing::diffForTest(correct_update, update), 1.0e-2f);
+			EXPECT_LE(ml::testing::diffForTest(correct_weights_update, weights_update), 1.0e-2f);
 		}
 	}
 
@@ -403,6 +428,9 @@ namespace ml
 		const int filters = 36;
 		const int kernel = 7;
 
+		const float alpha = 1.1f;
+		const float beta = 0.1f;
+
 		Tensor input( { batch_size, height, width, filters }, "float16", Device::cpu());
 		Tensor output = zeros_like(input);
 		Tensor weights( { kernel, kernel, filters }, "float16", Device::cpu());
@@ -412,7 +440,7 @@ namespace ml
 		ml::testing::initForTest(input, 1.0f);
 
 		Tensor correct_output = zeros_like(output);
-		baseline_depthwise_conv2D_forward(input, correct_output, weights, bias);
+		baseline_depthwise_conv2D_forward(input, correct_output, weights, bias, alpha, beta);
 
 //		depthwiseConvForward(context, input, weights, output, bias);
 //		EXPECT_LE(ml::testing::diffForTest(correct_output, output), 1.0e-4f);
@@ -426,9 +454,86 @@ namespace ml
 			weights.moveTo(device);
 			bias.moveTo(device);
 
-			depthwiseConvForward(context, input, weights, output, bias);
+			depthwiseConvForward(context, alpha, input, weights, beta, output, bias);
 			context.synchronize();
 			EXPECT_LE(ml::testing::diffForTest(correct_output, output), 1.0e-2f);
+		}
+	}
+	TEST(TestDepthwiseConv2D, backward_fp16)
+	{
+		Context context(Device::cpu());
+
+		const int batch_size = 12;
+		const int height = 13;
+		const int width = 17;
+		const int filters = 35;
+		const int kernel = 7;
+
+		const float alpha = 1.1f;
+		const float beta = 0.1f;
+
+		Tensor gradient_prev( { batch_size, height, width, filters }, "float16", Device::cpu());
+		Tensor gradient_next = zeros_like(gradient_prev);
+		Tensor weights( { kernel, kernel, filters }, "float16", Device::cpu());
+		ml::testing::initForTest(weights, 0.0f);
+		ml::testing::initForTest(gradient_next, 1.0f);
+		ml::testing::initForTest(gradient_prev, 1.5f);
+
+		Tensor correct_gradient_prev = gradient_prev;
+		baseline_depthwise_conv2D_backward(gradient_next, correct_gradient_prev, weights, alpha, beta);
+
+		//		depthwiseConvBackward(context, gradient_next, weights, gradient_prev);
+		//		EXPECT_LE(ml::testing::diffForTest(correct_gradient_prev, gradient_prev), 1.0e-4f);
+
+		if (ml::testing::has_device_supporting(DataType::FLOAT16))
+		{
+			const Device device = ml::testing::get_device_for_test();
+			Context context(device);
+			gradient_next.moveTo(device);
+			gradient_prev.moveTo(device);
+			weights.moveTo(device);
+			ml::testing::initForTest(gradient_prev, 1.5f);
+
+			depthwiseConvBackward(context, alpha, gradient_next, weights, beta, gradient_prev);
+			context.synchronize();
+			EXPECT_LE(ml::testing::diffForTest(correct_gradient_prev, gradient_prev), 1.0e-2f);
+		}
+	}
+	TEST(TestDepthwiseConv2D, update_fp16)
+	{
+		Context context(Device::cpu());
+
+		const int batch_size = 5;
+		const int height = 11;
+		const int width = 13;
+		const int filters = 36;
+		const int kernel = 7;
+
+		const float alpha = 1.1f;
+		const float beta = 0.1f;
+
+		Tensor input( { batch_size, height, width, filters }, "float16", Device::cpu());
+		Tensor gradient_next = zeros_like(input);
+		ml::testing::initForTest(input, 0.0f, 0.1f);
+		ml::testing::initForTest(gradient_next, 1.0, 0.1f);
+
+		Tensor correct_weights_update( { kernel, kernel, filters }, "float16", Device::cpu());
+		Tensor weights_update = zeros_like(correct_weights_update);
+		Tensor bias_update;
+		baseline_depthwise_conv2D_update(input, gradient_next, correct_weights_update, bias_update, alpha, beta);
+
+		if (ml::testing::has_device_supporting(DataType::FLOAT16))
+		{
+			const Device device = ml::testing::get_device_for_test();
+			Context context(device);
+			input.moveTo(device);
+			gradient_next.moveTo(device);
+			weights_update.moveTo(device);
+
+			depthwiseConvUpdate(context, alpha, input, gradient_next, beta, weights_update);
+			context.synchronize();
+
+			EXPECT_LE(ml::testing::diffForTest(correct_weights_update, weights_update), 1.0e-2f);
 		}
 	}
 

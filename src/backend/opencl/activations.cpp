@@ -82,21 +82,6 @@ namespace ml
 				}
 				break;
 			}
-			case ACTIVATION_GELU:
-			{
-				switch (dtype)
-				{
-//					case DTYPE_FLOAT16:
-//						kernel = program_cache.getKernel(context, "relu_forward_fp16");
-//						break;
-					case DTYPE_FLOAT32:
-						kernel = program_cache.getKernel(context, "gelu_forward_fp32");
-						break;
-					default:
-						break;
-				}
-				break;
-			}
 		}
 
 		kernel.setArg(0, opencl::getMemoryObject(output).buffer());
@@ -209,6 +194,10 @@ namespace ml
 		kernel.setArg(3, volume(shape));
 
 		opencl::runKernel(context, kernel, global, local);
+	}
+	void opencl_fused_bias_and_activation_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next,
+			const void *output, void *bias_gradient, mlActivationType_t act, float beta_prev, float beta_bias)
+	{
 	}
 
 	void opencl_add_bias_act(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input, const void *bias,

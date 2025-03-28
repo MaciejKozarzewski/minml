@@ -87,7 +87,8 @@ namespace ml
 		Tensor out = output.view( { first_dim, last_dim });
 		softmaxForward(context(), out, in);
 	}
-	void Softmax::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next)
+	void Softmax::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next,
+			const std::vector<float> &beta)
 	{
 		assert(input.size() == 1);
 

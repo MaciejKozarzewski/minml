@@ -429,7 +429,7 @@ namespace ml
 		winograd_output_transform(correct, matrices, transform_matrix, 4, nullptr, nullptr, false);
 
 		Device::cpu().setNumberOfThreads(2);
-		winogradOutputTransform(Context(), weights_shape, matrices, output, bias, Tensor(), ActivationType::LINEAR);
+		winogradOutputTransform(Context(), weights_shape, matrices, output, bias, Tensor(), ActivationType::LINEAR, 0.0f);
 
 		EXPECT_LE(testing::diffForTest(correct, output), 1.0e-4f);
 	}
@@ -451,11 +451,11 @@ namespace ml
 		winograd_output_transform(correct, matrices, transform_matrix, 4, &bias, &add, true);
 
 		Device::cpu().setNumberOfThreads(1);
-		winogradOutputTransform(Context(), weights_shape, matrices, output, bias, add, ActivationType::RELU);
+		winogradOutputTransform(Context(), weights_shape, matrices, output, bias, add, ActivationType::RELU, 0.0f);
 		EXPECT_LE(testing::diffForTest(correct, output), 1.0e-4f);
 
 		Device::cpu().setNumberOfThreads(2);
-		winogradOutputTransform(Context(), weights_shape, matrices, output, bias, add, ActivationType::RELU);
+		winogradOutputTransform(Context(), weights_shape, matrices, output, bias, add, ActivationType::RELU, 0.0f);
 		EXPECT_LE(testing::diffForTest(correct, output), 1.0e-4f);
 	}
 	TEST(TestWinograd3x3_4x4, cpuWeightTransform)
@@ -550,7 +550,7 @@ namespace ml
 		winograd_output_transform(correct, matrices, transform_matrix, 5, nullptr, nullptr, false);
 
 		Device::cpu().setNumberOfThreads(2);
-		winogradOutputTransform(Context(), weights_shape, matrices, output, bias, Tensor(), ActivationType::LINEAR);
+		winogradOutputTransform(Context(), weights_shape, matrices, output, bias, Tensor(), ActivationType::LINEAR, 0.0f);
 
 		EXPECT_LE(testing::diffForTest(correct, output), 1.0e-4f);
 	}
@@ -573,11 +573,11 @@ namespace ml
 		winograd_output_transform(correct, matrices, transform_matrix, 5, &bias, &add, true);
 
 		Device::cpu().setNumberOfThreads(1);
-		winogradOutputTransform(Context(), weights_shape, matrices, output, bias, add, ActivationType::RELU);
+		winogradOutputTransform(Context(), weights_shape, matrices, output, bias, add, ActivationType::RELU, 0.0f);
 		EXPECT_LE(testing::diffForTest(correct, output), 1.0e-4f);
 
 		Device::cpu().setNumberOfThreads(2);
-		winogradOutputTransform(Context(), weights_shape, matrices, output, bias, add, ActivationType::RELU);
+		winogradOutputTransform(Context(), weights_shape, matrices, output, bias, add, ActivationType::RELU, 0.0f);
 		EXPECT_LE(testing::diffForTest(correct, output), 1.0e-4f);
 	}
 	TEST(TestWinograd3x3_5x5, cpuWeightTransform)
@@ -630,10 +630,10 @@ namespace ml
 
 		Tensor output_fp32( { 5, 7, 11, 35 }, DataType::FLOAT32, Device::cpu());
 		Tensor output_fp16(output_fp32.shape(), DataType::FLOAT16, Device::cpu());
-		winogradOutputTransform(Context(), weights_shape, matrices, output_fp32, Tensor(), Tensor(), ActivationType::LINEAR);
+		winogradOutputTransform(Context(), weights_shape, matrices, output_fp32, Tensor(), Tensor(), ActivationType::LINEAR, 0.0f);
 
 		matrices.convertTo(Context(), DataType::FLOAT16);
-		winogradOutputTransform(Context(), weights_shape, matrices, output_fp16, Tensor(), Tensor(), ActivationType::LINEAR);
+		winogradOutputTransform(Context(), weights_shape, matrices, output_fp16, Tensor(), Tensor(), ActivationType::LINEAR, 0.0f);
 
 		output_fp16.convertTo(Context(), DataType::FLOAT32);
 		EXPECT_LE(testing::diffForTest(output_fp32, output_fp16), 1.0e-3f);
@@ -688,10 +688,10 @@ namespace ml
 
 		Tensor output_fp32( { 5, 7, 11, 35 }, DataType::FLOAT32, Device::cpu());
 		Tensor output_fp16(output_fp32.shape(), DataType::FLOAT16, Device::cpu());
-		winogradOutputTransform(Context(), weights_shape, matrices, output_fp32, Tensor(), Tensor(), ActivationType::LINEAR);
+		winogradOutputTransform(Context(), weights_shape, matrices, output_fp32, Tensor(), Tensor(), ActivationType::LINEAR, 0.0f);
 
 		matrices.convertTo(Context(), DataType::FLOAT16);
-		winogradOutputTransform(Context(), weights_shape, matrices, output_fp16, Tensor(), Tensor(), ActivationType::LINEAR);
+		winogradOutputTransform(Context(), weights_shape, matrices, output_fp16, Tensor(), Tensor(), ActivationType::LINEAR, 0.0f);
 
 		output_fp16.convertTo(Context(), DataType::FLOAT32);
 		EXPECT_LE(testing::diffForTest(output_fp32, output_fp16), 1.0e-1f);
@@ -749,12 +749,12 @@ namespace ml
 		testing::initForTest(matrices, 0.0f);
 
 		Tensor output_cpu( { 5, 7, 11, 35 }, DataType::FLOAT32, Device::cpu());
-		winogradOutputTransform(Context(), weights_shape, matrices, output_cpu, Tensor(), Tensor(), ActivationType::LINEAR);
+		winogradOutputTransform(Context(), weights_shape, matrices, output_cpu, Tensor(), Tensor(), ActivationType::LINEAR, 0.0f);
 
 		matrices.moveTo(Device::cuda(0));
 		Context context(Device::cuda(0));
 		Tensor output_gpu(output_cpu.shape(), DataType::FLOAT32, Device::cuda(0));
-		winogradOutputTransform(context, weights_shape, matrices, output_gpu, Tensor(), Tensor(), ActivationType::LINEAR);
+		winogradOutputTransform(context, weights_shape, matrices, output_gpu, Tensor(), Tensor(), ActivationType::LINEAR, 0.0f);
 		context.synchronize();
 
 		EXPECT_LE(testing::diffForTest(output_cpu, output_gpu), 1.0e-4f);
@@ -846,12 +846,12 @@ namespace ml
 		testing::initForTest(matrices, 0.0f);
 
 		Tensor output_cpu( { 5, 7, 11, 35 }, DataType::FLOAT32, Device::cpu());
-		winogradOutputTransform(Context(), weights_shape, matrices, output_cpu, Tensor(), Tensor(), ActivationType::LINEAR);
+		winogradOutputTransform(Context(), weights_shape, matrices, output_cpu, Tensor(), Tensor(), ActivationType::LINEAR, 0.0f);
 
 		matrices.moveTo(Device::cuda(0));
 		Context context(Device::cuda(0));
 		Tensor output_gpu(output_cpu.shape(), DataType::FLOAT32, Device::cuda(0));
-		winogradOutputTransform(context, weights_shape, matrices, output_gpu, Tensor(), Tensor(), ActivationType::LINEAR);
+		winogradOutputTransform(context, weights_shape, matrices, output_gpu, Tensor(), Tensor(), ActivationType::LINEAR, 0.0f);
 		context.synchronize();
 
 		EXPECT_LE(testing::diffForTest(output_cpu, output_gpu), 1.0e-4f);
@@ -1004,10 +1004,10 @@ namespace ml
 
 		Tensor output_fp32( { 5, 7, 11, 35 }, DataType::FLOAT32, Device::cuda(0));
 		Tensor output_fp16(output_fp32.shape(), DataType::FLOAT16, Device::cuda(0));
-		winogradOutputTransform(context, weights_shape, matrices, output_fp32, Tensor(), Tensor(), ActivationType::LINEAR);
+		winogradOutputTransform(context, weights_shape, matrices, output_fp32, Tensor(), Tensor(), ActivationType::LINEAR, 0.0f);
 
 		matrices.convertTo(context, DataType::FLOAT16);
-		winogradOutputTransform(context, weights_shape, matrices, output_fp16, Tensor(), Tensor(), ActivationType::LINEAR);
+		winogradOutputTransform(context, weights_shape, matrices, output_fp16, Tensor(), Tensor(), ActivationType::LINEAR, 0.0f);
 
 		output_fp16.convertTo(context, DataType::FLOAT32);
 		EXPECT_LE(testing::diffForTest(output_fp32, output_fp16), 1.0e-3f);
@@ -1062,10 +1062,10 @@ namespace ml
 
 		Tensor output_fp32( { 5, 7, 11, 35 }, DataType::FLOAT32, Device::cuda(0));
 		Tensor output_fp16(output_fp32.shape(), DataType::FLOAT16, Device::cuda(0));
-		winogradOutputTransform(context, weights_shape, matrices, output_fp32, Tensor(), Tensor(), ActivationType::LINEAR);
+		winogradOutputTransform(context, weights_shape, matrices, output_fp32, Tensor(), Tensor(), ActivationType::LINEAR, 0.0f);
 
 		matrices.convertTo(context, DataType::FLOAT16);
-		winogradOutputTransform(context, weights_shape, matrices, output_fp16, Tensor(), Tensor(), ActivationType::LINEAR);
+		winogradOutputTransform(context, weights_shape, matrices, output_fp16, Tensor(), Tensor(), ActivationType::LINEAR, 0.0f);
 
 		output_fp16.convertTo(context, DataType::FLOAT32);
 		EXPECT_LE(testing::diffForTest(output_fp32, output_fp16), 2.0e-3f);
@@ -1123,12 +1123,12 @@ namespace ml
 		testing::initForTest(matrices, 0.0f);
 
 		Tensor output_cpu( { 5, 7, 11, 35 }, DataType::FLOAT32, Device::cpu());
-		winogradOutputTransform(Context(), weights_shape, matrices, output_cpu, Tensor(), Tensor(), ActivationType::LINEAR);
+		winogradOutputTransform(Context(), weights_shape, matrices, output_cpu, Tensor(), Tensor(), ActivationType::LINEAR, 0.0f);
 
 		matrices.moveTo(Device::opencl(0));
 		Context context(Device::opencl(0));
 		Tensor output_gpu(output_cpu.shape(), DataType::FLOAT32, Device::opencl(0));
-		winogradOutputTransform(context, weights_shape, matrices, output_gpu, Tensor(), Tensor(), ActivationType::LINEAR);
+		winogradOutputTransform(context, weights_shape, matrices, output_gpu, Tensor(), Tensor(), ActivationType::LINEAR, 0.0f);
 		context.synchronize();
 
 		EXPECT_LE(testing::diffForTest(output_cpu, output_gpu), 1.0e-4f);
@@ -1220,12 +1220,12 @@ namespace ml
 		testing::initForTest(matrices, 0.0f);
 
 		Tensor output_cpu( { 5, 7, 11, 35 }, DataType::FLOAT32, Device::cpu());
-		winogradOutputTransform(Context(), weights_shape, matrices, output_cpu, Tensor(), Tensor(), ActivationType::LINEAR);
+		winogradOutputTransform(Context(), weights_shape, matrices, output_cpu, Tensor(), Tensor(), ActivationType::LINEAR, 0.0f);
 
 		matrices.moveTo(Device::opencl(0));
 		Context context(Device::opencl(0));
 		Tensor output_gpu(output_cpu.shape(), DataType::FLOAT32, Device::opencl(0));
-		winogradOutputTransform(context, weights_shape, matrices, output_gpu, Tensor(), Tensor(), ActivationType::LINEAR);
+		winogradOutputTransform(context, weights_shape, matrices, output_gpu, Tensor(), Tensor(), ActivationType::LINEAR, 0.0f);
 		context.synchronize();
 
 		EXPECT_LE(testing::diffForTest(output_cpu, output_gpu), 1.0e-4f);

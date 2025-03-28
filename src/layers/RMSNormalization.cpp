@@ -67,22 +67,19 @@ namespace ml
 	{
 		getWeights().getParam().setall(1.0f);
 	}
-	void RMSNormalization::setRegularizer(const Regularizer &regularizer)
-	{
-		getWeights().getRegularizer() = Regularizer(regularizer.getCoefficient(), 1.0f);
-	}
 	void RMSNormalization::forward(const std::vector<Tensor> &input, Tensor &output)
 	{
 		assert(input.size() == 1);
 
 		rmsnormForward(context(), input[0], output, getWeights().getParam());
 	}
-	void RMSNormalization::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next)
+	void RMSNormalization::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next,
+			const std::vector<float> &beta)
 	{
 		assert(input.size() == 1);
 		assert(gradient_prev.size() == input.size());
 
-		rmsnormBackward(context(), input[0], gradient_prev[0], gradient_next, getWeights().getParam(), getWeights().getGradient());
+		rmsnormBackward(context(), input[0], gradient_prev[0], gradient_next, getWeights().getParam(), getWeights().getGradient(), beta[0]);
 	}
 
 } /* namespace ml */

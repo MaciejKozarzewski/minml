@@ -35,7 +35,6 @@ namespace ml
 		SIGMOID,
 		TANH,
 		RELU,
-		GELU,
 		EXP,
 		SOFTMAX
 	};
@@ -58,6 +57,7 @@ namespace ml
 			DataType m_dtype = DataType::FLOAT32;
 			ActivationType m_activation;
 
+			bool m_is_trainable = true;
 			bool m_is_quantizable = true;
 			int m_quantization_bits = 0;
 			std::vector<AffineTransform> m_input_transforms;
@@ -72,6 +72,7 @@ namespace ml
 			Layer& operator=(const Layer &&other) = delete;
 			virtual ~Layer() = default;
 
+			void setTrainable(bool b) noexcept;
 			bool isTrainable() const noexcept;
 			bool isQuantizable() const noexcept;
 
@@ -116,14 +117,10 @@ namespace ml
 			virtual void changeContext(std::shared_ptr<Context> &context);
 
 			virtual void init();
-			void setOptimizer(const Optimizer &optimizer);
-			void setRegularizer(const Regularizer &regularizer);
 
 			virtual void forward(const std::vector<Tensor> &input, Tensor &output) = 0;
-			virtual void backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev,
-					Tensor &gradient_next) = 0;
-
-			virtual void learn();
+			virtual void backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next,
+					const std::vector<float> &beta) = 0;
 			std::shared_ptr<Context> get_context();
 	};
 

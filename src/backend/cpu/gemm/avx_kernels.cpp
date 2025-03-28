@@ -62,6 +62,32 @@
 	vaddps(ymm3, ymm13, ymm13)\
 	vaddps(ymm4, ymm14, ymm14)\
 	vaddps(ymm5, ymm15, ymm15)
+#define SUB_KERNEL_8xFP32_8xFP32(n) \
+	vmovaps(mem(rbx, n*8*4), ymm0)\
+	vbroadcastss(mem(rax, (8*n+0)*4), ymm1)\
+	vbroadcastss(mem(rax, (8*n+1)*4), ymm2)\
+	vmulps(ymm1, ymm0, ymm1)\
+	vmulps(ymm2, ymm0, ymm2)\
+	vbroadcastss(mem(rax, (8*n+2)*4), ymm3)\
+	vbroadcastss(mem(rax, (8*n+3)*4), ymm4)\
+	vmulps(ymm3, ymm0, ymm3)\
+	vmulps(ymm4, ymm0, ymm4)\
+	vbroadcastss(mem(rax, (8*n+4)*4), ymm5)\
+	vbroadcastss(mem(rax, (8*n+5)*4), ymm6)\
+	vaddps(ymm1, ymm8, ymm8)\
+	vaddps(ymm2, ymm9, ymm9)\
+	vbroadcastss(mem(rax, (8*n+6)*4), ymm1)\
+	vbroadcastss(mem(rax, (8*n+7)*4), ymm2)\
+	vmulps(ymm5, ymm0, ymm5)\
+	vmulps(ymm6, ymm0, ymm6)\
+	vmulps(ymm1, ymm0, ymm1)\
+	vmulps(ymm2, ymm0, ymm2)\
+	vaddps(ymm3, ymm10, ymm10)\
+	vaddps(ymm4, ymm11, ymm11)\
+	vaddps(ymm5, ymm12, ymm12)\
+	vaddps(ymm6, ymm13, ymm13)\
+	vaddps(ymm1, ymm14, ymm14)\
+	vaddps(ymm2, ymm15, ymm15)
 
 #define SCALE_ACCUMULATORS_BY(reg)\
 	vmulps(reg, ymm6, ymm6) \
@@ -108,6 +134,23 @@
 	vmulps(ymm1, ymm13, ymm13) \
 	vmulps(ymm2, ymm14, ymm14) \
 	vmulps(ymm3, ymm15, ymm15)
+#define SCALE_ACCUMULATORS_8x1() \
+	vbroadcastss(mem(rax, 0*4), ymm0) \
+	vbroadcastss(mem(rax, 1*4), ymm1) \
+	vbroadcastss(mem(rax, 2*4), ymm2) \
+	vbroadcastss(mem(rax, 3*4), ymm3) \
+	vbroadcastss(mem(rax, 4*4), ymm4) \
+	vbroadcastss(mem(rax, 5*4), ymm5) \
+	vbroadcastss(mem(rax, 6*4), ymm6) \
+	vbroadcastss(mem(rax, 7*4), ymm7) \
+	vmulps(ymm0, ymm8, ymm8) \
+	vmulps(ymm1, ymm9, ymm9) \
+	vmulps(ymm2, ymm10, ymm10) \
+	vmulps(ymm3, ymm11, ymm11) \
+	vmulps(ymm4, ymm12, ymm12) \
+	vmulps(ymm5, ymm13, ymm13) \
+	vmulps(ymm6, ymm14, ymm14) \
+	vmulps(ymm7, ymm15, ymm15)
 
 #define ADD_BIAS_10x8xFP32(reg)\
 	vaddps(reg, ymm6, ymm6) \
@@ -159,6 +202,48 @@
 	vaddps(ymm4, acc3, acc3) \
 	vaddps(ymm5, acc4, acc4)
 
+#define ADD_BIAS_8x8xFP32(reg)\
+	vaddps(reg, ymm8, ymm8) \
+	vaddps(reg, ymm9, ymm9) \
+	vaddps(reg, ymm10, ymm10) \
+	vaddps(reg, ymm11, ymm11) \
+	vaddps(reg, ymm12, ymm12) \
+	vaddps(reg, ymm13, ymm13) \
+	vaddps(reg, ymm14, ymm14) \
+	vaddps(reg, ymm15, ymm15)
+
+#define LOAD_4x8xFP32()\
+	vmovups(mem(rcx), ymm1)\
+	add(r14, rcx)\
+	vmovups(mem(rcx), ymm2)\
+	add(r14, rcx)\
+	vmovups(mem(rcx), ymm3)\
+	add(r14, rcx)\
+	vmovups(mem(rcx), ymm4)\
+	add(r14, rcx)
+
+#define LOAD_4x8xFP16()\
+	vmovups(mem(rcx), xmm1)\
+	add(r14, rcx)\
+	vmovups(mem(rcx), xmm2)\
+	add(r14, rcx)\
+	vmovups(mem(rcx), xmm3)\
+	add(r14, rcx)\
+	vmovups(mem(rcx), xmm4)\
+	add(r14, rcx)
+
+#define SCALE_4x8xFP32_BY_BETA() \
+	vmulps(ymm1, ymm0, ymm1) \
+	vmulps(ymm2, ymm0, ymm2) \
+	vmulps(ymm3, ymm0, ymm3) \
+	vmulps(ymm4, ymm0, ymm4)
+
+#define ADD_4x8xFP32_TO_ACCUMULATORS(acc0, acc1, acc2, acc3) \
+	vaddps(ymm1, acc0, acc0) \
+	vaddps(ymm2, acc1, acc1) \
+	vaddps(ymm3, acc2, acc2) \
+	vaddps(ymm4, acc3, acc3)
+
 #define LOAD_ADD_16xFP16(beta, reg1, reg2, stride)\
 	vmovups(mem(rcx, 0*stride), xmm2)\
 	vmovups(mem(rcx, 1*stride), xmm3)\
@@ -180,6 +265,15 @@
 	vmovups(reg4, mem(rcx))\
 	add(r14, rcx)\
 	vmovups(reg5, mem(rcx))\
+	add(r14, rcx)
+#define STORE_4x8xFP32(reg1, reg2, reg3, reg4)\
+	vmovups(reg1, mem(rcx))\
+	add(r14, rcx)\
+	vmovups(reg2, mem(rcx))\
+	add(r14, rcx)\
+	vmovups(reg3, mem(rcx))\
+	add(r14, rcx)\
+	vmovups(reg4, mem(rcx))\
 	add(r14, rcx)
 
 #define STORE_5x8xFP16(reg0, reg1, reg2, reg3, reg4)\
@@ -483,6 +577,178 @@ namespace ml
 		label(D_IN_FP32)
 		STORE_5x8xFP32(ymm6, ymm7, ymm8, ymm9, ymm10)// D in fp32 path
 		STORE_5x8xFP32(ymm11, ymm12, ymm13, ymm14, ymm15)
+		label(END)
+
+		vzeroupper()
+
+		end_asm(
+				:// outputs
+				:// inputs
+				[A_ptr] "m"(A_ptr),
+				[B_ptr] "m"(B_ptr),
+				[C_ptr] "m"(C_ptr),
+				[D_ptr] "m"(D_ptr),
+				[k_iter] "m"(k_iter),
+				[k_left] "m"(k_left),
+				[C_stride] "m"(C_stride),
+				[D_stride] "m"(D_stride),
+				[alpha_ptr] "m"(alpha_ptr),
+				[beta_ptr] "m"(beta_ptr),
+				[flag_relu] "m"(flag_relu),
+				[bias_ptr] "m"(bias_ptr),
+				[cd_in_fp16] "m"(cd_in_fp16),
+				[scalar_alpha] "m"(scalar_alpha)
+				:// clobbers
+				"cc", "memory", "%ymm0", "%ymm1", "%ymm2", "%ymm3", "%ymm4", "%ymm5", "%ymm6", "%ymm7",
+				"%ymm8", "%ymm9", "%ymm10", "%ymm11", "%ymm12", "%ymm13", "%ymm14", "%ymm15", "%rax", "%rbx", "%rcx", "%r11", "%r14")
+	}
+	void gemm_avx_8x8(Fragment &D, const Fragment &alpha, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,
+			const Fragment &bias, bool use_relu) noexcept
+	{
+		assert(A.is_fp32());
+		assert(B.is_fp32());
+		assert(C.is_fp32() || C.is_fp16());
+		assert(D.is_fp32() || D.is_fp16());
+		assert(A.rows() == B.rows());
+		assert(A.stride() == 8);
+		assert(B.stride() == 8);
+		assert(D.rows() == A.columns());
+		assert(D.columns() == B.columns());
+
+		assert(alpha.is_packed());
+		assert(alpha.is_fp32());
+		assert(cpu::is_aligned(A.data(), 32));
+		assert(cpu::is_aligned(B.data(), 32));
+		assert(beta_ptr != nullptr);
+		if (bias.is_packed())
+		{
+			assert(cpu::is_aligned(bias.data(), 32));
+		}
+
+		const void *A_ptr = A.data();
+		const void *B_ptr = B.data();
+		const void *C_ptr = C.data();
+		void *D_ptr = D.data();
+		const void *bias_ptr = bias.is_packed() ? bias.data() : nullptr;
+		const void *alpha_ptr = alpha.data();
+
+		const int K = A.rows();
+		uint64_t k_iter = K / 4;
+		uint64_t k_left = K % 4;
+		const uint64_t C_stride = C.stride_in_bytes();
+		const uint64_t D_stride = D.stride_in_bytes();
+		const uint64_t flag_relu = use_relu;
+		const uint64_t cd_in_fp16 = C.is_fp16() | (D.is_fp16() << 1);
+		const uint64_t scalar_alpha = alpha.rows() == 1;
+
+		begin_asm()
+		movq(var(A_ptr), rax) // lhs pointer is in rax
+		movq(var(B_ptr), rbx)// rhs pointer is in rbx
+		ZERO_ACCUMULATORS()
+
+		movq(var(k_iter), r14)// load the number of 4-unrolled iterations
+		test(r14, r14)
+		je(FINALLOOP)
+
+		label(UNROLLED_x4)
+		SUB_KERNEL_8xFP32_8xFP32(0)
+		SUB_KERNEL_8xFP32_8xFP32(1)
+		SUB_KERNEL_8xFP32_8xFP32(2)
+		SUB_KERNEL_8xFP32_8xFP32(3)
+
+		add(imm(4*8*4), rax)
+		add(imm(4*8*4), rbx)
+		dec(r14)
+		jne(UNROLLED_x4)
+
+		label(FINALLOOP)
+		movq(var(k_left), r14)// load the number of 1-unrolled iterations
+		test(r14, r14)
+		je(EPILOGUE)
+
+		label(UNROLLED_x1)
+		SUB_KERNEL_8xFP32_8xFP32(0)
+		add(imm(1*8*4), rax)
+		add(imm(1*8*4), rbx)
+		dec(r14)
+		jne(UNROLLED_x1)
+
+		label(EPILOGUE)
+
+		movq(var(alpha_ptr), rax)// load address of alpha
+		movq(var(scalar_alpha), r14)
+		test(r14, r14)
+		je(COLUMN_ALPHA)
+//		SCALE_ACCUMULATORS_1x1()
+		jmp(AFTER_ALPHA_SCALING)
+
+		label(COLUMN_ALPHA)
+		SCALE_ACCUMULATORS_8x1()
+		label(AFTER_ALPHA_SCALING)
+
+		// load address of bias pointer
+		movq(var(bias_ptr), rax)
+		test(rax, rax)
+		je(AFTER_BIAS)
+		vmovaps(mem(rax), ymm2)// load bias
+		ADD_BIAS_10x8xFP32(ymm2)
+		label(AFTER_BIAS)
+
+		movq(var(beta_ptr), rbx)// load address of beta
+		vbroadcastss(mem(rbx), ymm0)
+		vxorps(ymm1, ymm1, ymm1)
+		vucomiss(xmm0, xmm1)// set ZF if beta == 0.
+		je(AFTER_LOAD_C)// if not loading C, jump to ReLU
+
+		movq(var(C_stride), r14)// C stride is r14
+		movq(var(C_ptr), rcx)// C pointer is in rcx
+
+		movq(var(cd_in_fp16), r11)// load fp16 flags
+		and_(imm(0x1), r11)// if set
+		test(r11, r11)
+		je(C_IN_FP32)
+
+		LOAD_5x8xFP16()// C in fp16 path
+		CONVERT_5x8xFP16_TO_5x8xFP32()
+		SCALE_5x8xFP32_BY_BETA()
+		ADD_5x8xFP32_TO_ACCUMULATORS(ymm6, ymm7, ymm8, ymm9, ymm10)
+		LOAD_5x8xFP16()
+		CONVERT_5x8xFP16_TO_5x8xFP32()
+		SCALE_5x8xFP32_BY_BETA()
+		ADD_5x8xFP32_TO_ACCUMULATORS(ymm11, ymm12, ymm13, ymm14, ymm15)
+		jmp(AFTER_LOAD_C)
+
+		label(C_IN_FP32)
+//		LOAD_4x8xFP32()
+//		SCALE_4x8xFP32_BY_BETA()
+//		ADD_4x8xFP32_TO_ACCUMULATORS(ymm8, ymm9, ymm10, ymm1)
+//		LOAD_4x8xFP32()
+//		SCALE_4x8xFP32_BY_BETA()
+//		ADD_4x8xFP32_TO_ACCUMULATORS(ymm12, ymm13, ymm14, ymm15)
+		label(AFTER_LOAD_C)
+
+		movq(var(flag_relu), r14)// load flag if to use relu
+		test(r14, r14)
+		je(AFTER_RELU)
+		RELU_10x8xFP32()
+		label(AFTER_RELU)
+
+		movq(var(D_stride), r14)// D stride is r14
+		movq(var(D_ptr), rcx)// D pointer is in rcx
+
+		movq(var(cd_in_fp16), r11)// load fp16 flags
+		and_(imm(0x2), r11)// if set
+		test(r11, r11)
+		je(D_IN_FP32)
+
+		CONVERT_ACCUMULATORS_TO_FP16()// D in fp16 path
+		STORE_5x8xFP16(xmm6, xmm7, xmm8, xmm9, xmm10)
+		STORE_5x8xFP16(xmm11, xmm12, xmm13, xmm14, xmm15)
+		jmp(END)
+
+		label(D_IN_FP32)
+		STORE_4x8xFP32(ymm8, ymm9, ymm10, ymm11)// D in fp32 path
+		STORE_4x8xFP32(ymm12, ymm13, ymm14, ymm15)
 		label(END)
 
 		vzeroupper()

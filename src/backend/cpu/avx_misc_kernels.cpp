@@ -133,9 +133,6 @@ namespace
 				for (size_t i = 0; i < elements; i++)
 					dst_ptr[i] = convert_to<T>(relu(convert_to<float>(src_ptr[i])));
 				break;
-			case ml::ACTIVATION_GELU:
-				for (size_t i = 0; i < elements; i++)
-					dst_ptr[i] = convert_to<T>(approx_gelu(convert_to<float>(src_ptr[i])));
 				break;
 			case ml::ACTIVATION_EXP:
 				for (size_t i = 0; i < elements; i++)
@@ -171,9 +168,6 @@ namespace
 						break;
 					case ml::ACTIVATION_RELU:
 						tmp = relu(tmp);
-						break;
-					case ml::ACTIVATION_GELU:
-						tmp = approx_gelu(tmp);
 						break;
 					case ml::ACTIVATION_EXP:
 						tmp = std::exp(tmp);
@@ -644,9 +638,6 @@ namespace ml
 					break;
 				case ACTIVATION_RELU:
 					kernel_add_bias_act<float16, ACTIVATION_RELU>(output, input, bias, first_dim, last_dim);
-					break;
-				case ACTIVATION_GELU:
-					kernel_add_bias_act<float16, ACTIVATION_GELU>(output, input, bias, first_dim, last_dim);
 					break;
 				case ACTIVATION_EXP:
 					kernel_add_bias_act<float16, ACTIVATION_EXP>(output, input, bias, first_dim, last_dim);

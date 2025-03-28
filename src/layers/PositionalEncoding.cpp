@@ -72,17 +72,17 @@ namespace ml
 		const Tensor flattened_input = convert_to_2D(input[0]);
 		const Tensor flattened_bias = flatten(getBias().getParam());
 		Tensor flattened_output = convert_to_2D(output);
-		addBiasAct(context(), flattened_output, flattened_input, flattened_bias, ActivationType::LINEAR);
+//		addBiasAct(context(), flattened_output, flattened_input, flattened_bias, ActivationType::LINEAR);
 	}
 	void PositionalEncoding::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev,
-			Tensor &gradient_next)
+			Tensor &gradient_next, const std::vector<float> &beta)
 	{
 		assert(input.size() == 1);
 		assert(gradient_prev.size() == 1);
 
 		Tensor flattened_gradient_next = convert_to_2D(gradient_next);
 		Tensor flattened_gradient_bias = flatten(getBias().getGradient());
-		sumOverFirstDim(context(), flattened_gradient_bias, flattened_gradient_next, 0);
+		sumOverFirstDim(context(), 1.0f, flattened_gradient_next, 0.0f, flattened_gradient_bias);
 		gradient_prev[0].copyFrom(context(), gradient_next);
 	}
 

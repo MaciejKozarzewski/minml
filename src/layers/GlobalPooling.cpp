@@ -53,10 +53,11 @@ namespace ml
 		assert(input.size() == 1);
 		globalAvgAndMaxPoolingForward(context(), input[0], output);
 	}
-	void GlobalPooling::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next)
+	void GlobalPooling::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next,
+			const std::vector<float> &beta)
 	{
 		assert(input.size() == 1);
-		globalAvgAndMaxPoolingBackward(context(), gradient_prev[0], gradient_next, input[0], output);
+		globalAvgAndMaxPoolingBackward(context(), gradient_prev[0], gradient_next, input[0], output, beta[0]);
 	}
 
 } /* namespace ml */

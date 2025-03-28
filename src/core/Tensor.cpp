@@ -490,7 +490,7 @@ namespace ml
 	}
 	size_t Tensor::sizeInBytes() const noexcept
 	{
-		return sizeOf(dtype()) * volume();
+		return sizeOf(dtype()) * static_cast<size_t>(volume());
 	}
 
 	bool Tensor::isOwning() const noexcept
@@ -708,13 +708,17 @@ namespace ml
 	{
 		return view(shape(), 0);
 	}
+	Tensor Tensor::view(const Shape &shape) const
+	{
+		return view(shape, 0);
+	}
 	Tensor Tensor::view(const Shape &shape, size_t offsetInElements) const
 	{
 		if (offsetInElements + shape.volume() > static_cast<size_t>(this->volume()))
-			throw ShapeMismatch(METHOD_NAME, "view would extend beyond the original tensor");
+			throw ShapeMismatch(METHOD_NAME, "view cannot extend beyond the original tensor");
 
 		void *tmp = ml::create_view(device(), const_cast<void*>(data()), sizeOf(dtype()) * offsetInElements, sizeOf(dtype()) * shape.volume());
-		if (tmp == nullptr)
+		if (tmp == nullptr and not isEmpty())
 			throw LogicError(METHOD_NAME, "could not create tensor view");
 
 		Tensor result;
@@ -726,6 +730,10 @@ namespace ml
 		result.m_is_page_locked = isPageLocked();
 		result.create_stride();
 		return result;
+	}
+	Tensor Tensor::view(const Shape &shape, std::initializer_list<int> position) const
+	{
+		return view(shape, get_index(position.begin(), position.size()));
 	}
 
 	const void* Tensor::data() const noexcept

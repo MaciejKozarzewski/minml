@@ -20,7 +20,7 @@
 
 #include <cassert>
 
-namespace vectors2
+namespace vectors
 {
 
 	/*

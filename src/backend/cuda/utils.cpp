@@ -147,6 +147,17 @@ namespace ml
 			else
 				return get(context)->m_allows_tf32;
 		}
+		void* Context::getCpuWorkspace(mlContext_t context)
+		{
+			if (context == nullptr)
+				return nullptr;
+			else
+			{
+				if (get(context)->m_cpu_workspace == nullptr)
+					get(context)->m_cpu_workspace = std::make_unique<uint8_t[]>(8 * 1024 * 1024);
+				return get(context)->m_cpu_workspace.get();
+			}
+		}
 #ifdef USE_CUDNN
 		cudnnHandle_t Context::getCudnnHandle(mlContext_t context)
 		{

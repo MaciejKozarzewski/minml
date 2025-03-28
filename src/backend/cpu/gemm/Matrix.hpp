@@ -108,8 +108,8 @@ namespace ml
 			 */
 			int index_at(int row, int column) const noexcept
 			{
-				assert((stride() == 0) or (0 <= row && row < rows()));
-				assert(0 <= column && column < columns());
+				assert((stride() == 0) or (0 <= row and row < rows()));
+				assert(0 <= column and column < columns());
 				return row * stride() + column;
 			}
 			/*
@@ -209,8 +209,8 @@ namespace ml
 			 */
 			int index_at(int batch, int row, int column) const noexcept
 			{
-				assert((stride() == 0) or (0 <= row && row < rows()));
-				assert(0 <= column && column < columns());
+				assert((stride() == 0) or (0 <= row and row < rows()));
+				assert(0 <= column and column < columns());
 				return batch * rows() * stride() + row * stride() + column;
 			}
 			/*

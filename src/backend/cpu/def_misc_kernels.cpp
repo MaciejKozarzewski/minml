@@ -63,14 +63,12 @@ namespace
 				return std::tanh(x);
 			case ml::ACTIVATION_RELU:
 				return relu(x);
-			case ml::ACTIVATION_GELU:
-				return approx_gelu(x);
 			case ml::ACTIVATION_EXP:
 				return std::exp(x);
 		}
 	}
 	template<int ACT, typename T>
-	T activation_backward(T gradient, T input, T output) noexcept
+	T activation_backward(T gradient, T output) noexcept
 	{
 		switch (ACT)
 		{
@@ -83,11 +81,6 @@ namespace
 				return gradient * (1.0f - square(output));
 			case ml::ACTIVATION_RELU:
 				return (output > 0.0f) ? gradient : 0.0f;
-			case ml::ACTIVATION_GELU:
-			{
-				const T tmp = sigmoid(1.6849f * input);
-				return tmp + 1.6849f * input * tmp * (1.0f - tmp);
-			}
 			case ml::ACTIVATION_EXP:
 				return gradient * output;
 		}
@@ -177,10 +170,6 @@ namespace
 			case ml::ACTIVATION_RELU:
 				for (size_t i = 0; i < elements; i++)
 					dst_ptr[i] = convert<float, T>(activation_forward<ml::ACTIVATION_RELU>(convert<T, float>(src_ptr[i])));
-				break;
-			case ml::ACTIVATION_GELU:
-				for (size_t i = 0; i < elements; i++)
-					dst_ptr[i] = convert<float, T>(activation_forward<ml::ACTIVATION_GELU>(convert<T, float>(src_ptr[i])));
 				break;
 			case ml::ACTIVATION_EXP:
 				for (size_t i = 0; i < elements; i++)
@@ -314,12 +303,6 @@ namespace ml
 					for (size_t i = 0; i < elements; i++)
 						prev_ptr[i] = (out_ptr[i] == 0.0f) ? 0.0f : next_ptr[i];
 					break;
-				case ACTIVATION_GELU:
-					for (size_t i = 0; i < elements; i++)
-					{
-						const float tmp = sigmoid(1.6849f * in_ptr[i]);
-						prev_ptr[i] = next_ptr[i] * (tmp + 1.6849f * in_ptr[i] * tmp * (1.0f - tmp));
-					}
 					break;
 				case ACTIVATION_EXP:
 					for (size_t i = 0; i < elements; i++)
@@ -346,9 +329,6 @@ namespace ml
 					break;
 				case ACTIVATION_RELU:
 					kernel_add_bias_act<float, ACTIVATION_RELU>(output, input, bias, first_dim, last_dim);
-					break;
-				case ACTIVATION_GELU:
-					kernel_add_bias_act<float, ACTIVATION_GELU>(output, input, bias, first_dim, last_dim);
 					break;
 				case ACTIVATION_EXP:
 					kernel_add_bias_act<float, ACTIVATION_EXP>(output, input, bias, first_dim, last_dim);

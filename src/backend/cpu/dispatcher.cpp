@@ -386,9 +386,70 @@ namespace ml
 	void cpu_activation_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next, const void *output,
 			mlActivationType_t act)
 	{
-		assert(act != ACTIVATION_GELU);
 		cpu::def_kernel_activation_backward_fp32(gradient_prev, gradient_next, nullptr, output, volume(shape), act);
 	}
+	void cpu_fused_bias_and_activation_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, void *gradient_next, const void *output,
+			void *bias_gradient, mlActivationType_t act, float beta_prev, float beta_bias)
+	{
+		const int first_dim = volume_without_last_dim(shape);
+		const int last_dim = get_last_dim(shape);
+
+		assert(cpu::Context::getWorkspaceSize(context) >= last_dim * sizeof(float));
+
+		float *tmp_ptr = cpu::Context::getWorkspace<float>(context);
+		float *prev_ptr = getPointer<float>(gradient_prev);
+		float *next_ptr = getPointer<float>(gradient_next);
+		const float *output_ptr = getPointer<float>(output);
+		float *bias_gradient_ptr = getPointer<float>(bias_gradient);
+
+		for (int j = 0; j < last_dim; j++)
+			tmp_ptr[j] = 0.0f;
+
+		for (int i = 0; i < first_dim; i++)
+		{
+			switch (act)
+			{
+				case ACTIVATION_SIGMOID:
+					for (int j = 0; j < last_dim; j++)
+						next_ptr[i] *= output_ptr[j] * (1.0f - output_ptr[j]);
+					break;
+				case ACTIVATION_TANH:
+					for (int j = 0; j < last_dim; j++)
+						next_ptr[i] *= (1.0f + output_ptr[j]) * (1.0f - output_ptr[j]);
+					break;
+				case ACTIVATION_RELU:
+					for (int j = 0; j < last_dim; j++)
+						next_ptr[i] = (output_ptr[j] == 0.0f) ? 0.0f : next_ptr[j];
+					break;
+				case ACTIVATION_EXP:
+					for (int j = 0; j < last_dim; j++)
+						next_ptr[i] *= output_ptr[j];
+					break;
+				default:
+					break;
+			}
+			for (int j = 0; j < last_dim; j++)
+				tmp_ptr[j] += next_ptr[i * last_dim + j];
+
+			if (prev_ptr != nullptr)
+			{
+				if (beta_prev != 0.0f)
+					for (int j = 0; j < last_dim; j++)
+						prev_ptr[j] = next_ptr[i * last_dim + j];
+				else
+					for (int j = 0; j < last_dim; j++)
+						prev_ptr[j] = beta_prev * prev_ptr[j] + next_ptr[i * last_dim + j];
+			}
+		}
+
+		if (beta_bias == 0.0f)
+			for (int j = 0; j < last_dim; j++)
+				bias_gradient_ptr[j] = tmp_ptr[j];
+		else
+			for (int j = 0; j < last_dim; j++)
+				bias_gradient_ptr[j] = bias_gradient_ptr[j] * beta_bias + tmp_ptr[j];
+	}
+
 	void cpu_softmax_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input)
 	{
 		const int first_dim = get_first_dim(shape);
@@ -419,10 +480,6 @@ namespace ml
 			default:
 				break;
 		}
-	}
-	void cpu_gelu_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next, const void *input)
-	{
-		cpu::def_kernel_activation_backward_fp32(gradient_prev, gradient_next, input, nullptr, volume(shape), ACTIVATION_GELU);
 	}
 } /* namespace avocado */
 

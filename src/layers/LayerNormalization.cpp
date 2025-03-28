@@ -77,11 +77,6 @@ namespace ml
 		getWeights().getParam().setall(1.0f);
 		getBias().getParam().setall(0.0f);
 	}
-	void LayerNormalization::setRegularizer(const Regularizer &regularizer)
-	{
-		getWeights().getRegularizer() = Regularizer(regularizer.getCoefficient(), 1.0f);
-		getBias().getRegularizer() = regularizer;
-	}
 	void LayerNormalization::forward(const std::vector<Tensor> &input, Tensor &output)
 	{
 		assert(input.size() <= 2);
@@ -93,13 +88,13 @@ namespace ml
 		layernormForward(context(), input[0], output, getWeights().getParam(), getBias().getParam(), ext);
 	}
 	void LayerNormalization::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev,
-			Tensor &gradient_next)
+			Tensor &gradient_next, const std::vector<float> &beta)
 	{
 		assert(input.size() == 1);
 		assert(gradient_prev.size() == input.size());
 
 		layernormBackward(context(), input[0], gradient_prev[0], gradient_next, getWeights().getParam(), getWeights().getGradient(),
-				getBias().getGradient());
+				getBias().getGradient(), beta[0]);
 	}
 
 } /* namespace ml */

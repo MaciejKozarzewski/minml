@@ -16,8 +16,9 @@
 #include <minml/layers/DepthwiseConv2D.hpp>
 #include <minml/layers/Conv2D.hpp>
 #include <minml/layers/BatchNormalization.hpp>
-#include <minml/layers/Gelu.hpp>
 #include <minml/layers/GlobalBroadcastHW.hpp>
+#include <minml/layers/GlobalAveragePooling.hpp>
+#include <minml/layers/ChannelScaling.hpp>
 #include <minml/layers/GlobalPooling.hpp>
 #include <minml/layers/Add.hpp>
 #include <minml/layers/Softmax.hpp>
@@ -30,6 +31,7 @@
 #include <minml/layers/SpaceToDepth.hpp>
 #include <minml/training/Optimizer.hpp>
 #include <minml/training/LossFunction.hpp>
+#include <minml/training/Trainer.hpp>
 #include <minml/utils/random.hpp>
 #include <minml/utils/time_util.hpp>
 #include <minml/utils/file_util.hpp>
@@ -539,7 +541,7 @@ void test_mnist()
 //	x = model.add(LayerNormalization().useGamma(false), x);
 	x = model.add(Dense(10, "linear"), x);
 	x = model.add(Softmax( { 1 }), x);
-	model.addOutput(x);
+	model.addOutput(x, CrossEntropyLoss());
 
 //	const int embedding = 512;
 //
@@ -567,7 +569,6 @@ void test_mnist()
 
 	const float learning_rate = 1.0e-3f;
 	model.init();
-	model.setOptimizer(Optimizer(learning_rate));
 //	model.setRegularizer(Regularizer(1.0e-4f));
 //	model.moveTo(Device::cpu());
 	model.moveTo(Device::cuda(0));
@@ -600,19 +601,18 @@ void test_mnist()
 	const int steps = 1000;
 	for (int e = 0; e < 150; e++)
 	{
-		if (e == 100)
-			model.setLearningRate(learning_rate / 10.0f);
+//		if (e == 100)
+//			model.setLearningRate(learning_rate / 10.0f);
 		double loss = 0.0;
 		double acc = 0.0;
 		for (int s = 0; s < steps; s++)
 		{
-			dataset.packSamples(model.getInput(), model.getTarget());
-			model.forward(batch_size);
-			model.backward(batch_size);
-			model.learn();
+//			dataset.packSamples(model.getInput(), model.getTarget());
+			model.train(batch_size);
+//			model.learn();
 			model.context().synchronize();
-			loss += model.getLoss(batch_size).at(0);
-			acc += get_accuracy(model.getOutput(), model.getTarget());
+//			loss += model.getLoss(batch_size).at(0);
+//			acc += get_accuracy(model.getOutput(), model.getTarget());
 			if (loss != loss)
 				break;
 		}
@@ -633,7 +633,7 @@ void test_mnist()
 		fs.save(json, so, 2);
 	}
 	return;
-	model.makeNonTrainable();
+	model.makeTrainable(false);
 	{
 		SerializedObject so;
 		Json json = model.save(so);
@@ -642,10 +642,10 @@ void test_mnist()
 	}
 	return;
 
-	dataset.packSamples(model.getInput(), model.getTarget(), 0);
+//	dataset.packSamples(model.getInput(), model.getTarget(), 0);
 	model.getOutput().zeroall(model.context());
 	model.print();
-	model.forward(1);
+	model.predict(1);
 	model.context().synchronize();
 
 	std::cout << "output = ";
@@ -678,9 +678,9 @@ void test_mnist()
 	std::cout << "changed anything = " << result << '\n';
 	model.print();
 
-	dataset.packSamples(model.getInput(), model.getTarget(), 0);
+//	dataset.packSamples(model.getInput(), model.getTarget(), 0);
 	model.getOutput().zeroall(model.context());
-	model.forward(1);
+	model.predict(1);
 	model.context().synchronize();
 
 	std::cout << "output = ";
@@ -705,7 +705,7 @@ void test_mnist()
 	model.convertTo(DataType::FLOAT16);
 	model.print();
 
-	dataset.packSamples(model.getInput(), model.getTarget(), 0);
+//	dataset.packSamples(model.getInput(), model.getTarget(), 0);
 //	for (int i = 0; i < 28; i++)
 //	{
 //		for (int j = 0; j < 28; j++)
@@ -714,7 +714,7 @@ void test_mnist()
 //	}
 //	printf("----------------------------------------\n");
 	model.getOutput().zeroall(model.context());
-	model.forward(1);
+	model.predict(1);
 	model.context().synchronize();
 
 	std::cout << "output = ";
@@ -722,8 +722,8 @@ void test_mnist()
 		std::cout << model.getOutput().get( { 0, j }) << ' ';
 	std::cout << '\n';
 	std::cout << "target = ";
-	for (int j = 0; j < 10; j++)
-		std::cout << model.getTarget().get( { 0, j }) << ' ';
+//	for (int j = 0; j < 10; j++)
+//		std::cout << model.getTarget().get( { 0, j }) << ' ';
 	std::cout << '\n' << '\n';
 }
 
@@ -3289,6 +3289,26 @@ int main()
 {
 	std::cout << "BEGIN" << std::endl;
 	std::cout << ml::Device::hardwareInfo();
+
+//	{
+//		Context context(Device::cpu());
+//
+//		Tensor A( { 8, 225, 128 }, "float32", context.device());
+//		Tensor B( { 225, 8 }, "float32", context.device());
+//		Tensor C( { 8, 8, 128 }, "float32", context.device());
+//
+//		const double t0 = getTime();
+//		const int repeats = 10000;
+//		for (int i = 0; i < repeats; i++)
+//			ml::gemmBatched(context, 't', 'n', C, A, B, 1, 0);
+//		const double t1 = getTime();
+//		std::cout << (t1 - t0) / repeats * 1e6 << "us\n";
+//		std::cout << (double) repeats * A.volume() * B.dim(1) / (t1 - t0) / 1e9 << " GFLOPS\n";
+//		context.synchronize();
+//		std::cout << "END" << std::endl;
+//		return 0;
+//	}
+
 //	{
 //		Tensor input( { 100, 15, 15, 100 }, "float32", Device::cpu());
 //		for (int i = 0; i < input.dim(1); i++)
@@ -3409,19 +3429,20 @@ int main()
 //		for (int i = 1; i <= 512; i *= 2)
 //			test_microkernel(12, 8, i, dtype, gemm_avx2_12x8);
 
-		std::cout << "fp32 kernel\n";
-		for (int i = 1; i <= 512; i *= 2)
-			test_microkernel(12, 8, i, dtype, gemm_avx2_12x8);
+//		std::cout << "fp32 kernel\n";
+//		for (int i = 1; i <= 512; i *= 2)
+//			test_microkernel(12, 8, i, dtype, gemm_avx2_12x8);
 
-		std::cout << "int8 kernel\n";
-		for (int i = 1; i <= 512; i *= 2)
-			test_microkernel(12, 8, i, dtype, intgemm_avx2_12x8);
+//		std::cout << "int8 kernel\n";
+//		for (int i = 1; i <= 512; i *= 2)
+//			test_microkernel(12, 8, i, dtype, intgemm_avx2_12x8);
+//		return 0;
 
 //		test_depthwise_conv_kernel_v2(6, 8, dtype, depthwise_conv_avx2_6x8_v2);
 //		test_depthwise_conv_kernel(12, 8, 49, dtype, depthwise_conv_avx2_12x8);
 //		for (int i = 1; i <= 512; i *= 2)
 //			test_depthwise_conv_kernel(12, 8, i, dtype, depthwise_conv_avx2_12x8);
-		return 0;
+//		return 0;
 
 //		int32_t center = 0;
 //		int32_t range = 0;
@@ -3510,218 +3531,280 @@ int main()
 	{
 		Graph graph;
 		const bool symmetric = false;
-		const int batch_size = 256;
-		const int board_size = 15;
-		int embedding = 256;
+		const int batch_size = 1024;
+		const int board_size = 20;
+		int embedding = 128;
 		const int patch_size = 1;
 		const int head_dim = 32;
 		const int pos_encoding_range = (board_size + patch_size - 1) / patch_size;
 
 		auto x = graph.addInput( { batch_size, board_size, board_size, 8 });
-		x = graph.add(Conv2D(embedding / (patch_size * patch_size), 3, "relu"), x);
-//		x = graph.add(Conv2D(embedding / (patch_size * patch_size), 5).useBias(false), x);
-//		x = graph.add(BatchNormalization("relu").useGamma(false), x);
-//		x = graph.add(ml::SpaceToDepth(patch_size), x);
+		x = graph.add(ml::Conv2D(embedding, 5).useBias(false), x);
+		x = graph.add(ml::BatchNormalization("relu").useGamma(false), x);
 
-//		const int size_2 = (board_size + 1) / 2;
-//
-//		x = graph.add(ml::Conv2D(embedding, 3, "relu"), x);
-//		x = graph.add(ml::Conv2D(embedding, 3, "relu"), x);
-//		auto level0 = graph.add(ml::Conv2D(embedding, 3, "relu"), x);
-//		x = graph.add(ml::SpaceToDepth(2), level0);
-//
-//		x = graph.add(ml::Conv2D(embedding * 2, 3, "relu"), x);
-//		x = graph.add(ml::Conv2D(embedding * 2, 3, "relu"), x);
-//		auto level1 = graph.add(ml::Conv2D(embedding * 2, 3, "relu"), x);
-//		x = graph.add(ml::SpaceToDepth(2), level1);
-//
-//		x = graph.add(ml::Conv2D(embedding * 4, 3, "relu"), x);
-//		x = graph.add(ml::Conv2D(embedding * 4, 3, "relu"), x);
-//		x = graph.add(ml::Conv2D(embedding * 4, 3, "relu"), x);
-//		x = graph.add(ml::Conv2D(embedding * 4, 3, "relu"), x);
-//
-//		x = graph.add(ml::DepthToSpace(2, { size_2, size_2 }), x);
-//		x = graph.add(ml::Conv2D(embedding * 2, 1, "linear"), x);
-//		x = graph.add(ml::Add(), { x, level1 });
-//		x = graph.add(ml::Conv2D(embedding * 2, 3, "relu"), x);
-//		x = graph.add(ml::Conv2D(embedding * 2, 3, "relu"), x);
-//		x = graph.add(ml::Conv2D(embedding * 2, 3, "relu"), x);
-//
-//		x = graph.add(ml::DepthToSpace(2, { board_size, board_size }), x);
-//		x = graph.add(ml::Conv2D(embedding, 1, "linear"), x);
-//		x = graph.add(ml::Add(), { x, level0 });
-//		x = graph.add(ml::Conv2D(embedding, 3, "relu"), x);
-//		x = graph.add(ml::Conv2D(embedding, 3, "relu"), x);
-//		x = graph.add(ml::Conv2D(embedding, 3, "relu"), x);
-
-//		for (int i = 0; i < 4; i++)
-//		{
-////			auto y = graph.add(ml::RMSNormalization(), x);
-////			y = graph.add(ml::Conv2D((3 - symmetric) * embedding, 1).useBias(false), y);
-////			y = graph.add(ml::MultiHeadAttention(embedding / head_dim, pos_encoding_range, symmetric), y);
-////			y = graph.add(ml::Conv2D(embedding, 1).useBias(false), y);
-////			x = graph.add(ml::Add(), { x, y });
-////
-////			y = graph.add(ml::RMSNormalization(), x);
-////			y = graph.add(ml::Conv2D(embedding, 1, "relu"), y);
-////			y = graph.add(ml::Conv2D(embedding, 1), y);
-////			x = graph.add(ml::Add(), { x, y });
-//
-////			auto y = graph.add(ml::Conv2D(embedding, 3, "relu"), x);
-////			y = graph.add(ml::Conv2D(embedding, 3, "linear"), y);
-////			x = graph.add(ml::Add("relu"), { x, y });
-//
-//			auto y = graph.add(ml::Conv2D(embedding, 1, "relu"), x);
-////			y = graph.add(ml::Conv2D(embedding, 3, "relu"), y);
-//			y = graph.add(ml::Conv2D(embedding, 1, "linear"), y);
-//			x = graph.add(ml::Add(), { x, y });
-//		}
-//		embedding *= 2;
-//		x = graph.add(ml::Conv2D(embedding, 1, "relu"), x);
+		auto y = graph.add(ml::GlobalAveragePooling(), x);
+		y = graph.add(ml::Dense(embedding, "relu"), y);
+		y = graph.add(ml::Dense(embedding, "sigmoid"), y);
+		x = graph.add(ml::ChannelScaling(), { x, y });
 
 		for (int i = 0; i < 8; i++)
 		{
-//			auto y = graph.add(ml::RMSNormalization(false), x);
-//			y = graph.add(ml::Conv2D((3 - symmetric) * embedding, 1).useBias(false), y);
-//			y = graph.add(ml::MultiHeadAttention(embedding / head_dim, pos_encoding_range, symmetric), y);
-//			y = graph.add(ml::Conv2D(embedding, 1).useBias(false), y);
-//			x = graph.add(ml::Add(), { x, y });
-//
-//			y = graph.add(ml::RMSNormalization(false), x);
-//			y = graph.add(ml::Conv2D(embedding, 1, "relu"), y);
-//			y = graph.add(ml::Conv2D(embedding, 1), y);
-//			x = graph.add(ml::Add(), { x, y });
-
-			auto y = graph.add(ml::DepthwiseConv2D(embedding, 7), x);
+			auto y = graph.add(ml::DepthwiseConv2D(embedding, 7).useBias(false), x);
+			y = graph.add(ml::BatchNormalization().useGamma(false), y);
 			y = graph.add(ml::Conv2D(embedding, 1, "relu"), y);
-			y = graph.add(ml::Conv2D(embedding, 1, "linear"), y);
-			x = graph.add(ml::Add(), { x, y });
+			x = graph.add(ml::Conv2D(embedding, 1), { y, x });
 
-//			auto y = graph.add(ml::Conv2D(embedding / 2, 1, "relu"), x);
-//			y = graph.add(ml::Conv2D(embedding / 2, 3, "relu"), y);
-//			y = graph.add(ml::Conv2D(embedding, 3, "linear"), y);
-//			x = graph.add(ml::Add("relu"), { x, y });
+			y = graph.add(ml::GlobalAveragePooling(), x);
+			y = graph.add(ml::Dense(embedding, "relu"), y);
+			y = graph.add(ml::Dense(embedding, "sigmoid"), y);
+			x = graph.add(ml::ChannelScaling(), { x, y });
 		}
-//		embedding *= 2;
-//		x = graph.add(ml::Conv2D(embedding, 1, "relu"), x);
-
-//		for (int i = 0; i < 4; i++)
-//		{
-//			auto y = graph.add(ml::Conv2D(embedding, 3, "relu"), x);
-//			y = graph.add(ml::Conv2D(embedding, 3, "linear"), y);
-//			x = graph.add(ml::Add("relu"), { x, y });
-//		}
-//		embedding *= 2;
-//		x = graph.add(ml::Conv2D(embedding, 1, "relu"), x);
-
-//		for (int i = 0; i < 2; i++)
-//		{
-//			auto y = graph.add(ml::RMSNormalization(), x);
-//			y = graph.add(ml::Conv2D((3 - symmetric) * embedding, 1).useBias(false), y);
-//			y = graph.add(ml::MultiHeadAttention(embedding / head_dim, pos_encoding_range, symmetric), y);
-//			y = graph.add(ml::Conv2D(embedding, 1).useBias(false), y);
-//			x = graph.add(ml::Add(), { x, y });
-
-//			auto y = graph.add(ml::Conv2D(embedding / 2, 1, "relu"), x);
-//			y = graph.add(ml::Conv2D(embedding / 2, 3, "relu"), y);
-//			y = graph.add(ml::Conv2D(embedding, 3, "linear"), y);
-//			x = graph.add(ml::Add("relu"), { x, y });
-
-//			auto y = graph.add(ml::Conv2D(embedding, 3, "relu"), x);
-//			y = graph.add(ml::Conv2D(embedding, 3, "linear"), y);
-//			x = graph.add(ml::Add("relu"), { x, y });
-
-//			auto y = graph.add(ml::RMSNormalization(), x);
-//			y = graph.add(ml::PositionalEncoding(), y);
-//			y = graph.add(ml::Conv2D((3 - symmetric) * embedding, 1).useBias(false), y);
-//			y = graph.add(ml::MultiHeadAttention(embedding / head_dim, pos_encoding_range, symmetric), y);
-//			y = graph.add(ml::Conv2D(embedding, 1).useBias(false), y);
-//			x = graph.add(ml::Add(), { x, y });
-
-//			y = graph.add(ml::RMSNormalization(), x);
-//			y = graph.add(ml::Conv2D(embedding, 1, "relu"), y);
-//			y = graph.add(ml::Conv2D(embedding, 1), y);
-//			x = graph.add(ml::Add(), { x, y });
-//		}
 
 		// policy head
-		auto p = graph.add(ml::DepthwiseConv2D(embedding, 7), x);
-		p = graph.add(ml::Conv2D(embedding, 1, "relu"), p);
-		p = graph.add(ml::Conv2D(1, 1, "linear"), p);
+		auto p = graph.add(ml::Conv2D(embedding, 1).useBias(false), x);
+		p = graph.add(ml::BatchNormalization("relu").useGamma(false), p);
+		y = graph.add(ml::GlobalAveragePooling(), p);
+		y = graph.add(ml::Dense(embedding, "relu"), y);
+		y = graph.add(ml::Dense(embedding, "sigmoid"), y);
+		p = graph.add(ml::ChannelScaling(), { p, y });
+		p = graph.add(ml::Conv2D(1, 1), p);
 		p = graph.add(ml::Softmax( { 1, 2, 3 }), p);
-		graph.addOutput(p, ml::CrossEntropyLoss(1.0f));
-//		auto p = graph.add(ml::RMSNormalization(), x);
-//		p = graph.add(ml::Conv2D(2 * embedding, 1).useBias(false), p);
-//		p = graph.add(ml::MultiHeadAttention(1, pos_encoding_range, true), p);
-//		p = graph.add(ml::Conv2D(1, 1), p);
-//		p = graph.add(ml::Softmax( { 1, 2, 3 }), p);
-//		graph.addOutput(p);
-
-//		auto common = graph.add(ml::GlobalPooling(), x);
-//		common = graph.add(ml::Dense(256, "relu"), common);
+		graph.addOutput(p, CrossEntropyLoss());
 
 		// value head
 		auto v = graph.add(ml::Conv2D(embedding, 1, "relu"), x);
-		v = graph.add(ml::GlobalPooling(), v);
-		v = graph.add(ml::Dense(256, "relu"), v);
-//		auto v = graph.add(ml::Dense(256).useBias(false), common);
-//		v = graph.add(BatchNormalization("relu").useGamma(false), v);
+		v = graph.add(ml::GlobalAveragePooling(), v);
+		v = graph.add(ml::Dense(256).useBias(false), v);
+		v = graph.add(ml::BatchNormalization("relu"), v);
 		v = graph.add(ml::Dense(3), v);
 		v = graph.add(ml::Softmax( { 1 }), v);
-		graph.addOutput(v, ml::CrossEntropyLoss(1.0f));
+		graph.addOutput(v, CrossEntropyLoss());
 
-		// uncertainty head
-//		auto unc = graph.add(ml::Dense(128, "relu"), common);
-//		unc = graph.add(ml::Dense(1, "sigmoid"), unc);
-//		graph.addOutput(unc, ml::MeanSquaredLoss(1.0f));
+		auto q = graph.add(ml::Conv2D(embedding, 1, "linear").useBias(false), x);
+		q = graph.add(ml::BatchNormalization("relu").useGamma(false), q);
+		y = graph.add(ml::GlobalAveragePooling(), q);
+		y = graph.add(ml::Dense(embedding, "relu"), y);
+		y = graph.add(ml::Dense(embedding, "sigmoid"), y);
+		q = graph.add(ml::ChannelScaling(), { q, y });
+		q = graph.add(ml::Conv2D(3, 1, "linear"), q);
+		q = graph.add(ml::Softmax( { 3 }), q);
+		graph.addOutput(q, CrossEntropyLoss());
 
-		// moves left head
-//		auto mlh = graph.add(ml::Dense(128, "relu"), common);
-//		mlh = graph.add(ml::Dense(50), mlh);
-//		mlh = graph.add(ml::Softmax( { 1 }), mlh);
-//		graph.addOutput(mlh, ml::CrossEntropyLoss(0.1f));
+		/*
+		 auto x = graph.addInput( { batch_size, board_size, board_size, 8 });
+		 x = graph.add(Conv2D(embedding / (patch_size * patch_size), 3, "relu"), x);
+		 //		x = graph.add(Conv2D(embedding / (patch_size * patch_size), 5).useBias(false), x);
+		 //		x = graph.add(BatchNormalization("relu").useGamma(false), x);
+		 //		x = graph.add(ml::SpaceToDepth(patch_size), x);
 
-//		auto p = graph.add(ml::RMSNormalization(), x);
-////		auto p = graph.add(ml::Conv2D(embedding, 3, "relu"), x);
-////		p = graph.add(ml::Conv2D(1, 3, "linear"), p);
-//		p = graph.add(ml::Conv2D(3 * embedding, 1).useBias(false), p);
-//		p = graph.add(ml::MultiHeadAttention(embedding / head_dim, pos_encoding_range), p);
-//		p = graph.add(ml::Conv2D(patch_size * patch_size, 1), p);
-////		p = graph.add(ml::DepthToSpace(patch_size, { board_size, board_size }), p);
-//		p = graph.add(ml::Softmax( { 1, 2, 3 }), p);
-//		graph.addOutput(p);
-//
-////		auto v = graph.add(ml::Conv2D(4, 1, "relu"), x);
-////		v = graph.add(ml::Dense(std::min(256, 2 * embedding), "relu"), v);
-////		v = graph.add(ml::Dense(3, "linear"), v);
-////		v = graph.add(ml::Softmax( { 1 }), v);
-//
-//		auto v = graph.add(ml::GlobalPooling(), x);
-//		v = graph.add(ml::Dense(embedding, "relu"), v);
-//		v = graph.add(ml::Dense(embedding, "relu"), v);
-//		v = graph.add(ml::Dense(3), v);
-//		v = graph.add(ml::Softmax( { 1 }), v);
-//		graph.addOutput(v);
+		 //		const int size_2 = (board_size + 1) / 2;
+		 //
+		 //		x = graph.add(ml::Conv2D(embedding, 3, "relu"), x);
+		 //		x = graph.add(ml::Conv2D(embedding, 3, "relu"), x);
+		 //		auto level0 = graph.add(ml::Conv2D(embedding, 3, "relu"), x);
+		 //		x = graph.add(ml::SpaceToDepth(2), level0);
+		 //
+		 //		x = graph.add(ml::Conv2D(embedding * 2, 3, "relu"), x);
+		 //		x = graph.add(ml::Conv2D(embedding * 2, 3, "relu"), x);
+		 //		auto level1 = graph.add(ml::Conv2D(embedding * 2, 3, "relu"), x);
+		 //		x = graph.add(ml::SpaceToDepth(2), level1);
+		 //
+		 //		x = graph.add(ml::Conv2D(embedding * 4, 3, "relu"), x);
+		 //		x = graph.add(ml::Conv2D(embedding * 4, 3, "relu"), x);
+		 //		x = graph.add(ml::Conv2D(embedding * 4, 3, "relu"), x);
+		 //		x = graph.add(ml::Conv2D(embedding * 4, 3, "relu"), x);
+		 //
+		 //		x = graph.add(ml::DepthToSpace(2, { size_2, size_2 }), x);
+		 //		x = graph.add(ml::Conv2D(embedding * 2, 1, "linear"), x);
+		 //		x = graph.add(ml::Add(), { x, level1 });
+		 //		x = graph.add(ml::Conv2D(embedding * 2, 3, "relu"), x);
+		 //		x = graph.add(ml::Conv2D(embedding * 2, 3, "relu"), x);
+		 //		x = graph.add(ml::Conv2D(embedding * 2, 3, "relu"), x);
+		 //
+		 //		x = graph.add(ml::DepthToSpace(2, { board_size, board_size }), x);
+		 //		x = graph.add(ml::Conv2D(embedding, 1, "linear"), x);
+		 //		x = graph.add(ml::Add(), { x, level0 });
+		 //		x = graph.add(ml::Conv2D(embedding, 3, "relu"), x);
+		 //		x = graph.add(ml::Conv2D(embedding, 3, "relu"), x);
+		 //		x = graph.add(ml::Conv2D(embedding, 3, "relu"), x);
 
-//		auto p = graph.add(ml::Conv2D(embedding, 1, "relu"), x);
-//		p = graph.add(ml::DepthToSpace(patch_size, { board_size, board_size }), p);
-//		p = graph.add(ml::Conv2D(1, 1), p);
-//		p = graph.add(ml::Softmax( { 1, 2, 3 }), p);
-//		graph.addOutput(p);
-//
-//		// value head
-//		auto v = graph.add(ml::GlobalPooling(), x);
-//		v = graph.add(ml::Dense(embedding, "relu"), v);
-//		v = graph.add(ml::Dense(3), v);
-//		v = graph.add(ml::Softmax( { 1 }), v);
-//		graph.addOutput(v);
+		 //		for (int i = 0; i < 4; i++)
+		 //		{
+		 ////			auto y = graph.add(ml::RMSNormalization(), x);
+		 ////			y = graph.add(ml::Conv2D((3 - symmetric) * embedding, 1).useBias(false), y);
+		 ////			y = graph.add(ml::MultiHeadAttention(embedding / head_dim, pos_encoding_range, symmetric), y);
+		 ////			y = graph.add(ml::Conv2D(embedding, 1).useBias(false), y);
+		 ////			x = graph.add(ml::Add(), { x, y });
+		 ////
+		 ////			y = graph.add(ml::RMSNormalization(), x);
+		 ////			y = graph.add(ml::Conv2D(embedding, 1, "relu"), y);
+		 ////			y = graph.add(ml::Conv2D(embedding, 1), y);
+		 ////			x = graph.add(ml::Add(), { x, y });
+		 //
+		 ////			auto y = graph.add(ml::Conv2D(embedding, 3, "relu"), x);
+		 ////			y = graph.add(ml::Conv2D(embedding, 3, "linear"), y);
+		 ////			x = graph.add(ml::Add("relu"), { x, y });
+		 //
+		 //			auto y = graph.add(ml::Conv2D(embedding, 1, "relu"), x);
+		 ////			y = graph.add(ml::Conv2D(embedding, 3, "relu"), y);
+		 //			y = graph.add(ml::Conv2D(embedding, 1, "linear"), y);
+		 //			x = graph.add(ml::Add(), { x, y });
+		 //		}
+		 //		embedding *= 2;
+		 //		x = graph.add(ml::Conv2D(embedding, 1, "relu"), x);
 
+		 for (int i = 0; i < 8; i++)
+		 {
+		 //			auto y = graph.add(ml::RMSNormalization(false), x);
+		 //			y = graph.add(ml::Conv2D((3 - symmetric) * embedding, 1).useBias(false), y);
+		 //			y = graph.add(ml::MultiHeadAttention(embedding / head_dim, pos_encoding_range, symmetric), y);
+		 //			y = graph.add(ml::Conv2D(embedding, 1).useBias(false), y);
+		 //			x = graph.add(ml::Add(), { x, y });
+		 //
+		 //			y = graph.add(ml::RMSNormalization(false), x);
+		 //			y = graph.add(ml::Conv2D(embedding, 1, "relu"), y);
+		 //			y = graph.add(ml::Conv2D(embedding, 1), y);
+		 //			x = graph.add(ml::Add(), { x, y });
+
+		 auto y = graph.add(ml::DepthwiseConv2D(embedding, 7), x);
+		 y = graph.add(ml::Conv2D(embedding, 1, "relu"), y);
+		 y = graph.add(ml::Conv2D(embedding, 1, "linear"), y);
+		 x = graph.add(ml::Add(), { x, y });
+
+		 //			auto y = graph.add(ml::Conv2D(embedding / 2, 1, "relu"), x);
+		 //			y = graph.add(ml::Conv2D(embedding / 2, 3, "relu"), y);
+		 //			y = graph.add(ml::Conv2D(embedding, 3, "linear"), y);
+		 //			x = graph.add(ml::Add("relu"), { x, y });
+		 }
+		 //		embedding *= 2;
+		 //		x = graph.add(ml::Conv2D(embedding, 1, "relu"), x);
+
+		 //		for (int i = 0; i < 4; i++)
+		 //		{
+		 //			auto y = graph.add(ml::Conv2D(embedding, 3, "relu"), x);
+		 //			y = graph.add(ml::Conv2D(embedding, 3, "linear"), y);
+		 //			x = graph.add(ml::Add("relu"), { x, y });
+		 //		}
+		 //		embedding *= 2;
+		 //		x = graph.add(ml::Conv2D(embedding, 1, "relu"), x);
+
+		 //		for (int i = 0; i < 2; i++)
+		 //		{
+		 //			auto y = graph.add(ml::RMSNormalization(), x);
+		 //			y = graph.add(ml::Conv2D((3 - symmetric) * embedding, 1).useBias(false), y);
+		 //			y = graph.add(ml::MultiHeadAttention(embedding / head_dim, pos_encoding_range, symmetric), y);
+		 //			y = graph.add(ml::Conv2D(embedding, 1).useBias(false), y);
+		 //			x = graph.add(ml::Add(), { x, y });
+
+		 //			auto y = graph.add(ml::Conv2D(embedding / 2, 1, "relu"), x);
+		 //			y = graph.add(ml::Conv2D(embedding / 2, 3, "relu"), y);
+		 //			y = graph.add(ml::Conv2D(embedding, 3, "linear"), y);
+		 //			x = graph.add(ml::Add("relu"), { x, y });
+
+		 //			auto y = graph.add(ml::Conv2D(embedding, 3, "relu"), x);
+		 //			y = graph.add(ml::Conv2D(embedding, 3, "linear"), y);
+		 //			x = graph.add(ml::Add("relu"), { x, y });
+
+		 //			auto y = graph.add(ml::RMSNormalization(), x);
+		 //			y = graph.add(ml::PositionalEncoding(), y);
+		 //			y = graph.add(ml::Conv2D((3 - symmetric) * embedding, 1).useBias(false), y);
+		 //			y = graph.add(ml::MultiHeadAttention(embedding / head_dim, pos_encoding_range, symmetric), y);
+		 //			y = graph.add(ml::Conv2D(embedding, 1).useBias(false), y);
+		 //			x = graph.add(ml::Add(), { x, y });
+
+		 //			y = graph.add(ml::RMSNormalization(), x);
+		 //			y = graph.add(ml::Conv2D(embedding, 1, "relu"), y);
+		 //			y = graph.add(ml::Conv2D(embedding, 1), y);
+		 //			x = graph.add(ml::Add(), { x, y });
+		 //		}
+
+		 // policy head
+		 auto p = graph.add(ml::DepthwiseConv2D(embedding, 7), x);
+		 p = graph.add(ml::Conv2D(embedding, 1, "relu"), p);
+		 p = graph.add(ml::Conv2D(1, 1, "linear"), p);
+		 p = graph.add(ml::Softmax( { 1, 2, 3 }), p);
+		 graph.addOutput(p, ml::CrossEntropyLoss(1.0f));
+		 //		auto p = graph.add(ml::RMSNormalization(), x);
+		 //		p = graph.add(ml::Conv2D(2 * embedding, 1).useBias(false), p);
+		 //		p = graph.add(ml::MultiHeadAttention(1, pos_encoding_range, true), p);
+		 //		p = graph.add(ml::Conv2D(1, 1), p);
+		 //		p = graph.add(ml::Softmax( { 1, 2, 3 }), p);
+		 //		graph.addOutput(p);
+
+		 //		auto common = graph.add(ml::GlobalPooling(), x);
+		 //		common = graph.add(ml::Dense(256, "relu"), common);
+
+		 // value head
+		 auto v = graph.add(ml::Conv2D(embedding, 1, "relu"), x);
+		 v = graph.add(ml::GlobalPooling(), v);
+		 v = graph.add(ml::Dense(256, "relu"), v);
+		 //		auto v = graph.add(ml::Dense(256).useBias(false), common);
+		 //		v = graph.add(BatchNormalization("relu").useGamma(false), v);
+		 v = graph.add(ml::Dense(3), v);
+		 v = graph.add(ml::Softmax( { 1 }), v);
+		 graph.addOutput(v, ml::CrossEntropyLoss(1.0f));
+
+		 // uncertainty head
+		 //		auto unc = graph.add(ml::Dense(128, "relu"), common);
+		 //		unc = graph.add(ml::Dense(1, "sigmoid"), unc);
+		 //		graph.addOutput(unc, ml::MeanSquaredLoss(1.0f));
+
+		 // moves left head
+		 //		auto mlh = graph.add(ml::Dense(128, "relu"), common);
+		 //		mlh = graph.add(ml::Dense(50), mlh);
+		 //		mlh = graph.add(ml::Softmax( { 1 }), mlh);
+		 //		graph.addOutput(mlh, ml::CrossEntropyLoss(0.1f));
+
+		 //		auto p = graph.add(ml::RMSNormalization(), x);
+		 ////		auto p = graph.add(ml::Conv2D(embedding, 3, "relu"), x);
+		 ////		p = graph.add(ml::Conv2D(1, 3, "linear"), p);
+		 //		p = graph.add(ml::Conv2D(3 * embedding, 1).useBias(false), p);
+		 //		p = graph.add(ml::MultiHeadAttention(embedding / head_dim, pos_encoding_range), p);
+		 //		p = graph.add(ml::Conv2D(patch_size * patch_size, 1), p);
+		 ////		p = graph.add(ml::DepthToSpace(patch_size, { board_size, board_size }), p);
+		 //		p = graph.add(ml::Softmax( { 1, 2, 3 }), p);
+		 //		graph.addOutput(p);
+		 //
+		 ////		auto v = graph.add(ml::Conv2D(4, 1, "relu"), x);
+		 ////		v = graph.add(ml::Dense(std::min(256, 2 * embedding), "relu"), v);
+		 ////		v = graph.add(ml::Dense(3, "linear"), v);
+		 ////		v = graph.add(ml::Softmax( { 1 }), v);
+		 //
+		 //		auto v = graph.add(ml::GlobalPooling(), x);
+		 //		v = graph.add(ml::Dense(embedding, "relu"), v);
+		 //		v = graph.add(ml::Dense(embedding, "relu"), v);
+		 //		v = graph.add(ml::Dense(3), v);
+		 //		v = graph.add(ml::Softmax( { 1 }), v);
+		 //		graph.addOutput(v);
+
+		 //		auto p = graph.add(ml::Conv2D(embedding, 1, "relu"), x);
+		 //		p = graph.add(ml::DepthToSpace(patch_size, { board_size, board_size }), p);
+		 //		p = graph.add(ml::Conv2D(1, 1), p);
+		 //		p = graph.add(ml::Softmax( { 1, 2, 3 }), p);
+		 //		graph.addOutput(p);
+		 //
+		 //		// value head
+		 //		auto v = graph.add(ml::GlobalPooling(), x);
+		 //		v = graph.add(ml::Dense(embedding, "relu"), v);
+		 //		v = graph.add(ml::Dense(3), v);
+		 //		v = graph.add(ml::Softmax( { 1 }), v);
+		 //		graph.addOutput(v);
+		 */
 //		graph.print();
-
-		graph.init();
+//		std::cout << '\n';
+//		graph.init();
 //		graph.moveTo(Device::cpu());
-		graph.moveTo(Device::cuda(0));
-		graph.convertTo(DataType::FLOAT16);
+//		graph.makeTrainable(false);
+//		FoldBatchNorm().optimize(graph);
+//		graph.print();
+//		std::cout << '\n';
+//		FuseConvBlock().optimize(graph);
+//		graph.print();
+//		return 0;
+		graph.moveTo(Device::cuda());
+		graph.init();
+		graph.convertTo(DataType::FLOAT32);
+		graph.setGradientScaler(GradientScaler(1024.0f));
 
 		Tensor input(graph.getInputShape(), graph.dtype(), Device::cpu());
 		for (int i = 0; i < input.shape().volumeWithoutLastDim(); i++)
@@ -3729,41 +3812,51 @@ int main()
 			if (input.dtype() == DataType::FLOAT32)
 			{
 				float *ptr = reinterpret_cast<float*>(input.data()) + i * graph.getInputShape().lastDim();
-				ptr[0] = 1.0f;
-				ptr[3] = 1.0f;
-				ptr[4] = 1.0f;
+				ptr[0] = randBool() ? 1.0f : 0.0f;
+				ptr[3] = randBool() ? 1.0f : 0.0f;
+				ptr[4] = randBool() ? 1.0f : 0.0f;
 			}
 			if (input.dtype() == DataType::FLOAT16)
 			{
 				uint16_t *ptr = reinterpret_cast<uint16_t*>(input.data()) + i * graph.getInputShape().lastDim();
-				ptr[0] = 0x3c00;
-				ptr[3] = 0x3c00;
-				ptr[4] = 0x3c00;
+				ptr[0] = randBool() ? 0x3c00 : 0x0000;
+				ptr[3] = randBool() ? 0x3c00 : 0x0000;
+				ptr[4] = randBool() ? 0x3c00 : 0x0000;
 			}
 		}
 		graph.getInput().copyFrom(graph.context(), input);
-//		graph.forward(batch_size);
-//		graph.context().synchronize();
-//		graph.backward(batch_size);
+		graph.context().synchronize();
+
+		graph.train(batch_size);
+		std::this_thread::sleep_for(std::chrono::milliseconds(200));
+
+//		for (int i = 0; i < 10; i++)
+		{
+			graph.train(batch_size);
+//			std::this_thread::sleep_for(std::chrono::milliseconds(5000));
+		}
+		graph.context().synchronize();
+		std::vector<float> losses = graph.getLoss(batch_size);
+//		std::cout << losses[0] << " " << losses[1] << " " << losses[2] << '\n';
+		return 0;
+
+		graph.predict(batch_size);
+		graph.context().synchronize();
+		std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+		std::cout << "\n\n\n";
+		graph.train(batch_size);
 //		graph.learn();
-//		graph.context().synchronize();
-//
-//		std::this_thread::sleep_for(std::chrono::milliseconds(200));
-//
-//		graph.forward(batch_size);
-//		graph.context().synchronize();
-//		std::this_thread::sleep_for(std::chrono::milliseconds(100));
-//
-//		graph.backward(batch_size);
-//		graph.learn();
-//		graph.context().synchronize();
-//
-		graph.makeNonTrainable();
+		graph.context().synchronize();
+		std::cout << "END" << std::endl;
+		return 0;
+
+		graph.makeTrainable(false);
 		ml::FoldAdd().optimize(graph);
 		graph.print();
 		std::this_thread::sleep_for(std::chrono::milliseconds(100));
-//
-		graph.forward(batch_size);
+
+		graph.predict(batch_size);
 		graph.context().synchronize();
 
 		std::cout << "starting benchmark\n";
@@ -3771,7 +3864,7 @@ int main()
 		int repeats = 0;
 		for (; repeats < 100000; repeats++)
 		{
-			graph.forward(batch_size);
+			graph.predict(batch_size);
 			graph.context().synchronize();
 			if ((getTime() - start) > 30.0)
 				break;
@@ -4351,7 +4444,7 @@ int main()
 			}
 		}
 		graph.getInput().copyFrom(graph.context(), input);
-		graph.forward(batch_size);
+		graph.predict(batch_size);
 		graph.context().synchronize();
 
 		std::cout << "starting benchmark\n";
@@ -4359,7 +4452,7 @@ int main()
 		int repeats = 0;
 		for (; repeats < 10000; repeats++)
 		{
-			graph.forward(batch_size);
+			graph.predict(batch_size);
 			graph.context().synchronize();
 			if ((getTime() - start) > 30.0)
 				break;
@@ -4400,83 +4493,6 @@ int main()
 //			std::cout << i << " : " << src[i] << " vs " << dst[i] << '\n';
 
 	}
-	std::cout << "END" << std::endl;
-
-	return 0;
-	{
-		Graph graph;
-		FileLoader fl("/home/maciek/alphagomoku/minml_test/minml3v7_10x128_opt.bin");
-		graph.load(fl.getJson(), fl.getBinaryData());
-		graph.moveTo(Device::cpu());
-		graph.setInputShape(Shape( { 1, 15, 15, 32 }));
-		graph.forward(1);
-	}
-	std::cout << "END" << std::endl;
-//	return 0;
-
-	const int blocks = 10;
-	const int filters = 128;
-
-	Graph graph;
-	auto x = graph.addInput( { 256, 15, 15, 32 });
-	x = graph.add(Conv2D(filters, 3, "linear").useBias(false), x);
-	for (int i = 0; i < blocks; i++)
-		x = graph.add(Conv2D(filters, 3, "linear").useBias(false), x);
-	x = graph.add(GlobalBroadcastHW(), x);
-	graph.addOutput(x);
-
-//	x = graph.add(Conv2D(filters, 3, "linear").useBias(false), x);
-////	x = graph.add(BatchNormalization("relu").useGamma(false), x);
-//
-//	for (int i = 0; i < blocks; i++)
-//	{
-//		auto y = graph.add(Conv2D(filters, 3, "linear").useBias(false), x);
-////		y = graph.add(BatchNormalization("relu").useGamma(false), y);
-//
-//		y = graph.add(Conv2D(filters, 3, "linear").useBias(false), y);
-////		y = graph.add(BatchNormalization("linear").useGamma(false), y);
-//
-//		x = graph.add(Add("relu"), { x, y });
-//	}
-//
-//	// policy head
-//	auto p = graph.add(Conv2D(filters, 3, "linear").useBias(false), x);
-////	p = graph.add(BatchNormalization("relu").useGamma(false), p);
-//	p = graph.add(ml::Conv2D(1, 1, "softmax"), p);
-//	graph.addOutput(p);
-//
-//	// value head
-//	auto v = graph.add(ml::Conv2D(2, 1, "linear").useBias(false), x);
-////	v = graph.add(ml::BatchNormalization("relu").useGamma(false), v);
-//
-//	v = graph.add(ml::Dense(std::min(256, 2 * filters), "linear").useBias(false), v);
-////	v = graph.add(ml::BatchNormalization("relu").useGamma(false), v);
-//	v = graph.add(ml::Dense(3, "softmax"), v);
-//	graph.addOutput(v);
-
-	graph.init();
-	graph.setOptimizer(Optimizer(1.0e-3f));
-	graph.setRegularizer(Regularizer(1.0e-5f));
-	graph.moveTo(Device::cuda(0));
-
-	graph.makeNonTrainable();
-	graph.convertTo(DataType::FLOAT16);
-
-	graph.print();
-
-	graph.forward(256);
-	graph.context().synchronize();
-//	return 0;
-
-	double start = getTime();
-	for (int i = 0; i < 1000; i++)
-	{
-		graph.forward(256);
-		graph.context().synchronize();
-	}
-	double stop = getTime();
-	std::cout << (stop - start) << '\n';
-
 	std::cout << "END" << std::endl;
 	return 0;
 }

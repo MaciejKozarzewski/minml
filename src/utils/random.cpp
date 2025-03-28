@@ -6,66 +6,68 @@
  */
 
 #include <minml/utils/random.hpp>
-#include <math.h>
+
+#include <cmath>
 #include <cstdlib>
-#include <assert.h>
+#include <random>
+#include <chrono>
+#include <cassert>
+
+namespace
+{
+#ifdef NDEBUG
+	thread_local std::mt19937 int32_generator(std::chrono::system_clock::now().time_since_epoch().count());
+	thread_local std::mt19937_64 int64_generator(std::chrono::system_clock::now().time_since_epoch().count());
+#else
+	thread_local std::mt19937 int32_generator(0);
+	thread_local std::mt19937_64 int64_generator(0);
+#endif
+}
 
 namespace ml
 {
 	float randFloat()
 	{
-		return static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
+		std::uniform_real_distribution<float> dist(0.0f, 1.0f);
+		return dist(int32_generator);
 	}
 	double randDouble()
 	{
-		return static_cast<double>(rand()) / static_cast<double>(RAND_MAX);
+		std::uniform_real_distribution<double> dist(0.0f, 1.0f);
+		return dist(int64_generator);
 	}
 	float randGaussian()
 	{
-		double x1, x2, w;
-		do
-		{
-			x1 = 2.0 * randDouble() - 1.0;
-			x2 = 2.0 * randDouble() - 1.0;
-			w = x1 * x1 + x2 * x2;
-		} while (w >= 1.0);
-
-		w = sqrt((-2.0 * log(w)) / w);
-		thread_local double stored_value;
-		thread_local bool is_stored = false;
-
-		if (is_stored)
-		{
-			is_stored = false;
-			return stored_value;
-		}
-		else
-		{
-			stored_value = x2 * w;
-			is_stored = true;
-			return static_cast<float>(x1 * w);
-		}
+		return randGaussian(0.0f, 1.0f);
 	}
-	int randInt()
+	float randGaussian(float mean, float variance)
 	{
-		return rand();
+		std::normal_distribution<float> dist(mean, variance);
+		return dist(int32_generator);
 	}
-	int randInt(int r)
+	int32_t randInt()
 	{
-		return rand() % r;
+		return int32_generator();
 	}
-	int randInt(int r0, int r1)
+	int32_t randInt(int r)
 	{
-		assert(r1 > r0);
-		return r0 + rand() % (r1 - r0);
+		assert(r != 0);
+		std::uniform_int_distribution<int32_t> dist(0, r - 1);
+		return dist(int32_generator);
 	}
-	int64_t randLong()
+	int32_t randInt(int r0, int r1)
 	{
-		return ((static_cast<int64_t>(rand())) << 33) | ((static_cast<int64_t>(rand())) << 2) | (rand() & 2);
+		assert(r0 != r1);
+		std::uniform_int_distribution<int32_t> dist(r0, r1 - 1);
+		return dist(int32_generator);
+	}
+	uint64_t randLong()
+	{
+		return int64_generator();
 	}
 	bool randBool()
 	{
-		return rand() & 1;
+		return static_cast<bool>(int32_generator() & 1);
 	}
 
 } /* namespace ml */

@@ -21,26 +21,33 @@
 #include <cuda_runtime_api.h>
 #include <cuda_fp16.h>
 
-namespace vectors2
+namespace vectors
 {
+	template<typename T, int N>
+	__device__ vec<T, N> zero()
+	{
+		return vec<T, N>(0.0f);
+	}
+	template<typename T, int N>
+	__device__ vec<T, N> one()
+	{
+		return vec<T, N>(1.0f);
+	}
 
 	template<typename T, int N>
 	__device__ vec<T, N> sigmoid(const vec<T, N> &x)
 	{
-		const vec<T, N> one(static_cast<T>(1));
-		return one / (one + vectors2::exp(-x));
+		return one<T, N>() / (one<T, N>() + vectors::exp(-x));
 	}
 	template<typename T, int N>
 	__device__ vec<T, N> relu(const vec<T, N> &x)
 	{
-		const vec<T, N> zero(static_cast<T>(0));
-		return vectors2::max(zero, x);
+		return vectors::max(zero<T, N>(), x);
 	}
 	template<typename T, int N>
 	__device__ vec<T, N> approx_gelu(const vec<T, N> &x)
 	{
-		const vec<T, N> tmp(static_cast<T>(1.6849));
-		return x * sigmoid(tmp * x);
+		return x * vectors::sigmoid(vec<T, N>(1.6849f) * x);
 	}
 
 }

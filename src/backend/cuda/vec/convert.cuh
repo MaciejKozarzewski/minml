@@ -21,7 +21,7 @@
 #include <cuda_runtime_api.h>
 #include <cuda_fp16.h>
 
-namespace vectors2
+namespace vectors
 {
 
 	template<typename T, typename U, int N>

@@ -10,7 +10,6 @@
 
 #include "../utils.hpp"
 
-#include "../vectors/vectors.cuh"
 #include "../helpers/indexers.cuh"
 
 #include <cuda_runtime_api.h>
@@ -230,6 +229,8 @@ namespace ml
 	}
 	void cuda_convert_type(mlContext_t context, void *dst, mlDataType_t dst_dtype, const void *src, mlDataType_t src_dtype, int elements)
 	{
+		if (elements == 0)
+			return;
 		cudaStream_t stream = cuda::Context::getStream(context);
 
 		if (dst_dtype == src_dtype && dst != src)
@@ -323,7 +324,7 @@ namespace ml
 		dim3 gridDim((output_elements + blockDim.x - 1) / blockDim.x);
 
 		int *offsets = getPointer<int>(cuda::Context::getWorkspace(context));
-		assert(output_elements *sizeof(int) <= cuda::Context::getWorkspaceSize(context));
+		assert(output_elements * sizeof(int) <= cuda::Context::getWorkspaceSize(context));
 
 		kernel_calculate_space2depth_offsets<<<gridDim, blockDim, 0, stream>>>(offsets, height, width, channels_in, patch_size_h, patch_size_w);
 		assert(cudaGetLastError() == cudaSuccess);
@@ -364,7 +365,7 @@ namespace ml
 		dim3 gridDim((input_elements + blockDim.x - 1) / blockDim.x);
 
 		int *offsets = getPointer<int>(cuda::Context::getWorkspace(context));
-		assert(input_elements *sizeof(int) <= cuda::Context::getWorkspaceSize(context));
+		assert(input_elements * sizeof(int) <= cuda::Context::getWorkspaceSize(context));
 
 		kernel_calculate_space2depth_offsets<<<gridDim, blockDim, 0, stream>>>(offsets, height, width, channels_out, patch_size_h, patch_size_w);
 		assert(cudaGetLastError() == cudaSuccess);

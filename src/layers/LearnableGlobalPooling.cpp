@@ -83,10 +83,10 @@ namespace ml
 		Tensor tmp_out = output.view( { batch_size, channels, m_expansion_ratio });
 
 		gemmBatched(context(), 't', 't', tmp_out, tmp_in, getWeights().getParam(), 1, 0);
-		activationForward(context(), output, output, m_activation);
+		activationForward(context(), 1.0f, output, 0.0f, output, m_activation);
 	}
 	void LearnableGlobalPooling::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev,
-			Tensor &gradient_next)
+			Tensor &gradient_next, const std::vector<float> &beta)
 	{
 		assert(input.size() == 1);
 		const int batch_size = input[0].dim(0);
@@ -99,12 +99,12 @@ namespace ml
 		Tensor tmp_next = gradient_next.view( { batch_size, channels, m_expansion_ratio });
 		Tensor tmp_update = m_workspace.lock()->view( { batch_size, m_expansion_ratio, height * width });
 
-		activationBackward(context(), gradient_next, gradient_next, output, m_activation);
+		activationBackward(context(), 1.0f, gradient_next, output, 0.0f, gradient_next, m_activation);
 
-		gemmBatched(context(), 'n', 't', tmp_prev, getWeights().getParam(), tmp_next, 1, 0);
+		gemmBatched(context(), 't', 't', tmp_prev, getWeights().getParam(), tmp_next, 1, beta[0]);
 		gemmBatched(context(), 't', 't', tmp_update, tmp_next, tmp_in, 1, 0);
 
-		sumOverFirstDim(context(), getWeights().getParam(), tmp_update, 0);
+		sumOverFirstDim(context(), 1.0f, tmp_update.view( { batch_size, m_expansion_ratio * height * width }), 0.0f, getWeights().getParam());
 	}
 
 } /* namespace ml */

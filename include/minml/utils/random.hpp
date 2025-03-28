@@ -15,10 +15,11 @@ namespace ml
 	float randFloat();
 	double randDouble();
 	float randGaussian();
+	float randGaussian(float mean, float variance);
 	int32_t randInt();
 	int32_t randInt(int r);
 	int32_t randInt(int r0, int r1);
-	int64_t randLong();
+	uint64_t randLong();
 	bool randBool();
 }
 

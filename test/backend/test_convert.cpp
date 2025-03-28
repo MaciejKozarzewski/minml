@@ -180,7 +180,7 @@ namespace
 						break;
 				}
 			}
-			void backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next)
+			void backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next, const std::vector<float> &beta)
 			{
 				switch (dtype())
 				{
@@ -249,7 +249,7 @@ namespace
 						break;
 				}
 			}
-			void backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next)
+			void backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next, const std::vector<float> &beta)
 			{
 				switch (dtype())
 				{
@@ -299,7 +299,7 @@ namespace ml
 
 		baseline_space_to_depth<float>(correct_output, input);
 
-		spaceToDepth(Context(), input, output);
+		spaceToDepth(Context(), input, output, 0.0f);
 
 		EXPECT_LE(testing::diffForTest(correct_output, output), 1.0e-4f);
 
@@ -312,7 +312,7 @@ namespace ml
 			output.moveTo(device);
 			output.zeroall();
 
-			spaceToDepth(context, input, output);
+			spaceToDepth(context, input, output, 0.0f);
 			context.synchronize();
 
 			EXPECT_LE(testing::diffForTest(correct_output, output), 1.0e-4f);
@@ -339,7 +339,7 @@ namespace ml
 
 		baseline_depth_to_space<float>(correct_output, input);
 
-		depthToSpace(Context(), input, output);
+		depthToSpace(Context(), input, output, 0.0f);
 
 		EXPECT_LE(testing::diffForTest(correct_output, output), 1.0e-4f);
 
@@ -352,7 +352,7 @@ namespace ml
 			output.moveTo(device);
 			output.zeroall();
 
-			depthToSpace(context, input, output);
+			depthToSpace(context, input, output, 0.0f);
 			context.synchronize();
 
 			EXPECT_LE(testing::diffForTest(correct_output, output), 1.0e-4f);

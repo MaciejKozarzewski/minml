@@ -32,6 +32,7 @@ namespace
 	}
 	int get_tiles_count(int dim, int tile_size) noexcept
 	{
+		assert(tile_size > 0);
 		return (dim + tile_size - 1) / tile_size;
 	}
 	Shape get_matrices_shape(int kernel_size, int tile_size, const Shape &shape) noexcept
@@ -146,25 +147,35 @@ namespace ml
 		else
 		{
 			choose_algorithm();
-			switch (m_algorithm)
+
+			const std::array<int, 3> tmp = explicit_gemm_workspace(getInputShape(), getOutputShape(), getWeightShape());
+
+			const Shape tmp1 = get_matrices_shape(m_kernel_size, m_winograd_tile_size, getInputShape());
+			const Shape tmp2 = get_matrices_shape(m_kernel_size, m_winograd_tile_size, getOutputShape());
+			int result = 0;
+			switch (m_forward_algorithm)
 			{
 				case ConvolutionAlgorithm::EXPLICIT_GEMM:
-				{
-					const std::array<int, 3> tmp = explicit_gemm_workspace(getInputShape(), getOutputShape(), getWeightShape());
-					if (isTrainable())
-						return std::max(tmp[0], std::max(tmp[1], tmp[2]));
-					else
-						return tmp[0];
-				}
+					result = std::max(result, tmp[0]);
+					break;
 				case ConvolutionAlgorithm::WINOGRAD_NON_FUSED:
-				{
-					const Shape tmp1 = get_matrices_shape(m_kernel_size, m_winograd_tile_size, getInputShape());
-					const Shape tmp2 = get_matrices_shape(m_kernel_size, m_winograd_tile_size, getOutputShape());
-					return tmp1.volume() + tmp2.volume() + 1024;
-				}
+					result = std::max(result, tmp1.volume() + tmp2.volume() + 1024);
+					break;
 				default:
-					return 0;
+					break;
 			}
+			switch (m_backward_algorithm)
+			{
+				case ConvolutionAlgorithm::EXPLICIT_GEMM:
+					result = std::max(result, std::max(tmp[1], tmp[2]));
+					break;
+				case ConvolutionAlgorithm::WINOGRAD_NON_FUSED:
+					result = std::max(result, tmp1.volume() + tmp2.volume() + 1024);
+					break;
+				default:
+					break;
+			}
+			return result;
 		}
 	}
 	void Conv2D::changeContext(std::shared_ptr<Context> &context)
@@ -273,9 +284,6 @@ namespace ml
 									case ActivationType::RELU:
 										tmp = std::max(0.0f, tmp);
 										break;
-									case ActivationType::GELU:
-										tmp = 0.5f * tmp * (1.0f + std::erf(tmp / std::sqrt(2.0f)));
-										break;
 									case ActivationType::EXP:
 										tmp = std::exp(tmp);
 										break;
@@ -292,7 +300,7 @@ namespace ml
 
 		choose_algorithm();
 
-		switch (m_algorithm)
+		switch (m_forward_algorithm)
 		{
 			case ConvolutionAlgorithm::IMPLICIT_GEMM:
 			{
@@ -315,26 +323,6 @@ namespace ml
 				else
 					explicit_gemm_forward(context(), input[0], output, getWeights().getParam(), getBias().getParam(), *m_workspace.lock(),
 							m_activation, Tensor());
-
-//				Tensor input_matrix;
-//				Tensor output_matrix = output.view( { output.shape().volumeWithoutLastDim(), output.lastDim() });
-//				Tensor weight_matrix = getWeights().getParam().view( { getWeightShape().firstDim(), getWeightShape().volumeWithoutFirstDim() });
-//				if (m_kernel_size == 1)
-//					input_matrix = input[0].view( { input[0].shape().volumeWithoutLastDim(), input[0].lastDim() });
-//				else
-//				{
-//					assert(device().isCPU());
-//					input_matrix = m_workspace.lock()->view( { input[0].shape().volumeWithoutLastDim(), getWeightShape().volumeWithoutFirstDim() });
-//					im2row(context(), input_matrix, input[0], m_kernel_size, true, nullptr);
-//				}
-//
-//				if (input.size() == 2)
-//				{
-//					const Tensor add = input[1].view(output_matrix.shape());
-//					gemm_ex(context(), output_matrix, 1, 'n', input_matrix, 't', weight_matrix, 1, add, getBias().getParam(), m_activation);
-//				}
-//				else
-//					gemm_ex(context(), output_matrix, 1, 'n', input_matrix, 't', weight_matrix, 0, output_matrix, getBias().getParam(), m_activation);
 
 				break;
 			}
@@ -359,43 +347,35 @@ namespace ml
 
 				if (input.size() == 1)
 					winogradOutputTransform(context(), getWeightShape(), output_matrices, output, getBias().getParam(),
-							Tensor(Shape(), dtype(), device()), m_activation);
+							Tensor(Shape(), dtype(), device()), m_activation, 0.0f);
 				else
-					winogradOutputTransform(context(), getWeightShape(), output_matrices, output, getBias().getParam(), input[1], m_activation);
+					winogradOutputTransform(context(), getWeightShape(), output_matrices, output, getBias().getParam(), input[1], m_activation, 0.0f);
 
 				break;
 			}
 		}
 	}
-	void Conv2D::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next)
+	void Conv2D::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next,
+			const std::vector<float> &beta)
 	{
 		choose_algorithm();
 
-		activationBackward(context(), gradient_next, gradient_next, output, m_activation);
-		if (gradient_prev.size() == 2)
-			gradient_prev.at(1).copyFrom(context(), gradient_next);
-		switch (m_algorithm)
+		if (gradient_prev.size() == 1)
+		{
+			Tensor empty;
+			fusedBiasActCopyBackward(context(), gradient_next, output, 0.0f, empty, 0.0f, getBias().getGradient(), m_activation);
+		}
+		else
+			fusedBiasActCopyBackward(context(), gradient_next, output, beta[1], gradient_prev[1], 0.0f, getBias().getGradient(), m_activation);
+
+		switch (m_backward_algorithm)
 		{
 			default:
 				throw NotImplemented(METHOD_NAME, "");
 			case ConvolutionAlgorithm::EXPLICIT_GEMM:
 			{
-				explicit_gemm_backward(context(), gradient_prev[0], gradient_next, output, getWeights().getParam(), *m_workspace.lock());
+				explicit_gemm_backward(context(), gradient_prev[0], gradient_next, output, getWeights().getParam(), *m_workspace.lock(), beta[0]);
 				explicit_gemm_update(context(), input[0], gradient_next, getWeights().getGradient(), *m_workspace.lock());
-
-//				assert(m_kernel_size == 1);
-//
-//				Tensor gradient_prev_matrix = gradient_prev[0].view( { gradient_prev[0].shape().volumeWithoutLastDim(), gradient_prev[0].lastDim() });
-//				Tensor weight_matrix = getWeights().getParam().view( { getWeightShape().firstDim(), getWeightShape().volumeWithoutFirstDim() });
-//				Tensor gradient_next_matrix = gradient_next.view(
-//						{ gradient_next.shape().volumeWithoutLastDim(), getWeightShape().volumeWithoutLastDim() });
-//				gemm(context(), 'n', 'n', gradient_prev_matrix, gradient_next_matrix, weight_matrix, 1, 0);
-//
-//				Tensor input_matrix = input[0].view( { input[0].shape().volumeWithoutLastDim(), input[0].lastDim() });
-//				Tensor weight_update_matrix = getWeights().getGradient().view(
-//						{ getWeightShape().firstDim(), getWeightShape().volumeWithoutFirstDim() });
-//				Tensor gradient_matrix = gradient_next.view( { gradient_next.shape().volumeWithoutLastDim(), gradient_next.lastDim() });
-//				gemm(context(), 't', 'n', weight_update_matrix, gradient_matrix, input_matrix, 1, 0);
 
 				break;
 			}
@@ -415,7 +395,7 @@ namespace ml
 				winogradInputTransform(context(), getWeightShape(), gradient_next, gradient_next_matrices);
 				gemmBatched(context(), 'n', 'n', gradient_prev_matrices, gradient_next_matrices, *m_transformed_weights, 1, 0);
 				winogradOutputTransform(context(), getWeightShape(), gradient_prev_matrices, gradient_prev[0], Tensor( { }, dtype(), device()),
-						Tensor( { }, dtype(), device()), ActivationType::LINEAR);
+						Tensor( { }, dtype(), device()), ActivationType::LINEAR, beta[0]);
 
 				winogradGradientTransform(context(), getWeightShape(), gradient_next, gradient_next_matrices);
 				winogradInputTransform(context(), getWeightShape(), input[0], gradient_prev_matrices);
@@ -424,8 +404,6 @@ namespace ml
 				break;
 			}
 		}
-		if (isUsingBias())
-			sumOverFirstDim(context(), getBias().getGradient(), gradient_next, 0);
 	}
 
 	void Conv2D::choose_algorithm() const
@@ -437,31 +415,32 @@ namespace ml
 		const bool can_use_cudnn = false;
 #endif
 		if (can_use_cudnn)
-			m_algorithm = ConvolutionAlgorithm::IMPLICIT_GEMM;
+			m_forward_algorithm = ConvolutionAlgorithm::IMPLICIT_GEMM;
 		else
 		{
-			if (m_kernel_size == 1 or (m_kernel_size == 5 and device().isCPU() and not isTrainable())) // TODO for 5x5 kernel it may be good to use winograd if there are enough filters
-				m_algorithm = ConvolutionAlgorithm::EXPLICIT_GEMM;
-			else
+			if (m_kernel_size == 3)
 			{
-				assert(m_kernel_size == 3 || m_kernel_size == 5);
-				m_algorithm = ConvolutionAlgorithm::WINOGRAD_NON_FUSED;
+				m_forward_algorithm = ConvolutionAlgorithm::WINOGRAD_NON_FUSED;
+				m_backward_algorithm = ConvolutionAlgorithm::WINOGRAD_NON_FUSED;
 				switch (device().type())
 				{
 					case DeviceType::CPU:
-					{
-						if (isTrainable())
-							m_winograd_tile_size = (m_kernel_size == 3) ? 4 : 2;
-						else
-							m_winograd_tile_size = (m_kernel_size == 3) ? 5 : 2;
+						m_winograd_tile_size = isTrainable() ? 4 : 5;
 						break;
-					}
 					case DeviceType::CUDA:
 					case DeviceType::OPENCL:
-					{
-						m_winograd_tile_size = (m_kernel_size == 3) ? 4 : 2;
+						m_winograd_tile_size = 4;
 						break;
-					}
+				}
+			}
+			else
+			{
+				m_forward_algorithm = ConvolutionAlgorithm::EXPLICIT_GEMM;
+				m_backward_algorithm = ConvolutionAlgorithm::EXPLICIT_GEMM;
+				if (m_kernel_size == 5)
+				{
+					m_backward_algorithm = ConvolutionAlgorithm::WINOGRAD_NON_FUSED;
+					m_winograd_tile_size = 2;
 				}
 			}
 		}

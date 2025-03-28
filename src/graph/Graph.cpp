@@ -10,13 +10,16 @@
 #include <minml/graph/CalibrationTable.hpp>
 #include <minml/core/Device.hpp>
 #include <minml/core/Context.hpp>
+#include <minml/core/math.hpp>
 #include <minml/core/ml_exceptions.hpp>
 #include <minml/layers/Input.hpp>
 #include <minml/training/LossFunction.hpp>
 #include <minml/utils/json.hpp>
 #include <minml/utils/testing_util.hpp>
+#include <minml/utils/file_util.hpp>
 
 #include <algorithm>
+#include <thread>
 #include <cmath>
 
 namespace
@@ -39,6 +42,17 @@ namespace
 	void removeByValue(std::vector<T> &vec, T value)
 	{
 		removeByIndex(vec, indexOf(vec, value));
+	}
+	bool is_nan_or_inf(const ml::Tensor &t)
+	{
+		ml::Tensor tmp = t.view( { t.volume() });
+		for (int i = 0; i < tmp.volume(); i++)
+		{
+			const float x = tmp.get( { i });
+			if (isnanf(x) or isinff(x))
+				return true;
+		}
+		return false;
 	}
 }
 
@@ -77,17 +91,13 @@ namespace ml
 			throw LogicError(METHOD_NAME, "nodes list must not be empty");
 		return add_node(layer, nodes);
 	}
-	void Graph::addOutput(GraphNodeID node, const LossFunction &loss)
+	void Graph::addOutput(GraphNodeID node, const LossFunction &loss, float weight)
 	{
 		m_output_nodes.push_back(get_node(node));
 		m_targets.push_back(Tensor());
 		m_masks.push_back(Tensor());
 		m_losses.push_back(loss.clone());
-	}
-	void Graph::addOutput(GraphNodeID node, float weight)
-	{
-		CrossEntropyLoss loss(weight);
-		this->addOutput(node, loss);
+		m_loss_weights.push_back(weight);
 	}
 
 	const Tensor& Graph::getInput(int index) const
@@ -104,16 +114,13 @@ namespace ml
 	}
 	const Tensor& Graph::getTarget(int index) const
 	{
-		if (not isTrainable())
-			throw LogicError(METHOD_NAME, "Graph is not trainable");
 		return m_targets.at(index);
 	}
 	const Tensor& Graph::getMask(int index) const
 	{
-		if (not isTrainable())
-			throw LogicError(METHOD_NAME, "Graph is not trainable");
 		return m_masks.at(index);
 	}
+
 	Tensor& Graph::getInput(int index)
 	{
 		return m_input_nodes.at(index)->getOutputTensor();
@@ -161,29 +168,33 @@ namespace ml
 		if (numberOfInputs() == 0)
 			return 0;
 		else
-			return getOutputShape().firstDim();
+			return getInputShape().firstDim();
 	}
 	void Graph::moveTo(Device newDevice)
 	{
-		if (newDevice == device())
-			return;
-
 		m_context = std::make_shared<Context>(newDevice);
 		for (size_t i = 0; i < m_nodes.size(); i++)
 			m_nodes[i]->changeContext(m_context);
-		m_workspace = nullptr;
-		if (m_backup_tensor != nullptr)
-			m_backup_tensor->moveTo(newDevice);
 		for (size_t i = 0; i < m_targets.size(); i++)
 			m_targets[i].moveTo(newDevice);
 		for (size_t i = 0; i < m_masks.size(); i++)
 			m_masks[i].moveTo(newDevice);
+		m_workspace = nullptr;
 	}
 	void Graph::convertTo(DataType newType)
 	{
+		if (isTrainable() and newType == DataType::FLOAT16)
+		{
+			const std::vector<Tensor> params = getParameters();
+			m_fp32_weights_copy.resize(params.size());
+			for (size_t i = 0; i < params.size(); i++)
+			{
+				m_fp32_weights_copy[i] = zeros_like(params[i]);
+				m_fp32_weights_copy[i].copyFrom(context(), params[i]);
+			}
+		}
 		m_datatype = newType;
 		m_workspace = nullptr;
-		m_backup_tensor = nullptr;
 		for (int i = 0; i < numberOfNodes(); i++)
 			getNode(i).convertTo(newType);
 	}
@@ -198,30 +209,27 @@ namespace ml
 
 		for (size_t i = 0; i < m_nodes.size(); i++)
 			m_nodes[i]->resolveInputShapes();
-		m_backup_tensor = nullptr;
 		m_workspace = nullptr;
 	}
 
-	void Graph::setOptimizer(const Optimizer &optimizer)
-	{
-		if (not isTrainable())
-			throw LogicError(METHOD_NAME, "Graph is not trainable");
-		for (int i = 0; i < numberOfNodes(); i++)
-			getNode(i).getLayer().setOptimizer(optimizer);
-	}
-	void Graph::setRegularizer(const Regularizer &regularizer)
-	{
-		if (not isTrainable())
-			throw LogicError(METHOD_NAME, "Graph is not trainable");
-		for (int i = 0; i < numberOfNodes(); i++)
-			getNode(i).getLayer().setRegularizer(regularizer);
-	}
 	void Graph::init()
 	{
 		for (int i = 0; i < numberOfNodes(); i++)
 			getNode(i).getLayer().init();
 	}
-	void Graph::forward(int batchSize)
+	void Graph::setOptimizer(const RAdam &opt)
+	{
+		m_optimizer = opt;
+	}
+	void Graph::setRegularizer(const RegularizerL2 &reg)
+	{
+		m_regularizer = reg;
+	}
+	void Graph::setGradientScaler(const GradientScaler &scaler)
+	{
+		m_gradient_scaler = scaler;
+	}
+	void Graph::predict(int batchSize)
 	{
 		if (m_workspace == nullptr)
 			create_workspace();
@@ -229,67 +237,141 @@ namespace ml
 		for (size_t i = 0; i < m_nodes.size(); i++)
 			m_nodes[i]->forward(batchSize);
 	}
-	void Graph::backward(int batchSize)
+	void Graph::train(int batchSize)
 	{
+		{
+			std::vector<Tensor> param_gradients = getParameterGradients();
+			for (size_t i = 0; i < param_gradients.size(); i++)
+				param_gradients[i].zeroall();
+		}
+
 		if (not isTrainable())
 			throw LogicError(METHOD_NAME, "Graph is not trainable");
-		if (m_backup_tensor == nullptr)
-			create_backup_tensor();
+
+		predict(batchSize);
+
+		const float gradient_scale = (m_datatype == DataType::FLOAT16) ? m_gradient_scaler.getScale() : 1.0f;
+		for (size_t i = 0; i < m_losses.size(); i++)
+		{
+			const Shape tmp = change_dim<0>(getTarget(i).shape(), batchSize);
+			Tensor gradient = getGradient(i).view(tmp);
+			Tensor output = getOutput(i).view(tmp);
+			Tensor target = getTarget(i).view(tmp);
+			Tensor mask = getMask(i).view(tmp);
+			m_losses.at(i)->getGradient(context(), m_loss_weights[i] * gradient_scale / batchSize, gradient, output, target, mask);
+		}
+
+		std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
 		if (m_workspace == nullptr)
 			create_workspace();
 		for (size_t i = 0; i < m_nodes.size(); i++)
 			m_nodes[i]->prepareForBackward();
 
-		for (size_t i = 0; i < m_targets.size(); i++)
-		{
-			Shape tmp(getTarget(i).shape());
-			tmp[0] = batchSize;
-			Tensor gradient = getGradient(i).view(tmp);
-			Tensor output = getOutput(i).view(tmp);
-			Tensor target = getTarget(i).view(tmp);
-			Tensor mask = getMask(i).view(tmp);
-			m_losses.at(i)->getGradient(context(), gradient, output, target, mask);
-		}
-
 		for (int i = static_cast<int>(m_nodes.size()) - 1; i >= 0; i--)
-			m_nodes[i]->backward(batchSize, *m_backup_tensor);
+			m_nodes[i]->backward(batchSize);
+
+		std::vector<Tensor> params = getParameters();
+		std::vector<Tensor> param_gradients = getParameterGradients();
+//		m_regularizer.apply(context(), gradient_scale, params, param_gradients);
+
+//		{
+//			Json json = Json::array();
+//			SerializedObject so;
+//			for (size_t i = 0; i < param_gradients.size(); i++)
+//			{
+//				std::cout << i << " " << ml::testing::normForTest(param_gradients[i]) << '\n';
+//				json[i] = param_gradients[i].serialize(so);
+//			}
+//			FileSaver fs("/home/maciek/alphagomoku/dump.bin");
+//			fs.save(json, so);
+//			exit(0);
+//		}
+
+//		FileLoader fl("/home/maciek/alphagomoku/dump.bin");
+
+		for (size_t i = 0; i < param_gradients.size() / 2; i++)
+		{
+//			const Tensor loaded_dw(fl.getJson()[2 * i + 0], fl.getBinaryData());
+//			const Tensor loaded_db(fl.getJson()[2 * i + 1], fl.getBinaryData());
+//
+//			Tensor current_dw = zeros_like(param_gradients[2 * i + 0]);
+//			current_dw.copyFrom(context(), param_gradients[2 * i + 0]);
+//			current_dw.convertTo(context(), DataType::FLOAT32);
+//
+//			Tensor current_db = zeros_like(param_gradients[2 * i + 1]);
+//			current_db.copyFrom(context(), param_gradients[2 * i + 1]);
+//			current_db.convertTo(context(), DataType::FLOAT32);
+//			std::cout << i << " weights = " << ml::testing::diffForTest(current_dw, loaded_dw) << " (" << ml::testing::normForTest(loaded_dw) << ", "
+//					<< ml::testing::normForTest(current_dw) / gradient_scale << "), bias = " << ml::testing::diffForTest(current_db, loaded_db)
+//					<< " (" << ml::testing::normForTest(loaded_db) << ", " << ml::testing::normForTest(current_db) / gradient_scale << ")  "
+//					<< getNode(i).getLayer().name() << " (" << is_nan_or_inf(current_dw) << ", " << is_nan_or_inf(current_db) << ")\n";
+
+//			std::cout << i << " " << ml::testing::normForTest(param_gradients[2 * i + 0]) / gradient_scale << " "
+//					<< ml::testing::normForTest(param_gradients[2 * i + 1]) / gradient_scale << " " << getNode(i).getLayer().name() << '\n';
+		}
+		switch (m_datatype)
+		{
+			case DataType::FLOAT16:
+			{
+				const float inv_gradient_scale = m_gradient_scaler.getInvScale(context(), param_gradients);
+				if (inv_gradient_scale != 0.0f)
+				{
+					std::cout << "\n\n---gradients ok, updating weights with scale " << inv_gradient_scale << "\n\n";
+					m_optimizer.apply(context(), m_fp32_weights_copy, param_gradients, inv_gradient_scale);
+					for (size_t i = 0; i < params.size(); i++)
+						convertType(context(), params[i].data(), params[i].dtype(), m_fp32_weights_copy[i].data(), DataType::FLOAT32,
+								params[i].volume());
+				}
+				else
+				{
+					std::cout << "\n\n---some gradients are NaN or Inf, reducing scale to " << m_gradient_scaler.getScale()
+							<< " and skipping update\n\n";
+				}
+				break;
+			}
+			case DataType::FLOAT32:
+			{
+				m_optimizer.apply(context(), params, param_gradients, 1.0f);
+				break;
+			}
+			default:
+				throw NotImplemented(METHOD_NAME, "training in types other than fp32 or fp16 are not supported");
+		}
 	}
 	std::vector<float> Graph::getLoss(int batchSize)
 	{
-		if (not isTrainable())
-			throw LogicError(METHOD_NAME, "Graph is not trainable");
-		if (m_workspace == nullptr)
-			create_workspace();
-
-		std::vector<float> result(numberOfOutputs());
-		for (size_t i = 0; i < m_targets.size(); i++)
+		std::vector<float> result(m_losses.size());
+		for (size_t i = 0; i < m_losses.size(); i++)
 		{
-			Shape tmp(getTarget(i).shape());
-			tmp[0] = batchSize;
+			const Shape tmp = change_dim<0>(getTarget(i).shape(), batchSize);
 			Tensor output = getOutput(i).view(tmp);
 			Tensor target = getTarget(i).view(tmp);
 			Tensor mask = getMask(i).view(tmp);
-			result[i] = m_losses.at(i)->getLoss(context(), output, target, mask);
+			result[i] = m_losses.at(i)->getLoss(context(), output, target, mask) * m_loss_weights[i] / batchSize;
 		}
 		return result;
 	}
-	void Graph::learn()
-	{
-		if (not isTrainable())
-			throw LogicError(METHOD_NAME, "Graph is not trainable");
-		if (m_workspace == nullptr)
-			create_workspace();
 
-		for (int i = 0; i < numberOfNodes(); i++)
-			getNode(i).getLayer().learn();
-	}
-	void Graph::setLearningRate(float lr)
+	std::vector<Tensor> Graph::getParameters()
 	{
-		for (int i = 0; i < numberOfNodes(); i++)
+		std::vector<Tensor> result(m_nodes.size() * 2);
+		for (size_t i = 0; i < m_nodes.size(); i++)
 		{
-			getNode(i).getLayer().getWeights().getOptimizer().setLearningRate(lr);
-			getNode(i).getLayer().getBias().getOptimizer().setLearningRate(lr);
+			result[2 * i + 0] = m_nodes[i]->getLayer().getWeights().getParam().view();
+			result[2 * i + 1] = m_nodes[i]->getLayer().getBias().getParam().view();
 		}
+		return result;
+	}
+	std::vector<Tensor> Graph::getParameterGradients()
+	{
+		std::vector<Tensor> result(m_nodes.size() * 2);
+		for (size_t i = 0; i < m_nodes.size(); i++)
+		{
+			result[2 * i + 0] = m_nodes[i]->getLayer().getWeights().getGradient().view();
+			result[2 * i + 1] = m_nodes[i]->getLayer().getBias().getGradient().view();
+		}
+		return result;
 	}
 
 	void Graph::print() const
@@ -319,12 +401,6 @@ namespace ml
 	}
 	void Graph::makeTrainable(bool b)
 	{
-		if (not b)
-		{
-			m_targets.clear();
-			m_masks.clear();
-			m_losses.clear();
-		}
 		for (int i = 0; i < numberOfNodes(); i++)
 			getNode(i).makeTrainable(b);
 		m_is_trainable = b;
@@ -374,14 +450,11 @@ namespace ml
 	{
 		m_context = std::make_shared<Context>();
 		m_nodes.clear();
-		m_targets.clear();
-		m_masks.clear();
 
 		m_input_nodes.clear();
 		m_output_nodes.clear();
 
 		m_workspace.reset();
-		m_backup_tensor.reset();
 
 		m_datatype = DataType::FLOAT32;
 	}
@@ -403,11 +476,6 @@ namespace ml
 		{
 			getNode(i).getLayer().loadParameters(json[i]["layer"], binary_data);
 			m_is_trainable |= getNode(i).getLayer().isTrainable();
-		}
-		if (isTrainable())
-		{
-			m_targets = std::vector<Tensor>(numberOfOutputs());
-			m_masks = std::vector<Tensor>(numberOfOutputs());
 		}
 	}
 
@@ -458,25 +526,12 @@ namespace ml
 		for (int i = 0; i < numberOfNodes(); i++)
 			getNode(i).getLayer().setWorkspace(m_workspace);
 	}
-	void Graph::create_backup_tensor()
-	{
-		int tmp = 0;
-		for (size_t i = 0; i < m_nodes.size(); i++)
-			tmp = std::max(tmp, m_nodes[i]->getBackupStorage());
-		m_backup_tensor = std::make_unique<Tensor>(Shape( { tmp }), dtype(), device());
-	}
 
 	Json Graph::save_node(const GraphNode *node, SerializedObject &binary_data) const
 	{
 		Json result;
 		result["is_input_node"] = node->isInputNode();
 		result["is_output_node"] = node->isOutputNode();
-		if (node->isOutputNode())
-		{
-			for (size_t i = 0; i < m_output_nodes.size(); i++)
-				if (m_output_nodes[i] == node)
-					result["loss"] = isTrainable() ? m_losses.at(i)->serialize(binary_data) : Json();
-		}
 		result["input_nodes"] = Json(JsonType::Array);
 		for (int i = 0; i < node->numberOfInputs(); i++)
 			result["input_nodes"][i] = index_of_node(node->getInputNode(i));
@@ -500,22 +555,7 @@ namespace ml
 		if (json["is_input_node"])
 			m_input_nodes.push_back(m_nodes.back().get());
 		if (json["is_output_node"])
-		{
 			m_output_nodes.push_back(m_nodes.back().get());
-			if (json.hasKey("loss_weight"))
-				m_losses.push_back(std::make_unique<CrossEntropyLoss>(json["loss_weight"].getDouble()));
-			else
-			{
-				if (not json["loss"].isNull())
-				{
-					if (json["loss"]["name"].getString() == "CrossEntropyLoss")
-						m_losses.push_back(std::make_unique<CrossEntropyLoss>());
-					if (json["loss"]["name"].getString() == "MeanSquaredLoss")
-						m_losses.push_back(std::make_unique<MeanSquaredLoss>());
-					m_losses.back()->unserialize(json["loss"], binary_data);
-				}
-			}
-		}
 	}
 	int Graph::index_of_node(const GraphNode *node) const noexcept
 	{
@@ -526,13 +566,13 @@ namespace ml
 	}
 	const GraphNode* Graph::get_node(GraphNodeID index) const
 	{
-		if (index < 0 || index >= numberOfNodes())
+		if (index < 0 or index >= numberOfNodes())
 			throw IndexOutOfBounds(METHOD_NAME, "index", index, numberOfNodes());
 		return m_nodes[index].get();
 	}
 	GraphNode* Graph::get_node(GraphNodeID index)
 	{
-		if (index < 0 || index >= numberOfNodes())
+		if (index < 0 or index >= numberOfNodes())
 			throw IndexOutOfBounds(METHOD_NAME, "index", index, numberOfNodes());
 		return m_nodes[index].get();
 	}
