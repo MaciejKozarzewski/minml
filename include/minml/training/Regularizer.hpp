@@ -22,24 +22,6 @@ namespace ml /* forward declarations */
 
 namespace ml
 {
-
-	class Regularizer
-	{
-			float m_coefficient = 0.0f;
-			float m_offset = 0.0f;
-		public:
-			Regularizer() = default;
-			Regularizer(float coefficient, float offset = 0.0f);
-
-			float getCoefficient() const noexcept;
-			float getOffset() const noexcept;
-
-			void apply(const Context &context, Parameter &param);
-
-			Json serialize(SerializedObject &binary_data) const;
-			void unserialize(const Json &json, const SerializedObject &binary_data);
-	};
-
 	class RegularizerL2
 	{
 			float m_scale = 0.0f;

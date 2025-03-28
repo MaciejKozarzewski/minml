@@ -140,8 +140,11 @@ namespace
 					const int w = origin_w + i;
 					if (is_inside(h, w, height, width))
 					{
-						acc[i] = acc[i] * get<T>(alpha) + bias;
-						update_element(y_ptr + input_offset + h * h_stride + w * w_stride, 1.0f, acc[i], beta);
+						const int idx = input_offset + h * h_stride + w * w_stride;
+						T tmp = acc[i] * get<T>(alpha) + bias;
+						if (beta != 0.0f)
+							tmp += get<T>(beta) * y_ptr[idx];
+						y_ptr[idx] = tmp;
 					}
 				}
 			}
@@ -241,7 +244,12 @@ namespace
 		__syncthreads();
 
 		if (threadIdx.y == 0 && last_dim_idx < last_dim)
-			update_element(dst + last_dim_idx, alpha, workspace[0][threadIdx.x], beta);
+		{
+			T tmp = get<T>(alpha) * workspace[0][threadIdx.x];
+			if (beta != 0.0f)
+				tmp += get<T>(beta) * dst[last_dim_idx];
+			dst[last_dim_idx] = tmp;
+		}
 	}
 
 	using namespace ml;

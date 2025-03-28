@@ -505,7 +505,6 @@ namespace ml
 				cpu_global_avg_and_max_pooling_forward(get(context), get(input.dtype()), get_shape(input), output.data(), input.data());
 				break;
 			case DeviceType::CUDA:
-				cuda_global_avg_and_max_pooling_forward(get(context), get(input.dtype()), get_shape(input), output.data(), input.data());
 				break;
 			case DeviceType::OPENCL:
 				opencl_global_avg_and_max_pooling_forward(get(context), get(input.dtype()), get_shape(input), output.data(), input.data());
@@ -522,8 +521,6 @@ namespace ml
 						output.data());
 				break;
 			case DeviceType::CUDA:
-				cuda_global_avg_and_max_pooling_backward(get(context), get_shape(input), gradient_prev.data(), gradient_next.data(), input.data(),
-						output.data());
 				break;
 			case DeviceType::OPENCL:
 				opencl_global_avg_and_max_pooling_backward(get(context), get_shape(input), gradient_prev.data(), gradient_next.data(), input.data(),
@@ -542,8 +539,6 @@ namespace ml
 						get(act));
 				break;
 			case DeviceType::CUDA:
-				cuda_global_broadcasting_forward(get(context), get(input.dtype()), get_shape(input), output.data(), input.data(), bias.data(),
-						get(act));
 				break;
 			case DeviceType::OPENCL:
 				opencl_global_broadcasting_forward(get(context), get(input.dtype()), get_shape(input), output.data(), input.data(), bias.data(),
@@ -561,8 +556,6 @@ namespace ml
 						get(act));
 				break;
 			case DeviceType::CUDA:
-				cuda_global_broadcasting_backward(get(context), get_shape(output), gradient_prev.data(), gradient_next.data(), output.data(),
-						get(act));
 				break;
 			case DeviceType::OPENCL:
 				opencl_global_broadcasting_backward(get(context), get_shape(output), gradient_prev.data(), gradient_next.data(), output.data(),
@@ -1183,51 +1176,6 @@ namespace ml
 				break;
 		}
 	}
-
-	void radamOptimize(const Context &context, float scale, const Tensor &gradient, Tensor &weight, Tensor &momentum, Tensor &variance,
-			float learning_rate, float beta1, float beta2, int step)
-	{
-		switch (context.device().type())
-		{
-			case DeviceType::CPU:
-				break;
-			case DeviceType::CUDA:
-				cuda_radam_optimize(get(context), scale, get(gradient), get(weight), get(momentum), get(variance), learning_rate, beta1, beta2, step);
-				break;
-			case DeviceType::OPENCL:
-				break;
-		}
-	}
-	int isNanOrInf(const Context &context, const Tensor &tensor)
-	{
-		switch (context.device().type())
-		{
-			case DeviceType::CPU:
-				return 0;
-			case DeviceType::CUDA:
-				return cuda_is_nan_or_inf(get(context), get(tensor));
-			case DeviceType::OPENCL:
-				return 0;
-			default:
-				return 0;
-		}
-	}
-	void l2Regularization(const Context &context, Tensor &gradient, const Tensor &param, float coefficient, float offset)
-	{
-		switch (context.device().type())
-		{
-			case DeviceType::CPU:
-				cpu_l2_regularization(get(context), get_shape(gradient), gradient.data(), param.data(), coefficient, offset);
-				break;
-			case DeviceType::CUDA:
-				cuda_l2_regularization(get(context), get(gradient), get(param), coefficient, offset);
-				break;
-			case DeviceType::OPENCL:
-				opencl_l2_regularization(get(context), get_shape(gradient), gradient.data(), param.data(), coefficient, offset);
-				break;
-		}
-	}
-
 	void radamOptimize(const Context &context, float scale, const std::vector<Tensor> &gradients, std::vector<Tensor> &weights,
 			std::vector<Tensor> &momentums, std::vector<Tensor> &variances, float learning_rate, float beta1, float beta2, int step)
 	{

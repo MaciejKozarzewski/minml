@@ -140,13 +140,6 @@ namespace ml
 			Tensor &gradient);
 	void crossEntropyGradient(const Context &context, float alpha, const Tensor &output, const Tensor &target, const Tensor &mask, float beta,
 			Tensor &gradient);
-
-	void radamOptimize(const Context &context, float scale, const Tensor &gradient, Tensor &weight, Tensor &momentum, Tensor &variance,
-			float learning_rate, float beta1, float beta2, int step);
-	int isNanOrInf(const Context &context, const Tensor &tensor);
-	void l2Regularization(const Context &context, Tensor &gradient, const Tensor &param, float coefficient, float offset);
-
-	// fused variants
 	void radamOptimize(const Context &context, float scale, const std::vector<Tensor> &gradients, std::vector<Tensor> &weights,
 			std::vector<Tensor> &momentums, std::vector<Tensor> &variances, float learning_rate, float beta1, float beta2, int step);
 	std::vector<int> isNanOrInf(const Context &context, const std::vector<Tensor> &tensors);

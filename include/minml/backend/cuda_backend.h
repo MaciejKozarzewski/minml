@@ -122,14 +122,6 @@ namespace ml
 		/*
 		 * global pooling
 		 */
-		DLL_PUBLIC void cuda_global_avg_and_max_pooling_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output,
-				const void *input);
-		DLL_PUBLIC void cuda_global_avg_and_max_pooling_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next,
-				const void *input, const void *output);
-		DLL_PUBLIC void cuda_global_broadcasting_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input,
-				const void *bias, mlActivationType_t act);
-		DLL_PUBLIC void cuda_global_broadcasting_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, void *gradient_next,
-				const void *output, mlActivationType_t act);
 		DLL_PUBLIC void cuda_global_average_pooling_forward(mlContext_t context, float alpha, const mlTensor_t x, float beta, mlTensor_t y);
 		DLL_PUBLIC void cuda_global_average_pooling_backward(mlContext_t context, float alpha, const mlTensor_t dy, float beta, mlTensor_t dx);
 		DLL_PUBLIC void cuda_channel_scaling_forward(mlContext_t context, float alpha, const mlTensor_t x, const mlTensor_t scales, float beta,
@@ -242,11 +234,6 @@ namespace ml
 				const mlTensor_t mask, float beta, mlTensor_t gradient);
 		DLL_PUBLIC void cuda_cross_entropy_gradient(mlContext_t context, float alpha, const mlTensor_t output, const mlTensor_t target,
 				const mlTensor_t mask, float beta, mlTensor_t gradient);
-
-		DLL_PUBLIC void cuda_radam_optimize(mlContext_t context, float scale, const mlTensor_t gradient, mlTensor_t weights, mlTensor_t momentum,
-				mlTensor_t variance, float learning_rate, float beta1, float beta2, int step);
-		DLL_PUBLIC int cuda_is_nan_or_inf(mlContext_t context, const mlTensor_t tensor);
-		DLL_PUBLIC void cuda_l2_regularization(mlContext_t context, mlTensor_t gradient, const mlTensor_t param, float coefficient, float offset);
 
 		DLL_PUBLIC void cuda_fused_radam_optimize(mlContext_t context, float scale, const mlTensor_t *gradients, mlTensor_t *weights,
 				mlTensor_t *momentums, mlTensor_t *variances, float learning_rate, float beta1, float beta2, int step, int num_tensors);

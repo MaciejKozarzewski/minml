@@ -5,13 +5,16 @@ else()
 	find_package(CUDAToolkit)
 	enable_language(CUDA)
 
-	set(codesrc 	kernels/activations.cu
+	set(codesrc
+		kernels/activations.cu
 		kernels/attention.cu
+		kernels/batchnorm.cu
 		kernels/conversion.cu
 		kernels/depthwise_conv.cu
 		kernels/global_pooling.cu
-		kernels/normalization.cu
+		kernels/layernorm.cu
 		kernels/quantized.cu
+		kernels/rmsnorm.cu
 		kernels/softmax.cu
 		kernels/tensor_op.cu
 		kernels/training.cu

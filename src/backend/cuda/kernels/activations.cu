@@ -265,63 +265,6 @@ namespace ml
 		}
 		assert(cudaGetLastError() == cudaSuccess);
 	}
-//	void cuda_activation_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input, mlActivationType_t act)
-//	{
-//		assert(input != nullptr);
-//		assert(output != nullptr);
-//
-//		switch (act)
-//		{
-//			case ACTIVATION_LINEAR:
-//				if (output != input)
-//					ml::cuda_memcpy_within_device(context, output, 0, input, 0, size_of(dtype) * volume(shape));
-//				break;
-//			case ACTIVATION_SIGMOID:
-//				dispatch_activation_forward<ACTIVATION_SIGMOID>(context, dtype, shape, output, input);
-//				break;
-//			case ACTIVATION_TANH:
-//				dispatch_activation_forward<ACTIVATION_TANH>(context, dtype, shape, output, input);
-//				break;
-//			case ACTIVATION_RELU:
-//				dispatch_activation_forward<ACTIVATION_RELU>(context, dtype, shape, output, input);
-//				break;
-//			case ACTIVATION_GELU:
-//				dispatch_activation_forward<ACTIVATION_GELU>(context, dtype, shape, output, input);
-//				break;
-//			case ACTIVATION_EXP:
-//				dispatch_activation_forward<ACTIVATION_EXP>(context, dtype, shape, output, input);
-//				break;
-//		}
-//		assert(cudaGetLastError() == cudaSuccess);
-//	}
-//	void cuda_activation_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next, const void *output,
-//			mlActivationType_t act)
-//	{
-//		assert(gradient_prev != nullptr);
-//		assert(gradient_next != nullptr);
-//		assert(output != nullptr);
-//
-//		switch (act)
-//		{
-//			case ACTIVATION_LINEAR:
-//				if (gradient_prev != gradient_next)
-//					ml::cuda_memcpy_within_device(context, gradient_prev, 0, gradient_next, 0, sizeof(float) * volume(shape));
-//				break;
-//			case ACTIVATION_SIGMOID:
-//				dispatch_activation_backward<ACTIVATION_SIGMOID>(context, DTYPE_FLOAT32, shape, gradient_prev, gradient_next, nullptr, output);
-//				break;
-//			case ACTIVATION_TANH:
-//				dispatch_activation_backward<ACTIVATION_TANH>(context, DTYPE_FLOAT32, shape, gradient_prev, gradient_next, nullptr, output);
-//				break;
-//			case ACTIVATION_RELU:
-//				dispatch_activation_backward<ACTIVATION_RELU>(context, DTYPE_FLOAT32, shape, gradient_prev, gradient_next, nullptr, output);
-//				break;
-//			case ACTIVATION_EXP:
-//				dispatch_activation_backward<ACTIVATION_EXP>(context, DTYPE_FLOAT32, shape, gradient_prev, gradient_next, nullptr, output);
-//				break;
-//		}
-//		assert(cudaGetLastError() == cudaSuccess);
-//	}
 
 	void cuda_add_bias_act(mlContext_t context, float alpha, const mlTensor_t x, const mlTensor_t b, float beta, mlTensor_t y, mlActivationType_t act)
 	{

@@ -7,8 +7,6 @@ target_sources(${LibName} PRIVATE 	Add.cpp
 								DepthwiseConv2D.cpp
 								FusedConvBlock.cpp
 								GlobalAveragePooling.cpp
-								GlobalBroadcastHW.cpp
-								GlobalPooling.cpp
 								Input.cpp
 								Layer.cpp
 								LayerNormalization.cpp

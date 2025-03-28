@@ -16,39 +16,6 @@
 
 namespace ml
 {
-	Regularizer::Regularizer(float coefficient, float offset) :
-			m_coefficient(coefficient),
-			m_offset(offset)
-	{
-	}
-	float Regularizer::getCoefficient() const noexcept
-	{
-		return m_coefficient;
-	}
-	float Regularizer::getOffset() const noexcept
-	{
-		return m_offset;
-	}
-	void Regularizer::apply(const Context &context, Parameter &param)
-	{
-		l2Regularization(context, param.getGradient(), param.getParam(), m_coefficient, m_offset);
-	}
-
-	Json Regularizer::serialize(SerializedObject &binary_data) const
-	{
-		Json result;
-		result["name"] = "RegularizerL2";
-		result["coefficient"] = m_coefficient;
-		result["offset"] = m_offset;
-		return result;
-	}
-	void Regularizer::unserialize(const Json &json, const SerializedObject &binary_data)
-	{
-		assert(json["name"].getString() == "RegularizerL2");
-		m_coefficient = json["coefficient"];
-		m_offset = json["offset"];
-	}
-
 	RegularizerL2::RegularizerL2(float scale) :
 			m_scale(scale)
 	{

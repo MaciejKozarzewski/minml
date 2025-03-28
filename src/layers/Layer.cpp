@@ -32,8 +32,6 @@
 #include <minml/layers/LayerNormalization.hpp>
 #include <minml/layers/LearnableGlobalPooling.hpp>
 #include <minml/layers/GlobalAveragePooling.hpp>
-#include <minml/layers/GlobalBroadcastHW.hpp>
-#include <minml/layers/GlobalPooling.hpp>
 #include <minml/layers/MultiHeadAttention.hpp>
 #include <minml/layers/PositionalEncoding.hpp>
 #include <minml/layers/RMSNormalization.hpp>
@@ -312,8 +310,6 @@ namespace ml
 		static const DepthwiseConv2D depthwise_conv2d(0, 0);
 		static const FusedConvBlock fused_conv_block;
 		static const GlobalAveragePooling global_average_pooling;
-		static const GlobalBroadcastHW global_broadcast;
-		static const GlobalPooling global_pooling;
 		static const LayerNormalization layernorm;
 		static const LearnableGlobalPooling learnable_global_pooling(0);
 		static const MultiHeadAttention mha(0, 0, false);
@@ -347,10 +343,6 @@ namespace ml
 			result = fused_conv_block.clone(json);
 		if (name == global_average_pooling.name())
 			result = global_average_pooling.clone(json);
-		if (name == global_broadcast.name())
-			result = global_broadcast.clone(json);
-		if (name == global_pooling.name())
-			result = global_pooling.clone(json);
 		if (name == layernorm.name())
 			result = layernorm.clone(json);
 		if (name == learnable_global_pooling.name())

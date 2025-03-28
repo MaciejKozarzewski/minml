@@ -19,32 +19,6 @@ namespace ml
 
 namespace ml
 {
-	class Optimizer
-	{
-		private:
-			Tensor m_momentum;
-			Tensor m_variance;
-
-			float m_learning_rate = 0.001f;
-			float m_beta1 = 0.9f;
-			float m_beta2 = 0.999f;
-			int m_steps = 0;
-			float m_weight_decay = 0.0f;
-		public:
-			Optimizer(float learningRate = 0.001f, float beta1 = 0.9f, float beta2 = 0.999f, float weight_decay = 0.0f);
-
-			float getLearningRate() const noexcept;
-			void setLearningRate(float lr) noexcept;
-			int getSteps() const noexcept;
-
-			void restart(const Context &context) noexcept;
-			void moveTo(Device newDevice);
-			void apply(const Context &context, Parameter &param, float scale);
-
-			Json serialize(SerializedObject &binary_data) const;
-			void unserialize(const Json &json, const SerializedObject &binary_data);
-	};
-
 	class RAdam
 	{
 		private:
