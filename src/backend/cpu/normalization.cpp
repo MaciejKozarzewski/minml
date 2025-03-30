@@ -292,15 +292,9 @@ namespace ml
 			weights_ptr[0 * last_dim + j] = stats[j].get_average();
 		for (int j = 0; j < last_dim; j++)
 			weights_ptr[1 * last_dim + j] = stats[j].get_variance();
-
-		if (not use_gamma)
-			for (int j = 0; j < last_dim; j++)
-				weights_ptr[2 * last_dim + j] = 1.0f;
-		if (not use_beta)
-			for (int j = 0; j < last_dim; j++)
-				weights_ptr[3 * last_dim + j] = 0.0f;
 	}
-	void cpu_fold_batchnorm(mlContext_t context, mlShape_t shape, void *layer_weights, void *layer_bias, const void *batchnorm_weights)
+	void cpu_fold_batchnorm(mlContext_t context, mlShape_t shape, void *layer_weights, void *layer_bias, const void *batchnorm_weights,
+			bool use_gamma, bool use_beta)
 	{
 		assert(layer_weights != nullptr);
 		assert(layer_bias != nullptr);
@@ -321,16 +315,18 @@ namespace ml
 
 			for (int j = 0; j < channels; j++)
 			{
-				const float scale = get_gamma(bn_ptr, j, channels) / get_stddev(bn_ptr, j, channels); // gamma / sqrt(variance + epsilon)
-				const float shift = -get_mean(bn_ptr, j, channels) * scale + get_beta(bn_ptr, j, channels); // -mean * scale + beta
+				const float gamma = use_gamma ? get_gamma(bn_ptr, j, channels) : 1.0f;
+				const float scale = gamma / get_stddev(bn_ptr, j, channels); // gamma / sqrt(variance + epsilon)
+				const float beta = use_beta ? get_beta(bn_ptr, j, channels) : 0.0f;
+				const float shift = -get_mean(bn_ptr, j, channels) * scale + beta; // -mean * scale + beta
 				getPointer<float>(layer_bias)[j] = getPointer<float>(layer_bias)[j] * scale + shift;
 			}
 
 			for (int i = 0; i < first_dim; i++)
 				for (int j = 0; j < channels; j++)
 				{
-					const float scale = get_gamma(bn_ptr, j, channels) / get_stddev(bn_ptr, j, channels); // gamma / sqrt(variance + epsilon)
-					const float shift = -get_mean(bn_ptr, j, channels) * scale + get_beta(bn_ptr, j, channels); // -mean * scale + beta
+					const float gamma = use_gamma ? get_gamma(bn_ptr, j, channels) : 1.0f;
+					const float scale = gamma / get_stddev(bn_ptr, j, channels); // gamma / sqrt(va
 					getPointer<float>(layer_weights)[i * channels + j] *= scale;
 				}
 		}
@@ -343,8 +339,10 @@ namespace ml
 
 			for (int i = 0; i < channels; i++)
 			{
-				const float scale = get_gamma(bn_ptr, i, channels) / get_stddev(bn_ptr, i, channels); // gamma / sqrt(variance + epsilon)
-				const float shift = -get_mean(bn_ptr, i, channels) * scale + get_beta(bn_ptr, i, channels); // -mean * scale + beta
+				const float gamma = use_gamma ? get_gamma(bn_ptr, i, channels) : 1.0f;
+				const float scale = gamma / get_stddev(bn_ptr, i, channels); // gamma / sqrt(variance + epsilon)
+				const float beta = use_beta ? get_beta(bn_ptr, i, channels) : 0.0f;
+				const float shift = -get_mean(bn_ptr, i, channels) * scale + beta; // -mean * scale + beta
 
 				getPointer<float>(layer_bias)[i] = getPointer<float>(layer_bias)[i] * scale + shift;
 				for (int j = 0; j < last_dim; j++)

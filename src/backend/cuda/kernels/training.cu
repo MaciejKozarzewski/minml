@@ -86,7 +86,7 @@ namespace
 		assert(blockDim.x == 256);
 		__shared__ cg::block_tile_memory<256> btm;
 		cg::thread_block thb = cg::this_thread_block(btm);
-		cg::thread_block_tile<256> tile = cg::tiled_partition<256>(thb);
+		cg::thread_block_tile < 256 > tile = cg::tiled_partition<256>(thb);
 
 		const int tid = blockIdx.x * blockDim.x + threadIdx.x;
 		const int stride = gridDim.x * blockDim.x;
@@ -109,7 +109,7 @@ namespace
 		assert(blockDim.x == 256);
 		__shared__ cg::block_tile_memory<256> btm;
 		cg::thread_block thb = cg::this_thread_block(btm);
-		cg::thread_block_tile<256> tile = cg::tiled_partition<256>(thb);
+		cg::thread_block_tile < 256 > tile = cg::tiled_partition<256>(thb);
 
 		float acc = 0.0f;
 		for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < elements; i += gridDim.x * blockDim.x)
@@ -129,7 +129,7 @@ namespace
 		assert(blockDim.x == 256);
 		__shared__ cg::block_tile_memory<256> btm;
 		cg::thread_block thb = cg::this_thread_block(btm);
-		cg::thread_block_tile<256> tile = cg::tiled_partition<256>(thb);
+		cg::thread_block_tile < 256 > tile = cg::tiled_partition<256>(thb);
 
 		float acc = 0.0f;
 		for (int i = threadIdx.x; i < elements; i += blockDim.x)
@@ -139,49 +139,13 @@ namespace
 			workspace[0] = sum;
 	}
 
-	template<int N, typename T>
-	__global__ void kernel_learn_radam(float scale, const T *gradient, float *weight, float *momentum, float *variance, int elements,
-			float learning_rate, float beta1, float beta2, int step)
-	{
-		const float pow_beta1 = bounded_pow(beta1, step, 1.0e-8f);
-		const float pow_beta2 = bounded_pow(beta2, step, 1.0e-8f);
-		const float p_inf = 2.0f / (1.0f - beta2) - 1.0f;
-		const float p = p_inf - 2.0f * step * pow_beta2 / (1.0f - pow_beta2);
-		float r = 1.0f;
-		if (p > 4.0f)
-			r = sqrt((p - 4.0f) * (p - 2.0f) * p_inf / ((p_inf - 4.0f) * (p_inf - 2.0f) * p));
-
-		const int tid = blockIdx.x * blockDim.x + threadIdx.x;
-		const int stride = gridDim.x * blockDim.x;
-
-		for (int i = N * tid; i < elements; i += N * stride)
-		{
-			vec<float, N> w(weight + i);
-			vec<float, N> g = scale * convert<float>(vec<T, N>(gradient + i));
-			vec<float, N> m(momentum + i);
-			vec<float, N> v(variance + i);
-
-			m = beta1 * m + (1.0f - beta1) * g;
-			v = beta2 * v + (1.0f - beta2) * square(g);
-
-			vec<float, N> correction(1.0f);
-			if (p > 4.0f)
-				correction = sqrt((1.0f - pow_beta2) / (v + 1.0e-8f)) * r;
-
-			w = round_small_to_zero(w - learning_rate * correction * m / (1.0f - pow_beta1));
-
-			m.store(momentum + i);
-			v.store(variance + i);
-			w.store(weight + i);
-		}
-	}
-
 	struct radam_tensors
 	{
 			const void *gradient;
 			float *weight;
 			float *momentum;
 			float *variance;
+			void *weight_copy;
 			int64_t elements;
 	};
 	template<typename T>
@@ -200,6 +164,7 @@ namespace
 		float *momentum = tensors[blockIdx.y].momentum;
 		float *variance = tensors[blockIdx.y].variance;
 		const int elements = tensors[blockIdx.y].elements;
+		T *weight_copy = reinterpret_cast<T*>(tensors[blockIdx.y].weight_copy);
 
 		for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < elements; i += gridDim.x * blockDim.x)
 		{
@@ -220,72 +185,8 @@ namespace
 			momentum[i] = m;
 			variance[i] = v;
 			weight[i] = w;
-		}
-	}
-
-	__device__ uint32_t is_nan_or_inf(float x)
-	{
-		return static_cast<uint32_t>(isnan(x)) + (static_cast<uint32_t>(isinf(x)) << 1u);
-	}
-	__device__ uint32_t is_nan_or_inf(half x)
-	{
-#if __CUDA_ARCH__ >= FP16_MIN_ARCH
-		return static_cast<uint32_t>(__hisnan(x)) + (static_cast<uint32_t>(__hisinf(x) & 1) << 1u);
-#else
-		return 0u;
-#endif
-	}
-	template<typename T, int N>
-	__global__ void kernel_is_nan_or_inf_step_1(uint32_t *workspace, const T *input, int elements)
-	{
-		assert(blockDim.x == 256);
-		__shared__ cg::block_tile_memory<256> btm;
-		cg::thread_block thb = cg::this_thread_block(btm);
-		cg::thread_block_tile<256> tile = cg::tiled_partition<256>(thb);
-
-		const int tid = N * (blockIdx.x * blockDim.x + threadIdx.x);
-		const int stride = N * (gridDim.x * blockDim.x);
-
-		uint32_t local_flag = 0;
-		for (int i = tid; i < elements; i += stride)
-		{
-			const vec<T, N> tmp(input + i);
-			for (int n = 0; n < N; n++)
-				local_flag |= is_nan_or_inf(tmp[n]);
-		}
-		const uint32_t flag = cg::reduce(tile, local_flag, cg::bit_or<uint32_t>());
-		if (threadIdx.x == 0)
-			workspace[blockIdx.x] = flag;
-	}
-	__global__ void kernel_is_nan_or_inf_step_2(uint32_t *workspace, int elements)
-	{
-		assert(gridDim.x == 1);
-		assert(blockDim.x == 256);
-		__shared__ cg::block_tile_memory<256> btm;
-		cg::thread_block thb = cg::this_thread_block(btm);
-		cg::thread_block_tile<256> tile = cg::tiled_partition<256>(thb);
-
-		uint32_t local_flag = 0;
-		for (int i = threadIdx.x; i < elements; i += blockDim.x)
-			local_flag |= workspace[i];
-		const uint32_t flag = cg::reduce(tile, local_flag, cg::bit_or<uint32_t>());
-		if (threadIdx.x == 0)
-			workspace[0] = flag;
-	}
-
-	template<typename T, int N>
-	__global__ void kernel_regularizer_l2(T *gradient, const T *param, float scale, float offset, int elements)
-	{
-		assert(elements % N == 0);
-		const int tid = blockIdx.x * blockDim.x + threadIdx.x;
-		const int stride = gridDim.x * blockDim.x;
-
-		for (int i = N * tid; i < elements; i += N * stride)
-		{
-			const vec<T, N> w(param + i);
-			vec<T, N> g(gradient + i);
-			g += vec<T, N>(scale) * (w - vec<T, N>(offset));
-			g.store(gradient + i);
+			if (weight_copy != nullptr)
+				weight_copy[i] = w;
 		}
 	}
 
@@ -314,6 +215,19 @@ namespace
 			int32_t elements;
 			uint32_t flag;
 	};
+
+	__device__ uint32_t is_nan_or_inf(float x)
+	{
+		return static_cast<uint32_t>(isnan(x)) + (static_cast<uint32_t>(isinf(x)) << 1u);
+	}
+	__device__ uint32_t is_nan_or_inf(half x)
+	{
+#if __CUDA_ARCH__ >= FP16_MIN_ARCH
+		return static_cast<uint32_t>(__hisnan(x)) + (static_cast<uint32_t>(__hisinf(x) & 1) << 1u);
+#else
+		return 0u;
+#endif
+	}
 	template<typename T, int N>
 	__device__ uint32_t check_nan_inf(const T *ptr, int elements)
 	{
@@ -333,7 +247,7 @@ namespace
 		assert(blockDim.x == 256);
 		__shared__ cg::block_tile_memory<256> btm;
 		cg::thread_block thb = cg::this_thread_block(btm);
-		cg::thread_block_tile<256> tile = cg::tiled_partition<256>(thb);
+		cg::thread_block_tile < 256 > tile = cg::tiled_partition<256>(thb);
 
 		const T *data = reinterpret_cast<const T*>(tensors[blockIdx.x].data);
 		const int elements = tensors[blockIdx.x].elements;
@@ -450,120 +364,8 @@ namespace ml
 		cuda_mean_squared_gradient(context, alpha, output, target, mask, beta, gradient);
 	}
 
-	void cuda_radam_optimize(mlContext_t context, float scale, const mlTensor_t gradient, mlTensor_t weights, mlTensor_t momentum,
-			mlTensor_t variance, float learning_rate, float beta1, float beta2, int step)
-	{
-		assert(step > 0);
-		const int elements = volume(gradient);
-		dim3 blockDim(256);
-
-		cudaStream_t stream = cuda::Context::getStream(context);
-
-		dim3 gridDim_x4 = cuda::gridSize<1024>(elements / 4, blockDim.x);
-		dim3 gridDim_x1 = cuda::gridSize<1024>(elements, blockDim.x);
-		switch (gradient.dtype)
-		{
-			case DTYPE_FLOAT16:
-			{
-				if (elements % 4 == 0)
-					kernel_learn_radam<4> <<<gridDim_x4, blockDim, 0, stream>>>(scale, data<half>(gradient), data<float>(weights),
-							data<float>(momentum), data<float>(variance), elements, learning_rate, beta1, beta2, step);
-				else
-					kernel_learn_radam<1> <<<gridDim_x1, blockDim, 0, stream>>>(scale, data<half>(gradient), data<float>(weights),
-							data<float>(momentum), data<float>(variance), elements, learning_rate, beta1, beta2, step);
-				break;
-			}
-			case DTYPE_FLOAT32:
-			{
-				if (elements % 4 == 0)
-					kernel_learn_radam<4> <<<gridDim_x4, blockDim, 0, stream>>>(scale, data<float>(gradient), data<float>(weights),
-							data<float>(momentum), data<float>(variance), elements, learning_rate, beta1, beta2, step);
-				else
-					kernel_learn_radam<1> <<<gridDim_x1, blockDim, 0, stream>>>(scale, data<float>(gradient), data<float>(weights),
-							data<float>(momentum), data<float>(variance), elements, learning_rate, beta1, beta2, step);
-				break;
-			}
-		}
-		assert(cudaGetLastError() == cudaSuccess);
-	}
-	int cuda_is_nan_or_inf(mlContext_t context, const mlTensor_t tensor)
-	{
-		const int elements = volume(tensor);
-		if (elements == 0)
-			return 0;
-
-		assert(ml::cuda::Context::getWorkspaceSize(context) >= 4096 * sizeof(uint32_t));
-
-		uint32_t *workspace = cuda::Context::getWorkspace<uint32_t>(context);
-
-		dim3 blockDim(256);
-		dim3 gridDim((elements + 255) / 256);
-		cudaStream_t stream = cuda::Context::getStream(context);
-
-		switch (tensor.dtype)
-		{
-			case DTYPE_FLOAT16:
-			{
-				if (elements % 4 == 0)
-					kernel_is_nan_or_inf_step_1<half, 4> <<<gridDim, blockDim, 0, stream>>>(workspace, data<half>(tensor), elements);
-				else
-					kernel_is_nan_or_inf_step_1<half, 1> <<<gridDim, blockDim, 0, stream>>>(workspace, data<half>(tensor), elements);
-				break;
-			}
-			case DTYPE_FLOAT32:
-			{
-				if (elements % 4 == 0)
-					kernel_is_nan_or_inf_step_1<float, 4> <<<gridDim, blockDim, 0, stream>>>(workspace, data<float>(tensor), elements);
-				else
-					kernel_is_nan_or_inf_step_1<float, 1> <<<gridDim, blockDim, 0, stream>>>(workspace, data<float>(tensor), elements);
-				break;
-			}
-		}
-		assert(cudaGetLastError() == cudaSuccess);
-
-		kernel_is_nan_or_inf_step_2<<<1, blockDim, 0, stream>>>(workspace, gridDim.x);
-		assert(cudaGetLastError() == cudaSuccess);
-
-		uint32_t result = 0;
-		cudaMemcpyAsync(&result, workspace, sizeof(uint32_t), cudaMemcpyDeviceToHost, stream);
-		cudaError_t status = cudaStreamSynchronize(stream);
-		assert(status == cudaSuccess);
-		return result;
-	}
-	void cuda_l2_regularization(mlContext_t context, mlTensor_t gradient, const mlTensor_t param, float coefficient, float offset)
-	{
-		const int elements = volume(param);
-		dim3 blockDim(256);
-		dim3 gridDim = cuda::gridSize<1024>(elements, blockDim.x);
-
-		switch (param.dtype)
-		{
-			case DTYPE_FLOAT16:
-			{
-				if (elements % 4 == 0)
-					kernel_regularizer_l2<half, 4> <<<gridDim, blockDim, 0, cuda::Context::getStream(context)>>>(data<half>(gradient),
-							data<half>(param), coefficient, offset, elements);
-				else
-					kernel_regularizer_l2<half, 1> <<<gridDim, blockDim, 0, cuda::Context::getStream(context)>>>(data<half>(gradient),
-							data<half>(param), coefficient, offset, elements);
-				break;
-			}
-			case DTYPE_FLOAT32:
-			{
-				if (elements % 4 == 0)
-					kernel_regularizer_l2<float, 4> <<<gridDim, blockDim, 0, cuda::Context::getStream(context)>>>(data<float>(gradient),
-							data<float>(param), coefficient, offset, elements);
-				else
-					kernel_regularizer_l2<float, 1> <<<gridDim, blockDim, 0, cuda::Context::getStream(context)>>>(data<float>(gradient),
-							data<float>(param), coefficient, offset, elements);
-				break;
-			}
-		}
-		assert(cudaGetLastError() == cudaSuccess);
-	}
-
 	void cuda_fused_radam_optimize(mlContext_t context, float scale, const mlTensor_t *gradient, mlTensor_t *weights, mlTensor_t *momentum,
-			mlTensor_t *variance, float learning_rate, float beta1, float beta2, int step, int num_tensors)
+			mlTensor_t *variance, mlTensor_t *weights_copy, float learning_rate, float beta1, float beta2, int step, int num_tensors)
 	{
 		assert(step > 0);
 		if (num_tensors <= 0)
@@ -573,10 +375,21 @@ namespace ml
 		radam_tensors *cpu_workspace = reinterpret_cast<radam_tensors*>(cuda::Context::getCpuWorkspace(context));
 		for (int i = 0; i < num_tensors; i++)
 		{
+			assert(is_fp32(gradient[i]) || is_fp16(gradient[i]));
+			assert(is_fp32(weights[i]));
+			assert(is_fp32(momentum[i]));
+			assert(is_fp32(variance[i]));
 			cpu_workspace[i].gradient = gradient[i].data;
 			cpu_workspace[i].weight = data<float>(weights[i]);
 			cpu_workspace[i].momentum = data<float>(momentum[i]);
 			cpu_workspace[i].variance = data<float>(variance[i]);
+			if (weights_copy != nullptr)
+			{
+				assert(is_fp16(weights_copy[i]));
+				cpu_workspace[i].weight_copy = weights_copy[i].data;
+			}
+			else
+				cpu_workspace[i].weight_copy = nullptr;
 			cpu_workspace[i].elements = volume(gradient[i]);
 		}
 

@@ -8,11 +8,20 @@
 #include <minml/training/Optimizer.hpp>
 #include <minml/layers/Parameter.hpp>
 #include <minml/utils/json.hpp>
+#include <minml/utils/testing_util.hpp>
 #include <minml/core/Context.hpp>
 #include <minml/core/math.hpp>
 
 #include <algorithm>
 #include <cmath>
+
+namespace
+{
+	bool is_fp16(const std::vector<ml::Tensor> &v)
+	{
+		return v.empty() ? false : (v[0].dtype() == ml::DataType::FLOAT16);
+	}
+}
 
 namespace ml
 {
@@ -53,21 +62,36 @@ namespace ml
 	}
 	void RAdam::apply(const Context &context, std::vector<Tensor> &weights, const std::vector<Tensor> &gradients, float scale)
 	{
+		if (is_fp16(weights) and m_fp32_weights.size() != weights.size())
+		{
+			m_fp32_weights.clear();
+			for (size_t i = 0; i < weights.size(); i++)
+			{
+				m_fp32_weights.emplace_back(weights[i].shape(), DataType::FLOAT32, weights[i].device());
+				convertTensor(context, m_fp32_weights.back(), weights[i]);
+			}
+		}
 		if (m_momentums.size() != weights.size())
 		{
 			m_momentums.clear();
 			for (size_t i = 0; i < weights.size(); i++)
-				m_momentums.push_back(zeros_like(weights[i]));
+				m_momentums.emplace_back(weights[i].shape(), DataType::FLOAT32, weights[i].device());
 		}
 		if (m_variances.size() != weights.size())
 		{
 			m_variances.clear();
 			for (size_t i = 0; i < weights.size(); i++)
-				m_variances.push_back(zeros_like(weights[i]));
+				m_variances.emplace_back(weights[i].shape(), DataType::FLOAT32, weights[i].device());
 		}
 
 		m_steps++;
-		radamOptimize(context, scale, gradients, weights, m_momentums, m_variances, m_learning_rate, m_beta1, m_beta2, m_steps);
+		if (is_fp16(weights))
+			radamOptimize(context, scale, gradients, m_fp32_weights, m_momentums, m_variances, weights, m_learning_rate, m_beta1, m_beta2, m_steps);
+		else
+		{
+			std::vector<Tensor> empty;
+			radamOptimize(context, scale, gradients, weights, m_momentums, m_variances, empty, m_learning_rate, m_beta1, m_beta2, m_steps);
+		}
 	}
 
 	Json RAdam::serialize(SerializedObject &binary_data) const
@@ -78,12 +102,16 @@ namespace ml
 		result["beta1"] = m_beta1;
 		result["beta2"] = m_beta2;
 		result["steps"] = m_steps;
+		result["fp32_weights"] = Json::array();
+		for (size_t i = 0; i < m_fp32_weights.size(); i++)
+			result["fp32_weights"][i] = m_fp32_weights[i].serialize(binary_data);
 		result["momentums"] = Json::array();
 		for (size_t i = 0; i < m_momentums.size(); i++)
 			result["momentums"][i] = m_momentums[i].serialize(binary_data);
 		result["variances"] = Json::array();
 		for (size_t i = 0; i < m_variances.size(); i++)
 			result["variances"][i] = m_variances[i].serialize(binary_data);
+
 		return result;
 	}
 	void RAdam::unserialize(const Json &json, const SerializedObject &binary_data)
@@ -93,10 +121,13 @@ namespace ml
 		m_beta1 = json["beta1"];
 		m_beta2 = json["beta2"];
 		m_steps = json["steps"];
+		m_fp32_weights = std::vector<Tensor>(json["fp32_weights"].size());
+		for (size_t i = 0; i < m_fp32_weights.size(); i++)
+			m_fp32_weights[i].unserialize(json["fp32_weights"][i], binary_data);
 		m_momentums = std::vector<Tensor>(json["momentum"].size());
-		m_variances = std::vector<Tensor>(json["variance"].size());
 		for (size_t i = 0; i < m_momentums.size(); i++)
 			m_momentums[i].unserialize(json["momentum"][i], binary_data);
+		m_variances = std::vector<Tensor>(json["variance"].size());
 		for (size_t i = 0; i < m_variances.size(); i++)
 			m_variances[i].unserialize(json["variance"][i], binary_data);
 	}

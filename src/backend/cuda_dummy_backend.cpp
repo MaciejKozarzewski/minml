@@ -278,26 +278,27 @@ namespace ml
 	}
 
 	// batchnorm
-	void cuda_batchnorm_inference(mlContext_t context, float alpha, const mlTensor_t x, const mlTensor_t w, const mlTensor_t stats, float beta, mlTensor_t y,
-			mlActivationType_t act)
+	void cuda_batchnorm_inference(mlContext_t context, float alpha, const mlTensor_t x, const mlTensor_t w, const mlTensor_t b,
+			const mlTensor_t avg_var, float beta, mlTensor_t y, mlActivationType_t act)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
-	void cuda_batchnorm_forward(mlContext_t context, float alpha, const mlTensor_t x, const mlTensor_t w, float beta, mlTensor_t y,
-			mlTensor_t running_stats, mlActivationType_t act)
+	void cuda_batchnorm_forward(mlContext_t context, float alpha, const mlTensor_t x, const mlTensor_t w, const mlTensor_t b, float beta,
+			mlTensor_t y, mlTensor_t running_stats, mlActivationType_t act)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
-	void cuda_batchnorm_backward(mlContext_t context, float alpha, const mlTensor_t x, mlTensor_t dy, const mlTensor_t w,
-			const mlTensor_t running_stats, float beta_dx, mlTensor_t dx, float beta_dw, mlTensor_t dw, mlActivationType_t act)
+	void cuda_batchnorm_backward(mlContext_t context, float alpha, const mlTensor_t x, mlTensor_t dy, const mlTensor_t w, const mlTensor_t b,
+			const mlTensor_t running_stats, float beta_dx, mlTensor_t dx, float beta_dw, mlTensor_t dw, mlTensor_t db, mlActivationType_t act)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
-	void cuda_batchnorm_update(mlContext_t context, const mlTensor_t running_stat, mlTensor_t weights, bool use_gamma, bool use_beta)
+	void cuda_batchnorm_update(mlContext_t context, const mlTensor_t running_stat, mlTensor_t avg_var)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
-	void cuda_fold_batchnorm(mlContext_t context, mlShape_t shape, void *layer_weights, void *layer_bias, const void *batchnorm_weights)
+	void cuda_fold_batchnorm(mlContext_t context, mlTensor_t layer_weights, mlTensor_t layer_bias, const mlTensor_t bn_weights,
+			const mlTensor_t bn_bias, const mlTensor_t bn_avg_var)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
@@ -367,8 +368,8 @@ namespace ml
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
-	void cuda_fused_act_bias_copy_backward(mlContext_t context, mlTensor_t dy, const mlTensor_t y, float beta_dx, mlTensor_t dx,
-			float beta_dw, mlTensor_t dw, mlActivationType_t act)
+	void cuda_fused_act_bias_copy_backward(mlContext_t context, mlTensor_t dy, const mlTensor_t y, float beta_dx, mlTensor_t dx, float beta_dw,
+			mlTensor_t dw, mlActivationType_t act)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
@@ -415,8 +416,8 @@ namespace ml
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
-	void cuda_radam_optimize(mlContext_t context, float scale, const mlTensor_t gradient, mlTensor_t weights, mlTensor_t momentum,
-			mlTensor_t variance, float learning_rate, float beta1, float beta2, int step)
+	void cuda_fused_radam_optimize(mlContext_t context, float scale, const mlTensor_t *gradients, mlTensor_t *weights, mlTensor_t *momentums,
+			mlTensor_t *variances, mlTensor_t *weights_copy, float learning_rate, float beta1, float beta2, int step, int num_tensors)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}

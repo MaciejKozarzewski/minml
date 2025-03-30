@@ -236,7 +236,7 @@ namespace
 							dy *= (one<T, N>() - square(y));
 							break;
 						case ml::ACTIVATION_RELU:
-							dy = select(y == zero<T, N>(), zero<T, N>(), dy);
+							dy = select(y <= zero<T, N>(), zero<T, N>(), dy);
 							break;
 					}
 					store_vec(gradient_next + tmp_idx, dy);
@@ -248,7 +248,6 @@ namespace
 						dy += vec<T, N>(beta_prev) * load_vec<T, N>(gradient_prev + tmp_idx);
 					store_vec(gradient_prev + tmp_idx, dy);
 				}
-
 			}
 		}
 

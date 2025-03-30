@@ -65,7 +65,7 @@ namespace
 			case ml::ACTIVATION_TANH:
 				return gradient * (one - square(output));
 			case ml::ACTIVATION_RELU:
-				return select(output == zero, zero, gradient);
+				return select(output <= zero, zero, gradient);
 			case ml::ACTIVATION_EXP:
 				return gradient * output;
 		}

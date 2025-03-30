@@ -853,6 +853,12 @@ namespace ml
 			ml::destroy_view(device(), data());
 	}
 
+	Tensor copy_tensor(const Tensor &t)
+	{
+		Tensor result(t.shape(), t.dtype(), t.device());
+		result.copyFrom(Context(), t);
+		return result;
+	}
 	Tensor zeros_like(const Tensor &t)
 	{
 		return Tensor(t.shape(), t.dtype(), t.device());

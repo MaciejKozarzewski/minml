@@ -158,15 +158,16 @@ namespace ml
 		/*
 		 * batchnorm
 		 */
-		DLL_PUBLIC void cuda_batchnorm_inference(mlContext_t context, float alpha, const mlTensor_t x, const mlTensor_t w, const mlTensor_t stats,
-				float beta, mlTensor_t y, mlActivationType_t act);
-		DLL_PUBLIC void cuda_batchnorm_forward(mlContext_t context, float alpha, const mlTensor_t x, const mlTensor_t w, float beta, mlTensor_t y,
-				mlTensor_t running_stats, mlActivationType_t act);
+		DLL_PUBLIC void cuda_batchnorm_inference(mlContext_t context, float alpha, const mlTensor_t x, const mlTensor_t w, const mlTensor_t b,
+				const mlTensor_t avg_var, float beta, mlTensor_t y, mlActivationType_t act);
+		DLL_PUBLIC void cuda_batchnorm_forward(mlContext_t context, float alpha, const mlTensor_t x, const mlTensor_t w, const mlTensor_t b,
+				float beta, mlTensor_t y, mlTensor_t running_stats, mlActivationType_t act);
 		DLL_PUBLIC void cuda_batchnorm_backward(mlContext_t context, float alpha, const mlTensor_t x, mlTensor_t dy, const mlTensor_t w,
-				const mlTensor_t running_stats, float beta_dx, mlTensor_t dx, float beta_dw, mlTensor_t dw, mlActivationType_t act);
-		DLL_PUBLIC void cuda_batchnorm_update(mlContext_t context, const mlTensor_t running_stat, mlTensor_t weights, bool use_gamma, bool use_beta);
-		DLL_PUBLIC void cuda_fold_batchnorm(mlContext_t context, mlShape_t shape, void *layer_weights, void *layer_bias,
-				const void *batchnorm_weights);
+				const mlTensor_t b, const mlTensor_t running_stats, float beta_dx, mlTensor_t dx, float beta_dw, mlTensor_t dw, mlTensor_t db,
+				mlActivationType_t act);
+		DLL_PUBLIC void cuda_batchnorm_update(mlContext_t context, const mlTensor_t running_stat, mlTensor_t avg_var);
+		DLL_PUBLIC void cuda_fold_batchnorm(mlContext_t context, mlTensor_t layer_weights, mlTensor_t layer_bias, const mlTensor_t bn_weights,
+				const mlTensor_t bn_bias, const mlTensor_t bn_avg_var);
 
 		/*
 		 *  layernorm
@@ -236,7 +237,8 @@ namespace ml
 				const mlTensor_t mask, float beta, mlTensor_t gradient);
 
 		DLL_PUBLIC void cuda_fused_radam_optimize(mlContext_t context, float scale, const mlTensor_t *gradients, mlTensor_t *weights,
-				mlTensor_t *momentums, mlTensor_t *variances, float learning_rate, float beta1, float beta2, int step, int num_tensors);
+				mlTensor_t *momentums, mlTensor_t *variances, mlTensor_t *weights_copy, float learning_rate, float beta1, float beta2, int step,
+				int num_tensors);
 		DLL_PUBLIC void cuda_fused_is_nan_or_inf(mlContext_t context, const mlTensor_t *tensors, int *result, int num_tensors);
 		DLL_PUBLIC void cuda_fused_l2_regularization(mlContext_t context, mlTensor_t *gradients, const mlTensor_t *params, float scale,
 				int num_tensors);

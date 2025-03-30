@@ -13,6 +13,7 @@
 #include <minml/core/math.hpp>
 #include <minml/core/ml_exceptions.hpp>
 #include <minml/layers/Input.hpp>
+#include <minml/layers/BatchNormalization.hpp>
 #include <minml/training/LossFunction.hpp>
 #include <minml/utils/json.hpp>
 #include <minml/utils/testing_util.hpp>
@@ -42,17 +43,6 @@ namespace
 	void removeByValue(std::vector<T> &vec, T value)
 	{
 		removeByIndex(vec, indexOf(vec, value));
-	}
-	bool is_nan_or_inf(const ml::Tensor &t)
-	{
-		ml::Tensor tmp = t.view( { t.volume() });
-		for (int i = 0; i < tmp.volume(); i++)
-		{
-			const float x = tmp.get( { i });
-			if (isnanf(x) or isinff(x))
-				return true;
-		}
-		return false;
 	}
 }
 
@@ -98,6 +88,10 @@ namespace ml
 		m_masks.push_back(Tensor());
 		m_losses.push_back(loss.clone());
 		m_loss_weights.push_back(weight);
+	}
+	void Graph::addOutput(GraphNodeID node)
+	{
+		addOutput(node, CrossEntropyLoss());
 	}
 
 	const Tensor& Graph::getInput(int index) const
@@ -183,20 +177,14 @@ namespace ml
 	}
 	void Graph::convertTo(DataType newType)
 	{
-		if (isTrainable() and newType == DataType::FLOAT16)
-		{
-			const std::vector<Tensor> params = getParameters();
-			m_fp32_weights_copy.resize(params.size());
-			for (size_t i = 0; i < params.size(); i++)
-			{
-				m_fp32_weights_copy[i] = zeros_like(params[i]);
-				m_fp32_weights_copy[i].copyFrom(context(), params[i]);
-			}
-		}
 		m_datatype = newType;
 		m_workspace = nullptr;
 		for (int i = 0; i < numberOfNodes(); i++)
 			getNode(i).convertTo(newType);
+		for (size_t i = 0; i < m_targets.size(); i++)
+			m_targets[i] = Tensor();
+		for (size_t i = 0; i < m_masks.size(); i++)
+			m_masks[i] = Tensor();
 	}
 	void Graph::setInputShape(const Shape &shape)
 	{
@@ -229,6 +217,19 @@ namespace ml
 	{
 		m_gradient_scaler = scaler;
 	}
+	RAdam& Graph::getOptimizer()
+	{
+		return m_optimizer;
+	}
+	RegularizerL2& Graph::getRegularizer()
+	{
+		return m_regularizer;
+	}
+	GradientScaler& Graph::getGradientScaler()
+	{
+		return m_gradient_scaler;
+	}
+
 	void Graph::predict(int batchSize)
 	{
 		if (m_workspace == nullptr)
@@ -239,12 +240,6 @@ namespace ml
 	}
 	void Graph::train(int batchSize)
 	{
-		{
-			std::vector<Tensor> param_gradients = getParameterGradients();
-			for (size_t i = 0; i < param_gradients.size(); i++)
-				param_gradients[i].zeroall();
-		}
-
 		if (not isTrainable())
 			throw LogicError(METHOD_NAME, "Graph is not trainable");
 
@@ -261,8 +256,6 @@ namespace ml
 			m_losses.at(i)->getGradient(context(), m_loss_weights[i] * gradient_scale / batchSize, gradient, output, target, mask);
 		}
 
-		std::this_thread::sleep_for(std::chrono::milliseconds(100));
-
 		if (m_workspace == nullptr)
 			create_workspace();
 		for (size_t i = 0; i < m_nodes.size(); i++)
@@ -273,7 +266,7 @@ namespace ml
 
 		std::vector<Tensor> params = getParameters();
 		std::vector<Tensor> param_gradients = getParameterGradients();
-//		m_regularizer.apply(context(), gradient_scale, params, param_gradients);
+		m_regularizer.apply(context(), gradient_scale, params, param_gradients);
 
 //		{
 //			Json json = Json::array();
@@ -289,9 +282,9 @@ namespace ml
 //		}
 
 //		FileLoader fl("/home/maciek/alphagomoku/dump.bin");
-
-		for (size_t i = 0; i < param_gradients.size() / 2; i++)
-		{
+//
+//		for (size_t i = 0; i < param_gradients.size() / 2; i++)
+//		{
 //			const Tensor loaded_dw(fl.getJson()[2 * i + 0], fl.getBinaryData());
 //			const Tensor loaded_db(fl.getJson()[2 * i + 1], fl.getBinaryData());
 //
@@ -305,38 +298,21 @@ namespace ml
 //			std::cout << i << " weights = " << ml::testing::diffForTest(current_dw, loaded_dw) << " (" << ml::testing::normForTest(loaded_dw) << ", "
 //					<< ml::testing::normForTest(current_dw) / gradient_scale << "), bias = " << ml::testing::diffForTest(current_db, loaded_db)
 //					<< " (" << ml::testing::normForTest(loaded_db) << ", " << ml::testing::normForTest(current_db) / gradient_scale << ")  "
-//					<< getNode(i).getLayer().name() << " (" << is_nan_or_inf(current_dw) << ", " << is_nan_or_inf(current_db) << ")\n";
+//					<< getNode(i).getLayer().name() << "\n";
+//
+////			std::cout << i << " " << ml::testing::normForTest(param_gradients[2 * i + 0]) / gradient_scale << " "
+////					<< ml::testing::normForTest(param_gradients[2 * i + 1]) / gradient_scale << " " << getNode(i).getLayer().name() << '\n';
+//		}
 
-//			std::cout << i << " " << ml::testing::normForTest(param_gradients[2 * i + 0]) / gradient_scale << " "
-//					<< ml::testing::normForTest(param_gradients[2 * i + 1]) / gradient_scale << " " << getNode(i).getLayer().name() << '\n';
-		}
-		switch (m_datatype)
+		const float inv_gradient_scale = (m_datatype == DataType::FLOAT16) ? m_gradient_scaler.getInvScale(context(), param_gradients) : 1.0f;
+		if (inv_gradient_scale != 0.0f)
 		{
-			case DataType::FLOAT16:
-			{
-				const float inv_gradient_scale = m_gradient_scaler.getInvScale(context(), param_gradients);
-				if (inv_gradient_scale != 0.0f)
-				{
-					std::cout << "\n\n---gradients ok, updating weights with scale " << inv_gradient_scale << "\n\n";
-					m_optimizer.apply(context(), m_fp32_weights_copy, param_gradients, inv_gradient_scale);
-					for (size_t i = 0; i < params.size(); i++)
-						convertType(context(), params[i].data(), params[i].dtype(), m_fp32_weights_copy[i].data(), DataType::FLOAT32,
-								params[i].volume());
-				}
-				else
-				{
-					std::cout << "\n\n---some gradients are NaN or Inf, reducing scale to " << m_gradient_scaler.getScale()
-							<< " and skipping update\n\n";
-				}
-				break;
-			}
-			case DataType::FLOAT32:
-			{
-				m_optimizer.apply(context(), params, param_gradients, 1.0f);
-				break;
-			}
-			default:
-				throw NotImplemented(METHOD_NAME, "training in types other than fp32 or fp16 are not supported");
+//			std::cout << "---gradients ok, updating weights with scale " << m_gradient_scaler.getScale() << "\n";
+			m_optimizer.apply(context(), params, param_gradients, inv_gradient_scale);
+		}
+		else
+		{
+//			std::cout << "---some gradients are NaN or Inf, reducing scale to " << m_gradient_scaler.getScale() << " and skipping update\n";
 		}
 	}
 	std::vector<float> Graph::getLoss(int batchSize)
@@ -460,22 +436,60 @@ namespace ml
 	}
 	Json Graph::save(SerializedObject &binary_data) const
 	{
-		Json result(JsonType::Array);
-		for (int i = 0; i < static_cast<int>(m_nodes.size()); i++)
-			result[i] = save_node(m_nodes[i].get(), binary_data);
+		Json result;
+		result["dtype"] = toString(m_datatype);
+		result["is_trainable"] = m_is_trainable;
+		result["nodes"] = Json::array();
+		for (size_t i = 0; i < m_nodes.size(); i++)
+			result["nodes"][i] = save_node(m_nodes[i].get(), binary_data);
+		if (isTrainable())
+		{
+			result["optimizer"] = m_optimizer.serialize(binary_data);
+			result["regularizer"] = m_regularizer.serialize(binary_data);
+			result["gradient_scaler"] = m_gradient_scaler.serialize(binary_data);
+			result["loss_function"] = Json::array();
+			for (size_t i = 0; i < m_loss_weights.size(); i++)
+				result["loss_function"][i] = m_losses[i]->serialize(binary_data);
+			result["loss_weights"] = Json::array();
+			for (size_t i = 0; i < m_loss_weights.size(); i++)
+				result["loss_weights"][i] = m_loss_weights[i];
+		}
 		return result;
 	}
 	void Graph::load(const Json &json, const SerializedObject &binary_data)
 	{
 		clear();
-		for (int i = 0; i < json.size(); i++)
-			load_node(json[i], binary_data);
 
-		m_is_trainable = false;
+		if (json.isArray())
+		{ // old format
+			for (int i = 0; i < json.size(); i++)
+				load_node(json[i], binary_data);
+			for (int i = 0; i < numberOfNodes(); i++)
+				getNode(i).getLayer().loadParameters(json[i]["layer"], binary_data);
+			m_is_trainable = false;
+			return;
+		}
+
+		m_datatype = typeFromString(json["dtype"]);
+		m_is_trainable = json["is_trainable"].getBool();
+		for (int i = 0; i < json.size(); i++)
+			load_node(json["nodes"][i], binary_data);
+
 		for (int i = 0; i < numberOfNodes(); i++)
+			getNode(i).getLayer().loadParameters(json[i]["nodes"]["layer"], binary_data);
+
+		if (isTrainable())
 		{
-			getNode(i).getLayer().loadParameters(json[i]["layer"], binary_data);
-			m_is_trainable |= getNode(i).getLayer().isTrainable();
+			m_optimizer.unserialize(json["optimizer"], binary_data);
+			m_regularizer.unserialize(json["regularizer"], binary_data);
+			m_gradient_scaler.unserialize(json["gradient_scaler"], binary_data);
+			if (json["loss_function"]["name"].getString() == "CrossEntropyLoss")
+				m_losses.push_back(std::make_unique<CrossEntropyLoss>());
+			if (json["loss_function"]["name"].getString() == "MeanSquaredLoss")
+				m_losses.push_back(std::make_unique<MeanSquaredLoss>());
+			m_losses.back()->unserialize(json["loss_function"], binary_data);
+			for (int i = 0; i < json["loss_weights"].size(); i++)
+				m_loss_weights.push_back(json["loss_weights"][i]);
 		}
 	}
 

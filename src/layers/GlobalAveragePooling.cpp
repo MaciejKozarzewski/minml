@@ -11,8 +11,8 @@
 #include <minml/core/ml_exceptions.hpp>
 #include <minml/layers/GlobalAveragePooling.hpp>
 #include <minml/utils/json.hpp>
-
 #include <minml/utils/time_util.hpp>
+#include <minml/utils/testing_util.hpp>
 
 namespace ml
 {
@@ -53,8 +53,8 @@ namespace ml
 		assert(input.size() == 1);
 		globalAveragePoolingForward(context(), 1.0f, input[0], 0.0f, output);
 	}
-	void GlobalAveragePooling::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next,
-			const std::vector<float> &beta)
+	void GlobalAveragePooling::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev,
+			Tensor &gradient_next, const std::vector<float> &beta)
 	{
 		assert(input.size() == 1);
 		globalAveragePoolingBackward(context(), 1.0f, gradient_next, beta[0], gradient_prev[0]);

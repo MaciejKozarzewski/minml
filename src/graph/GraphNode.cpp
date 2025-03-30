@@ -173,7 +173,11 @@ namespace ml
 		getLayer().forward(input, output);
 //		getLayer().context().synchronize();
 //		std::cout << "forward " << m_layer->name() << " " << m_layer->getInputShape() << " x " << m_layer->getWeightShape() << " -> "
-//				<< m_layer->getOutputShape() << " = " << testing::normForTest(output) << '\n';
+//				<< m_layer->getOutputShape() << "  :  ";
+//		for (size_t i = 0; i < input.size(); i++)
+//			std::cout << testing::normForTest(input[i]) << " ";
+//		std::cout << " x (" << testing::normForTest(m_layer->getWeights().getParam()) << ", " << testing::normForTest(m_layer->getBias().getParam())
+//				<< ") -> " << testing::normForTest(output) << '\n';
 //		m_timer.stop();
 
 //		const bool emulate_low_precision = false; // getLayer().isTrainable() and getLayer().dtype() == DataType::FLOAT32;
@@ -209,7 +213,7 @@ namespace ml
 		m_layer->backward(input, output, gradient_prev, gradient_next, beta);
 
 //		getLayer().context().synchronize();
-//		std::cout << "         " << m_layer->name() << " " << m_layer->getInputShape() << " x " << m_layer->getWeightShape() << " -> "
+//		std::cout << "backward " << m_layer->name() << " " << m_layer->getInputShape() << " x " << m_layer->getWeightShape() << " -> "
 //				<< m_layer->getOutputShape() << " = " << testing::normForTest(gradient_next) << '\n';
 
 		for (int i = 0; i < numberOfInputs(); i++)

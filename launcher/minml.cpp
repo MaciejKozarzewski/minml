@@ -16,10 +16,8 @@
 #include <minml/layers/DepthwiseConv2D.hpp>
 #include <minml/layers/Conv2D.hpp>
 #include <minml/layers/BatchNormalization.hpp>
-#include <minml/layers/GlobalBroadcastHW.hpp>
 #include <minml/layers/GlobalAveragePooling.hpp>
 #include <minml/layers/ChannelScaling.hpp>
-#include <minml/layers/GlobalPooling.hpp>
 #include <minml/layers/Add.hpp>
 #include <minml/layers/Softmax.hpp>
 #include <minml/layers/Multiply.hpp>
@@ -31,7 +29,6 @@
 #include <minml/layers/SpaceToDepth.hpp>
 #include <minml/training/Optimizer.hpp>
 #include <minml/training/LossFunction.hpp>
-#include <minml/training/Trainer.hpp>
 #include <minml/utils/random.hpp>
 #include <minml/utils/time_util.hpp>
 #include <minml/utils/file_util.hpp>
@@ -3531,9 +3528,9 @@ int main()
 	{
 		Graph graph;
 		const bool symmetric = false;
-		const int batch_size = 1024;
-		const int board_size = 20;
-		int embedding = 128;
+		const int batch_size = 128;
+		const int board_size = 15;
+		int embedding = 256;
 		const int patch_size = 1;
 		const int head_dim = 32;
 		const int pos_encoding_range = (board_size + patch_size - 1) / patch_size;
@@ -3547,7 +3544,7 @@ int main()
 		y = graph.add(ml::Dense(embedding, "sigmoid"), y);
 		x = graph.add(ml::ChannelScaling(), { x, y });
 
-		for (int i = 0; i < 8; i++)
+		for (int i = 0; i < 0; i++)
 		{
 			auto y = graph.add(ml::DepthwiseConv2D(embedding, 7).useBias(false), x);
 			y = graph.add(ml::BatchNormalization().useGamma(false), y);

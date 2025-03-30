@@ -137,7 +137,7 @@ namespace vectors
 	}
 	DEVICE_INLINE vec1f operator<=(const vec1f &lhs, const vec1f &rhs)
 	{
-		return vec1f(to_mask<float>(lhs.x0 < rhs.x0));
+		return vec1f(to_mask<float>(lhs.x0 <= rhs.x0));
 	}
 
 	DEVICE_INLINE vec1f abs(const vec1f &a)

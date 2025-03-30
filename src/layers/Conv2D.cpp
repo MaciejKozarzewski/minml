@@ -11,9 +11,9 @@
 #include <minml/core/math.hpp>
 #include <minml/core/ml_exceptions.hpp>
 #include <minml/utils/json.hpp>
-#include <minml/utils/testing_util.hpp>
 #include <minml/utils/string_util.hpp>
 #include <minml/utils/time_util.hpp>
+#include <minml/utils/testing_util.hpp>
 
 #include <cmath>
 
@@ -148,18 +148,18 @@ namespace ml
 		{
 			choose_algorithm();
 
-			const std::array<int, 3> tmp = explicit_gemm_workspace(getInputShape(), getOutputShape(), getWeightShape());
+			const std::array<int, 3> gemm1 = explicit_gemm_workspace(getInputShape(), getOutputShape(), getWeightShape());
 
-			const Shape tmp1 = get_matrices_shape(m_kernel_size, m_winograd_tile_size, getInputShape());
-			const Shape tmp2 = get_matrices_shape(m_kernel_size, m_winograd_tile_size, getOutputShape());
+			const Shape win1 = get_matrices_shape(m_kernel_size, m_winograd_tile_size, getInputShape());
+			const Shape win2 = get_matrices_shape(m_kernel_size, m_winograd_tile_size, getOutputShape());
 			int result = 0;
 			switch (m_forward_algorithm)
 			{
 				case ConvolutionAlgorithm::EXPLICIT_GEMM:
-					result = std::max(result, tmp[0]);
+					result = std::max(result, gemm1[0]);
 					break;
 				case ConvolutionAlgorithm::WINOGRAD_NON_FUSED:
-					result = std::max(result, tmp1.volume() + tmp2.volume() + 1024);
+					result = std::max(result, win1.volume() + win2.volume() + 1024);
 					break;
 				default:
 					break;
@@ -167,10 +167,10 @@ namespace ml
 			switch (m_backward_algorithm)
 			{
 				case ConvolutionAlgorithm::EXPLICIT_GEMM:
-					result = std::max(result, std::max(tmp[1], tmp[2]));
+					result = std::max(result, std::max(gemm1[1], gemm1[2]));
 					break;
 				case ConvolutionAlgorithm::WINOGRAD_NON_FUSED:
-					result = std::max(result, tmp1.volume() + tmp2.volume() + 1024);
+					result = std::max(result, win1.volume() + win2.volume() + 1024);
 					break;
 				default:
 					break;
@@ -376,7 +376,6 @@ namespace ml
 			{
 				explicit_gemm_backward(context(), gradient_prev[0], gradient_next, output, getWeights().getParam(), *m_workspace.lock(), beta[0]);
 				explicit_gemm_update(context(), input[0], gradient_next, getWeights().getGradient(), *m_workspace.lock());
-
 				break;
 			}
 			case ConvolutionAlgorithm::WINOGRAD_NON_FUSED:
@@ -394,8 +393,8 @@ namespace ml
 
 				winogradInputTransform(context(), getWeightShape(), gradient_next, gradient_next_matrices);
 				gemmBatched(context(), 'n', 'n', gradient_prev_matrices, gradient_next_matrices, *m_transformed_weights, 1, 0);
-				winogradOutputTransform(context(), getWeightShape(), gradient_prev_matrices, gradient_prev[0], Tensor( { }, dtype(), device()),
-						Tensor( { }, dtype(), device()), ActivationType::LINEAR, beta[0]);
+				winogradOutputTransform(context(), getWeightShape(), gradient_prev_matrices, gradient_prev[0], Tensor(), Tensor(),
+						ActivationType::LINEAR, beta[0]);
 
 				winogradGradientTransform(context(), getWeightShape(), gradient_next, gradient_next_matrices);
 				winogradInputTransform(context(), getWeightShape(), input[0], gradient_prev_matrices);

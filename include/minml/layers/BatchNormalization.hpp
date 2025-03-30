@@ -15,8 +15,9 @@ namespace ml
 
 	class BatchNormalization: public Layer
 	{
-			Tensor m_running_stats;
-			int m_running_id = 0;
+			Tensor m_historical_stats;
+			Tensor m_avg_var;
+			int m_history_id = 0;
 			int m_total_steps = 0;
 			int m_history_size = 100;
 			bool m_use_gamma = true;
@@ -28,6 +29,9 @@ namespace ml
 			BatchNormalization& useGamma(bool b) noexcept;
 			BatchNormalization& useBeta(bool b) noexcept;
 			BatchNormalization& historySize(int s) noexcept;
+
+			bool isUsingGamma() const noexcept;
+			bool isUsingBeta() const noexcept;
 
 			void setInputShape(const std::vector<Shape> &shapes);
 			Shape getOutputShape() const;
@@ -49,6 +53,7 @@ namespace ml
 			void backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next,
 					const std::vector<float> &beta);
 			void updateStatistics();
+			Tensor& getStatistics();
 	};
 
 } /* namespace ml */

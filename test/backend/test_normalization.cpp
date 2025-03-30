@@ -19,8 +19,8 @@ namespace
 {
 	using namespace ml;
 
-	void baseline_bn_forward(const Tensor &input, Tensor &output, const Tensor &weight, Tensor &stats, int stat_id, ActivationType act,
-			float epsilon = 1.0e-6)
+	void baseline_bn_forward(const Tensor &input, Tensor &output, const Tensor &weights, const Tensor &bias, Tensor &stats, int stat_id,
+			ActivationType act, float epsilon = 1.0e-6)
 	{
 		assert(input.device().isCPU());
 		const int first_dim = input.shape().volumeWithoutLastDim();
@@ -48,14 +48,15 @@ namespace
 			{
 				const float avg = stats.get( { stat_id, 3 * f + 1 });
 				const float stddev = std::sqrt(epsilon + stats.get( { stat_id, 3 * f + 2 }) / (first_dim - 1));
-				const float gamma = weight.get( { 2, f });
-				const float beta = weight.get( { 3, f });
+				const float gamma = weights.get( { f });
+				const float beta = bias.get( { f });
 				const float tmp = (input.get( { b, f }) - avg) / stddev;
 				output.set(tmp * gamma + beta, { b, f });
 			}
 		activationForward(Context(), 1.0f, output, 0.0f, output, act);
 	}
-	void baseline_bn_inference(const Tensor &input, Tensor &output, const Tensor &weight, ActivationType act, float epsilon = 1.0e-6)
+	void baseline_bn_inference(const Tensor &input, Tensor &output, const Tensor &weights, const Tensor &bias, const Tensor &stats,
+			ActivationType act, float epsilon = 1.0e-6)
 	{
 		assert(input.device().isCPU());
 		const int first_dim = input.shape().volumeWithoutLastDim();
@@ -63,16 +64,16 @@ namespace
 		for (int i = 0; i < first_dim; i++)
 			for (int j = 0; j < last_dim; j++)
 			{
-				const float avg = weight.get( { 0, j });
-				const float var = weight.get( { 1, j });
-				const float gamma = weight.get( { 2, j });
-				const float beta = weight.get( { 3, j });
+				const float avg = stats.get( { 0, j });
+				const float var = stats.get( { 1, j });
+				const float gamma = weights.get( { j });
+				const float beta = bias.get( { j });
 				const float tmp = gamma * (input.get( { i, j }) - avg) / std::sqrt(epsilon + var) + beta;
 				output.at( { i, j }) = tmp;
 			}
 		activationForward(Context(), 1.0f, output, 0.0f, output, act);
 	}
-	void baseline_bn_backward(const Tensor &input, const Tensor &output, Tensor &gradient_prev, Tensor &gradient_next, const Tensor &weight,
+	void baseline_bn_backward(const Tensor &input, const Tensor &output, Tensor &gradient_prev, Tensor &gradient_next, const Tensor &weights,
 			const Tensor &stats, int stat_id, ActivationType act, float epsilon = 1.0e-6f)
 	{
 		assert(input.device().isCPU());
@@ -85,7 +86,7 @@ namespace
 		for (int b = 0; b < first_dim; b++) //apply variance, beta and gamma to output
 			for (int f = 0; f < last_dim; f++)
 			{
-				const float gamma = 1.0e-16f + weight.get( { 2, f });
+				const float gamma = 1.0e-16f + weights.get( { f });
 				const float avg = stats.get( { stat_id, 3 * f + 1 });
 				const float var = sqrt(epsilon + stats.get( { stat_id, 3 * f + 2 }) / (first_dim - 1));
 				const float in = (input.get( { b, f }) - avg) / var;
@@ -99,7 +100,7 @@ namespace
 		for (int b = 0; b < first_dim; b++) //apply variance, beta and gamma to output
 			for (int f = 0; f < last_dim; f++)
 			{
-				const float gamma = 1.0e-8f + weight.get( { 2, f });
+				const float gamma = 1.0e-8f + weights.get( { f });
 				const float avg = stats.get( { stat_id, 3 * f + 1 });
 				const float var = sqrt(epsilon + stats.get( { stat_id, 3 * f + 2 }) / (first_dim - 1));
 				const float in = (input.get( { b, f }) - avg) / var;
@@ -110,8 +111,8 @@ namespace
 				gradient_prev.set(tmp1 + tmp2 + tmp3, { b, f });
 			}
 	}
-	void baseline_bn_update(const Tensor &input, const Tensor &gradient_next, const Tensor &stats, int stat_id, Tensor &weight_update, float epsilon =
-			1.0e-6f)
+	void baseline_bn_update(const Tensor &input, const Tensor &gradient_next, const Tensor &stats, int stat_id, Tensor &weight_update,
+			Tensor &bias_update, float epsilon = 1.0e-6f)
 	{
 		assert(input.device().isCPU());
 		const int first_dim = input.shape().volumeWithoutLastDim();
@@ -131,8 +132,8 @@ namespace
 			}
 		for (int f = 0; f < last_dim; f++)
 		{
-			weight_update.at( { 2, f }) = weight_update.get( { 2, f }) + d_gamma.get( { f });
-			weight_update.at( { 3, f }) = weight_update.get( { 3, f }) + d_beta.get( { f });
+			weight_update.at( { f }) = weight_update.get( { f }) + d_gamma.get( { f });
+			bias_update.at( { f }) = bias_update.get( { f }) + d_beta.get( { f });
 		}
 	}
 	void baseline_bn_learn(Tensor &stat, const Tensor &running_stat, int first_dim)
@@ -478,11 +479,13 @@ namespace ml
 		for (int i = 0; i < 10; i++)
 			output.push_back(Tensor(input.shape(), "float32", Device::cpu()));
 
-		Tensor weight( { 4, filters }, "float32", Device::cpu());
+		Tensor weights( { filters }, "float32", Device::cpu());
+		Tensor bias = zeros_like(weights);
 		Tensor correct_stats( { (int) output.size(), 3 * filters }, "float32", Device::cpu());
 
-		testing::initForTest(weight, 0.0f);
-		add_scalar_to_tensor(weight, 1.001f);
+		testing::initForTest(weights, 0.0f);
+		add_scalar_to_tensor(weights, 1.001f);
+		testing::initForTest(bias, 0.0f);
 
 		std::vector<Tensor> correct;
 		for (size_t i = 0; i < output.size(); i++)
@@ -491,7 +494,7 @@ namespace ml
 		for (size_t i = 0; i < output.size(); i++)
 		{
 			testing::initForTest(input, 0.1f * i);
-			baseline_bn_forward(input, correct[i], weight, correct_stats, i, ActivationType::SIGMOID);
+			baseline_bn_forward(input, correct[i], weights, bias, correct_stats, i, ActivationType::SIGMOID);
 //			Tensor stats = running_stats.view( { running_stats.lastDim() }, i * running_stats.lastDim());
 //			batchnormForward(context, 1.0f, input, weight, 0.0f, output[i], stats, ActivationType::SIGMOID);
 //
@@ -511,7 +514,8 @@ namespace ml
 				output[i].moveTo(device);
 				output[i].zeroall();
 			}
-			weight.moveTo(device);
+			weights.moveTo(device);
+			bias.moveTo(device);
 			running_stats.moveTo(device);
 			running_stats.zeroall();
 
@@ -519,8 +523,7 @@ namespace ml
 			{
 				testing::initForTest(input, 0.1f * i);
 				Tensor stats = running_stats.view( { running_stats.lastDim() }, { (int) i, 0 });
-				Tensor gamma_beta = weight.view( { 2, filters }, { 2, 0 });
-				batchnormForward(context, 1.0f, input, gamma_beta, 0.0f, output[i], stats, ActivationType::SIGMOID);
+				batchnormForward(context, 1.0f, input, weights, bias, 0.0f, output[i], stats, ActivationType::SIGMOID);
 				context.synchronize();
 
 				Tensor stats1 = correct_stats.view( { 3 * filters }, i * 3 * filters);
@@ -576,27 +579,28 @@ namespace ml
 		Tensor gradient_prev(input.shape(), "float32", Device::cpu());
 		Tensor gradient_next(input.shape(), "float32", Device::cpu());
 
-		Tensor weight( { 4, filters }, "float32", Device::cpu());
+		Tensor weights( { filters }, "float32", Device::cpu());
+		Tensor bias = zeros_like(weights);
 		Tensor stats( { 10, 3 * filters }, "float32", Device::cpu());
 
-		Tensor weight_update( { 4, filters }, "float32", Device::cpu());
+		Tensor weights_update = zeros_like(weights);
+		Tensor bias_update = zeros_like(bias);
 
 		testing::initForTest(input, 0.0f);
 		testing::initForTest(gradient_next, 1.57f);
-		testing::initForTest(weight, 0.0f);
-		add_scalar_to_tensor(weight, 1.1f);
+		testing::initForTest(weights, 0.0f);
+		add_scalar_to_tensor(weights, 1.1f);
+		testing::initForTest(bias, 0.0f);
 
-		testing::initForTest(weight_update, 0.1f);
-
-		Tensor correct_prev(output.shape(), "float32", Device::cpu());
-		Tensor correct_weight_update( { 4, filters }, "float32", Device::cpu());
-		correct_weight_update.copyFrom(Context(), weight_update);
+		Tensor correct_prev = zeros_like(gradient_prev);
+		Tensor correct_weights_update = zeros_like(weights_update);
+		Tensor correct_bias_update = zeros_like(bias_update);
 
 		const int stat_id = 2;
 
-		baseline_bn_forward(input, output, weight, stats, stat_id, ActivationType::LINEAR);
-		baseline_bn_backward(input, output, correct_prev, gradient_next, weight, stats, stat_id, ActivationType::LINEAR);
-		baseline_bn_update(input, gradient_next, stats, stat_id, correct_weight_update);
+		baseline_bn_forward(input, output, weights, bias, stats, stat_id, ActivationType::LINEAR);
+		baseline_bn_backward(input, output, correct_prev, gradient_next, weights, stats, stat_id, ActivationType::LINEAR);
+		baseline_bn_update(input, gradient_next, stats, stat_id, correct_weights_update, correct_bias_update);
 
 		Tensor running_stats( { 64, 3 * filters }, "float32", Device::cpu());
 		output.zeroall();
@@ -612,29 +616,32 @@ namespace ml
 		{
 			const Device device = testing::get_device_for_test();
 			Context context(device);
-			testing::initForTest(weight_update, 0.1f);
 			testing::initForTest(gradient_next, 1.57f);
 
-			weight_update.moveTo(device);
+			weights_update.moveTo(device);
+			bias_update.moveTo(device);
 			input.moveTo(device);
 			output.moveTo(device);
 			gradient_prev.moveTo(device);
 			gradient_next.moveTo(device);
-			weight.moveTo(device);
+			weights.moveTo(device);
+			bias.moveTo(device);
 			running_stats.moveTo(device);
 
 			output.zeroall();
+			weights_update.zeroall();
+			bias_update.zeroall();
 			running_stats.zeroall();
 			gradient_prev.zeroall();
 
 			Tensor stats2 = running_stats.view( { running_stats.lastDim() }, { stat_id, 0 });
-			Tensor gamma_beta = weight.view( { 2, filters }, { 2, 0 });
-			batchnormForward(context, 1.0f, input, gamma_beta, 0.0f, output, stats2, ActivationType::LINEAR);
-			batchnormBackward(context, 1.0f, input, output, gradient_next, gamma_beta, 0.0f, gradient_prev, 1.0f, weight_update, stats2,
-					ActivationType::LINEAR);
+			batchnormForward(context, 1.0f, input, weights, bias, 0.0f, output, stats2, ActivationType::LINEAR);
+			batchnormBackward(context, 1.0f, input, output, gradient_next, weights, bias, 0.0f, gradient_prev, 1.0f, weights_update, bias_update,
+					stats2, ActivationType::LINEAR);
 			context.synchronize();
 
-			EXPECT_LE(testing::diffForTest(correct_weight_update, weight_update), 1.0e-4f);
+			EXPECT_LE(testing::diffForTest(correct_weights_update, weights_update), 1.0e-4f);
+			EXPECT_LE(testing::diffForTest(correct_bias_update, bias_update), 1.0e-4f);
 			EXPECT_LE(testing::diffForTest(correct_prev, gradient_prev), 1.0e-4f);
 		}
 	}
@@ -652,11 +659,13 @@ namespace ml
 		for (int i = 0; i < 10; i++)
 			outputs.push_back(zeros_like(input));
 
-		Tensor weight( { 4, filters }, "float16", Device::cpu());
+		Tensor weights( { filters }, "float16", Device::cpu());
+		Tensor bias = zeros_like(weights);
 		Tensor correct_stats( { (int) outputs.size(), 3 * filters }, "float32", Device::cpu());
 
-		testing::initForTest(weight, 0.0f);
-		add_scalar_to_tensor(weight, 1.001f);
+		testing::initForTest(weights, 0.0f);
+		add_scalar_to_tensor(weights, 1.001f);
+		testing::initForTest(bias, 0.0f);
 
 		std::vector<Tensor> correct_outputs;
 		for (size_t i = 0; i < outputs.size(); i++)
@@ -665,7 +674,7 @@ namespace ml
 		for (size_t i = 0; i < outputs.size(); i++)
 		{
 			testing::initForTest(input, 0.1f * i);
-			baseline_bn_forward(input, correct_outputs[i], weight, correct_stats, i, ActivationType::SIGMOID);
+			baseline_bn_forward(input, correct_outputs[i], weights, bias, correct_stats, i, ActivationType::SIGMOID);
 //			batchnormForward(context, 1.0f, input, weight, 0.0f, output[i], running_stats, i, ActivationType::SIGMOID);
 //
 //			EXPECT_LE(testing::diffForTest(correct[i], output[i]), 1.0e-4f);
@@ -684,7 +693,8 @@ namespace ml
 				outputs[i].moveTo(device);
 				outputs[i].zeroall();
 			}
-			weight.moveTo(device);
+			weights.moveTo(device);
+			bias.moveTo(device);
 			running_stats.moveTo(device);
 			running_stats.zeroall();
 
@@ -692,8 +702,7 @@ namespace ml
 			{
 				testing::initForTest(input, 0.1f * i);
 				Tensor stats = running_stats.view( { running_stats.lastDim() }, { (int) i, 0 });
-				Tensor gamma_beta = weight.view( { 2, filters }, { 2, 0 });
-				batchnormForward(context, 1.0f, input, gamma_beta, 0.0f, outputs[i], stats, ActivationType::SIGMOID);
+				batchnormForward(context, 1.0f, input, weights, bias, 0.0f, outputs[i], stats, ActivationType::SIGMOID);
 				context.synchronize();
 
 				Tensor stats1 = correct_stats.view( { 3 * filters }, i * 3 * filters);
@@ -740,7 +749,7 @@ namespace ml
 		const int batch_size = 11;
 		const int height = 12;
 		const int width = 13;
-		const int filters = 44;
+		const int filters = 43;
 		Context context;
 
 		Tensor input( { batch_size * height * width, filters }, "float16", Device::cpu());
@@ -748,66 +757,70 @@ namespace ml
 		Tensor gradient_prev = zeros_like(input);
 		Tensor gradient_next = zeros_like(input);
 
-		Tensor weight( { 4, filters }, "float16", Device::cpu());
+		Tensor weights( { filters }, "float16", Device::cpu());
+		Tensor bias = zeros_like(weights);
 		Tensor stats( { 10, 3 * filters }, "float32", Device::cpu());
 
-		Tensor weight_update = zeros_like(weight);
+		Tensor weights_update = zeros_like(weights);
+		Tensor bias_update = zeros_like(bias);
 
 		testing::initForTest(input, 0.0f);
 		testing::initForTest(gradient_next, 1.57f);
-		testing::initForTest(weight, 0.0f);
-		add_scalar_to_tensor(weight, 1.1f);
-
-		testing::initForTest(weight_update, 0.1f);
+		testing::initForTest(weights, 0.0f);
+		add_scalar_to_tensor(weights, 1.1f);
+		testing::initForTest(bias, 0.0f);
 
 		Tensor correct_prev = zeros_like(gradient_prev);
-		Tensor correct_weight_update = zeros_like(weight_update);
-		correct_weight_update.copyFrom(Context(), weight_update);
+		Tensor correct_weights_update = zeros_like(weights_update);
+		Tensor correct_bias_update = zeros_like(bias_update);
 
 		const int stat_id = 2;
 
-		baseline_bn_forward(input, output, weight, stats, stat_id, ActivationType::LINEAR);
-		baseline_bn_backward(input, output, correct_prev, gradient_next, weight, stats, stat_id, ActivationType::LINEAR);
-		baseline_bn_update(input, gradient_next, stats, stat_id, correct_weight_update);
+		baseline_bn_forward(input, output, weights, bias, stats, stat_id, ActivationType::LINEAR);
+		baseline_bn_backward(input, output, correct_prev, gradient_next, weights, stats, stat_id, ActivationType::LINEAR);
+		baseline_bn_update(input, gradient_next, stats, stat_id, correct_weights_update, correct_bias_update);
 
 		Tensor running_stats( { 64, 3 * filters }, "float32", Device::cpu());
-//		output.zeroall();
-//		testing::initForTest(gradient_next, 1.57f);
-//		Tensor stats2 = running_stats.view( { running_stats.lastDim() }, stat_id * running_stats.lastDim());
-//		batchnormForward(context, 1.0f, input, weight, 0.0f, output, stats2, ActivationType::SIGMOID);
-//		batchnormBackward(context, 1.0f, input, output, gradient_next, weight, 0.0f, gradient_prev, 1.0f, weight_update, stats2,
-//				ActivationType::SIGMOID);
-//		EXPECT_LE(testing::diffForTest(correct_prev, gradient_prev), 1.0e-4f);
-//		EXPECT_LE(testing::diffForTest(correct_weight_update, weight_update), 1.0e-4f);
+		output.zeroall();
+		testing::initForTest(gradient_next, 1.57f);
+		Tensor stats2 = running_stats.view( { running_stats.lastDim() }, { stat_id, 0 });
+		//		batchnormForward(context, 1.0f, input, weight, 0.0f, output, stats2, ActivationType::SIGMOID);
+		//		batchnormBackward(context, 1.0f, input, output, gradient_next, weight, 0.0f, gradient_prev, 1.0f, weight_update, stats2,
+		//				ActivationType::SIGMOID);
+		//		EXPECT_LE(testing::diffForTest(correct_prev, gradient_prev), 1.0e-4f);
+		//		EXPECT_LE(testing::diffForTest(correct_weight_update, weight_update), 1.0e-4f);
 
 		if (testing::has_device_supporting(DataType::FLOAT16))
 		{
 			const Device device = testing::get_device_for_test();
 			Context context(device);
-			testing::initForTest(weight_update, 0.1f);
 			testing::initForTest(gradient_next, 1.57f);
 
-			weight_update.moveTo(device);
+			weights_update.moveTo(device);
+			bias_update.moveTo(device);
 			input.moveTo(device);
 			output.moveTo(device);
 			gradient_prev.moveTo(device);
 			gradient_next.moveTo(device);
-			weight.moveTo(device);
+			weights.moveTo(device);
+			bias.moveTo(device);
 			running_stats.moveTo(device);
 
 			output.zeroall();
+			weights_update.zeroall();
+			bias_update.zeroall();
 			running_stats.zeroall();
 			gradient_prev.zeroall();
 
 			Tensor stats2 = running_stats.view( { running_stats.lastDim() }, { stat_id, 0 });
-			Tensor gamma_beta = weight.view( { 2, filters }, { 2, 0 });
-			batchnormForward(context, 1.0f, input, gamma_beta, 0.0f, output, stats2, ActivationType::LINEAR);
-			batchnormBackward(context, 1.0f, input, output, gradient_next, gamma_beta, 0.0f, gradient_prev, 1.0f, weight_update, stats2,
-					ActivationType::LINEAR);
+			batchnormForward(context, 1.0f, input, weights, bias, 0.0f, output, stats2, ActivationType::LINEAR);
+			batchnormBackward(context, 1.0f, input, output, gradient_next, weights, bias, 0.0f, gradient_prev, 1.0f, weights_update, bias_update,
+					stats2, ActivationType::LINEAR);
 			context.synchronize();
 
+			EXPECT_LE(testing::diffForTest(correct_weights_update, weights_update), 1.0e-2f);
+			EXPECT_LE(testing::diffForTest(correct_bias_update, bias_update), 1.0e-3f);
 			EXPECT_LE(testing::diffForTest(correct_prev, gradient_prev), 1.0e-3f);
-			EXPECT_LE(testing::diffForTest(correct_weight_update, weight_update), 1.0e-2f);
 		}
 	}
 //	TEST(TestBatchNorm, learn)

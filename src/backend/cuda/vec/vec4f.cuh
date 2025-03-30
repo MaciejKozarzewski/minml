@@ -199,8 +199,8 @@ namespace vectors
 	}
 	DEVICE_INLINE vec4f operator<=(const vec4f &lhs, const vec4f &rhs)
 	{
-		return vec4f(to_mask<float>(lhs.x0 < rhs.x0), to_mask<float>(lhs.x1 < rhs.x1), to_mask<float>(lhs.x2 < rhs.x2),
-				to_mask<float>(lhs.x3 < rhs.x3));
+		return vec4f(to_mask<float>(lhs.x0 <= rhs.x0), to_mask<float>(lhs.x1 <= rhs.x1), to_mask<float>(lhs.x2 <= rhs.x2),
+				to_mask<float>(lhs.x3 <= rhs.x3));
 	}
 
 	DEVICE_INLINE vec4f operator+(const vec4f &lhs, const vec4f &rhs)

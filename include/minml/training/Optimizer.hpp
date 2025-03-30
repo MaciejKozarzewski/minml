@@ -22,6 +22,7 @@ namespace ml
 	class RAdam
 	{
 		private:
+			std::vector<Tensor> m_fp32_weights;
 			std::vector<Tensor> m_momentums;
 			std::vector<Tensor> m_variances;
 

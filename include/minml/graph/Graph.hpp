@@ -55,7 +55,6 @@ namespace ml
 			RAdam m_optimizer;
 			RegularizerL2 m_regularizer;
 			GradientScaler m_gradient_scaler;
-			std::vector<Tensor> m_fp32_weights_copy;
 
 			DataType m_datatype = DataType::FLOAT32;
 			bool m_is_trainable = true;
@@ -75,6 +74,7 @@ namespace ml
 			GraphNodeID add(const Layer &layer, GraphNodeID node);
 			GraphNodeID add(const Layer &layer, std::initializer_list<GraphNodeID> nodes);
 			void addOutput(GraphNodeID node, const LossFunction &loss, float weight = 1.0f);
+			void addOutput(GraphNodeID node);
 
 			const Tensor& getInput(int index = 0) const;
 			const Tensor& getOutput(int index = 0) const;
@@ -102,6 +102,10 @@ namespace ml
 			void setOptimizer(const RAdam &opt);
 			void setRegularizer(const RegularizerL2 &reg);
 			void setGradientScaler(const GradientScaler &scaler);
+			RAdam& getOptimizer();
+			RegularizerL2& getRegularizer();
+			GradientScaler& getGradientScaler();
+
 			void predict(int batchSize);
 			void train(int batchSize);
 			std::vector<float> getLoss(int batchSize);

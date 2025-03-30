@@ -10,6 +10,8 @@
 
 #include <vector>
 
+class Json;
+class SerializedObject;
 namespace ml
 {
 	class Context;
@@ -27,6 +29,8 @@ namespace ml
 			GradientScaler(float initialScale = 1.0f, int scaleChangeInterval = 1000);
 			float getScale() const noexcept;
 			float getInvScale(const Context &context, std::vector<Tensor> &params);
+			Json serialize(SerializedObject &binary_data) const;
+			void unserialize(const Json &json, const SerializedObject &binary_data);
 	};
 
 } /* namespace ml */

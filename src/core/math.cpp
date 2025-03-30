@@ -207,6 +207,11 @@ namespace ml
 				break;
 		}SYNC();
 	}
+	void convertTensor(const Context &context, Tensor &dst, const Tensor &src)
+	{
+		assert(dst.volume() == src.volume());
+		convertType(context, dst.data(), dst.dtype(), src.data(), src.dtype(), src.volume());
+	}
 	void convertType(const Context &context, void *dst, DataType dst_dtype, const void *src, DataType src_dtype, int elements)
 	{
 		static Timer timer("convertType");
@@ -330,7 +335,7 @@ namespace ml
 				opencl_winograd_gradient_transform(get(context), tile_size, get(gradient.dtype()), get(weight_shape), get_shape(gradient),
 						gradient.data(), matrices.data());
 				break;
-		}
+		}SYNC();
 	}
 	void winogradUpdateTransform(const Context &context, const Tensor &matrices, Tensor &update)
 	{
@@ -346,7 +351,7 @@ namespace ml
 			case DeviceType::OPENCL:
 				opencl_winograd_update_transform(get(context), tile_size, get(matrices.dtype()), get_shape(update), matrices.data(), update.data());
 				break;
-		}
+		}SYNC();
 	}
 
 	void im2row(const Context &context, Tensor &output, const Tensor &input, int kernel_size, bool invert, const void *padding)
@@ -362,7 +367,7 @@ namespace ml
 			case DeviceType::OPENCL:
 				// TODO
 				break;
-		}
+		}SYNC();
 	}
 	void depthToSpace(const Context &context, const Tensor &input, Tensor &output, float beta)
 	{
@@ -458,7 +463,7 @@ namespace ml
 			case DeviceType::OPENCL:
 				// TODO
 				break;
-		}
+		}SYNC();
 	}
 	void depthwiseConvBackward(const Context &context, float alpha, const Tensor &gradient_next, const Tensor &weights, float beta,
 			Tensor &gradient_prev)
@@ -475,7 +480,7 @@ namespace ml
 			case DeviceType::OPENCL:
 				// TODO
 				break;
-		}
+		}SYNC();
 	}
 	void depthwiseConvUpdate(const Context &context, float alpha, const Tensor &input, const Tensor &gradient_next, float beta,
 			Tensor &weights_update)
@@ -492,76 +497,7 @@ namespace ml
 			case DeviceType::OPENCL:
 				// TODO
 				break;
-		}
-	}
-
-	void globalAvgAndMaxPoolingForward(const Context &context, const Tensor &input, Tensor &output)
-	{
-		static Timer timer("global_pooling");
-		TimerGuard tg(timer);
-		switch (context.device().type())
-		{
-			case DeviceType::CPU:
-				cpu_global_avg_and_max_pooling_forward(get(context), get(input.dtype()), get_shape(input), output.data(), input.data());
-				break;
-			case DeviceType::CUDA:
-				break;
-			case DeviceType::OPENCL:
-				opencl_global_avg_and_max_pooling_forward(get(context), get(input.dtype()), get_shape(input), output.data(), input.data());
-				break;
 		}SYNC();
-	}
-	void globalAvgAndMaxPoolingBackward(const Context &context, Tensor &gradient_prev, const Tensor &gradient_next, const Tensor &input,
-			const Tensor &output, float beta)
-	{
-		switch (context.device().type())
-		{
-			case DeviceType::CPU:
-				cpu_global_avg_and_max_pooling_backward(get(context), get_shape(input), gradient_prev.data(), gradient_next.data(), input.data(),
-						output.data());
-				break;
-			case DeviceType::CUDA:
-				break;
-			case DeviceType::OPENCL:
-				opencl_global_avg_and_max_pooling_backward(get(context), get_shape(input), gradient_prev.data(), gradient_next.data(), input.data(),
-						output.data());
-				break;
-		}
-	}
-	void globalBroadcastingForward(const Context &context, const Tensor &input, Tensor &output, const Tensor &bias, ActivationType act)
-	{
-		static Timer timer("global_broadcasting");
-		TimerGuard tg(timer);
-		switch (context.device().type())
-		{
-			case DeviceType::CPU:
-				cpu_global_broadcasting_forward(get(context), get(input.dtype()), get_shape(input), output.data(), input.data(), bias.data(),
-						get(act));
-				break;
-			case DeviceType::CUDA:
-				break;
-			case DeviceType::OPENCL:
-				opencl_global_broadcasting_forward(get(context), get(input.dtype()), get_shape(input), output.data(), input.data(), bias.data(),
-						get(act));
-				break;
-		}SYNC();
-	}
-	void globalBroadcastingBackward(const Context &context, Tensor &gradient_prev, Tensor &gradient_next, const Tensor &output, ActivationType act,
-			float beta)
-	{
-		switch (context.device().type())
-		{
-			case DeviceType::CPU:
-				cpu_global_broadcasting_backward(get(context), get_shape(output), gradient_prev.data(), gradient_next.data(), output.data(),
-						get(act));
-				break;
-			case DeviceType::CUDA:
-				break;
-			case DeviceType::OPENCL:
-				opencl_global_broadcasting_backward(get(context), get_shape(output), gradient_prev.data(), gradient_next.data(), output.data(),
-						get(act));
-				break;
-		}
 	}
 
 	void globalAveragePoolingForward(const Context &context, float alpha, const Tensor &input, float beta, Tensor &output)
@@ -602,7 +538,7 @@ namespace ml
 				break;
 			case DeviceType::OPENCL:
 				break;
-		}
+		}SYNC();
 	}
 	void channelScalingForward(const Context &context, float alpha, const Tensor &input, const Tensor &scales, float beta, Tensor &output)
 	{
@@ -639,7 +575,7 @@ namespace ml
 				break;
 			case DeviceType::OPENCL:
 				break;
-		}
+		}SYNC();
 	}
 
 	void gemm(const Context &context, char opA, char opB, Tensor &C, const Tensor &A, const Tensor &B, float alpha, float beta)
@@ -722,84 +658,84 @@ namespace ml
 		}SYNC();
 	}
 
-	void batchnormInference(const Context &context, float alpha, const Tensor &input, const Tensor &weights, const Tensor &stats, float beta,
-			Tensor &output, ActivationType act)
+	void batchnormInference(const Context &context, float alpha, const Tensor &input, const Tensor &weights, const Tensor &bias,
+			const Tensor &avg_var, float beta, Tensor &output, ActivationType act)
 	{
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
-				cpu_batchnorm_inference(get(context), get(input.dtype()), get_shape(input), input.data(), output.data(), weights.data(), get(act));
+//				cpu_batchnorm_inference(get(context), get(input.dtype()), get_shape(input), input.data(), output.data(), weights.data(), get(act));
 				break;
 			case DeviceType::CUDA:
-				cuda_batchnorm_inference(get(context), alpha, get(input), get(weights), get(stats), beta, get(output), get(act));
+				cuda_batchnorm_inference(get(context), alpha, get(input), get(weights), get(bias), get(avg_var), beta, get(output), get(act));
 				break;
 			case DeviceType::OPENCL:
-				opencl_batchnorm_inference(get(context), get(input.dtype()), get_shape(input), input.data(), output.data(), weights.data(), get(act));
+//				opencl_batchnorm_inference(get(context), get(input.dtype()), get_shape(input), input.data(), output.data(), weights.data(), get(act));
 				break;
-		}
+		}SYNC();
 	}
-	void batchnormForward(const Context &context, float alpha, const Tensor &input, const Tensor &weights, float beta, Tensor &output,
-			Tensor &running_stats, ActivationType act)
+	void batchnormForward(const Context &context, float alpha, const Tensor &input, const Tensor &weights, const Tensor &bias, float beta,
+			Tensor &output, Tensor &running_stats, ActivationType act)
 	{
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
-				cpu_batchnorm_forward(get(context), get_shape(input), input.data(), output.data(), weights.data(), running_stats.data(), get(act));
+//				cpu_batchnorm_forward(get(context), get_shape(input), input.data(), output.data(), weights.data(), running_stats.data(), get(act));
 				break;
 			case DeviceType::CUDA:
-				cuda_batchnorm_forward(get(context), alpha, get(input), get(weights), beta, get(output), get(running_stats), get(act));
+				cuda_batchnorm_forward(get(context), alpha, get(input), get(weights), get(bias), beta, get(output), get(running_stats), get(act));
 				break;
 			case DeviceType::OPENCL:
 				break;
-		}
+		}SYNC();
 	}
 	void batchnormBackward(const Context &context, float alpha, const Tensor &input, const Tensor &output, Tensor &gradient_next,
-			const Tensor &weights, float beta_prev, Tensor &gradient_prev, float beta_update, Tensor &weights_update, const Tensor &running_stats,
-			ActivationType act)
+			const Tensor &weights, const Tensor &bias, float beta_prev, Tensor &gradient_prev, float beta_update, Tensor &weights_update,
+			Tensor &bias_update, const Tensor &running_stats, ActivationType act)
 	{
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
-				cpu_batchnorm_backward(get(context), get_shape(input), input.data(), output.data(), gradient_prev.data(), gradient_next.data(),
-						weights.data(), weights_update.data(), running_stats.data(), get(act));
+//				cpu_batchnorm_backward(get(context), get_shape(input), input.data(), output.data(), gradient_prev.data(), gradient_next.data(),
+//						weights.data(), weights_update.data(), running_stats.data(), get(act));
 				break;
 			case DeviceType::CUDA:
-				cuda_batchnorm_backward(get(context), alpha, get(input), get(gradient_next), get(weights), get(running_stats), beta_prev,
-						get(gradient_prev), beta_update, get(weights_update), get(act));
+				cuda_batchnorm_backward(get(context), alpha, get(input), get(gradient_next), get(weights), get(bias), get(running_stats), beta_prev,
+						get(gradient_prev), beta_update, get(weights_update), get(bias_update), get(act));
 				break;
 			case DeviceType::OPENCL:
 				break;
-		}
+		}SYNC();
 	}
-	void batchnormUpdate(const Context &context, const Tensor &running_stat, int stats_to_average, Tensor &weights, bool use_gamma, bool use_beta)
+	void batchnormUpdate(const Context &context, const Tensor &running_stats, Tensor &weights)
 	{
-		mlShape_t shape = get_shape(running_stat);
-		shape.dim[0] = stats_to_average;
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
-				cpu_batchnorm_update(get(context), shape, running_stat.data(), weights.data(), use_gamma, use_beta);
+//				cpu_batchnorm_update(get(context), shape, running_stat.data(), weights.data(), use_gamma, use_beta);
 				break;
 			case DeviceType::CUDA:
-				cuda_batchnorm_update(get(context), get(running_stat), get(weights), use_gamma, use_beta);
+				cuda_batchnorm_update(get(context), get(running_stats), get(weights));
 				break;
 			case DeviceType::OPENCL:
-				opencl_batchnorm_update(get(context), shape, running_stat.data(), weights.data(), use_gamma, use_beta);
+//				opencl_batchnorm_update(get(context), shape, running_stat.data(), weights.data(), use_gamma, use_beta);
 				break;
-		}
+		}SYNC();
 	}
-	void foldBatchnorm(const Context &context, Tensor &layer_weights, Tensor &layer_bias, const Tensor &batchnorm_weights)
+	void foldBatchnorm(const Context &context, Tensor &layer_weights, Tensor &layer_bias, const Tensor &bn_weights, const Tensor &bn_bias,
+			const Tensor &bn_avg_var)
 	{
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
-				cpu_fold_batchnorm(get(context), get_shape(layer_weights), layer_weights.data(), layer_bias.data(), batchnorm_weights.data());
+//				cpu_fold_batchnorm(get(context), get_shape(layer_weights), layer_weights.data(), layer_bias.data(), batchnorm_weights.data(),
+//						use_gamma, use_beta);
 				break;
 			case DeviceType::CUDA:
-				cuda_fold_batchnorm(get(context), get_shape(layer_weights), layer_weights.data(), layer_bias.data(), batchnorm_weights.data());
+				cuda_fold_batchnorm(get(context), get(layer_weights), get(layer_bias), get(bn_weights), get(bn_bias), get(bn_avg_var));
 				break;
 			case DeviceType::OPENCL:
-				opencl_fold_batchnorm(get(context), get_shape(layer_weights), layer_weights.data(), layer_bias.data(), batchnorm_weights.data());
+//				opencl_fold_batchnorm(get(context), get_shape(layer_weights), layer_weights.data(), layer_bias.data(), batchnorm_weights.data());
 				break;
 		}
 		context.synchronize();
@@ -1016,7 +952,7 @@ namespace ml
 				opencl_activation_backward(get(context), get_shape(gradient_prev), gradient_prev.data(), gradient_next.data(), output.data(),
 						get(act));
 				break;
-		}
+		}SYNC();
 	}
 	void softmaxForward(const Context &context, Tensor &output, const Tensor &input)
 	{
@@ -1081,7 +1017,7 @@ namespace ml
 			case DeviceType::OPENCL:
 //				opencl_sum_over_first_dim(get(context), get_shape(src), dst.data(), src.data(), beta);
 				break;
-		}
+		}SYNC();
 	}
 	void multiplyTensors(const Context &context, Tensor &dst, const Tensor &lhs, const Tensor &rhs)
 	{
@@ -1115,7 +1051,7 @@ namespace ml
 			case DeviceType::OPENCL:
 				opencl_add_tensors(get(context), get(dst.dtype()), get_shape(dst), beta, dst.data(), alpha1, src1.data(), alpha2, src2.data());
 				break;
-		}
+		}SYNC();
 	}
 
 	float meanSquaredLoss(const Context &context, const Tensor &output, const Tensor &target, const Tensor &mask)
@@ -1158,7 +1094,7 @@ namespace ml
 			case DeviceType::OPENCL:
 //				opencl_mean_squared_gradient(get(context), get_shape(output), gradient.data(), output.data(), target.data(), mask.data(), weight);
 				break;
-		}
+		}SYNC();
 	}
 	void crossEntropyGradient(const Context &context, float alpha, const Tensor &output, const Tensor &target, const Tensor &mask, float beta,
 			Tensor &gradient)
@@ -1174,10 +1110,11 @@ namespace ml
 			case DeviceType::OPENCL:
 //				opencl_cross_entropy_gradient(get(context), get_shape(output), gradient.data(), output.data(), target.data(), mask.data(), weight);
 				break;
-		}
+		}SYNC();
 	}
 	void radamOptimize(const Context &context, float scale, const std::vector<Tensor> &gradients, std::vector<Tensor> &weights,
-			std::vector<Tensor> &momentums, std::vector<Tensor> &variances, float learning_rate, float beta1, float beta2, int step)
+			std::vector<Tensor> &momentums, std::vector<Tensor> &variances, std::vector<Tensor> &weights_copy, float learning_rate, float beta1,
+			float beta2, int step)
 	{
 		assert(gradients.size() == weights.size());
 		assert(gradients.size() == momentums.size());
@@ -1186,17 +1123,18 @@ namespace ml
 		std::vector<mlTensor_t> _weights = get(weights);
 		std::vector<mlTensor_t> _momentums = get(momentums);
 		std::vector<mlTensor_t> _variances = get(variances);
+		std::vector<mlTensor_t> _weights_copy = get(weights_copy);
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
 				break;
 			case DeviceType::CUDA:
 				cuda_fused_radam_optimize(get(context), scale, _gradients.data(), _weights.data(), _momentums.data(), _variances.data(),
-						learning_rate, beta1, beta2, step, _gradients.size());
+						weights_copy.empty() ? nullptr : _weights_copy.data(), learning_rate, beta1, beta2, step, _gradients.size());
 				break;
 			case DeviceType::OPENCL:
 				break;
-		}
+		}SYNC();
 	}
 	std::vector<int> isNanOrInf(const Context &context, const std::vector<Tensor> &tensors)
 	{
@@ -1212,6 +1150,7 @@ namespace ml
 			case DeviceType::OPENCL:
 				break;
 		}
+		SYNC();
 		return result;
 	}
 	void l2Regularization(const Context &context, std::vector<Tensor> &gradients, const std::vector<Tensor> &params, float scale)
@@ -1228,7 +1167,7 @@ namespace ml
 				break;
 			case DeviceType::OPENCL:
 				break;
-		}
+		}SYNC();
 	}
 
 	/*
@@ -1292,6 +1231,7 @@ namespace ml
 			case DeviceType::OPENCL:
 				break;
 		}
+		SYNC();
 	}
 	std::array<int, 3> explicit_gemm_workspace(const Shape &inputShape, const Shape &outputShape, const Shape &weightShape)
 	{
@@ -1327,6 +1267,7 @@ namespace ml
 		const float beta = add.isEmpty() ? 0.0f : 1.0f;
 		const Tensor ext = add.isEmpty() ? output_matrix : add.view(output_matrix.shape());
 		gemm_ex(context, output_matrix, 1.0f, 'n', input_matrix, 't', weight_matrix, beta, ext, bias, activation);
+		SYNC();
 	}
 	void explicit_gemm_backward(const Context &context, Tensor &gradient_prev, Tensor &gradient_next, const Tensor &output, const Tensor &weights,
 			Tensor &workspace, float beta)
@@ -1356,6 +1297,7 @@ namespace ml
 
 			gemm(context, 'n', 't', gradient_prev_matrix, gradient_next_matrix, weight_matrix, 1, beta);
 		}
+		SYNC();
 	}
 	void explicit_gemm_update(const Context &context, const Tensor &input, const Tensor &gradient_next, Tensor &weight_update, Tensor &workspace)
 	{
@@ -1374,6 +1316,7 @@ namespace ml
 		Tensor weight_update_matrix = weight_update.view( { weight_update.firstDim(), weight_update.shape().volumeWithoutFirstDim() });
 		Tensor gradient_matrix = gradient_next.view( { gradient_next.shape().volumeWithoutLastDim(), gradient_next.lastDim() });
 		gemm(context, 't', 'n', weight_update_matrix, gradient_matrix, input_matrix, 1, 0);
+		SYNC();
 	}
 
 } /* namespace ml */

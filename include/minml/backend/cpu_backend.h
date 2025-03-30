@@ -105,8 +105,8 @@ namespace ml
 				mlActivationType_t act);
 		void cpu_batchnorm_backward(mlContext_t context, mlShape_t shape, const void *input, const void *output, void *gradient_prev,
 				void *gradient_next, const void *weights, void *weights_update, const void *running_stats, mlActivationType_t act);
-		void cpu_batchnorm_update(mlContext_t context, mlShape_t shape, const void *running_stat, void *weights, bool use_gamma, bool use_beta);
-		void cpu_fold_batchnorm(mlContext_t context, mlShape_t shape, void *layer_weights, void *layer_bias, const void *batchnorm_weights);
+		void cpu_batchnorm_update(mlContext_t context, mlShape_t shape, const void *running_stat, void *weights);
+		void cpu_fold_batchnorm(mlContext_t context, mlShape_t shape, void *layer_weights, void *layer_bias, const void *batchnorm_weights, bool use_gamma, bool use_beta);
 
 		/*
 		 * layernorm

@@ -17,7 +17,6 @@
 #include <minml/layers/DepthwiseConv2D.hpp>
 #include <minml/layers/FusedConvBlock.hpp>
 #include <minml/layers/SqueezeAndExcitation.hpp>
-#include <minml/layers/GlobalBroadcastHW.hpp>
 #include <minml/layers/GlobalAveragePooling.hpp>
 #include <minml/layers/Input.hpp>
 #include <minml/layers/Parameter.hpp>
@@ -121,12 +120,14 @@ namespace ml
 
 					if (is_conv2d(prev) or is_depthwise_conv2d(prev) or is_dense(prev))
 					{
-						const Tensor &batchnorm_weights = next->getLayer().getWeights().getParam();
+						const Tensor &bn_weights = next->getLayer().getWeights().getParam();
+						const Tensor &bn_bias = next->getLayer().getBias().getParam();
+						const Tensor &bn_avg_var =static_cast<BatchNormalization&>(next->getLayer()).getStatistics();
 
 						Tensor &layer_weights = prev->getLayer().getWeights().getParam();
 						Tensor &layer_bias = prev->getLayer().getBias().getParam();
 
-						foldBatchnorm(graph.context(), layer_weights, layer_bias, batchnorm_weights);
+						foldBatchnorm(graph.context(), layer_weights, layer_bias, bn_weights, bn_bias, bn_avg_var);
 
 						prev->getLayer().setActivationType(next->getLayer().getActivationType());
 
@@ -145,7 +146,6 @@ namespace ml
 		static const Conv2D conv2d(0, 0);
 		static const Dense dense(0);
 		static const Add add_layer;
-		static const GlobalBroadcastHW broadcast;
 
 		bool has_anything_changed = false;
 		for (int i = 0; i < graph.numberOfNodes(); i++)
@@ -157,9 +157,6 @@ namespace ml
 					input_index = std::max(input_index, graph.getNodeID(next->getInputNode(0)));
 				if (next->getInputNode(1)->getLayer().name() == conv2d.name() or next->getInputNode(1)->getLayer().name() == dense.name())
 					input_index = std::max(input_index, graph.getNodeID(next->getInputNode(1)));
-
-				if (next->getInputNode(0)->getLayer().name() == broadcast.name() or next->getInputNode(1)->getLayer().name() == broadcast.name())
-					input_index = -1;
 
 				if (input_index != -1 and not next->isOutputNode())
 				{

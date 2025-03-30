@@ -153,6 +153,7 @@ namespace ml
 
 	};
 
+	Tensor copy_tensor(const Tensor &t);
 	Tensor zeros_like(const Tensor &t);
 	Tensor ones_like(const Tensor &t);
 
