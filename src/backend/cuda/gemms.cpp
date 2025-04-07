@@ -55,11 +55,120 @@ namespace
 				return shape.dim[2];
 		}
 	}
+
+	int num_rows(const mlTensor_t &t) noexcept
+	{
+		switch (t.rank)
+		{
+			default:
+				return 0;
+			case 2:
+				return t.dim[0];
+			case 3:
+				return t.dim[1];
+		}
+	}
+	int num_columns(const mlTensor_t &t) noexcept
+	{
+		switch (t.rank)
+		{
+			default:
+				return 0;
+			case 2:
+				return t.dim[1];
+			case 3:
+				return t.dim[2];
+		}
+	}
 }
 
 namespace ml
 {
 
+	DLL_PUBLIC void cuda_gemm_v2(mlContext_t context, char opA, char opB, float alpha, const mlTensor_t A, const mlTensor_t B, float beta,
+			mlTensor_t C)
+	{
+		assert(context != nullptr);
+		cublasOperation_t op_A = is_transpose(opA) ? CUBLAS_OP_T : CUBLAS_OP_N;
+		cublasOperation_t op_B = is_transpose(opB) ? CUBLAS_OP_T : CUBLAS_OP_N;
+
+		const int M = is_transpose(opB) ? num_rows(B) : num_columns(B);
+		const int N = is_transpose(opA) ? num_columns(A) : num_rows(A);
+		const int K = is_transpose(opB) ? num_columns(B) : num_rows(B);
+
+		const int LDA = get_last_dim(A);
+		const int LDB = get_last_dim(B);
+		const int LDC = get_last_dim(C);
+
+		cublasHandle_t handle = cuda::Context::getHandle(context);
+		cublasStatus_t err = cublasSetMathMode(handle, CUBLAS_DEFAULT_MATH);
+		assert(err == CUBLAS_STATUS_SUCCESS);
+		switch (C.dtype)
+		{
+			case DTYPE_INT32: // AB [int8], C[int32]
+			{
+				assert(K % 4 == 0);
+				assert(A.dtype == DTYPE_INT8);
+				assert(B.dtype == DTYPE_INT8);
+				const int32_t _alpha = static_cast<int32_t>(alpha);
+				const int32_t _beta = static_cast<int32_t>(beta);
+				cublasStatus_t status = cublasGemmEx(handle, op_B, op_A, M, N, K, &_alpha, B.data, CUDA_R_8I, LDB, A.data, CUDA_R_8I, LDA, &_beta,
+						C.data, CUDA_R_32I, LDC, CUBLAS_COMPUTE_32I, CUBLAS_GEMM_DEFAULT);
+				assert(status == CUBLAS_STATUS_SUCCESS);
+				break;
+			}
+			case DTYPE_FLOAT16: // ABC [float16]
+			{
+				assert(is_fp16(A));
+				assert(is_fp16(B));
+				const half _alpha = alpha;
+				const half _beta = beta;
+				cublasStatus_t status = cublasHgemm(handle, op_B, op_A, M, N, K, &_alpha, data<half>(B), LDB, data<half>(A), LDA, &_beta,
+						data<half>(C), LDC);
+				assert(status == CUBLAS_STATUS_SUCCESS);
+				break;
+			}
+			case DTYPE_FLOAT32: // AB [float32 or float16], C[float32]
+			{
+				assert(A.dtype == B.dtype);
+				assert(is_fp32(A) || is_fp16(A));
+				const float _alpha = alpha;
+				const float _beta = beta;
+				if (is_fp32(A))
+				{
+					if (ml::cuda::Context::allowsTF32(context))
+					{
+						cublasStatus_t status = cublasGemmEx(handle, op_B, op_A, M, N, K, &_alpha, B.data, CUDA_R_32F, LDB, A.data, CUDA_R_32F, LDA,
+								&_beta, C.data, CUDA_R_32F, LDC, CUBLAS_COMPUTE_32F_FAST_TF32, CUBLAS_GEMM_DEFAULT);
+						assert(status == CUBLAS_STATUS_SUCCESS);
+					}
+					else
+					{
+						cublasStatus_t status = cublasSgemm(handle, op_B, op_A, M, N, K, &_alpha, data<float>(B), LDB, data<float>(A), LDA, &_beta,
+								data<float>(C), LDC);
+						assert(status == CUBLAS_STATUS_SUCCESS);
+					}
+				}
+				else
+				{
+					cublasStatus_t status = cublasGemmEx(handle, op_B, op_A, M, N, K, &_alpha, B.data, CUDA_R_16F, LDB, A.data, CUDA_R_16F, LDA,
+							&_beta, C.data, CUDA_R_16F, LDC, CUBLAS_COMPUTE_32F, CUBLAS_GEMM_DEFAULT);
+					assert(status == CUBLAS_STATUS_SUCCESS);
+				}
+
+				break;
+			}
+			case DTYPE_FLOAT64: // ABC [float64]
+			{
+				const double _alpha = alpha;
+				const double _beta = beta;
+				cublasStatus_t status = cublasDgemm(handle, op_B, op_A, M, N, K, &_alpha, data<double>(B), LDB, data<double>(A), LDA,
+						&_beta, data<double>(C), LDC);
+				assert(status == CUBLAS_STATUS_SUCCESS);
+				break;
+			}
+		}
+	}
 	void cuda_gemm(mlContext_t context, mlDataType_t dtype, mlShape_t shape_C, void *C, mlShape_t shape_A, const void *A, mlShape_t shape_B,
 			const void *B, char opA, char opB, float alpha, float beta)
 	{
@@ -92,11 +201,23 @@ namespace ml
 			}
 			case DTYPE_FLOAT16: // ABC [float16]
 			{
-				const half _alpha = alpha;
-				const half _beta = beta;
-				cublasStatus_t status = cublasHgemm(handle, op_B, op_A, M, N, K, &_alpha, getPointer<half>(B), LDB, getPointer<half>(A), LDA, &_beta,
-						getPointer<half>(C), LDC);
-				assert(status == CUBLAS_STATUS_SUCCESS);
+				if (K >= 1024)
+				{
+					const float _alpha = alpha;
+					const float _beta = beta;
+					cublasStatus_t status = cublasGemmEx(handle, op_B, op_A, M, N, K, &_alpha, getPointer<void>(B), CUDA_R_16F, LDB,
+							getPointer<void>(A), CUDA_R_16F, LDA, &_beta, getPointer<void>(C), CUDA_R_16F, LDC, CUBLAS_COMPUTE_32F,
+							CUBLAS_GEMM_DEFAULT);
+					assert(status == CUBLAS_STATUS_SUCCESS);
+				}
+				else
+				{
+					const half _alpha = alpha;
+					const half _beta = beta;
+					cublasStatus_t status = cublasHgemm(handle, op_B, op_A, M, N, K, &_alpha, getPointer<half>(B), LDB, getPointer<half>(A), LDA,
+							&_beta, getPointer<half>(C), LDC);
+					assert(status == CUBLAS_STATUS_SUCCESS);
+				}
 				break;
 			}
 			case DTYPE_FLOAT32: // ABC [float32]

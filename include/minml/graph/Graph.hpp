@@ -107,7 +107,7 @@ namespace ml
 			GradientScaler& getGradientScaler();
 
 			void predict(int batchSize);
-			void train(int batchSize);
+			bool train(int batchSize);
 			std::vector<float> getLoss(int batchSize);
 			std::vector<Tensor> getParameters();
 			std::vector<Tensor> getParameterGradients();

@@ -21,6 +21,16 @@ namespace
 	{
 		return v.empty() ? false : (v[0].dtype() == ml::DataType::FLOAT16);
 	}
+	bool check_same_device(const std::vector<ml::Tensor> &lhs, const std::vector<ml::Tensor> &rhs)
+	{
+		if (lhs.empty() or rhs.empty())
+			return true;
+		ml::Device device = lhs[0].device();
+		for (size_t i = 0; i < lhs.size(); i++)
+			if (lhs[i].device() != device or rhs[i].device() != device)
+				return false;
+		return true;
+	}
 }
 
 namespace ml
@@ -59,9 +69,19 @@ namespace ml
 			m_momentums[i].moveTo(newDevice);
 		for (size_t i = 0; i < m_variances.size(); i++)
 			m_variances[i].moveTo(newDevice);
+		for (size_t i = 0; i < m_fp32_weights.size(); i++)
+			m_fp32_weights[i].moveTo(newDevice);
+	}
+	void RAdam::convertTo(const Context &context, DataType newType)
+	{
+		for (size_t i = 0; i < m_momentums.size(); i++)
+			m_momentums[i].convertTo(context, newType);
+		for (size_t i = 0; i < m_variances.size(); i++)
+			m_variances[i].convertTo(context, newType);
 	}
 	void RAdam::apply(const Context &context, std::vector<Tensor> &weights, const std::vector<Tensor> &gradients, float scale)
 	{
+		assert(check_same_device(weights, gradients));
 		if (is_fp16(weights) and m_fp32_weights.size() != weights.size())
 		{
 			m_fp32_weights.clear();
@@ -83,6 +103,9 @@ namespace ml
 			for (size_t i = 0; i < weights.size(); i++)
 				m_variances.emplace_back(weights[i].shape(), DataType::FLOAT32, weights[i].device());
 		}
+		assert(check_same_device(weights, m_fp32_weights));
+		assert(check_same_device(weights, m_momentums));
+		assert(check_same_device(weights, m_variances));
 
 		m_steps++;
 		if (is_fp16(weights))
@@ -124,12 +147,12 @@ namespace ml
 		m_fp32_weights = std::vector<Tensor>(json["fp32_weights"].size());
 		for (size_t i = 0; i < m_fp32_weights.size(); i++)
 			m_fp32_weights[i].unserialize(json["fp32_weights"][i], binary_data);
-		m_momentums = std::vector<Tensor>(json["momentum"].size());
+		m_momentums = std::vector<Tensor>(json["momentums"].size());
 		for (size_t i = 0; i < m_momentums.size(); i++)
-			m_momentums[i].unserialize(json["momentum"][i], binary_data);
-		m_variances = std::vector<Tensor>(json["variance"].size());
+			m_momentums[i].unserialize(json["momentums"][i], binary_data);
+		m_variances = std::vector<Tensor>(json["variances"].size());
 		for (size_t i = 0; i < m_variances.size(); i++)
-			m_variances[i].unserialize(json["variance"][i], binary_data);
+			m_variances[i].unserialize(json["variances"][i], binary_data);
 	}
 
 } /* namespace ml */

@@ -39,6 +39,7 @@ namespace ml
 
 			void restart(const Context &context) noexcept;
 			void moveTo(Device newDevice);
+			void convertTo(const Context &context, DataType newType);
 			void apply(const Context &context, std::vector<Tensor> &weights, const std::vector<Tensor> &gradients, float scale);
 
 			Json serialize(SerializedObject &binary_data) const;

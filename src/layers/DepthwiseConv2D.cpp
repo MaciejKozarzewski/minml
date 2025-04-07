@@ -146,11 +146,12 @@ namespace ml
 			const std::vector<float> &beta)
 	{
 		assert(input.size() == 1 && gradient_prev.size() == 1);
+
+		Tensor empty;
+		fusedBiasActCopyBackward(context(), gradient_next, output, 0.0f, empty, 0.0f, getBias().getGradient(), m_activation);
+
 		depthwiseConvBackward(context(), 1.0f, gradient_next, getWeights().getParam(), beta[0], gradient_prev[0]);
 		depthwiseConvUpdate(context(), 1.0f, input[0], gradient_next, 0.0f, getWeights().getGradient());
-
-		if (isUsingBias())
-			sumOverFirstDim(context(), 1.0f, gradient_next, 0.0f, getBias().getGradient());
 	}
 
 } /* namespace ml */

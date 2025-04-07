@@ -30,13 +30,13 @@ namespace
 	template<typename T>
 	void setall_launcher(cudaStream_t stream, void *dst, int dstSize, const void *value)
 	{
-		const int length = dstSize / sizeof(T);
+		const int elements = dstSize / sizeof(T);
 		dim3 blockDim(256);
-		dim3 gridDim = gridSize<1024>(length, blockDim.x);
+		dim3 gridDim((elements + 255) / 256);
 
 		T v;
 		std::memcpy(&v, value, sizeof(T));
-		kernel_setall<<<gridDim, blockDim, 0, stream>>>(ml::getPointer<T>(dst), length, v);
+		kernel_setall<<<gridDim, blockDim, 0, stream>>>(ml::getPointer<T>(dst), elements, v);
 		assert(cudaGetLastError() == cudaSuccess);
 
 		if (stream == 0)

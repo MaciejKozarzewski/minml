@@ -131,6 +131,9 @@ namespace ml
 					assert(status == CUBLAS_STATUS_SUCCESS);
 					status = cublasSetStream_v2(get(context)->m_cublas_handle, getStream(context));
 					assert(status == CUBLAS_STATUS_SUCCESS);
+					status = cublasSetMathMode(get(context)->m_cublas_handle,
+							static_cast<cublasMath_t>(CUBLAS_DEFAULT_MATH | CUBLAS_MATH_DISALLOW_REDUCED_PRECISION_REDUCTION));
+					assert(status == CUBLAS_STATUS_SUCCESS);
 				}
 				return get(context)->m_cublas_handle;
 			}

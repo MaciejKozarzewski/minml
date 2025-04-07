@@ -67,7 +67,7 @@ namespace ml
 		if (m_historical_stats.isEmpty() and isTrainable())
 			m_historical_stats = Tensor(Shape( { m_history_size, 3 * shapes[0].lastDim() }), DataType::FLOAT32, device());
 		if (m_avg_var.isEmpty())
-			m_avg_var = Tensor(Shape( { 2, shapes[0].lastDim() }), dtype(), device());
+			m_avg_var = Tensor(Shape( { 2, shapes[0].lastDim() }), DataType::FLOAT32, device());
 		m_input_shapes = shapes;
 	}
 	Shape BatchNormalization::getOutputShape() const
@@ -175,22 +175,12 @@ namespace ml
 		Tensor stats = get_statistics(m_historical_stats, m_history_id);
 		batchnormBackward(context(), 1.0f, input[0], output, gradient_next, getWeights().getParam(), getBias().getParam(), beta[0], gradient_prev[0],
 				0.0f, getWeights().getGradient(), getBias().getGradient(), stats, m_activation);
-
-		updateStatistics();
 	}
 	void BatchNormalization::updateStatistics()
 	{
 		m_total_steps++;
 		m_history_id = (m_history_id + 1) % m_history_size;
 		Tensor stats = m_historical_stats.view( { std::min(m_history_size, m_total_steps), m_historical_stats.lastDim() });
-//		{
-//			std::cout << stats.info() << '\n';
-//			for (int i = 0; i < stats.firstDim(); i++)
-//				for (int j = 0; j < stats.lastDim() / 3; j++)
-//					std::cout << j << " : " << stats.get( { i, 3 * j + 0 }) << " " << stats.get( { i, 3 * j + 1 }) << " "
-//							<< stats.get( { i, 3 * j + 2 }) << '\n';
-//		}
-
 		batchnormUpdate(context(), stats, m_avg_var);
 	}
 	Tensor& BatchNormalization::getStatistics()
