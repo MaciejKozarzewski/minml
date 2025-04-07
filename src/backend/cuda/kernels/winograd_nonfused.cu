@@ -153,6 +153,9 @@ namespace
 								case ACTIVATION_RELU:
 									tmp = ml::internal::relu(tmp);
 									break;
+								case ACTIVATION_LEAKY_RELU:
+									tmp = ml::internal::leaky_relu(tmp);
+									break;
 							}
 
 							output[output_indexer.at(blockIdx.z, h, w, f)] = tmp;

@@ -63,6 +63,8 @@ namespace
 				return std::tanh(x);
 			case ml::ACTIVATION_RELU:
 				return relu(x);
+			case ml::ACTIVATION_LEAKY_RELU:
+				return (x > 0.0f) ? x : 0.1f * x;
 			case ml::ACTIVATION_EXP:
 				return std::exp(x);
 		}
@@ -81,6 +83,8 @@ namespace
 				return gradient * (1.0f - square(output));
 			case ml::ACTIVATION_RELU:
 				return (output > 0.0f) ? gradient : 0.0f;
+			case ml::ACTIVATION_LEAKY_RELU:
+				return (output > 0.0f) ? gradient : 0.1f * gradient;
 			case ml::ACTIVATION_EXP:
 				return gradient * output;
 		}

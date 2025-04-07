@@ -35,6 +35,7 @@ namespace ml
 		SIGMOID,
 		TANH,
 		RELU,
+		LEAKY_RELU,
 		EXP,
 		SOFTMAX
 	};

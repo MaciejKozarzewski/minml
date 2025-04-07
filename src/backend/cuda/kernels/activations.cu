@@ -45,6 +45,8 @@ namespace
 				return vectors::tanh(x);
 			case ml::ACTIVATION_RELU:
 				return vectors::relu(x);
+			case ml::ACTIVATION_LEAKY_RELU:
+				return select(x > zero<T, N>(), x, x * vec<T, N>(0.1f));
 			case ml::ACTIVATION_EXP:
 				return vectors::exp(x);
 		}
@@ -53,19 +55,19 @@ namespace
 	template<int ACT, typename T, int N>
 	__device__ vec<T, N> activation_backward(const vec<T, N> &gradient, const vec<T, N> &input, const vec<T, N> &output)
 	{
-		const vec<T, N> one(1.0f);
-		const vec<T, N> zero(0.0f);
 		switch (ACT)
 		{
 			default:
 			case ml::ACTIVATION_LINEAR:
 				return gradient;
 			case ml::ACTIVATION_SIGMOID:
-				return gradient * output * (one - output);
+				return gradient * output * (one<T, N>() - output);
 			case ml::ACTIVATION_TANH:
-				return gradient * (one - square(output));
+				return gradient * (one<T, N>() - square(output));
 			case ml::ACTIVATION_RELU:
-				return select(output <= zero, zero, gradient);
+				return select(output > zero<T, N>(), gradient, zero<T, N>());
+			case ml::ACTIVATION_LEAKY_RELU:
+				return select(output > zero<T, N>(), gradient, gradient * vec<T, N>(0.1f));
 			case ml::ACTIVATION_EXP:
 				return gradient * output;
 		}
@@ -235,6 +237,9 @@ namespace ml
 			case ACTIVATION_RELU:
 				dispatch_activation_forward<ACTIVATION_RELU>(context, alpha, x, beta, y);
 				break;
+			case ACTIVATION_LEAKY_RELU:
+				dispatch_activation_forward<ACTIVATION_LEAKY_RELU>(context, alpha, x, beta, y);
+				break;
 			case ACTIVATION_EXP:
 				dispatch_activation_forward<ACTIVATION_EXP>(context, alpha, x, beta, y);
 				break;
@@ -259,6 +264,9 @@ namespace ml
 			case ACTIVATION_RELU:
 				dispatch_activation_backward<ACTIVATION_RELU>(context, alpha, dy, y, beta, dx);
 				break;
+			case ACTIVATION_LEAKY_RELU:
+				dispatch_activation_backward<ACTIVATION_LEAKY_RELU>(context, alpha, dy, y, beta, dx);
+				break;
 			case ACTIVATION_EXP:
 				dispatch_activation_backward<ACTIVATION_EXP>(context, alpha, dy, y, beta, dx);
 				break;
@@ -281,6 +289,9 @@ namespace ml
 				break;
 			case ACTIVATION_RELU:
 				dispatch_add_to_last_dim<ACTIVATION_RELU>(context, alpha, x, b, beta, y, act);
+				break;
+			case ACTIVATION_LEAKY_RELU:
+				dispatch_add_to_last_dim<ACTIVATION_LEAKY_RELU>(context, alpha, x, b, beta, y, act);
 				break;
 			case ACTIVATION_EXP:
 				dispatch_add_to_last_dim<ACTIVATION_EXP>(context, alpha, x, b, beta, y, act);

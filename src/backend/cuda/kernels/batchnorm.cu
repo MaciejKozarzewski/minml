@@ -54,28 +54,64 @@ namespace
 		return ptr[3 * last_dim + idx];
 	}
 
-	template<typename T, int N>
-	__global__ void kernel_batchnorm_inference(float beta, T *output, float alpha, const T *input, const T *weights, const T *bias, const T *avg_var,
-			int first_dim, int last_dim, ml::mlActivationType_t act)
+	template<int N, typename T>
+	__global__ void kernel_batchnorm_inference(float beta, T *output, float alpha, const T *input, const T *weights, const T *bias,
+			const float *avg_var, int first_dim, int last_dim, ml::mlActivationType_t act)
 	{
 		assert(last_dim % N == 0);
 		const int tid = N * (blockIdx.x * blockDim.x + threadIdx.x);
 		if (tid < last_dim)
 		{
-			const vec<T, N> _mean(avg_var + tid);
-			const vec<T, N> _variance(avg_var + tid + last_dim);
-			const vec<T, N> _gamma = (weights != nullptr) ? vec<T, N>(weights + tid) : one<T, N>();
-			const vec<T, N> _beta = (bias != nullptr) ? vec<T, N>(bias + tid) : zero<T, N>();
+//			const vec<T, N> _mean = load_vec<T, N>(avg_var + tid);
+//			const vec<T, N> _variance = load_vec<T, N>(avg_var + tid + last_dim);
+//			const vec<T, N> _gamma = (weights != nullptr) ? vec<T, N>(weights + tid) : one<T, N>();
+//			const vec<T, N> _beta = (bias != nullptr) ? vec<T, N>(bias + tid) : zero<T, N>();
+//
+//			const vec<T, N> epsilon(1.0e-6f);
+//
+//			const vec<T, N> scale = _gamma / vectors::sqrt(_variance + epsilon);
+//			const vec<T, N> shift = -_mean * scale + _beta;
+//
+//			for (int i = blockIdx.y * blockDim.y + threadIdx.y; i < first_dim; i += gridDim.y * blockDim.y)
+//			{
+//				const int tmp_idx = i * last_dim + tid;
+//				vec<T, N> tmp(input + tmp_idx);
+//				tmp = tmp * scale + shift;
+//				switch (act)
+//				{
+//					case ml::ACTIVATION_SIGMOID:
+//						tmp = vectors::sigmoid(tmp);
+//						break;
+//					case ml::ACTIVATION_TANH:
+//						tmp = vectors::tanh(tmp);
+//						break;
+//					case ml::ACTIVATION_RELU:
+//						tmp = vectors::relu(tmp);
+//						break;
+//					case ml::ACTIVATION_LEAKY_RELU:
+//						tmp = select(tmp > zero<T, N>(), tmp, tmp * vec<T, N>(0.1f));
+//						break;
+//				}
+//				tmp *= vec<T, N>(alpha);
+//				if (beta != 0.0f)
+//					tmp += vec<T, N>(beta) * vec<T, N>(output + tmp_idx);
+//				tmp.store(output + tmp_idx);
+//			}
 
-			const vec<T, N> epsilon(1.0e-6f);
+			const vec<float, N> _mean = load_vec<float, N>(avg_var + tid);
+			const vec<float, N> _variance = load_vec<float, N>(avg_var + tid + last_dim);
+			const vec<float, N> _gamma = (weights != nullptr) ? load_vec<float, N>(weights + tid) : one<float, N>();
+			const vec<float, N> _beta = (bias != nullptr) ? load_vec<float, N>(bias + tid) : zero<float, N>();
 
-			const vec<T, N> scale = _gamma / vectors::sqrt(_variance + epsilon);
-			const vec<T, N> shift = -_mean * scale + _beta;
+			const vec<float, N> epsilon(1.0e-6f);
+
+			const vec<float, N> scale = _gamma / vectors::sqrt(_variance + epsilon);
+			const vec<float, N> shift = -_mean * scale + _beta;
 
 			for (int i = blockIdx.y * blockDim.y + threadIdx.y; i < first_dim; i += gridDim.y * blockDim.y)
 			{
 				const int tmp_idx = i * last_dim + tid;
-				vec<T, N> tmp(input + tmp_idx);
+				vec<float, N> tmp = load_vec<float, N>(input + tmp_idx);
 				tmp = tmp * scale + shift;
 				switch (act)
 				{
@@ -88,11 +124,14 @@ namespace
 					case ml::ACTIVATION_RELU:
 						tmp = vectors::relu(tmp);
 						break;
+					case ml::ACTIVATION_LEAKY_RELU:
+						tmp = select(tmp > zero<float, N>(), tmp, tmp * vec<float, N>(0.1f));
+						break;
 				}
-				tmp *= vec<T, N>(alpha);
+				tmp *= vec<float, N>(alpha);
 				if (beta != 0.0f)
-					tmp += vec<T, N>(beta) * vec<T, N>(output + tmp_idx);
-				tmp.store(output + tmp_idx);
+					tmp += vec<float, N>(beta) * load_vec<float, N>(output + tmp_idx);
+				store_vec(output + tmp_idx, tmp);
 			}
 		}
 	}
@@ -109,7 +148,7 @@ namespace
 			__syncthreads();
 		}
 	}
-	template<typename T, int N>
+	template<int N, typename T>
 	__global__ void kernel_batchnorm_forward_avg_var_1(AvgVarStats<float> *workspace, const T *input, int first_dim, int last_dim)
 	{
 		assert(blockDim.x == 32 && blockDim.y == 8);
@@ -124,7 +163,7 @@ namespace
 		if (tid < last_dim)
 			for (int i = blockDim.y * blockIdx.y + threadIdx.y; i < first_dim; i += blockDim.y * gridDim.y)
 			{
-				const vec<T, N> tmp(input + i * last_dim + tid);
+				const vec<float, N> tmp = load_vec<float, N>(input + i * last_dim + tid);
 				for (int n = 0; n < N; n++)
 					thread_stat[n].add(tmp[n]);
 			}
@@ -188,9 +227,9 @@ namespace
 			__syncthreads();
 		}
 	}
-	template<typename T, int N>
+	template<int N, typename T>
 	__global__ void kernel_batchnorm_backward_delta_1(float *workspace, const T *input, T *gradient_next, const T *weights, const T *bias,
-			const T *avg_var, int first_dim, int last_dim, ml::mlActivationType_t act)
+			const float *avg_var, int first_dim, int last_dim, ml::mlActivationType_t act)
 	{
 		assert(blockDim.x == 32 && blockDim.y == 8);
 		__shared__ float d_sigma[8 * 32 * N];
@@ -201,35 +240,72 @@ namespace
 		vec<float, N> d_mu_acc(0.0f);
 		if (tid < last_dim)
 		{
-			const vec<T, N> epsilon(1.0e-6f);
-			const vec<T, N> _mean(avg_var + tid);
-			const vec<T, N> _stddev = vectors::sqrt(vec<T, N>(avg_var + tid + last_dim) + epsilon);
-			const vec<T, N> _gamma = (weights != nullptr) ? vec<T, N>(weights + tid) : one<T, N>();
-			const vec<T, N> _beta = (bias != nullptr) ? vec<T, N>(bias + tid) : zero<T, N>();
+//			const vec<T, N> epsilon(1.0e-6f);
+//			const vec<T, N> _mean = load_vec<T, N>(avg_var + tid);
+//			const vec<T, N> _stddev = vectors::sqrt(load_vec<T, N>(avg_var + tid + last_dim) + epsilon);
+//			const vec<T, N> _gamma = (weights != nullptr) ? vec<T, N>(weights + tid) : one<T, N>();
+//			const vec<T, N> _beta = (bias != nullptr) ? vec<T, N>(bias + tid) : zero<T, N>();
+//
+//			for (int i = blockDim.y * blockIdx.y + threadIdx.y; i < first_dim; i += blockDim.y * gridDim.y)
+//			{
+//				const int tmp_idx = i * last_dim + tid;
+//				vec<T, N> grad(gradient_next + tmp_idx);
+//				const vec<T, N> inp(input + tmp_idx);
+//				const vec<T, N> hat_inp = (inp - _mean) / _stddev;
+//				vec<T, N> out = _gamma * hat_inp + _beta;
+//				switch (act)
+//				{
+//					case ml::ACTIVATION_SIGMOID:
+//						out = vectors::sigmoid(out);
+//						grad *= out * (one<T, N>() - out);
+//						break;
+//					case ml::ACTIVATION_TANH:
+//						grad *= (one<T, N>() - square(vectors::tanh(out)));
+//						break;
+//					case ml::ACTIVATION_RELU:
+//						grad = select(out > zero<T, N>(), grad, zero<T, N>());
+//						break;
+//					case ml::ACTIVATION_LEAKY_RELU:
+//						grad = select(out > zero<T, N>(), grad, grad * vec<T, N>(0.1f));
+//						break;
+//				}
+//				d_sigma_acc += convert<float, T, N>(grad * hat_inp);
+//				d_mu_acc += convert<float, T, N>(grad);
+//				grad.store(gradient_next + tmp_idx);
+//			}
+
+			const vec<float, N> epsilon(1.0e-6f);
+			const vec<float, N> _mean = load_vec<float, N>(avg_var + tid);
+			const vec<float, N> _stddev = vectors::sqrt(load_vec<float, N>(avg_var + tid + last_dim) + epsilon);
+			const vec<float, N> _gamma = (weights != nullptr) ? load_vec<float, N>(weights + tid) : one<float, N>();
+			const vec<float, N> _beta = (bias != nullptr) ? load_vec<float, N>(bias + tid) : zero<float, N>();
 
 			for (int i = blockDim.y * blockIdx.y + threadIdx.y; i < first_dim; i += blockDim.y * gridDim.y)
 			{
 				const int tmp_idx = i * last_dim + tid;
-				vec<T, N> grad(gradient_next + tmp_idx);
-				const vec<T, N> inp(input + tmp_idx);
-				const vec<T, N> hat_inp = (inp - _mean) / _stddev;
-				vec<T, N> out = _gamma * hat_inp + _beta;
+				vec<float, N> grad = load_vec<float, N>(gradient_next + tmp_idx);
+				const vec<float, N> inp = load_vec<float, N>(input + tmp_idx);
+				const vec<float, N> hat_inp = (inp - _mean) / _stddev;
+				vec<float, N> out = _gamma * hat_inp + _beta;
 				switch (act)
 				{
 					case ml::ACTIVATION_SIGMOID:
 						out = vectors::sigmoid(out);
-						grad *= out * (one<T, N>() - out);
+						grad *= out * (one<float, N>() - out);
 						break;
 					case ml::ACTIVATION_TANH:
-						grad *= (one<T, N>() - square(vectors::tanh(out)));
+						grad *= (one<float, N>() - square(vectors::tanh(out)));
 						break;
 					case ml::ACTIVATION_RELU:
-						grad = select(out <= zero<T, N>(), zero<T, N>(), grad);
+						grad = select(out > zero<float, N>(), grad, zero<float, N>());
+						break;
+					case ml::ACTIVATION_LEAKY_RELU:
+						grad = select(out > zero<float, N>(), grad, grad * vec<float, N>(0.1f));
 						break;
 				}
-				d_sigma_acc += convert<float, T, N>(grad * hat_inp);
-				d_mu_acc += convert<float, T, N>(grad);
-				grad.store(gradient_next + tmp_idx);
+				d_sigma_acc += grad * hat_inp;
+				d_mu_acc += grad;
+				store_vec(gradient_next + tmp_idx, grad);
 			}
 		}
 		const Indexer<3> idx(blockDim.y, blockDim.x, N);
@@ -274,17 +350,17 @@ namespace
 			workspace[last_dim + tid] = storage_d_mu[threadIdx.x];
 		}
 	}
-	template<typename T, int N>
+	template<int N, typename T, typename U>
 	__global__ void kernel_batchnorm_backward(const float *d_sigma_mu, const T *input, T *gradient_prev, const T *gradient_next, const T *weights,
-			const T *avg_var, T *weight_update, T *bias_update, int first_dim, int last_dim, float alpha, float beta_dx, float beta_dw)
+			const float *avg_var, U *weight_update, U *bias_update, int first_dim, int last_dim, float alpha, float beta_dx, float beta_dw)
 	{
 		// avg, stddev, gamma, d_sigma, d_mu
 		const int tid = N * (blockIdx.x * blockDim.x + threadIdx.x);
 		if (tid < last_dim)
 		{
 			const vec<float, N> epsilon(1.0e-6f);
-			const vec<float, N> _mean = load_vec<float, N>(avg_var + tid);
-			const vec<float, N> _stddev = vectors::sqrt(load_vec<float, N>(avg_var + tid + last_dim) + epsilon);
+			const vec<float, N> _mean(avg_var + tid);
+			const vec<float, N> _stddev = vectors::sqrt(vec<float, N>(avg_var + tid + last_dim) + epsilon);
 			const vec<float, N> _gamma = (weights != nullptr) ? load_vec<float, N>(weights + tid) : one<float, N>();
 
 			vec<float, N> d_sigma = load_vec<float, N>(d_sigma_mu + tid);
@@ -322,10 +398,9 @@ namespace
 		}
 	}
 
-	template<typename T>
-	__global__ void kernel_batchnorm_update(const AvgVarStats<float> *running_stat, T *avg_var, int first_dim, int last_dim)
+	__global__ void kernel_batchnorm_update(const AvgVarStats<float> *running_stat, float *avg_var, int first_dim, int last_dim)
 	{
-		__shared__ AvgVarStats<float> shared_stats[8 * 32]; // 32 x 3 layout will be perfectly interleaved with no bank conflicts
+		__shared__ AvgVarStats<float> shared_stats[32 * 32]; // 32 x 3 layout will be perfectly interleaved with no bank conflicts
 		for (int j = blockIdx.x * blockDim.x + threadIdx.x; j < last_dim; j += gridDim.x * blockDim.x)
 		{
 			const Indexer<3> idx(blockDim.y, blockDim.x, 1);
@@ -343,15 +418,15 @@ namespace
 			combine_stats_vec<1>(shared_stats, idx);
 			if (blockIdx.y == 0 && threadIdx.y == 0)
 			{
-				avg_var[0 * last_dim + j] = static_cast<T>(shared_stats[idx.at(0, threadIdx.x, 0)].get_average());
-				avg_var[1 * last_dim + j] = static_cast<T>(shared_stats[idx.at(0, threadIdx.x, 0)].get_variance());
+				avg_var[0 * last_dim + j] = shared_stats[idx.at(0, threadIdx.x, 0)].get_average();
+				avg_var[1 * last_dim + j] = shared_stats[idx.at(0, threadIdx.x, 0)].get_variance();
 			}
 		}
 	}
 
 	template<typename T>
 	__global__ void kernel_fold_batchnorm_4D(int first_dim, int last_dim, T *layer_weights, T *layer_bias, const T *bn_weights, const T *bn_bias,
-			const T *bn_avg_var)
+			const float *bn_avg_var)
 	{
 		const float mean = bn_avg_var[blockIdx.x];
 		const float stddev = sqrt(static_cast<float>(bn_avg_var[blockIdx.x + first_dim]) + 1.0e-6f);
@@ -368,7 +443,7 @@ namespace
 	}
 	template<typename T>
 	__global__ void kernel_fold_batchnorm_3D(int first_dim, int last_dim, T *layer_weights, T *layer_bias, const T *bn_weights, const T *bn_bias,
-			const T *bn_avg_var)
+			const float *bn_avg_var)
 	{
 		for (int i = blockIdx.x; i < first_dim; i += gridDim.x)
 			for (int j = threadIdx.x; j < last_dim; j += blockDim.x)
@@ -388,21 +463,6 @@ namespace
 			}
 	}
 
-	void calculate_avg_var(cudaStream_t stream, const AvgVarStats<float> *running_stats_ptr, void *avg_var, ml::mlDataType_t dtype, int last_dim)
-	{
-		switch (dtype)
-		{
-			case ml::DTYPE_FLOAT16:
-				kernel_calculate_avg_var<half> <<<1, 1024, 0, stream>>>(ml::getPointer<half>(avg_var), running_stats_ptr, last_dim);
-				break;
-			case ml::DTYPE_FLOAT32:
-				kernel_calculate_avg_var<float> <<<1, 1024, 0, stream>>>(ml::getPointer<float>(avg_var), running_stats_ptr, last_dim);
-				break;
-			default:
-				break;
-		}
-		assert(cudaGetLastError() == cudaSuccess);
-	}
 }
 
 namespace ml
@@ -410,6 +470,7 @@ namespace ml
 	void cuda_batchnorm_inference(mlContext_t context, float alpha, const mlTensor_t x, const mlTensor_t w, const mlTensor_t b,
 			const mlTensor_t avg_var, float beta, mlTensor_t y, mlActivationType_t act)
 	{
+		assert(avg_var.dtype == DTYPE_FLOAT32);
 		const int first_dim = volume_without_last_dim(x);
 		const int last_dim = get_last_dim(x);
 
@@ -423,21 +484,21 @@ namespace ml
 			case DTYPE_FLOAT16:
 			{
 				if (last_dim % 4 == 0)
-					kernel_batchnorm_inference<half, 4> <<<gridDim_x4, blockDim, 0, stream>>>(beta, data<half>(y), alpha, data<half>(x),
-							data<half>(w), data<half>(b), data<half>(avg_var), first_dim, last_dim, act);
+					kernel_batchnorm_inference<4> <<<gridDim_x4, blockDim, 0, stream>>>(beta, data<half>(y), alpha, data<half>(x), data<half>(w),
+							data<half>(b), data<float>(avg_var), first_dim, last_dim, act);
 				else
-					kernel_batchnorm_inference<half, 1> <<<gridDim_x1, blockDim, 0, stream>>>(beta, data<half>(y), alpha, data<half>(x),
-							data<half>(w), data<half>(b), data<half>(avg_var), first_dim, last_dim, act);
+					kernel_batchnorm_inference<1> <<<gridDim_x1, blockDim, 0, stream>>>(beta, data<half>(y), alpha, data<half>(x), data<half>(w),
+							data<half>(b), data<float>(avg_var), first_dim, last_dim, act);
 				break;
 			}
 			case DTYPE_FLOAT32:
 			{
 				if (last_dim % 4 == 0)
-					kernel_batchnorm_inference<float, 4> <<<gridDim_x4, blockDim, 0, stream>>>(beta, data<float>(y), alpha, data<float>(x),
-							data<float>(w), data<float>(b), data<float>(avg_var), first_dim, last_dim, act);
+					kernel_batchnorm_inference<4> <<<gridDim_x4, blockDim, 0, stream>>>(beta, data<float>(y), alpha, data<float>(x), data<float>(w),
+							data<float>(b), data<float>(avg_var), first_dim, last_dim, act);
 				else
-					kernel_batchnorm_inference<float, 1> <<<gridDim_x1, blockDim, 0, stream>>>(beta, data<float>(y), alpha, data<float>(x),
-							data<float>(w), data<float>(b), data<float>(avg_var), first_dim, last_dim, act);
+					kernel_batchnorm_inference<1> <<<gridDim_x1, blockDim, 0, stream>>>(beta, data<float>(y), alpha, data<float>(x), data<float>(w),
+							data<float>(b), data<float>(avg_var), first_dim, last_dim, act);
 				break;
 			}
 			default:
@@ -472,21 +533,17 @@ namespace ml
 			case DTYPE_FLOAT16:
 			{
 				if (last_dim % 4 == 0)
-					kernel_batchnorm_forward_avg_var_1<half, 4> <<<gridDim1_x4, blockDim1, 0, stream >>>(workspace, data<half>(x), first_dim,
-							last_dim);
+					kernel_batchnorm_forward_avg_var_1<4> <<<gridDim1_x4, blockDim1, 0, stream >>>(workspace, data<half>(x), first_dim, last_dim);
 				else
-					kernel_batchnorm_forward_avg_var_1<half, 1> <<<gridDim1_x1, blockDim1, 0, stream >>>(workspace, data<half>(x), first_dim,
-							last_dim);
+					kernel_batchnorm_forward_avg_var_1<1> <<<gridDim1_x1, blockDim1, 0, stream >>>(workspace, data<half>(x), first_dim, last_dim);
 				break;
 			}
 			case DTYPE_FLOAT32:
 			{
 				if (last_dim % 4 == 0)
-					kernel_batchnorm_forward_avg_var_1<float, 4> <<<gridDim1_x4, blockDim1, 0, stream >>>(workspace, data<float>(x), first_dim,
-							last_dim);
+					kernel_batchnorm_forward_avg_var_1<4> <<<gridDim1_x4, blockDim1, 0, stream >>>(workspace, data<float>(x), first_dim, last_dim);
 				else
-					kernel_batchnorm_forward_avg_var_1<float, 1> <<<gridDim1_x1, blockDim1, 0, stream >>>(workspace, data<float>(x), first_dim,
-							last_dim);
+					kernel_batchnorm_forward_avg_var_1<1> <<<gridDim1_x1, blockDim1, 0, stream >>>(workspace, data<float>(x), first_dim, last_dim);
 				break;
 			}
 			default:
@@ -500,14 +557,16 @@ namespace ml
 		kernel_batchnorm_forward_avg_var_2<<<gridDim2, blockDim2, 0, stream>>>(running_stats_ptr, workspace, workspace_first_dim, last_dim);
 		assert(cudaGetLastError() == cudaSuccess);
 
-		calculate_avg_var(stream, running_stats_ptr, workspace, x.dtype, last_dim);
+		kernel_calculate_avg_var<float> <<<1, 1024, 0, stream>>>(ml::getPointer<float>(workspace), running_stats_ptr, last_dim);
+		assert(cudaGetLastError() == cudaSuccess);
 
-		const mlTensor_t stats = make_tensor(workspace, w.dtype, { 2, last_dim });
+		const mlTensor_t stats = make_tensor(workspace, DTYPE_FLOAT32, { 2, last_dim });
 		cuda_batchnorm_inference(context, alpha, x, w, b, stats, beta, y, act);
 	}
 	void cuda_batchnorm_backward(mlContext_t context, float alpha, const mlTensor_t x, mlTensor_t dy, const mlTensor_t w, const mlTensor_t b,
 			const mlTensor_t running_stats, float beta_dx, mlTensor_t dx, float beta_dw, mlTensor_t dw, mlTensor_t db, mlActivationType_t act)
 	{
+		assert(dw.dtype == db.dtype);
 		const int first_dim = volume_without_last_dim(x);
 		const int last_dim = get_last_dim(x);
 
@@ -518,7 +577,8 @@ namespace ml
 		cudaStream_t stream = ml::cuda::Context::getStream(context);
 		const AvgVarStats<float> *running_stats_ptr = data<AvgVarStats<float>>(running_stats);
 
-		calculate_avg_var(stream, running_stats_ptr, avg_var, x.dtype, last_dim);
+		kernel_calculate_avg_var<float> <<<1, 1024, 0, stream>>>(avg_var, running_stats_ptr, last_dim);
+		assert(cudaGetLastError() == cudaSuccess);
 
 		dim3 blockDim1(32, 8);
 		dim3 gridDim1_x1((last_dim + 31) / 32, workspace_first_dim);
@@ -529,20 +589,20 @@ namespace ml
 			case DTYPE_FLOAT16:
 			{
 				if (last_dim % 4 == 0)
-					kernel_batchnorm_backward_delta_1<half, 4> <<<gridDim1_x4, blockDim1, 0, stream>>>(d_sigma_mu, data<half>(x), data<half>(dy),
-							data<half>(w), data<half>(b), getPointer<half>(avg_var), first_dim, last_dim, act);
+					kernel_batchnorm_backward_delta_1<4> <<<gridDim1_x4, blockDim1, 0, stream>>>(d_sigma_mu, data<half>(x), data<half>(dy),
+							data<half>(w), data<half>(b), getPointer<float>(avg_var), first_dim, last_dim, act);
 				else
-					kernel_batchnorm_backward_delta_1<half, 1> <<<gridDim1_x1, blockDim1, 0, stream>>>(d_sigma_mu, data<half>(x), data<half>(dy),
-							data<half>(w), data<half>(b), getPointer<half>(avg_var), first_dim, last_dim, act);
+					kernel_batchnorm_backward_delta_1<1> <<<gridDim1_x1, blockDim1, 0, stream>>>(d_sigma_mu, data<half>(x), data<half>(dy),
+							data<half>(w), data<half>(b), getPointer<float>(avg_var), first_dim, last_dim, act);
 				break;
 			}
 			case DTYPE_FLOAT32:
 			{
 				if (last_dim % 4 == 0)
-					kernel_batchnorm_backward_delta_1<float, 4> <<<gridDim1_x4, blockDim1, 0, stream>>>(d_sigma_mu, data<float>(x), data<float>(dy),
+					kernel_batchnorm_backward_delta_1<4> <<<gridDim1_x4, blockDim1, 0, stream>>>(d_sigma_mu, data<float>(x), data<float>(dy),
 							data<float>(w), data<float>(b), getPointer<float>(avg_var), first_dim, last_dim, act);
 				else
-					kernel_batchnorm_backward_delta_1<float, 1> <<<gridDim1_x1, blockDim1, 0, stream>>>(d_sigma_mu, data<float>(x), data<float>(dy),
+					kernel_batchnorm_backward_delta_1<1> <<<gridDim1_x1, blockDim1, 0, stream>>>(d_sigma_mu, data<float>(x), data<float>(dy),
 							data<float>(w), data<float>(b), getPointer<float>(avg_var), first_dim, last_dim, act);
 				break;
 			}
@@ -562,25 +622,39 @@ namespace ml
 			case DTYPE_FLOAT16:
 			{
 				if (last_dim % 4 == 0)
-					kernel_batchnorm_backward<half, 4> <<<gridDim3_x4, blockDim3, 0, stream>>>(d_sigma_mu, data<half>(x), data<half>(dx),
-							data<half>(dy), data<half>(w), getPointer<half>(avg_var), data<half>(dw), data<half>(db), first_dim, last_dim, alpha,
-							beta_dx, beta_dw );
+				{
+					if (is_fp16(dw))
+						kernel_batchnorm_backward<4> <<<gridDim3_x4, blockDim3, 0, stream>>>(d_sigma_mu, data<half>(x), data<half>(dx),
+								data<half>(dy), data<half>(w), getPointer<float>(avg_var), data<half>(dw), data<half>(db), first_dim, last_dim, alpha,
+								beta_dx, beta_dw );
+					else
+						kernel_batchnorm_backward<4> <<<gridDim3_x4, blockDim3, 0, stream>>>(d_sigma_mu, data<half>(x), data<half>(dx),
+								data<half>(dy), data<half>(w), getPointer<float>(avg_var), data<float>(dw), data<float>(db), first_dim, last_dim,
+								alpha, beta_dx, beta_dw );
+				}
 				else
-					kernel_batchnorm_backward<half, 1> <<<gridDim3_x1, blockDim3, 0, stream>>>(d_sigma_mu, data<half>(x), data<half>(dx),
-							data<half>(dy), data<half>(w), getPointer<half>(avg_var), data<half>(dw), data<half>(db), first_dim, last_dim, alpha,
-							beta_dx, beta_dw );
+				{
+					if (is_fp16(dw))
+						kernel_batchnorm_backward<1> <<<gridDim3_x1, blockDim3, 0, stream>>>(d_sigma_mu, data<half>(x), data<half>(dx),
+								data<half>(dy), data<half>(w), getPointer<float>(avg_var), data<half>(dw), data<half>(db), first_dim, last_dim, alpha,
+								beta_dx, beta_dw );
+					else
+						kernel_batchnorm_backward<1> <<<gridDim3_x1, blockDim3, 0, stream>>>(d_sigma_mu, data<half>(x), data<half>(dx),
+								data<half>(dy), data<half>(w), getPointer<float>(avg_var), data<float>(dw), data<float>(db), first_dim, last_dim,
+								alpha, beta_dx, beta_dw );
+				}
 				break;
 			}
 			case DTYPE_FLOAT32:
 			{
 				if (last_dim % 4 == 0)
-					kernel_batchnorm_backward<float, 4> <<<gridDim3_x4, blockDim3, 0, stream>>>(d_sigma_mu, data<float>(x), data<float>(dx),
-							data<float>(dy), data<float>(w), getPointer<float>(avg_var), data<float>(dw), data<float>(db), first_dim, last_dim, alpha,
-							beta_dx, beta_dw);
+					kernel_batchnorm_backward<4> <<<gridDim3_x4, blockDim3, 0, stream>>>(d_sigma_mu, data<float>(x), data<float>(dx), data<float>(dy),
+							data<float>(w), getPointer<float>(avg_var), data<float>(dw), data<float>(db), first_dim, last_dim, alpha, beta_dx,
+							beta_dw);
 				else
-					kernel_batchnorm_backward<float, 1> <<<gridDim3_x1, blockDim3, 0, stream>>>(d_sigma_mu, data<float>(x), data<float>(dx),
-							data<float>(dy), data<float>(w), getPointer<float>(avg_var), data<float>(dw), data<float>(db), first_dim, last_dim, alpha,
-							beta_dx, beta_dw);
+					kernel_batchnorm_backward<1> <<<gridDim3_x1, blockDim3, 0, stream>>>(d_sigma_mu, data<float>(x), data<float>(dx), data<float>(dy),
+							data<float>(w), getPointer<float>(avg_var), data<float>(dw), data<float>(db), first_dim, last_dim, alpha, beta_dx,
+							beta_dw);
 				break;
 			}
 		}
@@ -588,29 +662,23 @@ namespace ml
 	}
 	void cuda_batchnorm_update(mlContext_t context, const mlTensor_t running_stat, mlTensor_t avg_var)
 	{
+		assert(running_stat.dtype == DTYPE_FLOAT32);
+		assert(avg_var.dtype == DTYPE_FLOAT32);
 		const int first_dim = get_first_dim(running_stat);
 		const int last_dim = get_last_dim(running_stat) / 3;
 
 		cudaStream_t stream = ml::cuda::Context::getStream(context);
 
-		dim3 blockDim(32, 8);
+		dim3 blockDim(32, 32);
 		dim3 gridDim((last_dim + 31) / 32);
-		switch (avg_var.dtype)
-		{
-			case DTYPE_FLOAT16:
-				kernel_batchnorm_update <<<1, 1, 0, stream>>>(data<AvgVarStats<float>>(running_stat), data<half>(avg_var), first_dim, last_dim);
-				break;
-			case DTYPE_FLOAT32:
-				kernel_batchnorm_update <<<gridDim, blockDim, 0, stream>>>(data<AvgVarStats<float>>(running_stat), data<float>(avg_var), first_dim,
-						last_dim);
-				break;
-		}
+		kernel_batchnorm_update <<<gridDim, blockDim, 0, stream>>>(data<AvgVarStats<float>>(running_stat), data<float>(avg_var), first_dim, last_dim);
 		assert(cudaGetLastError() == cudaSuccess);
 		cudaDeviceSynchronize();
 	}
 	void cuda_fold_batchnorm(mlContext_t context, mlTensor_t layer_weights, mlTensor_t layer_bias, const mlTensor_t bn_weights,
 			const mlTensor_t bn_bias, const mlTensor_t bn_avg_var)
 	{
+		assert(bn_avg_var.dtype == DTYPE_FLOAT32);
 		cudaStream_t stream = ml::cuda::Context::getStream(context);
 		if (layer_weights.rank == 3)
 		{ // depthwise conv2D
@@ -623,7 +691,7 @@ namespace ml
 			{
 				case DTYPE_FLOAT16:
 					kernel_fold_batchnorm_3D<<<gridDim, blockDim, 0, stream>>>(first_dim, last_dim, data<half>(layer_weights), data<half>(layer_bias),
-							data<half>(bn_weights), data<half>(bn_bias), data<half>(bn_avg_var));
+							data<half>(bn_weights), data<half>(bn_bias), data<float>(bn_avg_var));
 					break;
 				case DTYPE_FLOAT32:
 					kernel_fold_batchnorm_3D<<<gridDim, blockDim, 0, stream>>>(first_dim, last_dim, data<float>(layer_weights),
@@ -644,7 +712,7 @@ namespace ml
 			{
 				case DTYPE_FLOAT16:
 					kernel_fold_batchnorm_4D<<<gridDim, blockDim, 0, stream>>>(first_dim, last_dim, data<half>(layer_weights), data<half>(layer_bias),
-							data<half>(bn_weights), data<half>(bn_bias), data<half>(bn_avg_var));
+							data<half>(bn_weights), data<half>(bn_bias), data<float>(bn_avg_var));
 					break;
 				case DTYPE_FLOAT32:
 					kernel_fold_batchnorm_4D<<<gridDim, blockDim, 0, stream>>>(first_dim, last_dim, data<float>(layer_weights),

@@ -56,6 +56,7 @@ namespace ml
 			ACTIVATION_SIGMOID,
 			ACTIVATION_TANH,
 			ACTIVATION_RELU,
+			ACTIVATION_LEAKY_RELU,
 			ACTIVATION_EXP
 		} mlActivationType_t;
 

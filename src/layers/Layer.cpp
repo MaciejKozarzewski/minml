@@ -73,6 +73,8 @@ namespace ml
 				return "tanh";
 			case ActivationType::RELU:
 				return "relu";
+			case ActivationType::LEAKY_RELU:
+				return "leaky_relu";
 			case ActivationType::EXP:
 				return "exp";
 			case ActivationType::SOFTMAX:
@@ -89,6 +91,8 @@ namespace ml
 			return ActivationType::TANH;
 		if (str == "relu")
 			return ActivationType::RELU;
+		if (str == "leaky_relu")
+			return ActivationType::LEAKY_RELU;
 		if (str == "gelu")
 			return ActivationType::EXP;
 		if (str == "softmax")

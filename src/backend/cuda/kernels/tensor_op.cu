@@ -223,29 +223,32 @@ namespace
 			for (int i = blockDim.y * blockIdx.y + threadIdx.y; i < first_dim; i += blockDim.y * gridDim.y)
 			{
 				const int tmp_idx = i * last_dim + last_dim_idx;
-				vec<T, N> dy = load_vec<T, N>(gradient_next + tmp_idx);
+				vec<float, N> dy = load_vec<float, N>(gradient_next + tmp_idx);
 				if (act != ml::ACTIVATION_LINEAR)
 				{
-					const vec<T, N> y = load_vec<T, N>(output + tmp_idx);
+					const vec<float, N> y = load_vec<float, N>(output + tmp_idx);
 					switch (act)
 					{
 						case ml::ACTIVATION_SIGMOID:
-							dy *= y * (one<T, N>() - y);
+							dy *= y * (one<float, N>() - y);
 							break;
 						case ml::ACTIVATION_TANH:
-							dy *= (one<T, N>() - square(y));
+							dy *= one<float, N>() - square(y);
 							break;
 						case ml::ACTIVATION_RELU:
-							dy = select(y <= zero<T, N>(), zero<T, N>(), dy);
+							dy = select(y > zero<float, N>(), dy, zero<float, N>());
+							break;
+						case ml::ACTIVATION_LEAKY_RELU:
+							dy = select(y > zero<float, N>(), dy, dy * vec<float, N>(0.1f));
 							break;
 					}
 					store_vec(gradient_next + tmp_idx, dy);
 				}
-				local_sum += convert<float, T, N>(dy);
+				local_sum += dy;
 				if (gradient_prev != nullptr)
 				{
 					if (beta_prev != 0.0f)
-						dy += vec<T, N>(beta_prev) * load_vec<T, N>(gradient_prev + tmp_idx);
+						dy += vec<float, N>(beta_prev) * load_vec<float, N>(gradient_prev + tmp_idx);
 					store_vec(gradient_prev + tmp_idx, dy);
 				}
 			}
@@ -273,7 +276,6 @@ namespace
 				for (int n = 0; n < N; n++)
 					bias_gradient[blockIdx.y * last_dim + last_dim_idx + n] = workspace[idx.at(0, threadIdx.x, n)];
 			}
-
 		}
 	}
 
@@ -558,7 +560,7 @@ namespace ml
 		dim3 gridDim2_x4((last_dim + 127) / 127);
 		if (dw.data != nullptr)
 		{
-			switch (y.dtype)
+			switch (dw.dtype)
 			{
 				case DTYPE_FLOAT16:
 				{
