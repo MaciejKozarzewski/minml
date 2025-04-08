@@ -137,7 +137,7 @@ namespace ml
 			Tensor &gradient);
 	void radamOptimize(const Context &context, float scale, const std::vector<Tensor> &gradients, std::vector<Tensor> &weights,
 			std::vector<Tensor> &momentums, std::vector<Tensor> &variances, std::vector<Tensor> &weights_copy, float learning_rate, float beta1,
-			float beta2, int step);
+			float beta2, int step, float weight_decay);
 	std::vector<int> isNanOrInf(const Context &context, const std::vector<Tensor> &tensors);
 	void l2Regularization(const Context &context, std::vector<Tensor> &gradients, const std::vector<Tensor> &params, float scale);
 

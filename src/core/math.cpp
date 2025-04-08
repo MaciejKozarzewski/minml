@@ -264,8 +264,7 @@ namespace ml
 						invert);
 				break;
 			case DeviceType::CUDA:
-				cuda_winograd_weight_transform(get(context), tile_size, get(weights.dtype()), get_shape(weights), weights.data(), matrices.data(),
-						invert);
+				cuda_winograd_weight_transform(get(context), tile_size, get(weights), get(matrices), invert);
 				break;
 			case DeviceType::OPENCL:
 				opencl_winograd_weight_transform(get(context), tile_size, get(weights.dtype()), get_shape(weights), weights.data(), matrices.data(),
@@ -286,8 +285,7 @@ namespace ml
 						matrices.data());
 				break;
 			case DeviceType::CUDA:
-				cuda_winograd_input_transform(get(context), tile_size, get(input.dtype()), get(weight_shape), get_shape(input), input.data(),
-						matrices.data());
+				cuda_winograd_input_transform(get(context), tile_size, get(input), get(matrices));
 				break;
 			case DeviceType::OPENCL:
 				opencl_winograd_input_transform(get(context), tile_size, get(input.dtype()), get(weight_shape), get_shape(input), input.data(),
@@ -309,8 +307,7 @@ namespace ml
 						output.data(), bias.data(), add.data(), get(act));
 				break;
 			case DeviceType::CUDA:
-				cuda_winograd_output_transform(get(context), tile_size, get(output.dtype()), get(weight_shape), get_shape(output), matrices.data(),
-						output.data(), bias.data(), add.data(), get(act));
+				cuda_winograd_output_transform(get(context), tile_size, get(matrices), get(bias), get(add), get(output), get(act));
 				break;
 			case DeviceType::OPENCL:
 				opencl_winograd_output_transform(get(context), tile_size, get(output.dtype()), get(weight_shape), get_shape(output), matrices.data(),
@@ -328,8 +325,7 @@ namespace ml
 						gradient.data(), matrices.data());
 				break;
 			case DeviceType::CUDA:
-				cuda_winograd_gradient_transform(get(context), tile_size, get(gradient.dtype()), get(weight_shape), get_shape(gradient),
-						gradient.data(), matrices.data());
+				cuda_winograd_gradient_transform(get(context), tile_size, get(gradient), get(matrices));
 				break;
 			case DeviceType::OPENCL:
 				opencl_winograd_gradient_transform(get(context), tile_size, get(gradient.dtype()), get(weight_shape), get_shape(gradient),
@@ -346,7 +342,7 @@ namespace ml
 				cpu_winograd_update_transform(get(context), tile_size, get(matrices.dtype()), get_shape(update), matrices.data(), update.data());
 				break;
 			case DeviceType::CUDA:
-				cuda_winograd_update_transform(get(context), tile_size, get(matrices.dtype()), get_shape(update), matrices.data(), update.data());
+				cuda_winograd_update_transform(get(context), tile_size, get(matrices), get(update));
 				break;
 			case DeviceType::OPENCL:
 				opencl_winograd_update_transform(get(context), tile_size, get(matrices.dtype()), get_shape(update), matrices.data(), update.data());
@@ -588,8 +584,7 @@ namespace ml
 				cpu_gemm(get(context), get(C.dtype()), get_shape(C), C.data(), get_shape(A), A.data(), get_shape(B), B.data(), opA, opB, alpha, beta);
 				break;
 			case DeviceType::CUDA:
-				cuda_gemm(get(context), get(C.dtype()), get_shape(C), C.data(), get_shape(A), A.data(), get_shape(B), B.data(), opA, opB, alpha,
-						beta);
+				cuda_gemm_v2(get(context), opA, opB, alpha, get(A), get(B), beta, get(C));
 				break;
 			case DeviceType::OPENCL:
 				opencl_gemm(get(context), get(C.dtype()), get_shape(C), C.data(), get_shape(A), A.data(), get_shape(B), B.data(), opA, opB, alpha,
@@ -608,8 +603,7 @@ namespace ml
 						alpha, beta);
 				break;
 			case DeviceType::CUDA:
-				cuda_gemm_batched(get(context), get(C.dtype()), get_shape(C), C.data(), get_shape(A), A.data(), get_shape(B), B.data(), opA, opB,
-						alpha, beta);
+				cuda_gemm_batched_v2(get(context), opA, opB, alpha, get(A), get(B), beta, get(C));
 				break;
 			case DeviceType::OPENCL:
 				opencl_gemm_batched(get(context), get(C.dtype()), get_shape(C), C.data(), get_shape(A), A.data(), get_shape(B), B.data(), opA, opB,
@@ -1114,7 +1108,7 @@ namespace ml
 	}
 	void radamOptimize(const Context &context, float scale, const std::vector<Tensor> &gradients, std::vector<Tensor> &weights,
 			std::vector<Tensor> &momentums, std::vector<Tensor> &variances, std::vector<Tensor> &weights_copy, float learning_rate, float beta1,
-			float beta2, int step)
+			float beta2, int step, float weight_decay)
 	{
 		assert(gradients.size() == weights.size());
 		assert(gradients.size() == momentums.size());
@@ -1130,7 +1124,7 @@ namespace ml
 				break;
 			case DeviceType::CUDA:
 				cuda_fused_radam_optimize(get(context), scale, _gradients.data(), _weights.data(), _momentums.data(), _variances.data(),
-						weights_copy.empty() ? nullptr : _weights_copy.data(), learning_rate, beta1, beta2, step, _gradients.size());
+						weights_copy.empty() ? nullptr : _weights_copy.data(), learning_rate, beta1, beta2, step, _gradients.size(), weight_decay);
 				break;
 			case DeviceType::OPENCL:
 				break;
@@ -1149,8 +1143,7 @@ namespace ml
 				break;
 			case DeviceType::OPENCL:
 				break;
-		}
-		SYNC();
+		}SYNC();
 		return result;
 	}
 	void l2Regularization(const Context &context, std::vector<Tensor> &gradients, const std::vector<Tensor> &params, float scale)
@@ -1163,7 +1156,6 @@ namespace ml
 			case DeviceType::CPU:
 				break;
 			case DeviceType::CUDA:
-				cuda_fused_l2_regularization(get(context), _gradients.data(), _params.data(), scale, gradients.size());
 				break;
 			case DeviceType::OPENCL:
 				break;
@@ -1230,8 +1222,7 @@ namespace ml
 				break;
 			case DeviceType::OPENCL:
 				break;
-		}
-		SYNC();
+		}SYNC();
 	}
 	std::array<int, 3> explicit_gemm_workspace(const Shape &inputShape, const Shape &outputShape, const Shape &weightShape)
 	{
@@ -1296,8 +1287,7 @@ namespace ml
 			im2row(context, gradient_next_matrix, gradient_next, kernel_size, true, nullptr);
 
 			gemm(context, 'n', 't', gradient_prev_matrix, gradient_next_matrix, weight_matrix, 1, beta);
-		}
-		SYNC();
+		}SYNC();
 	}
 	void explicit_gemm_update(const Context &context, const Tensor &input, const Tensor &gradient_next, Tensor &weight_update, Tensor &workspace)
 	{

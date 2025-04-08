@@ -56,6 +56,17 @@ namespace
 		}
 	}
 
+	int get_batch_stride(const mlTensor_t &t) noexcept
+	{
+		switch (t.rank)
+		{
+			default:
+			case 2:
+				return 0;
+			case 3:
+				return t.dim[1] * t.dim[2];
+		}
+	}
 	int num_rows(const mlTensor_t &t) noexcept
 	{
 		switch (t.rank)
@@ -85,7 +96,7 @@ namespace
 namespace ml
 {
 
-	DLL_PUBLIC void cuda_gemm_v2(mlContext_t context, char opA, char opB, float alpha, const mlTensor_t A, const mlTensor_t B, float beta,
+	void cuda_gemm_v2(mlContext_t context, char opA, char opB, float alpha, const mlTensor_t A, const mlTensor_t B, float beta,
 			mlTensor_t C)
 	{
 		assert(context != nullptr);
@@ -152,7 +163,7 @@ namespace ml
 				else
 				{
 					cublasStatus_t status = cublasGemmEx(handle, op_B, op_A, M, N, K, &_alpha, B.data, CUDA_R_16F, LDB, A.data, CUDA_R_16F, LDA,
-							&_beta, C.data, CUDA_R_16F, LDC, CUBLAS_COMPUTE_32F, CUBLAS_GEMM_DEFAULT);
+							&_beta, C.data, CUDA_R_32F, LDC, CUBLAS_COMPUTE_32F, CUBLAS_GEMM_DEFAULT);
 					assert(status == CUBLAS_STATUS_SUCCESS);
 				}
 
@@ -162,13 +173,91 @@ namespace ml
 			{
 				const double _alpha = alpha;
 				const double _beta = beta;
-				cublasStatus_t status = cublasDgemm(handle, op_B, op_A, M, N, K, &_alpha, data<double>(B), LDB, data<double>(A), LDA,
-						&_beta, data<double>(C), LDC);
+				cublasStatus_t status = cublasDgemm(handle, op_B, op_A, M, N, K, &_alpha, data<double>(B), LDB, data<double>(A), LDA, &_beta,
+						data<double>(C), LDC);
 				assert(status == CUBLAS_STATUS_SUCCESS);
 				break;
 			}
 		}
 	}
+	void cuda_gemm_batched_v2(mlContext_t context, char opA, char opB, float alpha, const mlTensor_t A, const mlTensor_t B, float beta, mlTensor_t C)
+	{
+		assert(context != nullptr);
+		assert(A.rank == 3 || B.rank == 3);
+		assert(C.rank == 3);
+		const int batch = get_first_dim(C);
+		cublasOperation_t op_A = is_transpose(opA) ? CUBLAS_OP_T : CUBLAS_OP_N;
+		cublasOperation_t op_B = is_transpose(opB) ? CUBLAS_OP_T : CUBLAS_OP_N;
+
+		const int M = is_transpose(opB) ? num_rows(B) : num_columns(B);
+		const int N = is_transpose(opA) ? num_columns(A) : num_rows(A);
+		const int K = is_transpose(opB) ? num_columns(B) : num_rows(B);
+
+		const int LDA = get_last_dim(A);
+		const int LDB = get_last_dim(B);
+		const int LDC = get_last_dim(C);
+		const int strideA = get_batch_stride(A);
+		const int strideB = get_batch_stride(B);
+		const int strideC = get_batch_stride(C);
+
+		cublasHandle_t handle = cuda::Context::getHandle(context);
+		cublasStatus_t err = cublasSetMathMode(handle, CUBLAS_DEFAULT_MATH);
+		assert(err == CUBLAS_STATUS_SUCCESS);
+		switch (C.dtype)
+		{
+			case DTYPE_FLOAT16:
+			{
+				assert(is_fp16(A));
+				assert(is_fp16(B));
+				const half _alpha = alpha;
+				const half _beta = beta;
+				cublasStatus_t status = cublasHgemmStridedBatched(handle, op_B, op_A, M, N, K, &_alpha, data<half>(B), LDB, strideB, data<half>(A),
+						LDA, strideA, &_beta, data<half>(C), LDC, strideC, batch);
+				assert(status == CUBLAS_STATUS_SUCCESS);
+				break;
+			}
+			case DTYPE_FLOAT32:
+			{
+				assert(A.dtype == B.dtype);
+				assert(is_fp32(A) || is_fp16(A));
+				const float _alpha = alpha;
+				const float _beta = beta;
+				if (is_fp32(A))
+				{
+					if (ml::cuda::Context::allowsTF32(context))
+					{
+						cublasStatus_t status = cublasGemmStridedBatchedEx(handle, op_B, op_A, M, N, K, &_alpha, B.data, CUDA_R_32F, LDB, strideB,
+								A.data, CUDA_R_32F, LDA, strideA, &_beta, C.data, CUDA_R_32F, LDC, strideC, batch, CUBLAS_COMPUTE_32F_FAST_TF32,
+								CUBLAS_GEMM_DEFAULT);
+						assert(status == CUBLAS_STATUS_SUCCESS);
+					}
+					else
+					{
+						cublasStatus_t status = cublasSgemmStridedBatched(handle, op_B, op_A, M, N, K, &_alpha, data<float>(B), LDB, strideB,
+								data<float>(A), LDA, strideA, &_beta, data<float>(C), LDC, strideC, batch);
+						assert(status == CUBLAS_STATUS_SUCCESS);
+					}
+				}
+				else
+				{
+					cublasStatus_t status = cublasGemmStridedBatchedEx(handle, op_B, op_A, M, N, K, &_alpha, B.data, CUDA_R_16F, LDB, strideB, A.data,
+							CUDA_R_16F, LDA, strideA, &_beta, C.data, CUDA_R_32F, LDC, strideC, batch, CUBLAS_COMPUTE_32F, CUBLAS_GEMM_DEFAULT);
+					assert(status == CUBLAS_STATUS_SUCCESS);
+				}
+				break;
+			}
+			case DTYPE_FLOAT64:
+			{
+				const double _alpha = alpha;
+				const double _beta = beta;
+				cublasStatus_t status = cublasDgemmStridedBatched(handle, op_B, op_A, M, N, K, &_alpha, data<double>(B), LDB, strideB,
+						data<double>(A), LDA, strideA, &_beta, data<double>(C), LDC, strideC, batch);
+				assert(status == CUBLAS_STATUS_SUCCESS);
+				break;
+			}
+		}
+	}
+
 	void cuda_gemm(mlContext_t context, mlDataType_t dtype, mlShape_t shape_C, void *C, mlShape_t shape_A, const void *A, mlShape_t shape_B,
 			const void *B, char opA, char opB, float alpha, float beta)
 	{

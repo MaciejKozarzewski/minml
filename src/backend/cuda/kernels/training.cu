@@ -27,23 +27,12 @@ namespace
 {
 	using namespace vectors;
 
-	__device__ vec4f round_small_to_zero(vec4f x)
-	{
-		vec4f result;
-		result.x0 = (fabsf(x.x0) < 1.0e-6f) ? 0.0f : x.x0;
-		result.x1 = (fabsf(x.x1) < 1.0e-6f) ? 0.0f : x.x1;
-		result.x2 = (fabsf(x.x2) < 1.0e-6f) ? 0.0f : x.x2;
-		result.x3 = (fabsf(x.x3) < 1.0e-6f) ? 0.0f : x.x3;
-		return result;
-	}
-	__device__ vec1f round_small_to_zero(vec1f x)
-	{
-		return vec1f((fabsf(x.x0) < 1.0e-6f) ? 0.0f : x.x0);
-	}
 	__device__ float round_small_to_zero(float x)
 	{
-		return (fabsf(x) < 1.0e-6f) ? 0.0f : x;
+		const uint32_t exponent = reinterpret_cast<uint32_t*>(&x)[0] & 0x7f800000;
+		return (exponent == 0) ? 0.0f : x;
 	}
+
 	__device__ float safe_log(float x)
 	{
 		return logf(1.0e-8f + x);
@@ -141,15 +130,15 @@ namespace
 
 	struct radam_tensors
 	{
-			const void *gradient;
+			const float *gradient;
 			float *weight;
 			float *momentum;
 			float *variance;
-			void *weight_copy;
+			half *weight_copy;
 			int64_t elements;
 	};
-	template<typename T>
-	__global__ void kernel_fused_learn_radam(float scale, radam_tensors *tensors, float learning_rate, float beta1, float beta2, int step)
+	__global__ void kernel_fused_learn_radam(float scale, radam_tensors *tensors, float learning_rate, float beta1, float beta2, int step,
+			float weight_decay)
 	{
 		const float pow_beta1 = bounded_pow(beta1, step, 1.0e-8f);
 		const float pow_beta2 = bounded_pow(beta2, step, 1.0e-8f);
@@ -159,17 +148,17 @@ namespace
 		if (p > 4.0f)
 			r = sqrt((p - 4.0f) * (p - 2.0f) * p_inf / ((p_inf - 4.0f) * (p_inf - 2.0f) * p));
 
-		const T *gradient = reinterpret_cast<const T*>(tensors[blockIdx.y].gradient);
+		const float *gradient = tensors[blockIdx.y].gradient;
 		float *weight = tensors[blockIdx.y].weight;
 		float *momentum = tensors[blockIdx.y].momentum;
 		float *variance = tensors[blockIdx.y].variance;
 		const int elements = tensors[blockIdx.y].elements;
-		T *weight_copy = reinterpret_cast<T*>(tensors[blockIdx.y].weight_copy);
+		half *weight_copy = tensors[blockIdx.y].weight_copy;
 
 		for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < elements; i += gridDim.x * blockDim.x)
 		{
 			float w = weight[i];
-			float g = scale * static_cast<float>(gradient[i]);
+			float g = scale * gradient[i] + weight_decay * w;
 			float m = momentum[i];
 			float v = variance[i];
 
@@ -188,25 +177,6 @@ namespace
 			if (weight_copy != nullptr)
 				weight_copy[i] = w;
 		}
-	}
-
-	struct l2_tensors
-	{
-			void *gradient;
-			const void *weight;
-			int64_t elements;
-	};
-	template<typename T>
-	__global__ void kernel_fused_regularizer_l2(l2_tensors *tensors, float scale)
-	{
-		T *gradient = reinterpret_cast<T*>(tensors[blockIdx.y].gradient);
-		const T *weight = reinterpret_cast<const T*>(tensors[blockIdx.y].weight);
-		const int elements = tensors[blockIdx.y].elements;
-
-		const T _scale = static_cast<T>(scale);
-
-		for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < elements; i += gridDim.x * blockDim.x)
-			gradient[i] += _scale * weight[i];
 	}
 
 	struct nan_inf_tensors
@@ -365,7 +335,8 @@ namespace ml
 	}
 
 	void cuda_fused_radam_optimize(mlContext_t context, float scale, const mlTensor_t *gradient, mlTensor_t *weights, mlTensor_t *momentum,
-			mlTensor_t *variance, mlTensor_t *weights_copy, float learning_rate, float beta1, float beta2, int step, int num_tensors)
+			mlTensor_t *variance, mlTensor_t *weights_copy, float learning_rate, float beta1, float beta2, int step, int num_tensors,
+			float weight_decay)
 	{
 		assert(step > 0);
 		if (num_tensors <= 0)
@@ -375,18 +346,18 @@ namespace ml
 		radam_tensors *cpu_workspace = reinterpret_cast<radam_tensors*>(cuda::Context::getCpuWorkspace(context));
 		for (int i = 0; i < num_tensors; i++)
 		{
-			assert(is_fp32(gradient[i]) || is_fp16(gradient[i]));
+			assert(is_fp32(gradient[i]));
 			assert(is_fp32(weights[i]));
 			assert(is_fp32(momentum[i]));
 			assert(is_fp32(variance[i]));
-			cpu_workspace[i].gradient = gradient[i].data;
+			cpu_workspace[i].gradient = data<float>(gradient[i]);
 			cpu_workspace[i].weight = data<float>(weights[i]);
 			cpu_workspace[i].momentum = data<float>(momentum[i]);
 			cpu_workspace[i].variance = data<float>(variance[i]);
 			if (weights_copy != nullptr)
 			{
 				assert(is_fp16(weights_copy[i]));
-				cpu_workspace[i].weight_copy = weights_copy[i].data;
+				cpu_workspace[i].weight_copy = data<half>(weights_copy[i]);
 			}
 			else
 				cpu_workspace[i].weight_copy = nullptr;
@@ -399,15 +370,7 @@ namespace ml
 
 		dim3 blockDim(256);
 		dim3 gridDim(32, num_tensors);
-		switch (gradient[0].dtype)
-		{
-			case DTYPE_FLOAT16:
-				kernel_fused_learn_radam<half> <<<gridDim, blockDim, 0, stream>>>(scale, device_workspace, learning_rate, beta1, beta2, step);
-				break;
-			case DTYPE_FLOAT32:
-				kernel_fused_learn_radam<float> <<<gridDim, blockDim, 0, stream>>>(scale, device_workspace, learning_rate, beta1, beta2, step);
-				break;
-		}
+		kernel_fused_learn_radam<<<gridDim, blockDim, 0, stream>>>(scale, device_workspace, learning_rate, beta1, beta2, step, weight_decay);
 		assert(cudaGetLastError() == cudaSuccess);
 	}
 	void cuda_fused_is_nan_or_inf(mlContext_t context, const mlTensor_t *tensor, int *result, int num_tensors)
@@ -449,37 +412,10 @@ namespace ml
 		for (int i = 0; i < num_tensors; i++)
 			result[i] = cpu_workspace[i].flag;
 	}
-	void cuda_fused_l2_regularization(mlContext_t context, mlTensor_t *gradient, const mlTensor_t *param, float scale, int num_tensors)
+
+	void cuda_combined_loss(mlContext_t context, float *result, const mlTensor_t *outputs, const mlTensor_t *targets, const mlTensor_t *masks, const float *weights)
 	{
-		if (num_tensors <= 0)
-			return;
-		cudaStream_t stream = cuda::Context::getStream(context);
 
-		l2_tensors *cpu_workspace = reinterpret_cast<l2_tensors*>(cuda::Context::getCpuWorkspace(context));
-		for (int i = 0; i < num_tensors; i++)
-		{
-			cpu_workspace[i].gradient = gradient[i].data;
-			cpu_workspace[i].weight = param[i].data;
-			cpu_workspace[i].elements = volume(gradient[i]);
-		}
-
-		l2_tensors *device_workspace = cuda::Context::getWorkspace<l2_tensors>(context);
-		cudaError_t status = cudaMemcpyAsync(device_workspace, cpu_workspace, sizeof(l2_tensors) * num_tensors, cudaMemcpyHostToDevice, stream);
-		assert(status == cudaSuccess);
-
-		dim3 blockDim(256);
-		dim3 gridDim(32, num_tensors);
-		switch (gradient[0].dtype)
-		{
-			case DTYPE_FLOAT16:
-				kernel_fused_regularizer_l2<half> <<<gridDim, blockDim, 0, stream>>>(device_workspace, scale);
-				break;
-			case DTYPE_FLOAT32:
-				kernel_fused_regularizer_l2<float> <<<gridDim, blockDim, 0, stream>>>(device_workspace, scale);
-				break;
-		}
-		assert(cudaGetLastError() == cudaSuccess);
 	}
-
 } /* namespace ml */
 

@@ -201,7 +201,7 @@ namespace
 								for (int j = 0; j < InputSize; j++)
 								{
 									const int w = origin_w + j - Padding;
-									inp[j] = is_inside(w, width) ? x_ptr[input_indexer.at(blockIdx.y, h, w, f)] : get<T>(0.0f);
+									inp[j] = is_inside(w, width) ? x_ptr[input_indexer.at(blockIdx.y, h, w, f)] : get<U>(0.0f);
 								}
 								const Line<T, TileSize> fil = convolution.load_filter(gradient_tile, i);
 								convolution.accumulate(update_acc, inp, fil);
@@ -215,23 +215,20 @@ namespace
 				dw_ptr[update_indexer.at(blockIdx.y, threadIdx.y, i, f)] = update_acc[i];
 		}
 	}
-	template<typename T, typename U>
-	__global__ void kernel_sum_update(float beta, T *dst, float alpha, const U *src, int first_dim, int last_dim)
+	template<typename T>
+	__global__ void kernel_sum_update(float beta, T *dst, float alpha, const float *src, int first_dim, int last_dim)
 	{
 		assert(blockDim.x == 32);
 		assert(blockDim.y == 32);
 		assert(gridDim.y == 1);
-		__shared__ U workspace[32][32 + 1];
+		__shared__ float workspace[32][32 + 1];
 
 		const int last_dim_idx = 32 * blockIdx.x + threadIdx.x;
-		U local_sum = get<U>(0.0f);
+		float local_sum = 0.0f;
 		if (last_dim_idx < last_dim)
 		{
 			for (int i = threadIdx.y; i < first_dim; i += 32)
-			{
-				const U tmp = src[i * last_dim + last_dim_idx];
-				local_sum += tmp;
-			}
+				local_sum += static_cast<float>(src[i * last_dim + last_dim_idx]);
 			workspace[threadIdx.y][threadIdx.x + 0] = local_sum;
 		}
 		__syncthreads();
@@ -245,10 +242,10 @@ namespace
 
 		if (threadIdx.y == 0 && last_dim_idx < last_dim)
 		{
-			T tmp = get<T>(alpha) * workspace[0][threadIdx.x];
+			float tmp = alpha * workspace[0][threadIdx.x];
 			if (beta != 0.0f)
-				tmp += get<T>(beta) * dst[last_dim_idx];
-			dst[last_dim_idx] = tmp;
+				tmp += beta * static_cast<float>(dst[last_dim_idx]);
+			dst[last_dim_idx] = static_cast<T>(tmp);
 		}
 	}
 
@@ -295,7 +292,7 @@ namespace
 				break;
 		}
 	}
-	template<typename T, int TileSize>
+	template<typename T, typename U, int TileSize>
 	void dispatch_dwconv_update(mlContext_t context, float alpha, const mlTensor_t &x, const mlTensor_t &dy, float beta, mlTensor_t &dw)
 	{
 		assert(x.rank == 4);
@@ -309,11 +306,11 @@ namespace
 		assert(dw.dim[0] == dw.dim[1]);
 
 		cudaStream_t stream = ml::cuda::Context::getStream(context);
-		T *workspace = getPointer<T>(ml::cuda::Context::getWorkspace(context));
+		float *workspace = getPointer<float>(ml::cuda::Context::getWorkspace(context));
 		const int workspace_size = ml::cuda::Context::getWorkspaceSize(context);
 
 		const int last_dim = filter_size * filter_size * channels;
-		const int max_blocks = workspace_size / (sizeof(T) * last_dim);
+		const int max_blocks = workspace_size / (sizeof(float) * last_dim);
 
 		constexpr int channels_per_thread = std::is_same<T, half2>::value ? 2 : 1;
 		const int channels_per_block = 32 * channels_per_thread;
@@ -326,16 +323,16 @@ namespace
 		switch (filter_size)
 		{
 			case 3:
-				kernel_depthwise_conv_update<TileSize, 3, T> <<<gridDim, blockDim, 0, stream>>>(workspace, data<T>(x), data<T>(dy), batch_size,
-						height, width, channels / channels_per_thread);
+				kernel_depthwise_conv_update<TileSize, 3> <<<gridDim, blockDim, 0, stream>>>(workspace, data<T>(x), data<T>(dy), batch_size, height,
+						width, channels / channels_per_thread);
 				break;
 			case 5:
-				kernel_depthwise_conv_update<TileSize, 5, T> <<<gridDim, blockDim, 0, stream>>>(workspace, data<T>(x), data<T>(dy), batch_size,
-						height, width, channels / channels_per_thread);
+				kernel_depthwise_conv_update<TileSize, 5> <<<gridDim, blockDim, 0, stream>>>(workspace, data<T>(x), data<T>(dy), batch_size, height,
+						width, channels / channels_per_thread);
 				break;
 			case 7:
-				kernel_depthwise_conv_update<TileSize, 7, T> <<<gridDim, blockDim, 0, stream>>>(workspace, data<T>(x), data<T>(dy), batch_size,
-						height, width, channels / channels_per_thread);
+				kernel_depthwise_conv_update<TileSize, 7> <<<gridDim, blockDim, 0, stream>>>(workspace, data<T>(x), data<T>(dy), batch_size, height,
+						width, channels / channels_per_thread);
 				break;
 			default:
 				break;
@@ -344,7 +341,7 @@ namespace
 
 		blockDim = dim3(32, 32);
 		gridDim = dim3((last_dim + channels_per_block - 1) / channels_per_block);
-		kernel_sum_update<<<gridDim, blockDim, 0, stream>>>(beta, data<T>(dw), alpha, workspace, num_blocks, last_dim / channels_per_thread);
+		kernel_sum_update<<<gridDim, blockDim, 0, stream>>>(beta, data<U>(dw), alpha, workspace, num_blocks, last_dim / channels_per_thread);
 		assert(cudaGetLastError() == cudaSuccess);
 	}
 }
@@ -403,15 +400,16 @@ namespace ml
 		{
 			case DTYPE_FLOAT16:
 			{
-				if (get_last_dim(dw) % 2 == 0)
-					dispatch_dwconv_update<half2, 4>(context, alpha, x, dy, beta, dw);
+				assert(is_fp32(dw) || is_fp16(dw));
+				if (is_fp32(dw))
+					dispatch_dwconv_update<half, float, 4>(context, alpha, x, dy, beta, dw);
 				else
-					dispatch_dwconv_update<half, 4>(context, alpha, x, dy, beta, dw);
+					dispatch_dwconv_update<half, half, 4>(context, alpha, x, dy, beta, dw);
 				break;
 			}
 			case DTYPE_FLOAT32:
 			{
-				dispatch_dwconv_update<float, 4>(context, alpha, x, dy, beta, dw);
+				dispatch_dwconv_update<float, float, 4>(context, alpha, x, dy, beta, dw);
 				break;
 			}
 			default:

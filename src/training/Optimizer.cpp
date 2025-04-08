@@ -35,10 +35,11 @@ namespace
 
 namespace ml
 {
-	RAdam::RAdam(float learningRate, float beta1, float beta2) :
+	RAdam::RAdam(float learningRate, float beta1, float beta2, float weightDecay) :
 			m_learning_rate(learningRate),
 			m_beta1(beta1),
-			m_beta2(beta2)
+			m_beta2(beta2),
+			m_weight_decay(weightDecay)
 	{
 	}
 
@@ -109,11 +110,11 @@ namespace ml
 
 		m_steps++;
 		if (is_fp16(weights))
-			radamOptimize(context, scale, gradients, m_fp32_weights, m_momentums, m_variances, weights, m_learning_rate, m_beta1, m_beta2, m_steps);
+			radamOptimize(context, scale, gradients, m_fp32_weights, m_momentums, m_variances, weights, m_learning_rate, m_beta1, m_beta2, m_steps, m_weight_decay);
 		else
 		{
 			std::vector<Tensor> empty;
-			radamOptimize(context, scale, gradients, weights, m_momentums, m_variances, empty, m_learning_rate, m_beta1, m_beta2, m_steps);
+			radamOptimize(context, scale, gradients, weights, m_momentums, m_variances, empty, m_learning_rate, m_beta1, m_beta2, m_steps, m_weight_decay);
 		}
 	}
 

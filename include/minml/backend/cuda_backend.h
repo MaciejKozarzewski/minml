@@ -93,16 +93,12 @@ namespace ml
 				void *output);
 
 		// implemented in 'winograd_non_fused.cu'
-		DLL_PUBLIC void cuda_winograd_weight_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape,
-				const void *weights, void *matrices, bool invert);
-		DLL_PUBLIC void cuda_winograd_input_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape,
-				mlShape_t input_shape, const void *input, void *matrices);
-		DLL_PUBLIC void cuda_winograd_output_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape,
-				mlShape_t output_shape, const void *matrices, void *output, const void *bias, const void *add, mlActivationType_t act);
-		DLL_PUBLIC void cuda_winograd_gradient_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape,
-				mlShape_t gradient_shape, const void *gradient, void *matrices);
-		DLL_PUBLIC void cuda_winograd_update_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape,
-				const void *matrices, void *update);
+		DLL_PUBLIC void cuda_winograd_weight_transform(mlContext_t context, int tile_size, const mlTensor_t w, mlTensor_t matrices, bool invert);
+		DLL_PUBLIC void cuda_winograd_input_transform(mlContext_t context, int tile_size, const mlTensor_t x, mlTensor_t matrices);
+		DLL_PUBLIC void cuda_winograd_output_transform(mlContext_t context, int tile_size, const mlTensor_t matrices, const mlTensor_t bias,
+				const mlTensor_t ext, mlTensor_t y, mlActivationType_t act);
+		DLL_PUBLIC void cuda_winograd_gradient_transform(mlContext_t context, int tile_size, const mlTensor_t dy, mlTensor_t matrices);
+		DLL_PUBLIC void cuda_winograd_update_transform(mlContext_t context, int tile_size, const mlTensor_t matrices, mlTensor_t dw);
 
 		// implemented in 'implicit_gemm_conv.cu'
 		DLL_PUBLIC void cuda_convolution_implicit_gemm_forward(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape,
@@ -133,6 +129,8 @@ namespace ml
 		 * matrix multiplications
 		 */
 		DLL_PUBLIC void cuda_gemm_v2(mlContext_t context, char opA, char opB, float alpha, const mlTensor_t A, const mlTensor_t B, float beta,
+				mlTensor_t C);
+		DLL_PUBLIC void cuda_gemm_batched_v2(mlContext_t context, char opA, char opB, float alpha, const mlTensor_t A, const mlTensor_t B, float beta,
 				mlTensor_t C);
 		DLL_PUBLIC void cuda_gemm(mlContext_t context, mlDataType_t dtype, mlShape_t shape_C, void *C, mlShape_t shape_A, const void *A,
 				mlShape_t shape_B, const void *B, char opA, char opB, float alpha, float beta);
@@ -240,10 +238,13 @@ namespace ml
 
 		DLL_PUBLIC void cuda_fused_radam_optimize(mlContext_t context, float scale, const mlTensor_t *gradients, mlTensor_t *weights,
 				mlTensor_t *momentums, mlTensor_t *variances, mlTensor_t *weights_copy, float learning_rate, float beta1, float beta2, int step,
-				int num_tensors);
+				int num_tensors, float weight_decay);
 		DLL_PUBLIC void cuda_fused_is_nan_or_inf(mlContext_t context, const mlTensor_t *tensors, int *result, int num_tensors);
 		DLL_PUBLIC void cuda_fused_l2_regularization(mlContext_t context, mlTensor_t *gradients, const mlTensor_t *params, float scale,
 				int num_tensors);
+
+		DLL_PUBLIC void cuda_combined_loss(mlContext_t context, float *result, const mlTensor_t *outputs, const mlTensor_t *targets,
+				const mlTensor_t *masks, const float *weights);
 
 		/*
 		 * quantization

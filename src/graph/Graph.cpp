@@ -211,10 +211,6 @@ namespace ml
 	{
 		m_optimizer = opt;
 	}
-	void Graph::setRegularizer(const RegularizerL2 &reg)
-	{
-		m_regularizer = reg;
-	}
 	void Graph::setGradientScaler(const GradientScaler &scaler)
 	{
 		m_gradient_scaler = scaler;
@@ -222,10 +218,6 @@ namespace ml
 	RAdam& Graph::getOptimizer()
 	{
 		return m_optimizer;
-	}
-	RegularizerL2& Graph::getRegularizer()
-	{
-		return m_regularizer;
 	}
 	GradientScaler& Graph::getGradientScaler()
 	{
@@ -268,7 +260,6 @@ namespace ml
 
 		std::vector<Tensor> params = getParameters();
 		std::vector<Tensor> param_gradients = getParameterGradients();
-		m_regularizer.apply(context(), gradient_scale, params, param_gradients);
 
 //		const std::vector<int> flags = isNanOrInf(context(), params);
 //		const bool are_all_params_ok = std::all_of(flags.begin(), flags.end(), [](int i)
@@ -476,7 +467,6 @@ namespace ml
 		if (isTrainable())
 		{
 			result["optimizer"] = m_optimizer.serialize(binary_data);
-			result["regularizer"] = m_regularizer.serialize(binary_data);
 			result["gradient_scaler"] = m_gradient_scaler.serialize(binary_data);
 			result["loss_function"] = Json::array();
 			for (size_t i = 0; i < m_loss_weights.size(); i++)
@@ -512,7 +502,6 @@ namespace ml
 		if (isTrainable())
 		{
 			m_optimizer.unserialize(json["optimizer"], binary_data);
-			m_regularizer.unserialize(json["regularizer"], binary_data);
 			m_gradient_scaler.unserialize(json["gradient_scaler"], binary_data);
 			for (int i = 0; i < json["loss_function"].size(); i++)
 			{

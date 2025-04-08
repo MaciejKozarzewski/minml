@@ -53,7 +53,6 @@ namespace ml
 			std::vector<std::unique_ptr<LossFunction>> m_losses;
 			std::vector<float> m_loss_weights;
 			RAdam m_optimizer;
-			RegularizerL2 m_regularizer;
 			GradientScaler m_gradient_scaler;
 
 			DataType m_datatype = DataType::FLOAT32;
@@ -100,10 +99,8 @@ namespace ml
 
 			void init();
 			void setOptimizer(const RAdam &opt);
-			void setRegularizer(const RegularizerL2 &reg);
 			void setGradientScaler(const GradientScaler &scaler);
 			RAdam& getOptimizer();
-			RegularizerL2& getRegularizer();
 			GradientScaler& getGradientScaler();
 
 			void predict(int batchSize);

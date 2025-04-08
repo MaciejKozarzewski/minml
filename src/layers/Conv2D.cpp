@@ -152,6 +152,7 @@ namespace ml
 
 			const Shape win1 = get_matrices_shape(m_kernel_size, m_winograd_tile_size, getInputShape());
 			const Shape win2 = get_matrices_shape(m_kernel_size, m_winograd_tile_size, getOutputShape());
+			const Shape win3 = get_weight_matrices_shape(getWeightShape(), m_winograd_tile_size);
 			int result = 0;
 			switch (m_forward_algorithm)
 			{
@@ -170,7 +171,7 @@ namespace ml
 					result = std::max(result, std::max(gemm1[1], gemm1[2]));
 					break;
 				case ConvolutionAlgorithm::WINOGRAD_NON_FUSED:
-					result = std::max(result, win1.volume() + win2.volume() + 1024);
+					result = std::max(result, win1.volume() + win2.volume() + 2 * win3.volume() + 1024);
 					break;
 				default:
 					break;
@@ -390,6 +391,9 @@ namespace ml
 				Tensor gradient_next_matrices = m_workspace.lock()->view(get_matrices_shape(m_kernel_size, m_winograd_tile_size, output.shape()));
 				Tensor gradient_prev_matrices = m_workspace.lock()->view(get_matrices_shape(m_kernel_size, m_winograd_tile_size, input[0].shape()),
 						gradient_next_matrices.volume());
+				Tensor weight_update_matrices = m_workspace.lock()->view(get_weight_matrices_shape(getWeightShape(), m_winograd_tile_size),
+						gradient_next_matrices.volume() + gradient_prev_matrices.volume());
+				weight_update_matrices.reinterpretAs(DataType::FLOAT32);
 
 				winogradInputTransform(context(), getWeightShape(), gradient_next, gradient_next_matrices);
 				gemmBatched(context(), 'n', 'n', gradient_prev_matrices, gradient_next_matrices, *m_transformed_weights, 1, 0);
@@ -398,8 +402,8 @@ namespace ml
 
 				winogradGradientTransform(context(), getWeightShape(), gradient_next, gradient_next_matrices);
 				winogradInputTransform(context(), getWeightShape(), input[0], gradient_prev_matrices);
-				gemmBatched(context(), 't', 'n', *m_transformed_weights, gradient_next_matrices, gradient_prev_matrices, 1, 0);
-				winogradUpdateTransform(context(), *m_transformed_weights, getWeights().getGradient());
+				gemmBatched(context(), 't', 'n', weight_update_matrices, gradient_next_matrices, gradient_prev_matrices, 1, 0);
+				winogradUpdateTransform(context(), weight_update_matrices, getWeights().getGradient());
 				break;
 			}
 		}

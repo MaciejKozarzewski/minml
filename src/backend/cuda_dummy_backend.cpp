@@ -146,28 +146,24 @@ namespace ml
 	}
 
 	// implemented in 'winograd_non_fused.cu'
-	void cuda_winograd_weight_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape, const void *weights,
-			void *matrices, bool invert)
+	void cuda_winograd_weight_transform(mlContext_t context, int tile_size, const mlTensor_t w, mlTensor_t matrices, bool invert)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
-	void cuda_winograd_input_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape, mlShape_t input_shape,
-			const void *input, void *matrices)
+	void cuda_winograd_input_transform(mlContext_t context, int tile_size, const mlTensor_t x, mlTensor_t matrices)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
-	void cuda_winograd_output_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape, mlShape_t output_shape,
-			const void *matrices, void *output, const void *bias, const void *add, mlActivationType_t act)
+	void cuda_winograd_output_transform(mlContext_t context, int tile_size, const mlTensor_t matrices, const mlTensor_t bias, const mlTensor_t ext,
+			mlTensor_t y, mlActivationType_t act)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
-	void cuda_winograd_gradient_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape, mlShape_t gradient_shape,
-			const void *gradient, void *matrices)
+	void cuda_winograd_gradient_transform(mlContext_t context, int tile_size, const mlTensor_t dy, mlTensor_t matrices)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
-	void cuda_winograd_update_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape, const void *matrices,
-			void *update)
+	void cuda_winograd_update_transform(mlContext_t context, int tile_size, const mlTensor_t matrices, mlTensor_t dw)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
@@ -254,6 +250,14 @@ namespace ml
 	}
 
 	// implemented in 'gemms.cpp'
+	void cuda_gemm_v2(mlContext_t context, char opA, char opB, float alpha, const mlTensor_t A, const mlTensor_t B, float beta, mlTensor_t C)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+	void cuda_gemm_batched_v2(mlContext_t context, char opA, char opB, float alpha, const mlTensor_t A, const mlTensor_t B, float beta, mlTensor_t C)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
 	void cuda_gemm(mlContext_t context, mlDataType_t dtype, mlShape_t shape_C, void *C, mlShape_t shape_A, const void *A, mlShape_t shape_B,
 			const void *B, char opA, char opB, float alpha, float beta)
 	{
@@ -417,7 +421,7 @@ namespace ml
 		throw NotImplemented(METHOD_NAME);
 	}
 	void cuda_fused_radam_optimize(mlContext_t context, float scale, const mlTensor_t *gradients, mlTensor_t *weights, mlTensor_t *momentums,
-			mlTensor_t *variances, mlTensor_t *weights_copy, float learning_rate, float beta1, float beta2, int step, int num_tensors)
+			mlTensor_t *variances, mlTensor_t *weights_copy, float learning_rate, float beta1, float beta2, int step, int num_tensors, float weight_decay)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
