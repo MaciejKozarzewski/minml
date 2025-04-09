@@ -110,11 +110,13 @@ namespace ml
 
 		m_steps++;
 		if (is_fp16(weights))
-			radamOptimize(context, scale, gradients, m_fp32_weights, m_momentums, m_variances, weights, m_learning_rate, m_beta1, m_beta2, m_steps, m_weight_decay);
+			radamOptimize(context, scale, gradients, m_fp32_weights, m_momentums, m_variances, weights, m_learning_rate, m_beta1, m_beta2, m_steps,
+					m_weight_decay);
 		else
 		{
 			std::vector<Tensor> empty;
-			radamOptimize(context, scale, gradients, weights, m_momentums, m_variances, empty, m_learning_rate, m_beta1, m_beta2, m_steps, m_weight_decay);
+			radamOptimize(context, scale, gradients, weights, m_momentums, m_variances, empty, m_learning_rate, m_beta1, m_beta2, m_steps,
+					m_weight_decay);
 		}
 	}
 
@@ -125,13 +127,17 @@ namespace ml
 		result["learning rate"] = m_learning_rate;
 		result["beta1"] = m_beta1;
 		result["beta2"] = m_beta2;
+		result["weight_decay"] = m_weight_decay;
 		result["steps"] = m_steps;
+
 		result["fp32_weights"] = Json::array();
 		for (size_t i = 0; i < m_fp32_weights.size(); i++)
 			result["fp32_weights"][i] = m_fp32_weights[i].serialize(binary_data);
+
 		result["momentums"] = Json::array();
 		for (size_t i = 0; i < m_momentums.size(); i++)
 			result["momentums"][i] = m_momentums[i].serialize(binary_data);
+
 		result["variances"] = Json::array();
 		for (size_t i = 0; i < m_variances.size(); i++)
 			result["variances"][i] = m_variances[i].serialize(binary_data);
@@ -144,13 +150,17 @@ namespace ml
 		m_learning_rate = json["learning rate"];
 		m_beta1 = json["beta1"];
 		m_beta2 = json["beta2"];
+		m_weight_decay = json["weight_decay"];
 		m_steps = json["steps"];
+
 		m_fp32_weights = std::vector<Tensor>(json["fp32_weights"].size());
 		for (size_t i = 0; i < m_fp32_weights.size(); i++)
 			m_fp32_weights[i].unserialize(json["fp32_weights"][i], binary_data);
+
 		m_momentums = std::vector<Tensor>(json["momentums"].size());
 		for (size_t i = 0; i < m_momentums.size(); i++)
 			m_momentums[i].unserialize(json["momentums"][i], binary_data);
+
 		m_variances = std::vector<Tensor>(json["variances"].size());
 		for (size_t i = 0; i < m_variances.size(); i++)
 			m_variances[i].unserialize(json["variances"][i], binary_data);
