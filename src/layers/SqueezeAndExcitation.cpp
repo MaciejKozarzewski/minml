@@ -110,7 +110,7 @@ namespace ml
 	void SqueezeAndExcitation::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev,
 			Tensor &gradient_next, const std::vector<float> &beta)
 	{
-		throw LogicError(METHOD_NAME, "FusedConvBlock is not a trainable layer");
+		throw LogicError(METHOD_NAME, "SqueezeAndExcitation is not a trainable layer");
 	}
 
 } /* namespace ml */

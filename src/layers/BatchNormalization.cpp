@@ -19,8 +19,7 @@ namespace
 	using namespace ml;
 	Tensor get_statistics(Tensor &running_stats, int id)
 	{
-		const int channels = running_stats.lastDim();
-		return running_stats.view( { channels }, id * channels);
+		return running_stats.view( { running_stats.lastDim() }, { id, 0 });
 	}
 }
 
@@ -172,7 +171,7 @@ namespace ml
 		assert(input.size() == 1);
 		assert(gradient_prev.size() == 1);
 
-		Tensor stats = get_statistics(m_historical_stats, m_history_id);
+		const Tensor stats = get_statistics(m_historical_stats, m_history_id);
 		batchnormBackward(context(), 1.0f, input[0], output, gradient_next, getWeights().getParam(), getBias().getParam(), beta[0], gradient_prev[0],
 				0.0f, getWeights().getGradient(), getBias().getGradient(), stats, m_activation);
 	}
@@ -180,7 +179,7 @@ namespace ml
 	{
 		m_total_steps++;
 		m_history_id = (m_history_id + 1) % m_history_size;
-		Tensor stats = m_historical_stats.view( { std::min(m_history_size, m_total_steps), m_historical_stats.lastDim() });
+		const Tensor stats = m_historical_stats.view( { std::min(m_history_size, m_total_steps), m_historical_stats.lastDim() });
 		batchnormUpdate(context(), stats, m_avg_var);
 	}
 	Tensor& BatchNormalization::getStatistics()

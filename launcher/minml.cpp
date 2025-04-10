@@ -3528,26 +3528,26 @@ int main()
 	{
 		Graph graph;
 		const bool symmetric = false;
-		const int batch_size = 128;
+		const int batch_size = 1024;
 		const int board_size = 15;
-		int embedding = 256;
+		int embedding = 128;
 		const int patch_size = 1;
 		const int head_dim = 32;
 		const int pos_encoding_range = (board_size + patch_size - 1) / patch_size;
 
 		auto x = graph.addInput( { batch_size, board_size, board_size, 8 });
 		x = graph.add(ml::Conv2D(embedding, 5).useBias(false), x);
-		x = graph.add(ml::BatchNormalization("relu").useGamma(false), x);
+		x = graph.add(ml::BatchNormalization("relu").useGamma(false).historySize(1000), x);
 
 		auto y = graph.add(ml::GlobalAveragePooling(), x);
 		y = graph.add(ml::Dense(embedding, "relu"), y);
 		y = graph.add(ml::Dense(embedding, "sigmoid"), y);
 		x = graph.add(ml::ChannelScaling(), { x, y });
 
-		for (int i = 0; i < 0; i++)
+		for (int i = 0; i < 1; i++)
 		{
 			auto y = graph.add(ml::DepthwiseConv2D(embedding, 7).useBias(false), x);
-			y = graph.add(ml::BatchNormalization().useGamma(false), y);
+			y = graph.add(ml::BatchNormalization().useGamma(false).historySize(1000), y);
 			y = graph.add(ml::Conv2D(embedding, 1, "relu"), y);
 			x = graph.add(ml::Conv2D(embedding, 1), { y, x });
 
@@ -3559,7 +3559,7 @@ int main()
 
 		// policy head
 		auto p = graph.add(ml::Conv2D(embedding, 1).useBias(false), x);
-		p = graph.add(ml::BatchNormalization("relu").useGamma(false), p);
+		p = graph.add(ml::BatchNormalization("relu").useGamma(false).historySize(1000), p);
 		y = graph.add(ml::GlobalAveragePooling(), p);
 		y = graph.add(ml::Dense(embedding, "relu"), y);
 		y = graph.add(ml::Dense(embedding, "sigmoid"), y);
@@ -3572,13 +3572,13 @@ int main()
 		auto v = graph.add(ml::Conv2D(embedding, 1, "relu"), x);
 		v = graph.add(ml::GlobalAveragePooling(), v);
 		v = graph.add(ml::Dense(256).useBias(false), v);
-		v = graph.add(ml::BatchNormalization("relu"), v);
+		v = graph.add(ml::BatchNormalization("leaky_relu").historySize(1000), v);
 		v = graph.add(ml::Dense(3), v);
 		v = graph.add(ml::Softmax( { 1 }), v);
 		graph.addOutput(v, CrossEntropyLoss());
 
 		auto q = graph.add(ml::Conv2D(embedding, 1, "linear").useBias(false), x);
-		q = graph.add(ml::BatchNormalization("relu").useGamma(false), q);
+		q = graph.add(ml::BatchNormalization("relu").useGamma(false).historySize(1000), q);
 		y = graph.add(ml::GlobalAveragePooling(), q);
 		y = graph.add(ml::Dense(embedding, "relu"), y);
 		y = graph.add(ml::Dense(embedding, "sigmoid"), y);
@@ -3800,8 +3800,9 @@ int main()
 //		return 0;
 		graph.moveTo(Device::cuda());
 		graph.init();
-		graph.convertTo(DataType::FLOAT32);
-		graph.setGradientScaler(GradientScaler(1024.0f));
+		graph.convertTo(DataType::FLOAT16);
+		graph.setGradientScaler(GradientScaler(1.0f));
+		graph.context().enableTF32(true);
 
 		Tensor input(graph.getInputShape(), graph.dtype(), Device::cpu());
 		for (int i = 0; i < input.shape().volumeWithoutLastDim(); i++)
