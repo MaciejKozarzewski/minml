@@ -27,65 +27,65 @@ namespace vectors
 		public:
 			half2 x0, x1;
 
-			HOST_DEVICE vec() // @suppress("Class members should be properly initialized")
+			__device__ vec() // @suppress("Class members should be properly initialized")
 			{
 			}
-			explicit HOST_DEVICE vec(half2 h0, half2 h1) :
+			explicit __device__ vec(half2 h0, half2 h1) :
 					x0(h0),
 					x1(h1)
 			{
 			}
-			explicit HOST_DEVICE vec(half h0, half h1, half h2, half h3) :
+			explicit __device__ vec(half h0, half h1, half h2, half h3) :
 					x0(h0, h1),
 					x1(h2, h3)
 			{
 			}
-			explicit HOST_DEVICE vec(half2 h) :
+			explicit __device__ vec(half2 h) :
 					vec4h(h, h)
 			{
 			}
-			explicit HOST_DEVICE vec(half h) :
+			explicit __device__ vec(half h) :
 					vec4h(h, h, h, h)
 			{
 			}
-			explicit HOST_DEVICE vec(float f) :
+			explicit __device__ vec(float f) :
 					vec4h(static_cast<half>(f))
 			{
 			}
-			HOST_DEVICE vec(const half *__restrict__ ptr)
+			__device__ vec(const half *__restrict__ ptr)
 			{
 				load(ptr);
 			}
-			HOST_DEVICE void load(const half *__restrict__ ptr)
+			__device__ void load(const half *__restrict__ ptr)
 			{
 				assert(ptr != nullptr);
 				*this = reinterpret_cast<const vec4h*>(ptr)[0];
 			}
-			HOST_DEVICE void store(half *__restrict__ ptr) const
+			__device__ void store(half *__restrict__ ptr) const
 			{
 				assert(ptr != nullptr);
 				reinterpret_cast<vec4h*>(ptr)[0] = *this;
 			}
-			HOST_DEVICE vec4h& operator=(float x)
+			__device__ vec4h& operator=(float x)
 			{
 				const half tmp = static_cast<half>(x);
 				x0 = half2 { tmp, tmp };
 				x1 = half2 { tmp, tmp };
 				return *this;
 			}
-			HOST_DEVICE vec4h operator-() const
+			__device__ vec4h operator-() const
 			{
 				return vec4h(-x0, -x1);
 			}
-			HOST_DEVICE vec4h operator~() const
+			__device__ vec4h operator~() const
 			{
 				return vec4h(bit_invert(x0), bit_invert(x1));
 			}
-			HOST_DEVICE int size() const
+			__device__ int size() const
 			{
 				return 4;
 			}
-			HOST_DEVICE half operator[](int idx) const
+			__device__ half operator[](int idx) const
 			{
 				assert(0 <= idx && idx < size());
 				switch (idx)
@@ -101,7 +101,7 @@ namespace vectors
 						return x1.y;
 				}
 			}
-			HOST_DEVICE half& operator[](int idx)
+			__device__ half& operator[](int idx)
 			{
 				assert(0 <= idx && idx < size());
 				switch (idx)

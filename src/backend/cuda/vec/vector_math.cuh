@@ -26,34 +26,34 @@
 namespace vectors
 {
 	template<int N, typename T, typename U>
-	__device__ void vector_copy(T *dst, const U *src)
+	DEVICE_INLINE void vector_copy(T *dst, const U *src)
 	{
 		store_vec(dst, load_vec<U, N>(src));
 	}
 
 	template<typename T, int N>
-	__device__ vec<T, N> zero()
+	DEVICE_INLINE vec<T, N> zero()
 	{
 		return vec<T, N>(0.0f);
 	}
 	template<typename T, int N>
-	__device__ vec<T, N> one()
+	DEVICE_INLINE vec<T, N> one()
 	{
 		return vec<T, N>(1.0f);
 	}
 
 	template<typename T, int N>
-	__device__ vec<T, N> sigmoid(const vec<T, N> &x)
+	DEVICE_INLINE vec<T, N> sigmoid(const vec<T, N> &x)
 	{
 		return one<T, N>() / (one<T, N>() + vectors::exp(-x));
 	}
 	template<typename T, int N>
-	__device__ vec<T, N> relu(const vec<T, N> &x)
+	DEVICE_INLINE vec<T, N> relu(const vec<T, N> &x)
 	{
 		return vectors::max(zero<T, N>(), x);
 	}
 	template<typename T, int N>
-	__device__ vec<T, N> approx_gelu(const vec<T, N> &x)
+	DEVICE_INLINE vec<T, N> approx_gelu(const vec<T, N> &x)
 	{
 		return x * vectors::sigmoid(vec<T, N>(1.6849f) * x);
 	}

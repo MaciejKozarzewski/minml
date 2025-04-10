@@ -27,49 +27,49 @@ namespace vectors
 		public:
 			half x0;
 
-			HOST_DEVICE vec() // @suppress("Class members should be properly initialized")
+			__device__ vec() // @suppress("Class members should be properly initialized")
 			{
 			}
-			explicit HOST_DEVICE vec(float f) :
+			explicit __device__ vec(float f) :
 					vec1h(static_cast<half>(f))
 			{
 			}
-			explicit HOST_DEVICE vec(half h) :
+			explicit __device__ vec(half h) :
 					x0(h)
 			{
 			}
-			HOST_DEVICE vec(const half *__restrict__ ptr)
+			__device__ vec(const half *__restrict__ ptr)
 			{
 				load(ptr);
 			}
-			HOST_DEVICE void load(const half *__restrict__ ptr)
+			__device__ void load(const half *__restrict__ ptr)
 			{
 				assert(ptr != nullptr);
 				x0 = ptr[0];
 			}
-			HOST_DEVICE void store(half *__restrict__ ptr) const
+			__device__ void store(half *__restrict__ ptr) const
 			{
 				assert(ptr != nullptr);
 				ptr[0] = x0;
 			}
-			HOST_DEVICE vec1h operator-() const
+			__device__ vec1h operator-() const
 			{
 				return vec1h(-x0);
 			}
-			HOST_DEVICE vec1h operator~() const
+			__device__ vec1h operator~() const
 			{
 				return vec1h(bit_invert(x0));
 			}
-			HOST_DEVICE int size() const
+			__device__ int size() const
 			{
 				return 1;
 			}
-			HOST_DEVICE half operator[](int idx) const
+			__device__ half operator[](int idx) const
 			{
 				assert(0 <= idx && idx < size());
 				return x0;
 			}
-			HOST_DEVICE half& operator[](int idx)
+			__device__ half& operator[](int idx)
 			{
 				assert(0 <= idx && idx < size());
 				return x0;

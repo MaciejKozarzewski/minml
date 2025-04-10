@@ -27,68 +27,68 @@ namespace vectors
 		public:
 			float x0;
 
-			HOST_DEVICE vec() // @suppress("Class members should be properly initialized")
+			__device__ vec() // @suppress("Class members should be properly initialized")
 			{
 			}
-			explicit HOST_DEVICE vec(float f) :
+			explicit __device__ vec(float f) :
 					x0(f)
 			{
 			}
-			HOST_DEVICE vec(const float *__restrict__ ptr)
+			__device__ vec(const float *__restrict__ ptr)
 			{
 				load(ptr);
 			}
-			HOST_DEVICE vec(const float *__restrict__ ptr, int num)
+			__device__ vec(const float *__restrict__ ptr, int num)
 			{
 				partial_load(ptr, num);
 			}
-			HOST_DEVICE void load(const float *__restrict__ ptr)
+			__device__ void load(const float *__restrict__ ptr)
 			{
 				assert(ptr != nullptr);
 				x0 = ptr[0];
 			}
-			HOST_DEVICE void store(float *__restrict__ ptr) const
+			__device__ void store(float *__restrict__ ptr) const
 			{
 				assert(ptr != nullptr);
 				ptr[0] = x0;
 			}
-			HOST_DEVICE void partial_load(const float *__restrict__ ptr, int num)
+			__device__ void partial_load(const float *__restrict__ ptr, int num)
 			{
 				assert(ptr != nullptr);
 				assert(0 <= num && num <= 1);
 				if (num == 1)
 					x0 = ptr[0];
 			}
-			HOST_DEVICE void partial_store(float *__restrict__ ptr, int num) const
+			__device__ void partial_store(float *__restrict__ ptr, int num) const
 			{
 				assert(ptr != nullptr);
 				assert(0 <= num && num <= 1);
 				if (num == 1)
 					ptr[0] = x0;
 			}
-			HOST_DEVICE vec1f operator-() const
+			__device__ vec1f operator-() const
 			{
 				return vec1f(-x0);
 			}
-			HOST_DEVICE vec1f operator~() const
+			__device__ vec1f operator~() const
 			{
 				return vec1f(bit_invert(x0));
 			}
-			HOST_DEVICE vec1f& operator=(float x)
+			__device__ vec1f& operator=(float x)
 			{
 				x0 = x;
 				return *this;
 			}
-			HOST_DEVICE int size() const
+			__device__ int size() const
 			{
 				return 1;
 			}
-			HOST_DEVICE float operator[](int idx) const
+			__device__ float operator[](int idx) const
 			{
 				assert(0 <= idx && idx < size());
 				return x0;
 			}
-			HOST_DEVICE float& operator[](int idx)
+			__device__ float& operator[](int idx)
 			{
 				assert(0 <= idx && idx < size());
 				return x0;

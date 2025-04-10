@@ -27,55 +27,55 @@ namespace vectors
 		public:
 			half2 x0, x1, x2, x3;
 
-			HOST_DEVICE vec() // @suppress("Class members should be properly initialized")
+			__device__ vec() // @suppress("Class members should be properly initialized")
 			{
 			}
-			explicit HOST_DEVICE vec(float f) :
+			explicit __device__ vec(float f) :
 					vec8h(static_cast<half>(f))
 			{
 			}
-			explicit HOST_DEVICE vec(half2 h0, half2 h1, half2 h2, half2 h3) :
+			explicit __device__ vec(half2 h0, half2 h1, half2 h2, half2 h3) :
 					x0(h0),
 					x1(h1),
 					x2(h2),
 					x3(h3)
 			{
 			}
-			explicit HOST_DEVICE vec(half h) :
+			explicit __device__ vec(half h) :
 					vec8h(half2(h, h))
 			{
 			}
-			explicit HOST_DEVICE vec(half2 h) :
+			explicit __device__ vec(half2 h) :
 					vec8h(h, h, h, h)
 			{
 			}
-			HOST_DEVICE vec(const half *__restrict__ ptr)
+			__device__ vec(const half *__restrict__ ptr)
 			{
 				load(ptr);
 			}
-			HOST_DEVICE void load(const half *__restrict__ ptr)
+			__device__ void load(const half *__restrict__ ptr)
 			{
 				assert(ptr != nullptr);
 				*this = reinterpret_cast<const vec8h*>(ptr)[0];
 			}
-			HOST_DEVICE void store(half *__restrict__ ptr) const
+			__device__ void store(half *__restrict__ ptr) const
 			{
 				assert(ptr != nullptr);
 				reinterpret_cast<vec8h*>(ptr)[0] = *this;
 			}
-			HOST_DEVICE vec8h operator-() const
+			__device__ vec8h operator-() const
 			{
 				return vec8h(-x0, -x1, -x2, -x3);
 			}
-			HOST_DEVICE vec8h operator~() const
+			__device__ vec8h operator~() const
 			{
 				return vec8h(bit_invert(x0), bit_invert(x1), bit_invert(x2), bit_invert(x3));
 			}
-			HOST_DEVICE int size() const
+			__device__ int size() const
 			{
 				return 8;
 			}
-			HOST_DEVICE half operator[](int idx) const
+			__device__ half operator[](int idx) const
 			{
 				assert(0 <= idx && idx < size());
 				switch (idx)
@@ -99,7 +99,7 @@ namespace vectors
 						return x3.y;
 				}
 			}
-			HOST_DEVICE half& operator[](int idx)
+			__device__ half& operator[](int idx)
 			{
 				assert(0 <= idx && idx < size());
 				switch (idx)

@@ -27,37 +27,37 @@ namespace vectors
 		public:
 			float x0, x1;
 
-			HOST_DEVICE vec() // @suppress("Class members should be properly initialized")
+			__device__ vec() // @suppress("Class members should be properly initialized")
 			{
 			}
-			explicit HOST_DEVICE vec(float f0, float f1) :
+			explicit __device__ vec(float f0, float f1) :
 					x0(f0),
 					x1(f1)
 			{
 			}
-			explicit HOST_DEVICE vec(float f) :
+			explicit __device__ vec(float f) :
 					vec(f, f)
 			{
 			}
-			HOST_DEVICE vec(const float *__restrict__ ptr)
+			__device__ vec(const float *__restrict__ ptr)
 			{
 				load(ptr);
 			}
-			HOST_DEVICE vec(const float *__restrict__ ptr, int num)
+			__device__ vec(const float *__restrict__ ptr, int num)
 			{
 				partial_load(ptr, num);
 			}
-			HOST_DEVICE void load(const float *__restrict__ ptr)
+			__device__ void load(const float *__restrict__ ptr)
 			{
 				assert(ptr != nullptr);
 				*this = reinterpret_cast<const vec2f*>(ptr)[0];
 			}
-			HOST_DEVICE void store(float *__restrict__ ptr) const
+			__device__ void store(float *__restrict__ ptr) const
 			{
 				assert(ptr != nullptr);
 				reinterpret_cast<vec2f*>(ptr)[0] = *this;
 			}
-			HOST_DEVICE void partial_load(const float *__restrict__ ptr, int num)
+			__device__ void partial_load(const float *__restrict__ ptr, int num)
 			{
 				assert(ptr != nullptr);
 				assert(0 <= num && num <= 2);
@@ -74,7 +74,7 @@ namespace vectors
 						break;
 				}
 			}
-			HOST_DEVICE void partial_store(float *__restrict__ ptr, int num) const
+			__device__ void partial_store(float *__restrict__ ptr, int num) const
 			{
 				assert(ptr != nullptr);
 				assert(0 <= num && num <= 2);
@@ -91,30 +91,30 @@ namespace vectors
 						break;
 				}
 			}
-			HOST_DEVICE vec2f operator-() const
+			__device__ vec2f operator-() const
 			{
 				return vec2f(-x0, -x1);
 			}
-			HOST_DEVICE vec2f operator~() const
+			__device__ vec2f operator~() const
 			{
 				return vec2f(bit_invert(x0), bit_invert(x1));
 			}
-			HOST_DEVICE vec2f& operator=(float x)
+			__device__ vec2f& operator=(float x)
 			{
 				x0 = x;
 				x1 = x;
 				return *this;
 			}
-			HOST_DEVICE int size() const
+			__device__ int size() const
 			{
 				return 2;
 			}
-			HOST_DEVICE float operator[](int idx) const
+			__device__ float operator[](int idx) const
 			{
 				assert(0 <= idx && idx < size());
 				return (idx == 0) ? x0 : x1;
 			}
-			HOST_DEVICE float& operator[](int idx)
+			__device__ float& operator[](int idx)
 			{
 				assert(0 <= idx && idx < size());
 				return (idx == 0) ? x0 : x1;

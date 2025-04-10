@@ -27,39 +27,39 @@ namespace vectors
 		public:
 			float x0, x1, x2, x3;
 
-			HOST_DEVICE vec() // @suppress("Class members should be properly initialized")
+			__device__ vec() // @suppress("Class members should be properly initialized")
 			{
 			}
-			explicit HOST_DEVICE vec(float f0, float f1, float f2, float f3) :
+			explicit __device__ vec(float f0, float f1, float f2, float f3) :
 					x0(f0),
 					x1(f1),
 					x2(f2),
 					x3(f3)
 			{
 			}
-			explicit HOST_DEVICE vec(float f) :
+			explicit __device__ vec(float f) :
 					vec(f, f, f, f)
 			{
 			}
-			HOST_DEVICE vec(const float *__restrict__ ptr)
+			__device__ vec(const float *__restrict__ ptr)
 			{
 				load(ptr);
 			}
-			HOST_DEVICE vec(const float *__restrict__ ptr, int num)
+			__device__ vec(const float *__restrict__ ptr, int num)
 			{
 				partial_load(ptr, num);
 			}
-			HOST_DEVICE void load(const float *__restrict__ ptr)
+			__device__ void load(const float *__restrict__ ptr)
 			{
 				assert(ptr != nullptr);
 				*this = reinterpret_cast<const vec4f*>(ptr)[0];
 			}
-			HOST_DEVICE void store(float *__restrict__ ptr) const
+			__device__ void store(float *__restrict__ ptr) const
 			{
 				assert(ptr != nullptr);
 				reinterpret_cast<vec4f*>(ptr)[0] = *this;
 			}
-			HOST_DEVICE void partial_load(const float *__restrict__ ptr, int num)
+			__device__ void partial_load(const float *__restrict__ ptr, int num)
 			{
 				assert(ptr != nullptr);
 				assert(0 <= num && num <= 4);
@@ -87,7 +87,7 @@ namespace vectors
 						break;
 				}
 			}
-			HOST_DEVICE void partial_store(float *__restrict__ ptr, int num) const
+			__device__ void partial_store(float *__restrict__ ptr, int num) const
 			{
 				assert(ptr != nullptr);
 				assert(0 <= num && num <= 4);
@@ -115,15 +115,15 @@ namespace vectors
 						break;
 				}
 			}
-			HOST_DEVICE vec4f operator-() const
+			__device__ vec4f operator-() const
 			{
 				return vec4f(-x0, -x1, -x2, -x3);
 			}
-			HOST_DEVICE vec4f operator~() const
+			__device__ vec4f operator~() const
 			{
 				return vec4f(bit_invert(x0), bit_invert(x1), bit_invert(x2), bit_invert(x3));
 			}
-			HOST_DEVICE vec4f& operator=(float x)
+			__device__ vec4f& operator=(float x)
 			{
 				x0 = x;
 				x1 = x;
@@ -131,11 +131,11 @@ namespace vectors
 				x3 = x;
 				return *this;
 			}
-			HOST_DEVICE int size() const
+			__device__ int size() const
 			{
 				return 4;
 			}
-			HOST_DEVICE float operator[](int idx) const
+			__device__ float operator[](int idx) const
 			{
 				assert(0 <= idx && idx < size());
 				switch (idx)
@@ -151,7 +151,7 @@ namespace vectors
 						return x3;
 				}
 			}
-			HOST_DEVICE float& operator[](int idx)
+			__device__ float& operator[](int idx)
 			{
 				assert(0 <= idx && idx < size());
 				switch (idx)
