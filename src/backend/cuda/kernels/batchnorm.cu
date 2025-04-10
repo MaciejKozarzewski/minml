@@ -549,7 +549,6 @@ namespace ml
 			default:
 				break;
 		}
-		cudaDeviceSynchronize();
 		assert(cudaGetLastError() == cudaSuccess);
 
 		dim3 blockDim2(32, 32);
