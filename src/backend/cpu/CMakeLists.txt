@@ -21,4 +21,5 @@ set_source_files_properties(avx_misc_kernels.cpp PROPERTIES COMPILE_OPTIONS "-ma
 target_link_libraries(${LibName} PRIVATE misc_backend)
 								
 add_subdirectory("gemm")
+add_subdirectory("kernels")
 add_subdirectory("winograd")

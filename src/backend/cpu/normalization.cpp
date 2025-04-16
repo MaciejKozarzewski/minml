@@ -293,60 +293,51 @@ namespace ml
 		for (int j = 0; j < last_dim; j++)
 			weights_ptr[1 * last_dim + j] = stats[j].get_variance();
 	}
-	void cpu_fold_batchnorm(mlContext_t context, mlShape_t shape, void *layer_weights, void *layer_bias, const void *batchnorm_weights,
-			bool use_gamma, bool use_beta)
+	void cpu_fold_batchnorm(mlContext_t context, mlTensor_t layer_weights, mlTensor_t layer_bias, const mlTensor_t bn_weights,
+			const mlTensor_t bn_bias, const mlTensor_t bn_avg_var)
 	{
-		assert(layer_weights != nullptr);
-		assert(layer_bias != nullptr);
-		assert(batchnorm_weights != nullptr);
+		const float *bn_w = data<float>(bn_weights);
+		const float *bn_b = data<float>(bn_bias);
+		const float *bn_stats = data<float>(bn_avg_var);
 
-		/* batchnorm_weights rows are:
-		 * mean
-		 * variance
-		 * gamma
-		 * beta
-		 */
-		if (shape.rank == 3)
+		if (layer_weights.rank == 3)
 		{ // depthwise conv2D
-			const int channels = get_last_dim(shape);
-			const int first_dim = volume_without_last_dim(shape);
-
-			const float *bn_ptr = getPointer<float>(batchnorm_weights);
+			const int channels = get_last_dim(layer_weights);
+			const int first_dim = volume_without_last_dim(layer_weights);
 
 			for (int j = 0; j < channels; j++)
 			{
-				const float gamma = use_gamma ? get_gamma(bn_ptr, j, channels) : 1.0f;
-				const float scale = gamma / get_stddev(bn_ptr, j, channels); // gamma / sqrt(variance + epsilon)
-				const float beta = use_beta ? get_beta(bn_ptr, j, channels) : 0.0f;
-				const float shift = -get_mean(bn_ptr, j, channels) * scale + beta; // -mean * scale + beta
-				getPointer<float>(layer_bias)[j] = getPointer<float>(layer_bias)[j] * scale + shift;
+				const float gamma = (bn_w == nullptr) ? 1.0f : bn_w[j];
+				const float beta = (bn_b == nullptr) ? 1.0f : bn_b[j];
+
+				const float scale = gamma / std::sqrt(bn_stats[channels + j] + epsilon);
+				const float shift = -bn_stats[j] * scale + beta; // -mean * scale + beta
+				data<float>(layer_bias)[j] = data<float>(layer_bias)[j] * scale + shift;
 			}
 
 			for (int i = 0; i < first_dim; i++)
 				for (int j = 0; j < channels; j++)
 				{
-					const float gamma = use_gamma ? get_gamma(bn_ptr, j, channels) : 1.0f;
-					const float scale = gamma / get_stddev(bn_ptr, j, channels); // gamma / sqrt(va
-					getPointer<float>(layer_weights)[i * channels + j] *= scale;
+					const float gamma = (bn_w == nullptr) ? 1.0f : bn_w[j];
+					const float scale = gamma / std::sqrt(bn_stats[channels + j] + epsilon);
+					data<float>(layer_weights)[i * channels + j] *= scale;
 				}
 		}
 		else
 		{
-			const int channels = get_first_dim(shape);
-			const int last_dim = volume_without_first_dim(shape);
-
-			const float *bn_ptr = getPointer<float>(batchnorm_weights);
+			const int channels = get_first_dim(layer_weights);
+			const int last_dim = volume_without_first_dim(layer_weights);
 
 			for (int i = 0; i < channels; i++)
 			{
-				const float gamma = use_gamma ? get_gamma(bn_ptr, i, channels) : 1.0f;
-				const float scale = gamma / get_stddev(bn_ptr, i, channels); // gamma / sqrt(variance + epsilon)
-				const float beta = use_beta ? get_beta(bn_ptr, i, channels) : 0.0f;
-				const float shift = -get_mean(bn_ptr, i, channels) * scale + beta; // -mean * scale + beta
+				const float gamma = (bn_w == nullptr) ? 1.0f : bn_w[i];
+				const float scale = gamma / std::sqrt(bn_stats[channels + i] + epsilon);
+				const float beta = (bn_b == nullptr) ? 1.0f : bn_b[i];
+				const float shift = -bn_stats[i] * scale + beta; // -mean * scale + beta
 
-				getPointer<float>(layer_bias)[i] = getPointer<float>(layer_bias)[i] * scale + shift;
+				data<float>(layer_bias)[i] = data<float>(layer_bias)[i] * scale + shift;
 				for (int j = 0; j < last_dim; j++)
-					getPointer<float>(layer_weights)[i * last_dim + j] *= scale;
+					data<float>(layer_weights)[i * last_dim + j] *= scale;
 			}
 		}
 

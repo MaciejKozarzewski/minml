@@ -64,7 +64,7 @@ namespace
 			case ml::ACTIVATION_RELU:
 				return relu(x);
 			case ml::ACTIVATION_LEAKY_RELU:
-				return (x > 0.0f) ? x : 0.1f * x;
+				return leaky_relu(x);
 			case ml::ACTIVATION_EXP:
 				return std::exp(x);
 		}
@@ -174,6 +174,10 @@ namespace
 			case ml::ACTIVATION_RELU:
 				for (size_t i = 0; i < elements; i++)
 					dst_ptr[i] = convert<float, T>(activation_forward<ml::ACTIVATION_RELU>(convert<T, float>(src_ptr[i])));
+				break;
+			case ml::ACTIVATION_LEAKY_RELU:
+				for (size_t i = 0; i < elements; i++)
+					dst_ptr[i] = convert<float, T>(activation_forward<ml::ACTIVATION_LEAKY_RELU>(convert<T, float>(src_ptr[i])));
 				break;
 			case ml::ACTIVATION_EXP:
 				for (size_t i = 0; i < elements; i++)
@@ -307,6 +311,9 @@ namespace ml
 					for (size_t i = 0; i < elements; i++)
 						prev_ptr[i] = (out_ptr[i] == 0.0f) ? 0.0f : next_ptr[i];
 					break;
+				case ACTIVATION_LEAKY_RELU:
+					for (size_t i = 0; i < elements; i++)
+						prev_ptr[i] = (out_ptr[i] < 0.0f) ? 0.1f * next_ptr[i] : next_ptr[i];
 					break;
 				case ACTIVATION_EXP:
 					for (size_t i = 0; i < elements; i++)
@@ -334,121 +341,15 @@ namespace ml
 				case ACTIVATION_RELU:
 					kernel_add_bias_act<float, ACTIVATION_RELU>(output, input, bias, first_dim, last_dim);
 					break;
+				case ACTIVATION_LEAKY_RELU:
+					kernel_add_bias_act<float, ACTIVATION_LEAKY_RELU>(output, input, bias, first_dim, last_dim);
+					break;
 				case ACTIVATION_EXP:
 					kernel_add_bias_act<float, ACTIVATION_EXP>(output, input, bias, first_dim, last_dim);
 					break;
 			}
 		}
 
-		void def_kernel_global_avg_and_max_pooling_forward_fp32(mlContext_t context, mlShape_t shape, const void *input, void *output)
-		{
-			const int batch_size = shape.dim[0];
-			const int hw = shape.dim[1] * shape.dim[2];
-			const int channels = shape.dim[3];
-
-			const float *input_ptr = reinterpret_cast<const float*>(input);
-			float *output_ptr = reinterpret_cast<float*>(output);
-
-			const float inv = 1.0f / hw;
-			for (int i = 0; i < batch_size; i++)
-			{
-				for (int k = 0; k < channels; k++)
-				{
-					output_ptr[k] = 0.0f; // avg
-					output_ptr[k + channels] = input_ptr[k]; // max
-				}
-
-				for (int j = 0; j < hw; j++)
-				{
-					for (int k = 0; k < channels; k++)
-					{
-						output_ptr[k] += input_ptr[k];
-						output_ptr[k + channels] = std::max(output_ptr[k + channels], input_ptr[k]);
-					}
-					input_ptr += channels;
-				}
-
-				for (int k = 0; k < channels; k++)
-					output_ptr[k] *= inv;
-				output_ptr += 2 * channels;
-			}
-		}
-		void def_kernel_global_avg_and_max_pooling_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next,
-				const void *input, const void *output)
-		{
-			const int batch_size = shape.dim[0];
-			const int hw = shape.dim[1] * shape.dim[2];
-			const int channels = shape.dim[3];
-
-			const float *input_ptr = reinterpret_cast<const float*>(input);
-			const float *output_ptr = reinterpret_cast<const float*>(output);
-			float *prev_ptr = reinterpret_cast<float*>(gradient_prev);
-			const float *next_ptr = reinterpret_cast<const float*>(gradient_next);
-
-			const float inv = 1.0f / hw;
-			for (int i = 0; i < batch_size; i++)
-			{
-				for (int j = 0; j < hw; j++)
-				{
-					for (int k = 0; k < channels; k++)
-					{
-						const float max_value = output_ptr[k + channels];
-						const float grad_avg = next_ptr[k];
-						const float grad_max = (input_ptr[k] == max_value) ? next_ptr[k + channels] : 0.0f;
-
-						prev_ptr[k] += inv * grad_avg + grad_max;
-					}
-					prev_ptr += channels;
-					input_ptr += channels;
-				}
-				next_ptr += 2 * channels;
-				output_ptr += 2 * channels;
-			}
-		}
-		void def_kernel_global_broadcasting_forward_fp32(mlContext_t context, mlShape_t shape, void *output, const void *input, const void *bias,
-				mlActivationType_t act)
-		{
-			switch (act)
-			{
-				case ACTIVATION_LINEAR:
-					kernel_global_broadcasting<ACTIVATION_LINEAR>(shape, output, input, bias);
-					break;
-				case ACTIVATION_SIGMOID:
-					kernel_global_broadcasting<ACTIVATION_SIGMOID>(shape, output, input, bias);
-					break;
-				case ACTIVATION_TANH:
-					kernel_global_broadcasting<ACTIVATION_TANH>(shape, output, input, bias);
-					break;
-				case ACTIVATION_RELU:
-					kernel_global_broadcasting<ACTIVATION_RELU>(shape, output, input, bias);
-					break;
-				default:
-					break;
-			}
-		}
-		void def_kernel_global_broadcasting_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, void *gradient_next,
-				const void *output, mlActivationType_t act)
-		{
-			const int batch_size = shape.dim[0];
-			const int hw = shape.dim[1] * shape.dim[2];
-			const int channels = shape.dim[3];
-
-			ml::cpu_activation_backward(context, shape, gradient_next, gradient_next, output, act);
-
-			float *prev_ptr = reinterpret_cast<float*>(gradient_prev);
-			const float *next_ptr = reinterpret_cast<const float*>(gradient_next);
-
-			for (int i = 0; i < batch_size; i++)
-			{
-				for (int j = 0; j < hw; j++)
-				{
-					for (int k = 0; k < channels; k++)
-						prev_ptr[k] += next_ptr[k];
-					next_ptr += channels;
-				}
-				prev_ptr += channels;
-			}
-		}
 	} /* namespace cpu */
 } /* namespace ml */
 

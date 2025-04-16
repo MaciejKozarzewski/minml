@@ -303,10 +303,9 @@ namespace ml
 	void average_pooling_avx_1x64xfp16(const TensorFragment &input, TensorFragment &output) noexcept
 	{
 		assert(input.is_fp16());
-		assert(output.is_fp16() || output.is_fp32());
+		assert(output.is_fp16());
 		assert(input.columns() >= 64);
 		assert(output.columns() == input.columns());
-		assert(input.rows() == output.rows());
 		assert(input.stride() == output.stride());
 		const uint64_t m_iter = input.rows();
 		const uint64_t stride = input.stride_in_bytes();
@@ -314,7 +313,6 @@ namespace ml
 		const void *input_ptr = input.data();
 		void *output_ptr = output.data();
 
-		const uint64_t output_in_fp32 = output.is_fp32();
 		const float inv_m = 1.0f / input.rows();
 		const void *inv_ptr = &inv_m;
 
@@ -329,7 +327,7 @@ namespace ml
 		test(r14, r14)
 		je(EPILOGUE)
 
-		label(UNROLLED4)
+		label(UNROLLED)
 		vmovups(mem(rax, 0*8*2), xmm8)
 		vmovups(mem(rax, 1*8*2), xmm9)
 		vmovups(mem(rax, 2*8*2), xmm10)
@@ -352,186 +350,14 @@ namespace ml
 		add(r12, rax)// add stride to input pointer
 
 		dec(r14)
-		jne(UNROLLED4)
+		jne(UNROLLED)
 
 		label(EPILOGUE)
 		movq(var(inv_ptr), r13)
 		vbroadcastss(mem(r13), ymm8)
 		DIVIDE_BY_M_FP32(ymm8)
 
-		movq(var(output_in_fp32), r12)
-		test(r12, r12)
-		je(OUTPUT_IN_FP16)
-		STORE_ACCUMULATORS_8x8xFP32(rbx)
-		jmp(END)
-
-		label(OUTPUT_IN_FP16)
 		STORE_ACCUMULATORS_8x8xFP16(rbx)
-
-		label(END)
-		vzeroupper()
-
-		end_asm(
-				:// outputs
-				:// inputs
-				[input_ptr] "m"(input_ptr),
-				[output_ptr] "m"(output_ptr),
-				[m_iter] "m"(m_iter),
-				[stride] "m"(stride),
-				[inv_ptr] "m"(inv_ptr),
-				[output_in_fp32] "m"(output_in_fp32)
-				:// clobbers
-				"cc", "memory", "%ymm0", "%ymm1", "%ymm2", "%ymm3", "%ymm4", "%ymm5", "%ymm6", "%ymm7",
-				"%ymm8", "%ymm9", "%ymm10", "%ymm11", "%ymm12", "%ymm13", "%ymm14", "%ymm15", "%rax", "%rbx",
-				"%r12", "%r13", "%r14", "%r15")
-	}
-	void average_pooling_avx_1x64xfp32(const TensorFragment &input, TensorFragment &output) noexcept
-	{
-		assert(input.is_fp32());
-		assert(output.is_fp16() || output.is_fp32());
-		assert(input.columns() >= 64);
-		assert(output.columns() == input.columns());
-		assert(input.rows() == output.rows());
-		assert(input.stride() == output.stride());
-		const uint64_t m_iter = input.rows();
-		const uint64_t stride = input.stride_in_bytes();
-
-		const void *input_ptr = input.data();
-		void *output_ptr = output.data();
-
-		const uint64_t output_in_fp32 = output.is_fp32();
-		const float inv_m = 1.0f / input.rows();
-		const void *inv_ptr = &inv_m;
-
-		begin_asm()
-		ZERO_ACCUMULATORS()
-
-		movq(var(input_ptr), rax) // input pointer is in rax
-		movq(var(output_ptr), rbx)// output pointer is in rbx
-		movq(var(stride), r12)// input stride is in r12
-
-		movq(var(m_iter), r14)// load the number of 4-unrolled iterations
-		test(r14, r14)
-		je(EPILOGUE)
-
-		label(UNROLLED4)
-		vmovups(mem(rax, 0*8*4), ymm8)
-		vmovups(mem(rax, 1*8*4), ymm9)
-		vmovups(mem(rax, 2*8*4), ymm10)
-		vmovups(mem(rax, 3*8*4), ymm11)
-		vmovups(mem(rax, 4*8*4), ymm12)
-		vmovups(mem(rax, 5*8*4), ymm13)
-		vmovups(mem(rax, 6*8*4), ymm14)
-		vmovups(mem(rax, 7*8*4), ymm15)
-
-		ACCUMULATE_8x8xFP32()
-		add(r12, rax)// add stride to input pointer
-
-		dec(r14)
-		jne(UNROLLED4)
-
-		label(EPILOGUE)
-		movq(var(inv_ptr), r13)
-		vbroadcastss(mem(r13), ymm8)
-		DIVIDE_BY_M_FP32(ymm8)
-
-		movq(var(output_in_fp32), r12)
-		test(r12, r12)
-		je(OUTPUT_IN_FP16)
-		STORE_ACCUMULATORS_8x8xFP32(rbx)
-		jmp(END)
-
-		label(OUTPUT_IN_FP16)
-		STORE_ACCUMULATORS_8x8xFP16(rbx)
-
-		label(END)
-		vzeroupper()
-
-		end_asm(
-				:// outputs
-				:// inputs
-				[input_ptr] "m"(input_ptr),
-				[output_ptr] "m"(output_ptr),
-				[m_iter] "m"(m_iter),
-				[stride] "m"(stride),
-				[inv_ptr] "m"(inv_ptr),
-				[output_in_fp32] "m"(output_in_fp32)
-				:// clobbers
-				"cc", "memory", "%ymm0", "%ymm1", "%ymm2", "%ymm3", "%ymm4", "%ymm5", "%ymm6", "%ymm7",
-				"%ymm8", "%ymm9", "%ymm10", "%ymm11", "%ymm12", "%ymm13", "%ymm14", "%ymm15", "%rax", "%rbx",
-				"%r12", "%r13", "%r14", "%r15")
-	}
-	void average_pooling_avx_1x32xfp64(const TensorFragment &input, TensorFragment &output) noexcept
-	{
-		assert(input.is_fp64());
-		assert(output.is_fp64());
-		assert(input.columns() >= 32);
-		assert(output.columns() == input.columns());
-		assert(input.rows() == output.rows());
-		assert(input.stride() == output.stride());
-		const uint64_t m_iter = input.rows();
-		const uint64_t stride = input.stride_in_bytes();
-
-		const void *input_ptr = input.data();
-		void *output_ptr = output.data();
-
-		const double inv_m = 1.0 / input.rows();
-		const void *inv_ptr = &inv_m;
-
-		begin_asm()
-		ZERO_ACCUMULATORS()
-
-		movq(var(input_ptr), rax) // input pointer is in rax
-		movq(var(output_ptr), rbx)// output pointer is in rbx
-		movq(var(stride), r12)// input stride is in r12
-
-		movq(var(m_iter), r14)// load the number of 4-unrolled iterations
-		test(r14, r14)
-		je(EPILOGUE)
-
-		label(UNROLLED4)
-		vmovupd(mem(rax, 0*4*8), ymm8)
-		vmovupd(mem(rax, 1*4*8), ymm9)
-		vmovupd(mem(rax, 2*4*8), ymm10)
-		vmovupd(mem(rax, 3*4*8), ymm11)
-		vmovupd(mem(rax, 4*4*8), ymm12)
-		vmovupd(mem(rax, 5*4*8), ymm13)
-		vmovupd(mem(rax, 6*4*8), ymm14)
-		vmovupd(mem(rax, 7*4*8), ymm15)
-
-		vaddpd(ymm8, ymm0, ymm0)
-		vaddpd(ymm9, ymm1, ymm1)
-		vaddpd(ymm10, ymm2, ymm2)
-		vaddpd(ymm11, ymm3, ymm3)
-		vaddpd(ymm12, ymm4, ymm4)
-		vaddpd(ymm13, ymm5, ymm5)
-		vaddpd(ymm14, ymm6, ymm6)
-		vaddpd(ymm15, ymm7, ymm7)
-		add(r12, rax)// add stride to input pointer
-
-		dec(r14)
-		jne(UNROLLED4)
-
-		label(EPILOGUE)
-		movq(var(inv_ptr), r13)
-		vbroadcastsd(mem(r13), ymm8)
-		vmulpd(ymm8, ymm0, ymm0)
-		vmulpd(ymm8, ymm1, ymm1)
-		vmulpd(ymm8, ymm2, ymm2)
-		vmulpd(ymm8, ymm3, ymm3)
-		vmulpd(ymm8, ymm4, ymm4)
-		vmulpd(ymm8, ymm5, ymm5)
-		vmulpd(ymm8, ymm6, ymm6)
-		vmulpd(ymm8, ymm7, ymm7)
-
-		vmovupd(ymm0, mem(rbx, 0*4*8))
-		vmovupd(ymm1, mem(rbx, 1*4*8))
-		vmovupd(ymm2, mem(rbx, 2*4*8))
-		vmovupd(ymm3, mem(rbx, 3*4*8))
-		vmovupd(ymm4, mem(rbx, 4*4*8))
-		vmovupd(ymm5, mem(rbx, 5*4*8))
-		vmovupd(ymm6, mem(rbx, 6*4*8))
-		vmovupd(ymm7, mem(rbx, 7*4*8))
 
 		vzeroupper()
 
@@ -548,14 +374,12 @@ namespace ml
 				"%ymm8", "%ymm9", "%ymm10", "%ymm11", "%ymm12", "%ymm13", "%ymm14", "%ymm15", "%rax", "%rbx",
 				"%r12", "%r13", "%r14", "%r15")
 	}
-
 	void average_pooling_avx_1x8xfp16(const TensorFragment &input, TensorFragment &output) noexcept
 	{
 		assert(input.is_fp16());
-		assert(output.is_fp16() || output.is_fp32());
-		assert(input.columns() >= 64);
+		assert(output.is_fp16());
+		assert(input.columns() >= 8);
 		assert(output.columns() == input.columns());
-		assert(input.rows() == output.rows());
 		assert(input.stride() == output.stride());
 		const uint64_t m_iter = input.rows();
 		const uint64_t stride = input.stride_in_bytes();
@@ -563,7 +387,6 @@ namespace ml
 		const void *input_ptr = input.data();
 		void *output_ptr = output.data();
 
-		const uint64_t output_in_fp32 = output.is_fp32();
 		const float inv_m = 1.0f / input.rows();
 		const void *inv_ptr = &inv_m;
 
@@ -578,31 +401,22 @@ namespace ml
 		test(r14, r14)
 		je(EPILOGUE)
 
-		label(UNROLLED4)
+		label(UNROLLED)
 		vmovups(mem(rax), xmm8)
 		vcvtph2ps(xmm8, ymm8)
 		vaddps(ymm8, ymm0, ymm0)
 		add(r12, rax)// add stride to input pointer
 
 		dec(r14)
-		jne(UNROLLED4)
+		jne(UNROLLED)
 
 		label(EPILOGUE)
 		movq(var(inv_ptr), r13)
 		vbroadcastss(mem(r13), ymm8)
 		vmulps(ymm8, ymm0, ymm0)
 
-		movq(var(output_in_fp32), r12)
-		test(r12, r12)
-		je(OUTPUT_IN_FP16)
-		vmovups(ymm0, mem(rbx))
-		jmp(END)
-
-		label(OUTPUT_IN_FP16)
 		vcvtps2ph(imm(0x03), ymm0, xmm0)
 		vmovups(xmm0, mem(rbx))
-
-		label(END)
 		vzeroupper()
 
 		end_asm(
@@ -612,20 +426,19 @@ namespace ml
 				[output_ptr] "m"(output_ptr),
 				[m_iter] "m"(m_iter),
 				[stride] "m"(stride),
-				[inv_ptr] "m"(inv_ptr),
-				[output_in_fp32] "m"(output_in_fp32)
+				[inv_ptr] "m"(inv_ptr)
 				:// clobbers
 				"cc", "memory", "%ymm0", "%ymm1", "%ymm2", "%ymm3", "%ymm4", "%ymm5", "%ymm6", "%ymm7",
 				"%ymm8", "%ymm9", "%ymm10", "%ymm11", "%ymm12", "%ymm13", "%ymm14", "%ymm15", "%rax", "%rbx",
 				"%r12", "%r13", "%r14", "%r15")
 	}
-	void average_pooling_avx_1x8xfp32(const TensorFragment &input, TensorFragment &output) noexcept
+
+	void average_pooling_avx_1x64xfp32(const TensorFragment &input, TensorFragment &output) noexcept
 	{
 		assert(input.is_fp32());
-		assert(output.is_fp16() || output.is_fp32());
+		assert(output.is_fp32());
 		assert(input.columns() >= 64);
 		assert(output.columns() == input.columns());
-		assert(input.rows() == output.rows());
 		assert(input.stride() == output.stride());
 		const uint64_t m_iter = input.rows();
 		const uint64_t stride = input.stride_in_bytes();
@@ -633,7 +446,6 @@ namespace ml
 		const void *input_ptr = input.data();
 		void *output_ptr = output.data();
 
-		const uint64_t output_in_fp32 = output.is_fp32();
 		const float inv_m = 1.0f / input.rows();
 		const void *inv_ptr = &inv_m;
 
@@ -648,30 +460,28 @@ namespace ml
 		test(r14, r14)
 		je(EPILOGUE)
 
-		label(UNROLLED4)
-		vmovups(mem(rax), ymm8)
-		vaddps(ymm8, ymm0, ymm0)
+		label(UNROLLED)
+		vmovups(mem(rax, 0*8*4), ymm8)
+		vmovups(mem(rax, 1*8*4), ymm9)
+		vmovups(mem(rax, 2*8*4), ymm10)
+		vmovups(mem(rax, 3*8*4), ymm11)
+		vmovups(mem(rax, 4*8*4), ymm12)
+		vmovups(mem(rax, 5*8*4), ymm13)
+		vmovups(mem(rax, 6*8*4), ymm14)
+		vmovups(mem(rax, 7*8*4), ymm15)
+
+		ACCUMULATE_8x8xFP32()
 		add(r12, rax)// add stride to input pointer
 
 		dec(r14)
-		jne(UNROLLED4)
+		jne(UNROLLED)
 
 		label(EPILOGUE)
 		movq(var(inv_ptr), r13)
 		vbroadcastss(mem(r13), ymm8)
-		vmulps(ymm8, ymm0, ymm0)
+		DIVIDE_BY_M_FP32(ymm8)
 
-		movq(var(output_in_fp32), r12)
-		test(r12, r12)
-		je(OUTPUT_IN_FP16)
-		vmovups(ymm0, mem(rbx))
-		jmp(END)
-
-		label(OUTPUT_IN_FP16)
-		vcvtps2ph(imm(0x03), ymm0, xmm0)
-		vmovups(xmm0, mem(rbx))
-
-		label(END)
+		STORE_ACCUMULATORS_8x8xFP32(rbx)
 		vzeroupper()
 
 		end_asm(
@@ -681,20 +491,18 @@ namespace ml
 				[output_ptr] "m"(output_ptr),
 				[m_iter] "m"(m_iter),
 				[stride] "m"(stride),
-				[inv_ptr] "m"(inv_ptr),
-				[output_in_fp32] "m"(output_in_fp32)
+				[inv_ptr] "m"(inv_ptr)
 				:// clobbers
 				"cc", "memory", "%ymm0", "%ymm1", "%ymm2", "%ymm3", "%ymm4", "%ymm5", "%ymm6", "%ymm7",
 				"%ymm8", "%ymm9", "%ymm10", "%ymm11", "%ymm12", "%ymm13", "%ymm14", "%ymm15", "%rax", "%rbx",
 				"%r12", "%r13", "%r14", "%r15")
 	}
-	void average_pooling_avx_1x4xfp64(const TensorFragment &input, TensorFragment &output) noexcept
+	void average_pooling_avx_1x8xfp32(const TensorFragment &input, TensorFragment &output) noexcept
 	{
-		assert(input.is_fp64());
-		assert(output.is_fp64());
-		assert(input.columns() >= 4);
+		assert(input.is_fp32());
+		assert(output.is_fp32());
+		assert(input.columns() >= 8);
 		assert(output.columns() == input.columns());
-		assert(input.rows() == output.rows());
 		assert(input.stride() == output.stride());
 		const uint64_t m_iter = input.rows();
 		const uint64_t stride = input.stride_in_bytes();
@@ -702,7 +510,7 @@ namespace ml
 		const void *input_ptr = input.data();
 		void *output_ptr = output.data();
 
-		const double inv_m = 1.0 / input.rows();
+		const float inv_m = 1.0f / input.rows();
 		const void *inv_ptr = &inv_m;
 
 		begin_asm()
@@ -716,20 +524,20 @@ namespace ml
 		test(r14, r14)
 		je(EPILOGUE)
 
-		label(UNROLLED4)
-		vmovupd(mem(rax), ymm8)
-		vaddpd(ymm8, ymm0, ymm0)
+		label(UNROLLED)
+		vmovups(mem(rax), ymm8)
+		vaddps(ymm8, ymm0, ymm0)
 		add(r12, rax)// add stride to input pointer
 
 		dec(r14)
-		jne(UNROLLED4)
+		jne(UNROLLED)
 
 		label(EPILOGUE)
 		movq(var(inv_ptr), r13)
-		vbroadcastsd(mem(r13), ymm8)
-		vmulpd(ymm8, ymm0, ymm0)
+		vbroadcastss(mem(r13), ymm8)
+		vmulps(ymm8, ymm0, ymm0)
 
-		vmovupd(ymm0, mem(rbx))
+		vmovups(ymm0, mem(rbx))
 		vzeroupper()
 
 		end_asm(
@@ -790,7 +598,7 @@ namespace ml
 		test(r14, r14)
 		je(EPILOGUE)
 
-		label(UNROLLED4)
+		label(UNROLLED)
 		vmovups(mem(rax, 0*8*2), xmm0)
 		vmovups(mem(rax, 1*8*2), xmm1)
 		vmovups(mem(rax, 2*8*2), xmm2)
@@ -821,9 +629,10 @@ namespace ml
 		STORE_ACCUMULATORS_8x8xFP16(rbx)
 
 		add(r12, rax)// add stride to input pointer
+		add(r12, rbx)// add stride to output pointer
 
 		dec(r14)
-		jne(UNROLLED4)
+		jne(UNROLLED)
 
 		label(EPILOGUE)
 		vzeroupper()
@@ -841,6 +650,64 @@ namespace ml
 				"%ymm8", "%ymm9", "%ymm10", "%ymm11", "%ymm12", "%ymm13", "%ymm14", "%ymm15", "%rax", "%rbx",
 				"%r12", "%r13", "%r14", "%r15")
 	}
+	void channel_scaling_avx_1x8xfp16(const TensorFragment &input, const TensorFragment &scales, TensorFragment &output) noexcept
+	{
+		assert(input.is_fp16());
+		assert(output.is_fp16());
+		assert(input.columns() >= 8);
+		assert(output.columns() == input.columns());
+		assert(scales.columns() == input.columns());
+		assert(input.rows() == output.rows());
+		assert(input.stride() == output.stride());
+		const uint64_t m_iter = input.rows();
+		const uint64_t stride = input.stride_in_bytes();
+
+		const void *input_ptr = input.data();
+		void *output_ptr = output.data();
+		const void *scales_ptr = scales.data();
+
+		begin_asm()
+		movq(var(scales_ptr), rax) // input pointer is in rax
+		vmovups(mem(rax), xmm8)
+		vcvtph2ps(xmm8, ymm8)
+
+		movq(var(input_ptr), rax)// input pointer is in rax
+		movq(var(output_ptr), rbx)// output pointer is in rbx
+		movq(var(stride), r12)// input stride is in r12
+
+		movq(var(m_iter), r14)// load the number iterations
+		test(r14, r14)
+		je(EPILOGUE)
+
+		label(UNROLLED)
+		vmovups(mem(rax), xmm0)
+		vcvtph2ps(xmm0, ymm0)
+		vmulps(ymm0, ymm8, ymm0)
+		vcvtps2ph(imm(0x03), ymm0, xmm0)
+		vmovups(xmm0, mem(rbx))
+		add(r12, rax)// add stride to input pointer
+		add(r12, rbx)// add stride to output pointer
+
+		dec(r14)
+		jne(UNROLLED)
+
+		label(EPILOGUE)
+		vzeroupper()
+
+		end_asm(
+				:// outputs
+				:// inputs
+				[input_ptr] "m"(input_ptr),
+				[output_ptr] "m"(output_ptr),
+				[scales_ptr] "m"(scales_ptr),
+				[m_iter] "m"(m_iter),
+				[stride] "m"(stride)
+				:// clobbers
+				"cc", "memory", "%ymm0", "%ymm1", "%ymm2", "%ymm3", "%ymm4", "%ymm5", "%ymm6", "%ymm7",
+				"%ymm8", "%ymm9", "%ymm10", "%ymm11", "%ymm12", "%ymm13", "%ymm14", "%ymm15", "%rax", "%rbx",
+				"%r12", "%r13", "%r14", "%r15")
+	}
+
 	void channel_scaling_avx_1x64xfp32(const TensorFragment &input, const TensorFragment &scales, TensorFragment &output) noexcept
 	{
 		assert(input.is_fp32());
@@ -876,7 +743,7 @@ namespace ml
 		test(r14, r14)
 		je(EPILOGUE)
 
-		label(UNROLLED4)
+		label(UNROLLED)
 		vmovups(mem(rax, 0*8*4), ymm0)
 		vmovups(mem(rax, 1*8*4), ymm1)
 		vmovups(mem(rax, 2*8*4), ymm2)
@@ -898,150 +765,10 @@ namespace ml
 		STORE_ACCUMULATORS_8x8xFP32(rbx)
 
 		add(r12, rax)// add stride to input pointer
+		add(r12, rbx)// add stride to output pointer
 
 		dec(r14)
-		jne(UNROLLED4)
-
-		label(EPILOGUE)
-		vzeroupper()
-
-		end_asm(
-				:// outputs
-				:// inputs
-				[input_ptr] "m"(input_ptr),
-				[output_ptr] "m"(output_ptr),
-				[scales_ptr] "m"(scales_ptr),
-				[m_iter] "m"(m_iter),
-				[stride] "m"(stride)
-				:// clobbers
-				"cc", "memory", "%ymm0", "%ymm1", "%ymm2", "%ymm3", "%ymm4", "%ymm5", "%ymm6", "%ymm7",
-				"%ymm8", "%ymm9", "%ymm10", "%ymm11", "%ymm12", "%ymm13", "%ymm14", "%ymm15", "%rax", "%rbx",
-				"%r12", "%r13", "%r14", "%r15")
-	}
-	void channel_scaling_avx_1x32xfp64(const TensorFragment &input, const TensorFragment &scales, TensorFragment &output) noexcept
-	{
-		assert(input.is_fp64());
-		assert(output.is_fp64());
-		assert(input.columns() >= 32);
-		assert(output.columns() == input.columns());
-		assert(scales.columns() == input.columns());
-		assert(input.rows() == output.rows());
-		assert(input.stride() == output.stride());
-		const uint64_t m_iter = input.rows();
-		const uint64_t stride = input.stride_in_bytes();
-
-		const void *input_ptr = input.data();
-		void *output_ptr = output.data();
-		const void *scales_ptr = scales.data();
-
-		begin_asm()
-		movq(var(scales_ptr), rax) // input pointer is in rax
-		vmovupd(mem(rax, 0*4*8), ymm8)
-		vmovupd(mem(rax, 1*4*8), ymm9)
-		vmovupd(mem(rax, 2*4*8), ymm10)
-		vmovupd(mem(rax, 3*4*8), ymm11)
-		vmovupd(mem(rax, 4*4*8), ymm12)
-		vmovupd(mem(rax, 5*4*8), ymm13)
-		vmovupd(mem(rax, 6*4*8), ymm14)
-		vmovupd(mem(rax, 7*4*8), ymm15)
-
-		movq(var(input_ptr), rax)// input pointer is in rax
-		movq(var(output_ptr), rbx)// output pointer is in rbx
-		movq(var(stride), r12)// input stride is in r12
-
-		movq(var(m_iter), r14)// load the number iterations
-		test(r14, r14)
-		je(EPILOGUE)
-
-		label(UNROLLED4)
-		vmovupd(mem(rax, 0*4*8), ymm0)
-		vmovupd(mem(rax, 1*4*8), ymm1)
-		vmovupd(mem(rax, 2*4*8), ymm2)
-		vmovupd(mem(rax, 3*4*8), ymm3)
-		vmovupd(mem(rax, 4*4*8), ymm4)
-		vmovupd(mem(rax, 5*4*8), ymm5)
-		vmovupd(mem(rax, 6*4*8), ymm6)
-		vmovupd(mem(rax, 7*4*8), ymm7)
-
-		vmulpd(ymm0, ymm8, ymm0)
-		vmulpd(ymm1, ymm9, ymm1)
-		vmulpd(ymm2, ymm10, ymm2)
-		vmulpd(ymm3, ymm11, ymm3)
-		vmulpd(ymm4, ymm12, ymm4)
-		vmulpd(ymm5, ymm13, ymm5)
-		vmulpd(ymm6, ymm14, ymm6)
-		vmulpd(ymm7, ymm15, ymm7)
-
-		vmovupd(ymm0, mem(rbx, 0*4*8))
-		vmovupd(ymm1, mem(rbx, 1*4*8))
-		vmovupd(ymm2, mem(rbx, 2*4*8))
-		vmovupd(ymm3, mem(rbx, 3*4*8))
-		vmovupd(ymm4, mem(rbx, 4*4*8))
-		vmovupd(ymm5, mem(rbx, 5*4*8))
-		vmovupd(ymm6, mem(rbx, 6*4*8))
-		vmovupd(ymm7, mem(rbx, 7*4*8))
-
-		add(r12, rax)// add stride to input pointer
-
-		dec(r14)
-		jne(UNROLLED4)
-
-		label(EPILOGUE)
-		vzeroupper()
-
-		end_asm(
-				:// outputs
-				:// inputs
-				[input_ptr] "m"(input_ptr),
-				[output_ptr] "m"(output_ptr),
-				[scales_ptr] "m"(scales_ptr),
-				[m_iter] "m"(m_iter),
-				[stride] "m"(stride)
-				:// clobbers
-				"cc", "memory", "%ymm0", "%ymm1", "%ymm2", "%ymm3", "%ymm4", "%ymm5", "%ymm6", "%ymm7",
-				"%ymm8", "%ymm9", "%ymm10", "%ymm11", "%ymm12", "%ymm13", "%ymm14", "%ymm15", "%rax", "%rbx",
-				"%r12", "%r13", "%r14", "%r15")
-	}
-
-	void channel_scaling_avx_1x8xfp16(const TensorFragment &input, const TensorFragment &scales, TensorFragment &output) noexcept
-	{
-		assert(input.is_fp16());
-		assert(output.is_fp16());
-		assert(input.columns() >= 64);
-		assert(output.columns() == input.columns());
-		assert(scales.columns() == input.columns());
-		assert(input.rows() == output.rows());
-		assert(input.stride() == output.stride());
-		const uint64_t m_iter = input.rows();
-		const uint64_t stride = input.stride_in_bytes();
-
-		const void *input_ptr = input.data();
-		void *output_ptr = output.data();
-		const void *scales_ptr = scales.data();
-
-		begin_asm()
-		movq(var(scales_ptr), rax) // input pointer is in rax
-		vmovups(mem(rax), xmm8)
-		vcvtph2ps(xmm8, ymm8)
-
-		movq(var(input_ptr), rax)// input pointer is in rax
-		movq(var(output_ptr), rbx)// output pointer is in rbx
-		movq(var(stride), r12)// input stride is in r12
-
-		movq(var(m_iter), r14)// load the number iterations
-		test(r14, r14)
-		je(EPILOGUE)
-
-		label(UNROLLED4)
-		vmovups(mem(rax), xmm0)
-		vcvtph2ps(xmm0, ymm0)
-		vmulps(ymm0, ymm8, ymm0)
-		vcvtps2ph(imm(0x03), ymm0, xmm0)
-		vmovups(xmm0, mem(rbx))
-		add(r12, rax)// add stride to input pointer
-
-		dec(r14)
-		jne(UNROLLED4)
+		jne(UNROLLED)
 
 		label(EPILOGUE)
 		vzeroupper()
@@ -1087,68 +814,16 @@ namespace ml
 		test(r14, r14)
 		je(EPILOGUE)
 
-		label(UNROLLED4)
+		label(UNROLLED)
 		vmovups(mem(rax), ymm0)
 		vmulps(ymm0, ymm8, ymm0)
 		vmovups(ymm0, mem(rbx))
 
 		add(r12, rax)// add stride to input pointer
+		add(r12, rbx)// add stride to output pointer
 
 		dec(r14)
-		jne(UNROLLED4)
-
-		label(EPILOGUE)
-		vzeroupper()
-
-		end_asm(
-				:// outputs
-				:// inputs
-				[input_ptr] "m"(input_ptr),
-				[output_ptr] "m"(output_ptr),
-				[scales_ptr] "m"(scales_ptr),
-				[m_iter] "m"(m_iter),
-				[stride] "m"(stride)
-				:// clobbers
-				"cc", "memory", "%ymm0", "%ymm1", "%ymm2", "%ymm3", "%ymm4", "%ymm5", "%ymm6", "%ymm7",
-				"%ymm8", "%ymm9", "%ymm10", "%ymm11", "%ymm12", "%ymm13", "%ymm14", "%ymm15", "%rax", "%rbx",
-				"%r12", "%r13", "%r14", "%r15")
-	}
-	void channel_scaling_avx_1x4xfp64(const TensorFragment &input, const TensorFragment &scales, TensorFragment &output) noexcept
-	{
-		assert(input.is_fp64());
-		assert(output.is_fp64());
-		assert(input.columns() >= 4);
-		assert(output.columns() == input.columns());
-		assert(scales.columns() == input.columns());
-		assert(input.rows() == output.rows());
-		assert(input.stride() == output.stride());
-		const uint64_t m_iter = input.rows();
-		const uint64_t stride = input.stride_in_bytes();
-
-		const void *input_ptr = input.data();
-		void *output_ptr = output.data();
-		const void *scales_ptr = scales.data();
-
-		begin_asm()
-		movq(var(scales_ptr), rax) // input pointer is in rax
-		vmovupd(mem(rax), ymm8)
-
-		movq(var(input_ptr), rax)// input pointer is in rax
-		movq(var(output_ptr), rbx)// output pointer is in rbx
-		movq(var(stride), r12)// input stride is in r12
-
-		movq(var(m_iter), r14)// load the number iterations
-		test(r14, r14)
-		je(EPILOGUE)
-
-		label(UNROLLED4)
-		vmovupd(mem(rax), ymm0)
-		vmulpd(ymm0, ymm8, ymm0)
-		vmovupd(ymm0, mem(rbx))
-		add(r12, rax)// add stride to input pointer
-
-		dec(r14)
-		jne(UNROLLED4)
+		jne(UNROLLED)
 
 		label(EPILOGUE)
 		vzeroupper()

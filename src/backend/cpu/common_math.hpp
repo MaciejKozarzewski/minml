@@ -48,6 +48,11 @@ namespace ml
 			return std::max(0.0f, x);
 		}
 		template<typename T>
+		T leaky_relu(T x) noexcept
+		{
+			return (x > static_cast<T>(0.0f)) ? x : static_cast<T>(0.1f) * x;
+		}
+		template<typename T>
 		T approx_gelu(T x) noexcept
 		{
 			return x / (1.0f + std::exp(-static_cast<T>(1.6849) * x));

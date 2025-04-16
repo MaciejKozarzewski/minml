@@ -422,35 +422,35 @@ namespace ml
 		{
 			case DeviceType::CPU:
 			{
-				const int batch = input.dim(0);
-				const int height = input.dim(1);
-				const int width = input.dim(2);
-				const int filters = input.dim(3);
-
-				const int kernel_height = weights.dim(0);
-				const int kernel_width = weights.dim(1);
-
-				const int pad_h = -(kernel_height - 1) / 2;
-				const int pad_w = -(kernel_width - 1) / 2;
-
-				output.zeroall();
-				for (int b = 0; b < batch; b++)
-					for (int f = 0; f < filters; f++)
-						for (int h = 0; h < height; h++)
-							for (int w = 0; w < width; w++)
-							{
-								float tmp = 0.0f;
-								for (int i = 0; i < kernel_height; i++)
-									for (int j = 0; j < kernel_width; j++)
-										if ((pad_h + h + i) >= 0 and (pad_h + h + i) < height and (pad_w + w + j) >= 0 and (pad_w + w + j) < width)
-											tmp += weights.get( { i, j, f }) * input.get( { b, pad_h + h + i, pad_w + w + j, f });
-								if (not bias.isEmpty())
-									tmp += bias.get( { f });
-								tmp *= alpha;
-								if (beta != 0.0f)
-									tmp += beta * output.get( { b, h, w, f });
-								output.at( { b, h, w, f }) = tmp;
-							}
+//				const int batch = input.dim(0);
+//				const int height = input.dim(1);
+//				const int width = input.dim(2);
+//				const int filters = input.dim(3);
+//
+//				const int kernel_height = weights.dim(0);
+//				const int kernel_width = weights.dim(1);
+//
+//				const int pad_h = -(kernel_height - 1) / 2;
+//				const int pad_w = -(kernel_width - 1) / 2;
+//
+//				output.zeroall();
+//				for (int b = 0; b < batch; b++)
+//					for (int f = 0; f < filters; f++)
+//						for (int h = 0; h < height; h++)
+//							for (int w = 0; w < width; w++)
+//							{
+//								float tmp = 0.0f;
+//								for (int i = 0; i < kernel_height; i++)
+//									for (int j = 0; j < kernel_width; j++)
+//										if ((pad_h + h + i) >= 0 and (pad_h + h + i) < height and (pad_w + w + j) >= 0 and (pad_w + w + j) < width)
+//											tmp += weights.get( { i, j, f }) * input.get( { b, pad_h + h + i, pad_w + w + j, f });
+//								if (not bias.isEmpty())
+//									tmp += bias.get( { f });
+//								tmp *= alpha;
+//								if (beta != 0.0f)
+//									tmp += beta * output.get( { b, h, w, f });
+//								output.at( { b, h, w, f }) = tmp;
+//							}
 				break;
 			}
 			case DeviceType::CUDA:
@@ -503,19 +503,8 @@ namespace ml
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
-			{
-				const float inv = 1.0f / (input.dim(1) * input.dim(2));
-				for (int i = 0; i < input.firstDim(); i++)
-					for (int l = 0; l < input.lastDim(); l++)
-					{
-						float avg_value = 0.0f;
-						for (int j = 0; j < input.dim(1); j++)
-							for (int k = 0; k < input.dim(2); k++)
-								avg_value += (float) input.at( { i, j, k, l });
-						output.at( { i, l }) = avg_value * inv;
-					}
+				cpu_global_average_pooling_forward(get(context), alpha, get(input), beta, get(output));
 				break;
-			}
 			case DeviceType::CUDA:
 				cuda_global_average_pooling_forward(get(context), alpha, get(input), beta, get(output));
 				break;
@@ -528,6 +517,7 @@ namespace ml
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
+				cpu_global_average_pooling_backward(get(context), alpha, get(gradient_next), beta, get(gradient_prev));
 				break;
 			case DeviceType::CUDA:
 				cuda_global_average_pooling_backward(get(context), alpha, get(gradient_next), beta, get(gradient_prev));
@@ -543,14 +533,8 @@ namespace ml
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
-			{
-				for (int i = 0; i < input.dim(0); i++)
-					for (int j = 0; j < input.dim(1); j++)
-						for (int k = 0; k < input.dim(2); k++)
-							for (int l = 0; l < input.dim(3); l++)
-								output.at( { i, j, k, l }) = (float) input.at( { i, j, k, l }) * (float) scales.at( { i, l });
+				cpu_channel_scaling_forward(get(context), alpha, get(input), get(scales), beta, get(output));
 				break;
-			}
 			case DeviceType::CUDA:
 				cuda_channel_scaling_forward(get(context), alpha, get(input), get(scales), beta, get(output));
 				break;
@@ -564,6 +548,8 @@ namespace ml
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
+				cpu_channel_scaling_backward(get(context), alpha, get(gradient_next), get(input), get(scales), beta_input, get(gradient_prev),
+						beta_scales, get(gradient_scales));
 				break;
 			case DeviceType::CUDA:
 				cuda_channel_scaling_backward(get(context), alpha, get(gradient_next), get(input), get(scales), beta_input, get(gradient_prev),
@@ -722,8 +708,7 @@ namespace ml
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
-//				cpu_fold_batchnorm(get(context), get_shape(layer_weights), layer_weights.data(), layer_bias.data(), batchnorm_weights.data(),
-//						use_gamma, use_beta);
+				cpu_fold_batchnorm(get(context), get(layer_weights), get(layer_bias), get(bn_weights), get(bn_bias), get(bn_avg_var));
 				break;
 			case DeviceType::CUDA:
 				cuda_fold_batchnorm(get(context), get(layer_weights), get(layer_bias), get(bn_weights), get(bn_bias), get(bn_avg_var));

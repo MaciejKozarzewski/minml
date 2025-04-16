@@ -29,14 +29,10 @@ namespace ml
 	 * sse2 kernels
 	 */
 	void average_pooling_sse2_1x32xfp32(const TensorFragment &input, TensorFragment &output) noexcept;
-	void average_pooling_sse2_1x16xfp64(const TensorFragment &input, TensorFragment &output) noexcept;
 	void average_pooling_sse2_1x4xfp32(const TensorFragment &input, TensorFragment &output) noexcept;
-	void average_pooling_sse2_1x2xfp64(const TensorFragment &input, TensorFragment &output) noexcept;
 
 	void channel_scaling_sse2_1x32xfp32(const TensorFragment &input, const TensorFragment &scales, TensorFragment &output) noexcept;
-	void channel_scaling_sse2_1x16xfp64(const TensorFragment &input, const TensorFragment &scales, TensorFragment &output) noexcept;
 	void channel_scaling_sse2_1x4xfp32(const TensorFragment &input, const TensorFragment &scales, TensorFragment &output) noexcept;
-	void channel_scaling_sse2_1x2xfp64(const TensorFragment &input, const TensorFragment &scales, TensorFragment &output) noexcept;
 
 	/*
 	 * avx kernels
@@ -46,17 +42,13 @@ namespace ml
 
 	void average_pooling_avx_1x64xfp16(const TensorFragment &input, TensorFragment &output) noexcept;
 	void average_pooling_avx_1x64xfp32(const TensorFragment &input, TensorFragment &output) noexcept;
-	void average_pooling_avx_1x32xfp64(const TensorFragment &input, TensorFragment &output) noexcept;
 	void average_pooling_avx_1x8xfp16(const TensorFragment &input, TensorFragment &output) noexcept;
 	void average_pooling_avx_1x8xfp32(const TensorFragment &input, TensorFragment &output) noexcept;
-	void average_pooling_avx_1x4xfp64(const TensorFragment &input, TensorFragment &output) noexcept;
 
 	void channel_scaling_avx_1x64xfp16(const TensorFragment &input, const TensorFragment &scales, TensorFragment &output) noexcept;
 	void channel_scaling_avx_1x64xfp32(const TensorFragment &input, const TensorFragment &scales, TensorFragment &output) noexcept;
-	void channel_scaling_avx_1x32xfp64(const TensorFragment &input, const TensorFragment &scales, TensorFragment &output) noexcept;
 	void channel_scaling_avx_1x8xfp16(const TensorFragment &input, const TensorFragment &scales, TensorFragment &output) noexcept;
 	void channel_scaling_avx_1x8xfp32(const TensorFragment &input, const TensorFragment &scales, TensorFragment &output) noexcept;
-	void channel_scaling_avx_1x4xfp64(const TensorFragment &input, const TensorFragment &scales, TensorFragment &output) noexcept;
 
 } /* namespace ml */
 
