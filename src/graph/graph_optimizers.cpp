@@ -122,7 +122,7 @@ namespace ml
 					{
 						const Tensor &bn_weights = next->getLayer().getWeights().getParam();
 						const Tensor &bn_bias = next->getLayer().getBias().getParam();
-						const Tensor &bn_avg_var =static_cast<BatchNormalization&>(next->getLayer()).getStatistics();
+						const Tensor &bn_avg_var = static_cast<BatchNormalization&>(next->getLayer()).getStatistics();
 
 						Tensor &layer_weights = prev->getLayer().getWeights().getParam();
 						Tensor &layer_bias = prev->getLayer().getBias().getParam();
@@ -214,7 +214,9 @@ namespace ml
 			{
 				std::unique_ptr<FusedConvBlock> fused_block = std::make_unique<FusedConvBlock>((DepthwiseConv2D&) nodes[0]->getLayer(),
 						(Conv2D&) nodes[1]->getLayer(), (Conv2D&) nodes[2]->getLayer());
+				fused_block->setInputShape(nodes[0]->getLayer().getInputShape());
 				nodes[0]->replaceLayer(fused_block.release());
+				nodes[0]->resolveInputShapes();
 
 				while (nodes[2]->numberOfOutputs() > 0)
 					GraphNode::replaceInputLink(nodes[2], nodes[0], nodes[2]->getOutputNode(0));
@@ -244,7 +246,9 @@ namespace ml
 			{
 				std::unique_ptr<SqueezeAndExcitation> fused_block = std::make_unique<SqueezeAndExcitation>((Dense&) nodes[1]->getLayer(),
 						(Dense&) nodes[2]->getLayer());
+				fused_block->setInputShape(nodes[0]->getLayer().getInputShape());
 				nodes[0]->replaceLayer(fused_block.release());
+				nodes[0]->resolveInputShapes();
 
 				while (nodes[3]->numberOfOutputs() > 0)
 					GraphNode::replaceInputLink(nodes[3], nodes[0], nodes[3]->getOutputNode(0));
@@ -254,6 +258,7 @@ namespace ml
 				graph.remove_node(nodes[3]);
 
 				has_anything_changed = true;
+
 			}
 		}
 		return has_anything_changed;
