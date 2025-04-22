@@ -417,7 +417,8 @@ namespace
 			{
 				output = baseline_mha_forward(input[0], getWeights().getParam(), m_number_of_heads, m_symmetric);
 			}
-			void backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next, const std::vector<float> &beta)
+			void backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next,
+					const std::vector<float> &beta)
 			{
 				baseline_mha_backward(input[0], getWeights().getParam(), gradient_prev[0], gradient_next, getWeights().getGradient(),
 						m_number_of_heads, m_symmetric);
@@ -439,8 +440,8 @@ namespace ml
 
 	TEST(TestMultiHeadAttention, forward)
 	{
-		const bool use_bias = false;
-		const bool symmetric = true;
+		const bool use_bias = true;
+		const bool symmetric = false;
 		const int batch_size = 3;
 		const int height = 13;
 		const int width = 14;
@@ -503,8 +504,8 @@ namespace ml
 	}
 	TEST(TestMultiHeadAttention, backward)
 	{
-		const bool use_bias = false;
-		const bool symmetric = true;
+		const bool use_bias = true;
+		const bool symmetric = false;
 		const int batch_size = 3;
 		const int height = 13;
 		const int width = 14;
@@ -568,9 +569,9 @@ namespace ml
 //		std::cout << "backprop grad = " << gradient_prev.get(index) << " vs numerical = " << (loss_p - loss_m) / (2 * eps) << '\n';
 //		exit(0);
 
-		multiHeadAttentionForward(context, input, output, weights, bias, mask, workspace, backward_data, num_heads, symmetric);
+//		multiHeadAttentionForward(context, input, output, weights, bias, mask, workspace, backward_data, num_heads, symmetric);
 //		multiHeadAttentionBackward(context, input, weights, bias, mask, gradient_prev, gradient_next, weights_update, bias_update, workspace,
-//				backward_data, num_heads, symmetric);
+//				backward_data, num_heads, symmetric, 0.0f);
 
 //		EXPECT_LE(testing::diffForTest(correct_gradient_prev, gradient_prev), 1.0e-4f);
 //		EXPECT_LE(testing::diffForTest(correct_weights_update, weights_update), 1.0e-4f);
@@ -594,9 +595,10 @@ namespace ml
 
 			const int workspace_size = multiHeadAttentionGetWorkspaceSize(context, input.shape(), weights.shape(), num_heads, true);
 			Tensor workspace( { workspace_size }, "float32", context.device());
+			Tensor mask_update;
 			multiHeadAttentionForward(context, input, output, weights, bias, mask, workspace, backward_data, num_heads, symmetric);
-//			multiHeadAttentionBackward(context, input, weights, bias, mask, gradient_prev, gradient_next, weights_update, bias_update, workspace,
-//					backward_data, num_heads, symmetric);
+			multiHeadAttentionBackward(context, input, weights, bias, mask, gradient_prev, gradient_next, weights_update, bias_update, mask_update,
+					workspace, backward_data, num_heads, symmetric, 0.0f);
 
 			context.synchronize();
 //			for (int i = 0; i < weights_update.dim(0); i++)
@@ -609,8 +611,8 @@ namespace ml
 //							exit(0);
 //						}
 
-//			EXPECT_LE(testing::diffForTest(correct_gradient_prev, gradient_prev), 1.0e-4f);
-//			EXPECT_LE(testing::diffForTest(correct_weights_update, weights_update), 1.0e-4f);
+			EXPECT_LE(testing::diffForTest(correct_gradient_prev, gradient_prev), 1.0e-4f);
+			EXPECT_LE(testing::diffForTest(correct_weights_update, weights_update), 1.0e-4f);
 		}
 	}
 } /* namespace ml */

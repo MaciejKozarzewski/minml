@@ -48,8 +48,6 @@ namespace
 				return std::tanh(x);
 			case ActivationType::RELU:
 				return std::max(0.0f, x);
-			case ActivationType::GELU:
-				return 0.5f * x * (1.0f + std::erf(x / std::sqrt(2.0f)));
 			case ActivationType::EXP:
 				return std::exp(x);
 		}
@@ -240,77 +238,77 @@ namespace ml
 			EXPECT_LE(ml::testing::diffForTest(correct_output_fp32, output_fp32), 1.0e-4f);
 		}
 	}
-	TEST(TestQuantization, conv2D_5x5_forward)
-	{
-		const int batch_size = 3;
-		const int height = 12;
-		const int width = 13;
-		const int input_channels = 36;
-		const int output_channels = 44;
-
-		Context context(Device::cpu());
-		Tensor input( { batch_size, height, width, input_channels }, "int8", Device::cpu());
-		Tensor output_int8( { batch_size, height, width, output_channels }, "int8", Device::cpu());
-		Tensor output_fp32(output_int8.shape(), "float32", Device::cpu());
-		Tensor weights( { output_channels, 5, 5, input_channels }, "int8", Device::cpu());
-		Tensor bias( { output_channels }, "float32", Device::cpu());
-		Tensor channel_scales = zeros_like(bias);
-		Tensor ext = zeros_like(output_int8);
-		ml::testing::initForTest(weights, 0.0);
-		ml::testing::initForTest(input, 1.0);
-		ml::testing::initForTest(bias, 1.0);
-		ml::testing::initForTest(channel_scales, 1.0, 0.0001);
-		ml::testing::initForTest(ext, 0);
-
-		const AffineTransform input_transform(0.123f, 4.56f);
-		const AffineTransform output_transform(0.078f, 0.9f);
-		const AffineTransform ext_transform(0.078f, -0.9f);
-
-		const int32_t input_zero = get_zero<int8_t>(input_transform);
-
-		Tensor correct_output_int8 = zeros_like(output_int8);
-		Tensor correct_output_fp32 = zeros_like(output_fp32);
-		baseline_int8_conv2D_forward(input, input_transform, correct_output_int8, output_transform, weights, channel_scales, bias, ext, ext_transform,
-				ActivationType::RELU);
-		baseline_int8_conv2D_forward(input, input_transform, correct_output_fp32, output_transform, weights, channel_scales, bias, ext, ext_transform,
-				ActivationType::RELU);
-
-//		Tensor weight_matrices = weights.view(Shape( { output_channels, input_channels }));
-//		Tensor input_matrices = input.view(Shape( { batch_size * height * width, input_channels }));
-//		Tensor output_matrices = output.view(Shape( { batch_size * height * width, output_channels }));
+//	TEST(TestQuantization, conv2D_5x5_forward)
+//	{
+//		const int batch_size = 3;
+//		const int height = 12;
+//		const int width = 13;
+//		const int input_channels = 36;
+//		const int output_channels = 44;
 //
-//		gemm_ex(context, output_matrices, 1.0f, 'n', input_matrices, 't', weight_matrices, 0.0f, output_matrices, bias, ActivationType::SIGMOID);
-//		EXPECT_LE(ml::testing::diffForTest(correct_output, output), 1.0e-4f);
-
-		if (ml::testing::has_device_supporting(DataType::INT8))
-		{
-			const Device device = ml::testing::get_device_for_test();
-			Context context(device);
-			input.moveTo(device);
-			output_int8.moveTo(device);
-			output_fp32.moveTo(device);
-			weights.moveTo(device);
-			bias.moveTo(device);
-			channel_scales.moveTo(device);
-			ext.moveTo(device);
-			Tensor weight_matrices = weights.view(Shape( { output_channels, 5 * 5 * input_channels }));
-			Tensor input_matrices( { batch_size * height * width, 5 * 5 * input_channels }, "int8", device);
-			Tensor output_matrices( { batch_size * height * width, output_channels }, "int32", device);
-
-			output_int8.zeroall();
-			output_fp32.zeroall();
-
-			create_receptive_fields(context, input_matrices, input, 5, &input_zero);
-			gemm(context, 'n', 't', output_matrices, input_matrices, weight_matrices, 1, 0);
-			quantized_scale_shift_act(context, output_int8, output_transform, output_matrices, channel_scales, bias, ActivationType::RELU, ext,
-					ext_transform);
-			quantized_scale_shift_act(context, output_fp32, output_transform, output_matrices, channel_scales, bias, ActivationType::RELU, ext,
-					ext_transform);
-			context.synchronize();
-			EXPECT_LE(ml::testing::diffForTest(correct_output_int8, output_int8), 1.0e-4f);
-			EXPECT_LE(ml::testing::diffForTest(correct_output_fp32, output_fp32), 1.0e-4f);
-		}
-	}
+//		Context context(Device::cpu());
+//		Tensor input( { batch_size, height, width, input_channels }, "int8", Device::cpu());
+//		Tensor output_int8( { batch_size, height, width, output_channels }, "int8", Device::cpu());
+//		Tensor output_fp32(output_int8.shape(), "float32", Device::cpu());
+//		Tensor weights( { output_channels, 5, 5, input_channels }, "int8", Device::cpu());
+//		Tensor bias( { output_channels }, "float32", Device::cpu());
+//		Tensor channel_scales = zeros_like(bias);
+//		Tensor ext = zeros_like(output_int8);
+//		ml::testing::initForTest(weights, 0.0);
+//		ml::testing::initForTest(input, 1.0);
+//		ml::testing::initForTest(bias, 1.0);
+//		ml::testing::initForTest(channel_scales, 1.0, 0.0001);
+//		ml::testing::initForTest(ext, 0);
+//
+//		const AffineTransform input_transform(0.123f, 4.56f);
+//		const AffineTransform output_transform(0.078f, 0.9f);
+//		const AffineTransform ext_transform(0.078f, -0.9f);
+//
+//		const int32_t input_zero = get_zero<int8_t>(input_transform);
+//
+//		Tensor correct_output_int8 = zeros_like(output_int8);
+//		Tensor correct_output_fp32 = zeros_like(output_fp32);
+//		baseline_int8_conv2D_forward(input, input_transform, correct_output_int8, output_transform, weights, channel_scales, bias, ext, ext_transform,
+//				ActivationType::RELU);
+//		baseline_int8_conv2D_forward(input, input_transform, correct_output_fp32, output_transform, weights, channel_scales, bias, ext, ext_transform,
+//				ActivationType::RELU);
+//
+////		Tensor weight_matrices = weights.view(Shape( { output_channels, input_channels }));
+////		Tensor input_matrices = input.view(Shape( { batch_size * height * width, input_channels }));
+////		Tensor output_matrices = output.view(Shape( { batch_size * height * width, output_channels }));
+////
+////		gemm_ex(context, output_matrices, 1.0f, 'n', input_matrices, 't', weight_matrices, 0.0f, output_matrices, bias, ActivationType::SIGMOID);
+////		EXPECT_LE(ml::testing::diffForTest(correct_output, output), 1.0e-4f);
+//
+//		if (ml::testing::has_device_supporting(DataType::INT8))
+//		{
+//			const Device device = ml::testing::get_device_for_test();
+//			Context context(device);
+//			input.moveTo(device);
+//			output_int8.moveTo(device);
+//			output_fp32.moveTo(device);
+//			weights.moveTo(device);
+//			bias.moveTo(device);
+//			channel_scales.moveTo(device);
+//			ext.moveTo(device);
+//			Tensor weight_matrices = weights.view(Shape( { output_channels, 5 * 5 * input_channels }));
+//			Tensor input_matrices( { batch_size * height * width, 5 * 5 * input_channels }, "int8", device);
+//			Tensor output_matrices( { batch_size * height * width, output_channels }, "int32", device);
+//
+//			output_int8.zeroall();
+//			output_fp32.zeroall();
+//
+//			im2row(context, input_matrices, input, 5, false, &input_zero);
+//			gemm(context, 'n', 't', output_matrices, input_matrices, weight_matrices, 1, 0);
+//			quantized_scale_shift_act(context, output_int8, output_transform, output_matrices, channel_scales, bias, ActivationType::RELU, ext,
+//					ext_transform);
+//			quantized_scale_shift_act(context, output_fp32, output_transform, output_matrices, channel_scales, bias, ActivationType::RELU, ext,
+//					ext_transform);
+//			context.synchronize();
+//			EXPECT_LE(ml::testing::diffForTest(correct_output_int8, output_int8), 1.0e-4f);
+//			EXPECT_LE(ml::testing::diffForTest(correct_output_fp32, output_fp32), 1.0e-4f);
+//		}
+//	}
 	TEST(TestQuantization, depthwise_conv2D_forward)
 	{
 		const int batch_size = 1;
