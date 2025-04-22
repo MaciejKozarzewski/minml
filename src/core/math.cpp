@@ -414,6 +414,23 @@ namespace ml
 				break;
 		}
 	}
+	void fusedConvBlockForward(const Context &context, const Tensor &input, const Tensor &dwconv_weights, const Tensor &dwconv_bias,
+			const Tensor &first_conv_weights, const Tensor &first_conv_bias, const Tensor &second_conv_weights, const Tensor &second_conv_bias,
+			Tensor &output)
+	{
+		switch (context.device().type())
+		{
+			case DeviceType::CPU:
+				cpu_fused_conv_block_forward(get(context), get(input), get(dwconv_weights), get(dwconv_bias), get(first_conv_weights),
+						get(first_conv_bias), get(second_conv_weights), get(second_conv_bias), get(output));
+				break;
+			case DeviceType::CUDA:
+				break;
+			case DeviceType::OPENCL:
+				// TODO
+				break;
+		}
+	}
 
 	void depthwiseConvForward(const Context &context, float alpha, const Tensor &input, const Tensor &weights, float beta, Tensor &output,
 			const Tensor &bias)
@@ -496,6 +513,35 @@ namespace ml
 		}SYNC();
 	}
 
+	void averagePoolingForward(const Context &context, float alpha, const Tensor &input, float beta, Tensor &output, int size)
+	{
+		static Timer timer("global_average_pooling");
+		TimerGuard tg(timer);
+		switch (context.device().type())
+		{
+			case DeviceType::CPU:
+				break;
+			case DeviceType::CUDA:
+				cuda_average_pooling_forward(get(context), alpha, get(input), beta, get(output), size);
+				break;
+			case DeviceType::OPENCL:
+				break;
+		}SYNC();
+	}
+	void averagePoolingBackward(const Context &context, float alpha, const Tensor &gradient_next, float beta, Tensor &gradient_prev, int size)
+	{
+		switch (context.device().type())
+		{
+			case DeviceType::CPU:
+				break;
+			case DeviceType::CUDA:
+				cuda_average_pooling_backward(get(context), alpha, get(gradient_next), beta, get(gradient_prev), size);
+				break;
+			case DeviceType::OPENCL:
+				break;
+		}SYNC();
+	}
+
 	void globalAveragePoolingForward(const Context &context, float alpha, const Tensor &input, float beta, Tensor &output)
 	{
 		static Timer timer("global_average_pooling");
@@ -553,6 +599,69 @@ namespace ml
 				break;
 			case DeviceType::CUDA:
 				cuda_channel_scaling_backward(get(context), alpha, get(gradient_next), get(input), get(scales), beta_input, get(gradient_prev),
+						beta_scales, get(gradient_scales));
+				break;
+			case DeviceType::OPENCL:
+				break;
+		}SYNC();
+	}
+	void channelAveragePoolingForward(const Context &context, float alpha, const Tensor &input, float beta, Tensor &output)
+	{
+		static Timer timer("global_average_pooling");
+		TimerGuard tg(timer);
+		switch (context.device().type())
+		{
+			case DeviceType::CPU:
+//					cpu_global_average_pooling_forward(get(context), alpha, get(input), beta, get(output));
+				break;
+			case DeviceType::CUDA:
+				cuda_channel_average_pooling_forward(get(context), alpha, get(input), beta, get(output));
+				break;
+			case DeviceType::OPENCL:
+				break;
+		}SYNC();
+	}
+	void channelAveragePoolingBackward(const Context &context, float alpha, const Tensor &gradient_next, float beta, Tensor &gradient_prev)
+	{
+		switch (context.device().type())
+		{
+			case DeviceType::CPU:
+//					cpu_global_average_pooling_backward(get(context), alpha, get(gradient_next), beta, get(gradient_prev));
+				break;
+			case DeviceType::CUDA:
+				cuda_channel_average_pooling_backward(get(context), alpha, get(gradient_next), beta, get(gradient_prev));
+				break;
+			case DeviceType::OPENCL:
+				break;
+		}SYNC();
+	}
+	void spatialScalingForward(const Context &context, float alpha, const Tensor &input, const Tensor &scales, float beta, Tensor &output)
+	{
+		static Timer timer("channel_scaling");
+		TimerGuard tg(timer);
+		switch (context.device().type())
+		{
+			case DeviceType::CPU:
+//					cpu_channel_scaling_forward(get(context), alpha, get(input), get(scales), beta, get(output));
+				break;
+			case DeviceType::CUDA:
+				cuda_spatial_scaling_forward(get(context), alpha, get(input), get(scales), beta, get(output));
+				break;
+			case DeviceType::OPENCL:
+				break;
+		}SYNC();
+	}
+	void spatialScalingBackward(const Context &context, float alpha, const Tensor &gradient_next, const Tensor &input, const Tensor &scales,
+			float beta_input, Tensor &gradient_prev, float beta_scales, Tensor &gradient_scales)
+	{
+		switch (context.device().type())
+		{
+			case DeviceType::CPU:
+//					cpu_channel_scaling_backward(get(context), alpha, get(gradient_next), get(input), get(scales), beta_input, get(gradient_prev),
+//							beta_scales, get(gradient_scales));
+				break;
+			case DeviceType::CUDA:
+				cuda_spatial_scaling_backward(get(context), alpha, get(gradient_next), get(input), get(scales), beta_input, get(gradient_prev),
 						beta_scales, get(gradient_scales));
 				break;
 			case DeviceType::OPENCL:

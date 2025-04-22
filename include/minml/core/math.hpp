@@ -44,6 +44,10 @@ namespace ml
 	void convolutionImplicitGemmForward(const Context &context, const Tensor &input, const Tensor &weights, Tensor &output, const Tensor &bias,
 			const Tensor &add, ActivationType act);
 
+	void fusedConvBlockForward(const Context &context, const Tensor &input, const Tensor &dwconv_weights, const Tensor &dwconv_bias,
+			const Tensor &first_conv_weights, const Tensor &first_conv_bias, const Tensor &second_conv_weights, const Tensor &second_conv_bias,
+			Tensor &output);
+
 	void depthwiseConvForward(const Context &context, float alpha, const Tensor &input, const Tensor &weights, float beta, Tensor &output,
 			const Tensor &bias);
 	void depthwiseConvBackward(const Context &context, float alpha, const Tensor &gradient_next, const Tensor &weights, float beta,
@@ -51,10 +55,18 @@ namespace ml
 	void depthwiseConvUpdate(const Context &context, float alpha, const Tensor &input, const Tensor &gradient_next, float beta,
 			Tensor &weights_update);
 
+	void averagePoolingForward(const Context &context, float alpha, const Tensor &input, float beta, Tensor &output, int size);
+	void averagePoolingBackward(const Context &context, float alpha, const Tensor &gradient_next, float beta, Tensor &gradient_prev, int size);
+
 	void globalAveragePoolingForward(const Context &context, float alpha, const Tensor &input, float beta, Tensor &output);
 	void globalAveragePoolingBackward(const Context &context, float alpha, const Tensor &gradient_next, float beta, Tensor &gradient_prev);
 	void channelScalingForward(const Context &context, float alpha, const Tensor &input, const Tensor &scales, float beta, Tensor &output);
 	void channelScalingBackward(const Context &context, float alpha, const Tensor &gradient_next, const Tensor &input, const Tensor &scales,
+			float beta_input, Tensor &gradient_prev, float beta_scales, Tensor &gradient_scales);
+	void channelAveragePoolingForward(const Context &context, float alpha, const Tensor &input, float beta, Tensor &output);
+	void channelAveragePoolingBackward(const Context &context, float alpha, const Tensor &gradient_next, float beta, Tensor &gradient_prev);
+	void spatialScalingForward(const Context &context, float alpha, const Tensor &input, const Tensor &scales, float beta, Tensor &output);
+	void spatialScalingBackward(const Context &context, float alpha, const Tensor &gradient_next, const Tensor &input, const Tensor &scales,
 			float beta_input, Tensor &gradient_prev, float beta_scales, Tensor &gradient_scales);
 
 	void gemm(const Context &context, char opA, char opB, Tensor &C, const Tensor &A, const Tensor &B, float alpha, float beta);

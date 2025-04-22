@@ -211,26 +211,16 @@ namespace ml
 		throw NotImplemented(METHOD_NAME);
 	}
 
+	void cuda_average_pooling_forward(mlContext_t context, float alpha, const mlTensor_t x, float beta, mlTensor_t y, int size)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+	void cuda_average_pooling_backward(mlContext_t context, float alpha, const mlTensor_t dy, float beta, mlTensor_t dx, int size)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+
 	// implemented in 'global_pooling.cu'
-	void cuda_global_avg_and_max_pooling_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input)
-	{
-		throw NotImplemented(METHOD_NAME);
-	}
-	void cuda_global_avg_and_max_pooling_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next,
-			const void *input, const void *output)
-	{
-		throw NotImplemented(METHOD_NAME);
-	}
-	void cuda_global_broadcasting_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input, const void *bias,
-			mlActivationType_t act)
-	{
-		throw NotImplemented(METHOD_NAME);
-	}
-	void cuda_global_broadcasting_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, void *gradient_next, const void *output,
-			mlActivationType_t act)
-	{
-		throw NotImplemented(METHOD_NAME);
-	}
 	void cuda_global_average_pooling_forward(mlContext_t context, float alpha, const mlTensor_t x, float beta, mlTensor_t y)
 	{
 		throw NotImplemented(METHOD_NAME);
@@ -244,6 +234,23 @@ namespace ml
 		throw NotImplemented(METHOD_NAME);
 	}
 	void cuda_channel_scaling_backward(mlContext_t context, float alpha, const mlTensor_t dy, const mlTensor_t x, const mlTensor_t scales,
+			float beta_dx, mlTensor_t dx, float beta_scales, mlTensor_t dscales)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+	void cuda_channel_average_pooling_forward(mlContext_t context, float alpha, const mlTensor_t x, float beta, mlTensor_t y)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+	void cuda_channel_average_pooling_backward(mlContext_t context, float alpha, const mlTensor_t dy, float beta, mlTensor_t dx)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+	void cuda_spatial_scaling_forward(mlContext_t context, float alpha, const mlTensor_t x, const mlTensor_t scales, float beta, mlTensor_t y)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+	void cuda_spatial_scaling_backward(mlContext_t context, float alpha, const mlTensor_t dy, const mlTensor_t x, const mlTensor_t scales,
 			float beta_dx, mlTensor_t dx, float beta_scales, mlTensor_t dscales)
 	{
 		throw NotImplemented(METHOD_NAME);
@@ -421,7 +428,8 @@ namespace ml
 		throw NotImplemented(METHOD_NAME);
 	}
 	void cuda_fused_radam_optimize(mlContext_t context, float scale, const mlTensor_t *gradients, mlTensor_t *weights, mlTensor_t *momentums,
-			mlTensor_t *variances, mlTensor_t *weights_copy, float learning_rate, float beta1, float beta2, int step, int num_tensors, float weight_decay)
+			mlTensor_t *variances, mlTensor_t *weights_copy, float learning_rate, float beta1, float beta2, int step, int num_tensors,
+			float weight_decay)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}

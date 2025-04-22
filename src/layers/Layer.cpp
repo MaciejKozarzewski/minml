@@ -20,23 +20,26 @@
 #include <minml/training/Regularizer.hpp>
 #include <minml/training/Initializer.hpp>
 
+#include <minml/layers/Add.hpp>
+#include <minml/layers/AveragePooling.hpp>
+#include <minml/layers/BatchNormalization.hpp>
+#include <minml/layers/ChannelAveragePooling.hpp>
 #include <minml/layers/ChannelScaling.hpp>
 #include <minml/layers/Conv2D.hpp>
 #include <minml/layers/Dense.hpp>
 #include <minml/layers/DepthToSpace.hpp>
 #include <minml/layers/DepthwiseConv2D.hpp>
 #include <minml/layers/FusedConvBlock.hpp>
+#include <minml/layers/GlobalAveragePooling.hpp>
 #include <minml/layers/Input.hpp>
-#include <minml/layers/Add.hpp>
-#include <minml/layers/BatchNormalization.hpp>
 #include <minml/layers/LayerNormalization.hpp>
 #include <minml/layers/LearnableGlobalPooling.hpp>
-#include <minml/layers/GlobalAveragePooling.hpp>
 #include <minml/layers/MultiHeadAttention.hpp>
 #include <minml/layers/PositionalEncoding.hpp>
 #include <minml/layers/RMSNormalization.hpp>
 #include <minml/layers/Softmax.hpp>
 #include <minml/layers/SpaceToDepth.hpp>
+#include <minml/layers/SpatialScaling.hpp>
 #include <minml/layers/SqueezeAndExcitation.hpp>
 #include <minml/layers/WindowPartitioning.hpp>
 #include <minml/layers/WindowMerging.hpp>
@@ -306,8 +309,10 @@ namespace ml
 	std::unique_ptr<Layer> loadLayer(const Json &json, const SerializedObject &binary_data)
 	{
 		static const Add add;
+		static const AveragePooling average_pooling(0);
 		static const BatchNormalization batchnorm;
 		static const ChannelScaling channel_scaling;
+		static const ChannelAveragePooling channel_average_pooling;
 		static const Conv2D conv2d(0, 0);
 		static const Dense dense(0);
 		static const DepthToSpace depth_to_space(0, { 0, 0 });
@@ -322,6 +327,7 @@ namespace ml
 		static const PositionalEncoding positional_encoding;
 		static const Softmax softmax( { 0 });
 		static const SpaceToDepth space_to_depth(0);
+		static const SpatialScaling spatial_scaling;
 		static const SqueezeAndExcitation se;
 		static const WindowPartitioning window_partitioning(0, 0);
 		static const WindowMerging window_merging(Shape(), 0);
@@ -331,10 +337,14 @@ namespace ml
 
 		if (name == add.name())
 			result = add.clone(json);
+		if (name == average_pooling.name())
+			result = average_pooling.clone(json);
 		if (name == batchnorm.name())
 			result = batchnorm.clone(json);
 		if (name == channel_scaling.name())
 			result = channel_scaling.clone(json);
+		if (name == channel_average_pooling.name())
+			result = channel_average_pooling.clone(json);
 		if (name == conv2d.name())
 			result = conv2d.clone(json);
 		if (name == dense.name())
@@ -363,6 +373,8 @@ namespace ml
 			result = softmax.clone(json);
 		if (name == space_to_depth.name())
 			result = space_to_depth.clone(json);
+		if (name == spatial_scaling.name())
+			result = spatial_scaling.clone(json);
 		if (name == se.name())
 			result = se.clone(json);
 		if (name == window_partitioning.name())

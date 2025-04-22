@@ -116,6 +116,12 @@ namespace ml
 				mlTensor_t dw);
 
 		/*
+		 * average pooling
+		 */
+		DLL_PUBLIC void cuda_average_pooling_forward(mlContext_t context, float alpha, const mlTensor_t x, float beta, mlTensor_t y, int size);
+		DLL_PUBLIC void cuda_average_pooling_backward(mlContext_t context, float alpha, const mlTensor_t dy, float beta, mlTensor_t dx, int size);
+
+		/*
 		 * global pooling
 		 */
 		DLL_PUBLIC void cuda_global_average_pooling_forward(mlContext_t context, float alpha, const mlTensor_t x, float beta, mlTensor_t y);
@@ -123,6 +129,16 @@ namespace ml
 		DLL_PUBLIC void cuda_channel_scaling_forward(mlContext_t context, float alpha, const mlTensor_t x, const mlTensor_t scales, float beta,
 				mlTensor_t y);
 		DLL_PUBLIC void cuda_channel_scaling_backward(mlContext_t context, float alpha, const mlTensor_t dy, const mlTensor_t x,
+				const mlTensor_t scales, float beta_dx, mlTensor_t dx, float beta_scales, mlTensor_t dscales);
+
+		/*
+		 *
+		 */
+		DLL_PUBLIC void cuda_channel_average_pooling_forward(mlContext_t context, float alpha, const mlTensor_t x, float beta, mlTensor_t y);
+		DLL_PUBLIC void cuda_channel_average_pooling_backward(mlContext_t context, float alpha, const mlTensor_t dy, float beta, mlTensor_t dx);
+		DLL_PUBLIC void cuda_spatial_scaling_forward(mlContext_t context, float alpha, const mlTensor_t x, const mlTensor_t scales, float beta,
+				mlTensor_t y);
+		DLL_PUBLIC void cuda_spatial_scaling_backward(mlContext_t context, float alpha, const mlTensor_t dy, const mlTensor_t x,
 				const mlTensor_t scales, float beta_dx, mlTensor_t dx, float beta_scales, mlTensor_t dscales);
 
 		/*

@@ -74,6 +74,10 @@ namespace ml
 		void cpu_convolution_implicit_gemm_forward(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, mlShape_t weights_shape,
 				const void *input, const void *weights, void *output, const void *bias, const void *add, mlActivationType_t act);
 
+		void cpu_fused_conv_block_forward(mlContext_t context, const mlTensor_t input, const mlTensor_t dwconv_weights, const mlTensor_t dwconv_bias,
+				const mlTensor_t first_conv_weights, const mlTensor_t first_conv_bias, const mlTensor_t second_conv_weights,
+				const mlTensor_t second_conv_bias, mlTensor_t output);
+
 		// depthwise convolution
 		void cpu_depthwise_conv_forward(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, mlShape_t weights_shape, const void *input,
 				const void *weights, const void *bias, void *output);
@@ -106,7 +110,8 @@ namespace ml
 		void cpu_batchnorm_backward(mlContext_t context, mlShape_t shape, const void *input, const void *output, void *gradient_prev,
 				void *gradient_next, const void *weights, void *weights_update, const void *running_stats, mlActivationType_t act);
 		void cpu_batchnorm_update(mlContext_t context, mlShape_t shape, const void *running_stat, void *weights);
-		void cpu_fold_batchnorm(mlContext_t context, mlShape_t shape, void *layer_weights, void *layer_bias, const void *batchnorm_weights, bool use_gamma, bool use_beta);
+		void cpu_fold_batchnorm(mlContext_t context, mlTensor_t layer_weights, mlTensor_t layer_bias, const mlTensor_t bn_weights,
+				const mlTensor_t bn_bias, const mlTensor_t bn_avg_var);
 
 		/*
 		 * layernorm
@@ -145,21 +150,11 @@ namespace ml
 		void cpu_fused_bias_and_activation_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, void *gradient_next,
 				const void *output, void *bias_gradient, mlActivationType_t act, float beta_prev, float beta_bias);
 
-		// implemented in 'global_pooling.cu'
-		void cpu_global_avg_and_max_pooling_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input);
-		void cpu_global_avg_and_max_pooling_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next,
-				const void *input, const void *output);
-		void cpu_global_broadcasting_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input,
-				const void *bias, mlActivationType_t act);
-		void cpu_global_broadcasting_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, void *gradient_next, const void *output,
-				mlActivationType_t act);
-
-		void cpu_global_average_pooling_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input);
-		void cpu_global_average_pooling_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next);
-		void cpu_channel_scaling_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input,
-				const void *scales);
-		void cpu_channel_scaling_backward(mlContext_t context, mlShape_t shape, void *gradient_prev_0, void *gradient_prev_1,
-				const void *gradient_next, const void *input_0, const void *input_1);
+		void cpu_global_average_pooling_forward(mlContext_t context, float alpha, const mlTensor_t x, float beta, mlTensor_t y);
+		void cpu_global_average_pooling_backward(mlContext_t context, float alpha, const mlTensor_t dy, float beta, mlTensor_t dx);
+		void cpu_channel_scaling_forward(mlContext_t context, float alpha, const mlTensor_t x, const mlTensor_t scales, float beta, mlTensor_t y);
+		void cpu_channel_scaling_backward(mlContext_t context, float alpha, const mlTensor_t dy, const mlTensor_t x, const mlTensor_t scales,
+				float beta_dx, mlTensor_t dx, float beta_scales, mlTensor_t dscales);
 
 		// used for training
 		void cpu_emulate_low_precision(mlContext_t context, mlShape_t shape, mlDataType_t dtype, void *dst, const void *src, mlQuantizationData_t qd);

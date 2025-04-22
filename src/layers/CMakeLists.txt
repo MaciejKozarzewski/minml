@@ -1,5 +1,7 @@
 target_sources(${LibName} PRIVATE 	Add.cpp
+								AveragePooling.cpp
 								BatchNormalization.cpp
+								ChannelAveragePooling.cpp
 								ChannelScaling.cpp
 								Conv2D.cpp
 								Dense.cpp
@@ -19,6 +21,7 @@ target_sources(${LibName} PRIVATE 	Add.cpp
 								RMSNormalization.cpp
 								Softmax.cpp
 								SpaceToDepth.cpp
+								SpatialScaling.cpp
 								SqueezeAndExcitation.cpp
 								WindowMerging.cpp
 								WindowPartitioning.cpp)

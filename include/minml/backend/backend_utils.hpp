@@ -219,6 +219,19 @@ namespace ml
 		return make_tensor(data, dtype, make_shape(dims));
 	}
 
+	[[maybe_unused]] static int offset_at(const mlTensor_t &t, std::initializer_list<int> idx) noexcept
+	{
+		assert(idx.size() == static_cast<size_t>(t.rank));
+		int stride = 1;
+		int result = 0;
+		for (int i = t.rank - 1; i >= 0; i--)
+		{
+			result += idx.begin()[i] * stride;
+			stride *= t.dim[i];
+		}
+		return result;
+	}
+
 } /* namespace ml */
 
 #endif /* MINML_BACKEND_BACKEND_UTILS_HPP_ */

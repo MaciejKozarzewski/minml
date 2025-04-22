@@ -94,8 +94,9 @@ namespace
 			}
 		}
 	}
+
 	template<typename T, int N>
-	__global__ void kernel_channel_scaling_forward(float beta, T *output, float alpha, const T *input, const T *scale, int batch_size, int hw,
+	__global__ void kernel_channel_scaling_forward(float beta, T *output, float alpha, const T *input, const T *scales, int batch_size, int hw,
 			int channels)
 	{
 		assert(channels % N == 0);
@@ -107,12 +108,12 @@ namespace
 
 		if (dim2_index < channels)
 		{
-			const vec<T, N> _scale(scale + scale_indexer.at(dim0_index, dim2_index));
+			const vec<T, N> scale(scales + scale_indexer.at(dim0_index, dim2_index));
 			for (int i = dim1_index; i < hw; i += gridDim.y * blockDim.y)
 			{
 				const int idx = tensor_indexer.at(dim0_index, i, dim2_index);
 				const vec<T, N> x(input + idx);
-				vec<T, N> y = x * _scale * vec<T, N>(alpha);
+				vec<T, N> y = x * scale * vec<T, N>(alpha);
 				if (beta != 0.0f)
 					y += vec<T, N>(output + idx) * vec<T, N>(beta);
 				y.store(output + idx);
@@ -169,6 +170,98 @@ namespace
 			dscales.store(gradient_scales + tmp);
 		}
 	}
+
+	template<typename T, int N>
+	__global__ void kernel_channel_average_pooling_forward(float beta, T *output, float alpha, const T *input, int first_dim, int last_dim)
+	{
+		assert(last_dim % N == 0);
+		for (int i = blockIdx.y * blockDim.y + threadIdx.y; i < first_dim; i += blockDim.y * gridDim.y)
+		{
+			vec<T, N> local_sum(0.0f);
+			for (int j = N * threadIdx.x; j < last_dim; j += N * blockDim.x)
+				local_sum += vec<T, N>(input + i * last_dim + j);
+
+			float avg = horizontal_add(local_sum);
+			for (int k = 16; k >= 1; k /= 2)
+				avg += __shfl_xor_sync(0xffffffff, avg, k);
+			if (threadIdx.x == 0)
+			{
+				avg *= alpha / last_dim;
+				if (beta != 0.0f)
+					avg += beta * static_cast<float>(output[i]);
+				output[i] = avg;
+			}
+		}
+	}
+	template<typename T, int N>
+	__global__ void kernel_channel_average_pooling_backward(float beta, T *gradient_prev, float alpha, const T *gradient_next, int first_dim,
+			int last_dim)
+	{
+		assert(last_dim % N == 0);
+		for (int i = blockIdx.y * blockDim.y + threadIdx.y; i < first_dim; i += blockDim.y * gridDim.y)
+		{
+			const float gradient_avg = static_cast<float>(gradient_next[i]) * alpha / last_dim;
+			for (int j = N * threadIdx.x; j < last_dim; j += N * blockDim.x)
+			{
+				vec<T, N> tmp(gradient_avg);
+				if (beta != 0.0f)
+					tmp += vec<T, N>(gradient_prev + i * last_dim + j) * vec<T, N>(beta);
+				tmp.store(gradient_prev + i * last_dim + j);
+			}
+		}
+	}
+
+	template<typename T, int N>
+	__global__ void kernel_spatial_scaling_forward(float beta, T *output, float alpha, const T *input, const T *scales, int first_dim, int last_dim)
+	{
+		assert(last_dim % N == 0);
+		for (int i = blockIdx.y * blockDim.y + threadIdx.y; i < first_dim; i += blockDim.y * gridDim.y)
+		{
+			const vec<T, N> scale(static_cast<float>(scales[i]) * alpha);
+			for (int j = N * threadIdx.x; j < last_dim; j += N * blockDim.x)
+			{
+				const vec<T, N> x(input + i * last_dim + j);
+				vec<T, N> y = x * scale;
+				if (beta != 0.0f)
+					y += vec<T, N>(output + i * last_dim + j) * vec<T, N>(beta);
+				y.store(output + i * last_dim + j);
+			}
+		}
+	}
+	template<typename T, int N>
+	__global__ void kernel_spatial_scaling_backward(float beta1, T *gradient_input, float beta2, T *gradient_scales, float alpha,
+			const T *gradient_next, const T *input, const T *scales, int first_dim, int last_dim)
+	{
+		assert(last_dim % N == 0);
+		for (int i = blockIdx.y * blockDim.y + threadIdx.y; i < first_dim; i += blockDim.y * gridDim.y)
+		{
+			vec<T, N> scale_gradient(0.0f);
+			const vec<T, N> scale(static_cast<float>(scales[i]) * alpha);
+			for (int j = N * threadIdx.x; j < last_dim; j += N * blockDim.x)
+			{
+				const vec<T, N> dy(gradient_next + i * last_dim + j);
+
+				scale_gradient += dy * vec<T, N>(input + i * last_dim + j);
+
+				vec<T, N> dx = dy * scale;
+				if (beta1 != 0.0f)
+					dx += vec<T, N>(gradient_input + i * last_dim + j) * vec<T, N>(beta1);
+				dx.store(gradient_input + i * last_dim + j);
+			}
+
+			float dscale = horizontal_add(scale_gradient);
+			for (int k = 16; k >= 1; k /= 2)
+				dscale += __shfl_xor_sync(0xffffffff, dscale, k);
+			if (threadIdx.x == 0)
+			{
+				dscale *= alpha;
+				if (beta2 != 0.0f)
+					dscale += beta2 * static_cast<float>(gradient_scales[i]);
+				gradient_scales[i] = dscale;
+			}
+		}
+	}
+
 }
 
 namespace ml
@@ -344,6 +437,178 @@ namespace ml
 			case DTYPE_FLOAT64:
 				kernel_channel_scaling_backward<double, 1> <<<gridDim_x1, blockDim, 0, stream >>>(beta_dx, data<double>(dx), beta_scales,
 						data<double>(dscales), alpha, data<double>(dy), data<double>(x), data<double>(scales), batch_size, hw, channels);
+				break;
+		}
+		assert(cudaGetLastError() == cudaSuccess);
+	}
+
+	void cuda_channel_average_pooling_forward(mlContext_t context, float alpha, const mlTensor_t x, float beta, mlTensor_t y)
+	{
+		assert(x.rank == 4);
+		assert(y.rank == 2);
+		const int first_dim = volume_without_last_dim(x);
+		const int last_dim = get_last_dim(x);
+		assert(y.dim[0] == x.dim[0]);
+		assert(y.dim[1] == x.dim[1] * x.dim[2]);
+
+		cudaStream_t stream = cuda::Context::getStream(context);
+
+		dim3 blockDim(32, 8);
+		dim3 gridDim(1, std::min(2048, (first_dim + 7) / 8));
+		switch (x.dtype)
+		{
+			case DTYPE_FLOAT16:
+			{
+				if (last_dim % 4 == 0)
+					kernel_channel_average_pooling_forward<half, 4> <<<gridDim, blockDim, 0, stream >>>(beta, data<half>(y), alpha, data<half>(x),
+							first_dim, last_dim);
+				else
+					kernel_channel_average_pooling_forward<half, 1> <<<gridDim, blockDim, 0, stream >>>(beta, data<half>(y), alpha, data<half>(x),
+							first_dim, last_dim);
+				break;
+			}
+			case DTYPE_FLOAT32:
+			{
+				if (last_dim % 4 == 0)
+					kernel_channel_average_pooling_forward<float, 4> <<<gridDim, blockDim, 0, stream >>>(beta, data<float>(y), alpha, data<float>(x),
+							first_dim, last_dim);
+				else
+					kernel_channel_average_pooling_forward<float, 1> <<<gridDim, blockDim, 0, stream >>>(beta, data<float>(y), alpha, data<float>(x),
+							first_dim, last_dim);
+				break;
+			}
+			case DTYPE_FLOAT64:
+			{
+				kernel_channel_average_pooling_forward<double, 1> <<<gridDim, blockDim, 0, stream >>>(beta, data<double>(y), alpha, data<double>(x),
+						first_dim, last_dim);
+				break;
+			}
+		}
+		assert(cudaGetLastError() == cudaSuccess);
+	}
+	void cuda_channel_average_pooling_backward(mlContext_t context, float alpha, const mlTensor_t dy, float beta, mlTensor_t dx)
+	{
+		assert(dx.rank == 4);
+		assert(dy.rank == 2);
+		const int first_dim = volume_without_last_dim(dx);
+		const int last_dim = get_last_dim(dx);
+		assert(dy.dim[0] == dx.dim[0]);
+		assert(dy.dim[1] == dx.dim[1] * dx.dim[2]);
+
+		cudaStream_t stream = cuda::Context::getStream(context);
+
+		dim3 blockDim(32, 8);
+		dim3 gridDim(1, std::min(2048, (first_dim + 7) / 8));
+		switch (dx.dtype)
+		{
+			case DTYPE_FLOAT16:
+			{
+				if (last_dim % 4 == 0)
+					kernel_channel_average_pooling_backward<half, 4> <<<gridDim,blockDim, 0, stream >>>(beta, data<half>(dx), alpha, data<half>(dy),
+							first_dim, last_dim);
+				else
+					kernel_channel_average_pooling_backward<half, 1> <<<gridDim, blockDim, 0, stream >>>(beta, data<half>(dx), alpha, data<half>(dy),
+							first_dim, last_dim);
+				break;
+			}
+			case DTYPE_FLOAT32:
+			{
+				if (last_dim % 4 == 0)
+					kernel_channel_average_pooling_backward<float, 4> <<<gridDim, blockDim, 0, stream >>>(beta, data<float>(dx), alpha,
+							data<float>(dy), first_dim, last_dim);
+				else
+					kernel_channel_average_pooling_backward<float, 1> <<<gridDim, blockDim, 0, stream >>>(beta, data<float>(dx), alpha,
+							data<float>(dy), first_dim, last_dim);
+				break;
+			}
+			case DTYPE_FLOAT64:
+			{
+				kernel_channel_average_pooling_backward<double, 1> <<<gridDim, blockDim, 0, stream >>>(beta, data<double>(dx), alpha,
+						data<double>(dy), first_dim, last_dim);
+				break;
+			}
+		}
+		assert(cudaGetLastError() == cudaSuccess);
+	}
+	void cuda_spatial_scaling_forward(mlContext_t context, float alpha, const mlTensor_t x, const mlTensor_t scales, float beta, mlTensor_t y)
+	{
+		assert(x.rank == 4);
+		assert(y.rank == 4);
+		assert(scales.rank == 2);
+		const int first_dim = volume_without_last_dim(x);
+		const int last_dim = get_last_dim(x);
+		assert(scales.dim[0] == x.dim[0]);
+		assert(scales.dim[1] == x.dim[1] * x.dim[2]);
+
+		cudaStream_t stream = cuda::Context::getStream(context);
+
+		dim3 blockDim(32, 8);
+		dim3 gridDim(1, std::min(2048, (first_dim + 7) / 8));
+		switch (x.dtype)
+		{
+			case DTYPE_FLOAT16:
+			{
+				if (last_dim % 4 == 0)
+					kernel_spatial_scaling_forward<half, 4> <<<gridDim, blockDim, 0, stream >>>(beta, data<half>(y), alpha, data<half>(x),
+							data<half>(scales), first_dim, last_dim);
+				else
+					kernel_spatial_scaling_forward<half, 1> <<<gridDim, blockDim, 0, stream >>>(beta, data<half>(y), alpha, data<half>(x),
+							data<half>(scales), first_dim, last_dim);
+				break;
+			}
+			case DTYPE_FLOAT32:
+			{
+				if (last_dim % 4 == 0)
+					kernel_spatial_scaling_forward<float, 4> <<<gridDim, blockDim, 0, stream >>>(beta, data<float>(y), alpha, data<float>(x),
+							data<float>(scales), first_dim, last_dim);
+				else
+					kernel_spatial_scaling_forward<float, 1> <<<gridDim, blockDim, 0, stream >>>(beta, data<float>(y), alpha, data<float>(x),
+							data<float>(scales), first_dim, last_dim);
+				break;
+			}
+			case DTYPE_FLOAT64:
+				kernel_spatial_scaling_forward<double, 1> <<<gridDim, blockDim, 0, stream >>>(beta, data<double>(y), alpha, data<double>(x),
+						data<double>(scales), first_dim, last_dim);
+				break;
+		}
+		assert(cudaGetLastError() == cudaSuccess);
+	}
+	void cuda_spatial_scaling_backward(mlContext_t context, float alpha, const mlTensor_t dy, const mlTensor_t x, const mlTensor_t scales,
+			float beta_dx, mlTensor_t dx, float beta_scales, mlTensor_t dscales)
+	{
+		assert(dx.rank == 4);
+		assert(dy.rank == 4);
+		assert(dscales.rank == 2);
+		const int first_dim = volume_without_last_dim(x);
+		const int last_dim = get_last_dim(x);
+		assert(dscales.dim[0] == dx.dim[0]);
+		assert(dscales.dim[1] == dx.dim[1] * dx.dim[2]);
+
+		cudaStream_t stream = cuda::Context::getStream(context);
+
+		dim3 blockDim(32, 8);
+		dim3 gridDim(1, std::min(2048, (first_dim + 7) / 8));
+		switch (x.dtype)
+		{
+			case DTYPE_FLOAT16:
+				if (last_dim % 4 == 0)
+					kernel_spatial_scaling_backward<half, 4> <<<gridDim, blockDim, 0, stream >>>(beta_dx, data<half>(dx), beta_scales,
+							data<half>(dscales), alpha, data<half>(dy), data<half>(x), data<half>(scales), first_dim, last_dim);
+				else
+					kernel_spatial_scaling_backward<half, 1> <<<gridDim, blockDim, 0, stream >>>(beta_dx, data<half>(dx), beta_scales,
+							data<half>(dscales), alpha, data<half>(dy), data<half>(x), data<half>(scales), first_dim, last_dim);
+				break;
+			case DTYPE_FLOAT32:
+				if (last_dim % 4 == 0)
+					kernel_spatial_scaling_backward<float, 4> <<<gridDim, blockDim, 0, stream >>>(beta_dx, data<float>(dx), beta_scales,
+							data<float>(dscales), alpha, data<float>(dy), data<float>(x), data<float>(scales), first_dim, last_dim);
+				else
+					kernel_spatial_scaling_backward<float, 1> <<<gridDim, blockDim, 0, stream >>>(beta_dx, data<float>(dx), beta_scales,
+							data<float>(dscales), alpha, data<float>(dy), data<float>(x), data<float>(scales), first_dim, last_dim);
+				break;
+			case DTYPE_FLOAT64:
+				kernel_spatial_scaling_backward<double, 1> <<<gridDim, blockDim, 0, stream >>>(beta_dx, data<double>(dx), beta_scales,
+						data<double>(dscales), alpha, data<double>(dy), data<double>(x), data<double>(scales), first_dim, last_dim);
 				break;
 		}
 		assert(cudaGetLastError() == cudaSuccess);

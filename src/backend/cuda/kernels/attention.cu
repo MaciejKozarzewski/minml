@@ -196,13 +196,13 @@ namespace
 				input[idx + j] = shared_input[j];
 		}
 	}
-	template<bool UseBias>
-	__global__ void kernel_softmax_backward_in_place(const float *output, float *gradient, float *weights_update, int batch_size, int num_heads,
-			int height, int width, int weights_size, float *mask_update)
+	template<typename T, bool UseBias>
+	__global__ void kernel_softmax_backward_in_place(const T *output, T *gradient, T *weights_update, int batch_size, int num_heads, int height,
+			int width, int weights_size, float *mask_update)
 	{
 		__shared__ cg::block_tile_memory<128> btm;
 		cg::thread_block thb = cg::this_thread_block(btm);
-		cg::thread_block_tile<128> tile = cg::tiled_partition<128>(thb);
+		cg::thread_block_tile < 128 > tile = cg::tiled_partition < 128 > (thb);
 
 		extern __shared__ char shared_array[];
 
@@ -277,7 +277,8 @@ namespace
 				weights_update[update_indexer.at(batch_idx, head_idx, i)] = shared_weight_update[i];
 		}
 	}
-	__global__ void kernel_weights_update_reduction(const float *workspace, float *update, int batch_size, int num_heads, int last_dim)
+	template<typename T>
+	__global__ void kernel_weights_update_reduction(const float *workspace, T *update, int batch_size, int num_heads, int last_dim)
 	{
 		assert(blockDim.x == 32);
 		assert(blockDim.y == 32);
@@ -644,7 +645,7 @@ namespace ml
 		if (weights != nullptr)
 		{
 			const int shared_mem = sizeof(float) * (2 * tokens + weights_shape.dim[1] * weights_shape.dim[2] + 4) + sizeof(Index2D) * tokens;
-			kernel_softmax_backward_in_place<true> <<<gridDim, blockDim, shared_mem, stream>>>(getPointer<float>(qk_tensor_ptr),
+			kernel_softmax_backward_in_place<float, true> <<<gridDim, blockDim, shared_mem, stream>>>(getPointer<float>(qk_tensor_ptr),
 					getPointer<float>(backward_workspace), getPointer<float>(update_workspace), batch_size, num_heads, height, width,
 					weights_shape.dim[1], getPointer<float>(mask_update));
 			assert(cudaGetLastError() == cudaSuccess);
@@ -659,7 +660,7 @@ namespace ml
 		else
 		{ // not using bias
 			const int shared_mem = sizeof(float) * (2 * tokens + 4);
-			kernel_softmax_backward_in_place<false> <<<gridDim, blockDim, shared_mem, stream>>>(getPointer<float>(qk_tensor_ptr),
+			kernel_softmax_backward_in_place<float, false> <<<gridDim, blockDim, shared_mem, stream>>>(getPointer<float>(qk_tensor_ptr),
 					getPointer<float>(backward_workspace), nullptr, batch_size, num_heads, height, width, 0, getPointer<float>(mask_update));
 			assert(cudaGetLastError() == cudaSuccess);
 		}
