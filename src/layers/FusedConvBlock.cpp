@@ -105,95 +105,98 @@ namespace ml
 		assert(input.size() == 1);
 		if (device().isCPU())
 		{
-			const int batch = input[0].dim(0);
-			const int height = input[0].dim(1);
-			const int width = input[0].dim(2);
-			const int filters = input[0].dim(3);
+			fusedConvBlockForward(context(), input[0], m_depthwise_conv_weights, m_depthwise_conv_bias, m_conv_1_weights, m_conv_1_bias,
+					m_conv_2_weights, m_conv_2_bias, output);
 
-			const int kernel_height = m_depthwise_conv_weights.dim(0);
-			const int kernel_width = m_depthwise_conv_weights.dim(1);
-
-			const int pad_h = -(kernel_height - 1) / 2;
-			const int pad_w = -(kernel_width - 1) / 2;
-
-			output.zeroall();
-			for (int b = 0; b < batch; b++)
-				for (int f = 0; f < filters; f++)
-					for (int h = 0; h < height; h++)
-						for (int w = 0; w < width; w++)
-						{
-							float acc = m_depthwise_conv_bias.isEmpty() ? 0.0f : m_depthwise_conv_bias.get( { f });
-							for (int i = 0; i < kernel_height; i++)
-								for (int j = 0; j < kernel_width; j++)
-								{
-									const int x = pad_h + h + i;
-									const int y = pad_w + w + j;
-									if (0 <= x and x < height and 0 <= y and y < width)
-										acc += m_depthwise_conv_weights.get( { i, j, f }) * input[0].get( { b, x, y, f });
-								}
-							output.at( { b, h, w, f }) = acc;
-						}
-
-			Tensor tmp = m_workspace.lock()->view(output.shape());
-			for (int b = 0; b < batch; b++)
-				for (int h = 0; h < height; h++)
-					for (int w = 0; w < width; w++)
-						for (int out = 0; out < filters; out++)
-						{
-//							float acc = m_conv_1_bias.isEmpty() ? 0.0f : m_conv_1_bias.get( { out });
+//			const int batch = input[0].dim(0);
+//			const int height = input[0].dim(1);
+//			const int width = input[0].dim(2);
+//			const int filters = input[0].dim(3);
+//
+//			const int kernel_height = m_depthwise_conv_weights.dim(0);
+//			const int kernel_width = m_depthwise_conv_weights.dim(1);
+//
+//			const int pad_h = -(kernel_height - 1) / 2;
+//			const int pad_w = -(kernel_width - 1) / 2;
+//
+//			output.zeroall();
+//			for (int b = 0; b < batch; b++)
+//				for (int f = 0; f < filters; f++)
+//					for (int h = 0; h < height; h++)
+//						for (int w = 0; w < width; w++)
+//						{
+//							float acc = m_depthwise_conv_bias.isEmpty() ? 0.0f : m_depthwise_conv_bias.get( { f });
+//							for (int i = 0; i < kernel_height; i++)
+//								for (int j = 0; j < kernel_width; j++)
+//								{
+//									const int x = pad_h + h + i;
+//									const int y = pad_w + w + j;
+//									if (0 <= x and x < height and 0 <= y and y < width)
+//										acc += m_depthwise_conv_weights.get( { i, j, f }) * input[0].get( { b, x, y, f });
+//								}
+//							output.at( { b, h, w, f }) = acc;
+//						}
+//
+//			Tensor tmp = m_workspace.lock()->view(output.shape());
+//			for (int b = 0; b < batch; b++)
+//				for (int h = 0; h < height; h++)
+//					for (int w = 0; w < width; w++)
+//						for (int out = 0; out < filters; out++)
+//						{
+////							float acc = m_conv_1_bias.isEmpty() ? 0.0f : m_conv_1_bias.get( { out });
+////							for (int in = 0; in < filters; in++)
+////								acc += m_conv_1_weights.get( { out, 0, 0, in }) * output.get( { b, h, w, in });
+////							tmp.at( { b, h, w, out }) = std::max(0.0f, acc);
+//
+//							float max_w = 0.0f, max_o = 0.0f;
 //							for (int in = 0; in < filters; in++)
-//								acc += m_conv_1_weights.get( { out, 0, 0, in }) * output.get( { b, h, w, in });
-//							tmp.at( { b, h, w, out }) = std::max(0.0f, acc);
-
-							float max_w = 0.0f, max_o = 0.0f;
-							for (int in = 0; in < filters; in++)
-							{
-								max_w = std::max(max_w, std::abs(m_conv_1_weights.get( { out, 0, 0, in })));
-								max_o = std::max(max_o, std::abs(output.get( { b, h, w, in })));
-							}
-
-							const float scale_w = 2047.0f;
-							const float scale_o = 2047.0f;
-							int32_t acc = 0;
-							for (int in = 0; in < filters; in++)
-							{
-								const int32_t qw = scale_w / max_w * m_conv_1_weights.get( { out, 0, 0, in });
-								const int32_t qo = scale_o / max_o * output.get( { b, h, w, in });
-								acc += qw * qo;
-							}
-							const float bias = m_conv_1_bias.isEmpty() ? 0.0f : m_conv_1_bias.get( { out });
-							tmp.at( { b, h, w, out }) = std::max(0.0f, bias + acc * max_w * max_o / (scale_w * scale_o));
-						}
-
-			for (int b = 0; b < batch; b++)
-				for (int h = 0; h < height; h++)
-					for (int w = 0; w < width; w++)
-						for (int out = 0; out < filters; out++)
-						{
-//							float acc = m_conv_2_bias.isEmpty() ? 0.0f : m_conv_2_bias.get( { out });
+//							{
+//								max_w = std::max(max_w, std::abs(m_conv_1_weights.get( { out, 0, 0, in })));
+//								max_o = std::max(max_o, std::abs(output.get( { b, h, w, in })));
+//							}
+//
+//							const float scale_w = 2047.0f;
+//							const float scale_o = 2047.0f;
+//							int32_t acc = 0;
 //							for (int in = 0; in < filters; in++)
-//								acc += m_conv_2_weights.get( { out, 0, 0, in }) * tmp.get( { b, h, w, in });
-//							output.at( { b, h, w, out }) = acc + input[0].get( { b, h, w, out });
-
-							float max_w = 0.0f, max_o = 0.0f;
-							for (int in = 0; in < filters; in++)
-							{
-								max_w = std::max(max_w, std::abs(m_conv_2_weights.get( { out, 0, 0, in })));
-								max_o = std::max(max_o, std::abs(tmp.get( { b, h, w, in })));
-							}
-
-							const float scale_w = 2047.0f;
-							const float scale_o = 2047.0f;
-							int32_t acc = 0;
-							for (int in = 0; in < filters; in++)
-							{
-								const int32_t qw = scale_w / max_w * m_conv_2_weights.get( { out, 0, 0, in });
-								const int32_t qo = scale_o / max_o * tmp.get( { b, h, w, in });
-								acc += qw * qo;
-							}
-							const float bias = m_conv_2_bias.isEmpty() ? 0.0f : m_conv_2_bias.get( { out });
-							output.at( { b, h, w, out }) = bias + acc * max_w * max_o / (scale_w * scale_o) + input[0].get( { b, h, w, out });
-						}
+//							{
+//								const int32_t qw = scale_w / max_w * m_conv_1_weights.get( { out, 0, 0, in });
+//								const int32_t qo = scale_o / max_o * output.get( { b, h, w, in });
+//								acc += qw * qo;
+//							}
+//							const float bias = m_conv_1_bias.isEmpty() ? 0.0f : m_conv_1_bias.get( { out });
+//							tmp.at( { b, h, w, out }) = std::max(0.0f, bias + acc * max_w * max_o / (scale_w * scale_o));
+//						}
+//
+//			for (int b = 0; b < batch; b++)
+//				for (int h = 0; h < height; h++)
+//					for (int w = 0; w < width; w++)
+//						for (int out = 0; out < filters; out++)
+//						{
+////							float acc = m_conv_2_bias.isEmpty() ? 0.0f : m_conv_2_bias.get( { out });
+////							for (int in = 0; in < filters; in++)
+////								acc += m_conv_2_weights.get( { out, 0, 0, in }) * tmp.get( { b, h, w, in });
+////							output.at( { b, h, w, out }) = acc + input[0].get( { b, h, w, out });
+//
+//							float max_w = 0.0f, max_o = 0.0f;
+//							for (int in = 0; in < filters; in++)
+//							{
+//								max_w = std::max(max_w, std::abs(m_conv_2_weights.get( { out, 0, 0, in })));
+//								max_o = std::max(max_o, std::abs(tmp.get( { b, h, w, in })));
+//							}
+//
+//							const float scale_w = 2047.0f;
+//							const float scale_o = 2047.0f;
+//							int32_t acc = 0;
+//							for (int in = 0; in < filters; in++)
+//							{
+//								const int32_t qw = scale_w / max_w * m_conv_2_weights.get( { out, 0, 0, in });
+//								const int32_t qo = scale_o / max_o * tmp.get( { b, h, w, in });
+//								acc += qw * qo;
+//							}
+//							const float bias = m_conv_2_bias.isEmpty() ? 0.0f : m_conv_2_bias.get( { out });
+//							output.at( { b, h, w, out }) = bias + acc * max_w * max_o / (scale_w * scale_o) + input[0].get( { b, h, w, out });
+//						}
 		}
 		if (device().isCUDA())
 		{

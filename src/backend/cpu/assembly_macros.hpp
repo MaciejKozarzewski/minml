@@ -443,6 +443,7 @@
 #define comisd(_0, _1) INSTR_(comisd, _0, _1)
 
 #define vandps(_0, _1, _2) INSTR_(vandps, _0, _1, _2)
+#define vorps(_0, _1, _2) INSTR_(vorps, _0, _1, _2)
 
 #define vaddsubps(_0, _1, _2) INSTR_(vaddsubps, _0, _1, _2)
 #define vaddsubpd(_0, _1, _2) INSTR_(vaddsubpd, _0, _1, _2)

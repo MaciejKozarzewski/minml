@@ -1,8 +1,8 @@
-
 add_library(gemm_backend OBJECT avx_kernels.cpp
 								avx2_kernels.cpp
 								avx512f_kernels.cpp
 								def_kernels.cpp
+								fused_conv_block_runtime.cpp
 								gemm_runtime.cpp
 								gemm.cpp
 								mha_runtime.cpp

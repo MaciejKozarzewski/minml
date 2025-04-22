@@ -103,7 +103,6 @@ namespace ml
 
 			bool is_partial() const noexcept
 			{
-				assert(columns() <= stride());
 				return columns() < stride();
 			}
 			bool is_fp16() const noexcept
@@ -121,6 +120,10 @@ namespace ml
 			uint64_t stride_in_bytes() const noexcept
 			{
 				return stride() * size_of(dtype());
+			}
+			bool has_shape(int rows, int columns) const noexcept
+			{
+				return size() == Size2D(rows, columns);
 			}
 
 			void set_size(Size2D size, int stride) noexcept

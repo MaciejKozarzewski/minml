@@ -836,6 +836,7 @@ namespace ml
 		PERMUTE_6x8xFP32(ymm4, ymm5, ymm6, ymm7, ymm8, ymm9)
 		PERMUTE_6x8xFP32(ymm10, ymm11, ymm12, ymm13, ymm14, ymm15)
 
+		// now perform scaling by alpha
 		movq(var(alpha_ptr), rax)// load address of alpha
 		movq(var(scalar_alpha), r14)
 		test(r14, r14)
@@ -848,6 +849,7 @@ namespace ml
 		SCALE_ACCUMULATORS_12x1()
 		label(AFTER_ALPHA_SCALING)
 
+		// now perform bias addition
 		// load address of bias pointer
 		movq(var(bias_ptr), rax)
 		test(rax, rax)
@@ -2470,7 +2472,7 @@ namespace ml
 	}
 
 	// batched depthwise convolution kernel
-	void depthwise_conv_avx2_12x8(Fragment &C, const Fragment &alpha, const Fragment &A, const Fragment &B) noexcept
+	void depthwise_conv_avx2_12x8(Fragment &C, const Fragment &A, const Fragment &B, const Fragment &bias, bool transpose_store) noexcept
 	{
 		assert(A.is_fp32());
 		assert(B.is_fp32());
@@ -2481,22 +2483,22 @@ namespace ml
 		assert(C.rows() == A.columns());
 		assert(C.columns() == B.columns());
 
-		assert(alpha.is_packed());
-		assert(alpha.is_fp32());
+		assert(bias.is_packed());
+		assert(bias.is_fp32());
 		assert(cpu::is_aligned(A.data(), 32));
 		assert(cpu::is_aligned(B.data(), 32));
 
 		const void *A_ptr = A.data();
 		const void *B_ptr = B.data();
 		void *C_ptr = C.data();
-		const void *alpha_ptr = alpha.data();
+		const void *bias_ptr = bias.data();
 
 		const int K = A.rows();
 		uint64_t k_iter = K / 4;
 		uint64_t k_left = K % 4;
 		const uint64_t C_stride = C.stride_in_bytes();
 		const uint64_t c_in_fp16 = C.is_fp16();
-		const uint64_t scalar_alpha = alpha.columns() == 1;
+		const uint64_t transpose = transpose_store;
 
 		begin_asm()
 		movq(var(A_ptr), rax)
@@ -2532,18 +2534,38 @@ namespace ml
 
 		label(EPILOGUE)
 
-		movq(var(alpha_ptr), rax)// load address of alpha
-		movq(var(scalar_alpha), r14)
+		movq(var(bias_ptr), rax)// load address of bias pointer
+		vmovaps(mem(rax), ymm2)// load bias value
+		ADD_BIAS_12x8xFP32(ymm2)
+
+		movq(var(transpose), r14)
 		test(r14, r14)
-		je(COLUMN_ALPHA)
-		vbroadcastss(mem(rax), ymm0)// scalar alpha
-		jmp(AFTER_ALPHA_LOADING)
+		je(STORE_NORMAL)
 
-		label(COLUMN_ALPHA)
-		vmovups(mem(rax), ymm0)
-		label(AFTER_ALPHA_LOADING)
-		SCALE_ACCUMULATORS_1xN(ymm0)
+		// transpose and store into packed fragment of D
+		movq(var(C_ptr), rcx)// temp pointer is in rcx
+		AVX_4x8_TRANSPOSE()
+		vmovups(xmm4, mem(rcx, (0*12+0)*4))
+		vmovups(xmm5, mem(rcx, (1*12+0)*4))
+		vmovups(xmm6, mem(rcx, (2*12+0)*4))
+		vmovups(xmm7, mem(rcx, (3*12+0)*4))
+		vmovups(xmm0, mem(rcx, (4*12+0)*4))
+		vmovups(xmm1, mem(rcx, (5*12+0)*4))
+		vmovups(xmm2, mem(rcx, (6*12+0)*4))
+		vmovups(xmm3, mem(rcx, (7*12+0)*4))
 
+		AVX_8x8_TRANSPOSE_INV()
+		vmovups(ymm0, mem(rcx, (0*12+4)*4))
+		vmovups(ymm1, mem(rcx, (1*12+4)*4))
+		vmovups(ymm2, mem(rcx, (2*12+4)*4))
+		vmovups(ymm3, mem(rcx, (3*12+4)*4))
+		vmovups(ymm4, mem(rcx, (4*12+4)*4))
+		vmovups(ymm5, mem(rcx, (5*12+4)*4))
+		vmovups(ymm6, mem(rcx, (6*12+4)*4))
+		vmovups(ymm7, mem(rcx, (7*12+4)*4))
+		jmp(END)
+
+		label(STORE_NORMAL)
 		movq(var(C_stride), r14)// C stride is r14
 		movq(var(C_ptr), rcx)// C pointer is in rcx
 		movq(r14, r13)// r13 = r14
@@ -2579,9 +2601,9 @@ namespace ml
 				[k_iter] "m"(k_iter),
 				[k_left] "m"(k_left),
 				[C_stride] "m"(C_stride),
-				[alpha_ptr] "m"(alpha_ptr),
+				[bias_ptr] "m"(bias_ptr),
 				[c_in_fp16] "m"(c_in_fp16),
-				[scalar_alpha] "m"(scalar_alpha)
+				[transpose] "m"(transpose)
 				:// clobbers
 				"cc", "memory", "%ymm0", "%ymm1", "%ymm2", "%ymm3", "%ymm4", "%ymm5", "%ymm6", "%ymm7", "%ymm8", "%ymm9", "%ymm10", "%ymm11", "%ymm12",
 				"%ymm13", "%ymm14", "%ymm15", "%rax", "%rbx", "%rcx", "%r11", "%r13", "%r14", "%r15")
@@ -2760,6 +2782,217 @@ namespace ml
 				:// clobbers
 				"cc", "memory", "%ymm0", "%ymm1", "%ymm2", "%ymm3", "%ymm4", "%ymm5", "%ymm6", "%ymm7", "%ymm8", "%ymm9", "%ymm10", "%ymm11", "%ymm12",
 				"%ymm13", "%ymm14", "%ymm15", "%rax", "%rbx", "%rcx", "%r11", "%r13", "%r14", "%r15")
+	}
+	void fused_conv_block_stage_1_avx2_12x8(Fragment &temp, const Fragment &A, const Fragment &B, const Fragment &bias) noexcept
+	{
+		assert(temp.is_fp32());
+		assert(A.is_fp32());
+		assert(B.is_fp32());
+		assert(bias.is_fp32());
+
+		assert(temp.is_packed());
+		assert(A.is_packed());
+		assert(B.is_packed());
+		assert(bias.is_packed());
+
+		assert(cpu::is_aligned(A.data(), 32));
+		assert(cpu::is_aligned(B.data(), 32));
+		assert(cpu::is_aligned(bias.data(), 32));
+
+		assert(A.rows() == B.rows());
+		assert(A.stride() == 12);
+		assert(B.stride() == 8);
+		assert(temp.columns() == A.columns());
+		assert(temp.rows() == B.columns());
+
+		const void *A_ptr = A.data();
+		const void *B_ptr = B.data();
+		void *temp_ptr = temp.data();
+		const void *bias_ptr = bias.data();
+
+		uint64_t k_iter = A.rows() / 4;
+		uint64_t k_left = A.rows() % 4;
+
+		begin_asm()
+		movq(var(A_ptr), rax)
+		movq(var(B_ptr), rbx)
+		ZERO_ACCUMULATORS()
+
+		movq(var(k_iter), r14) // load the number of 4-unrolled iterations
+		test(r14, r14)
+		je(FINALLOOP)
+
+		label(UNROLLED_x4)
+		SUB_KERNEL_12xFP32_8xFP32(0)
+		SUB_KERNEL_12xFP32_8xFP32(1)
+		SUB_KERNEL_12xFP32_8xFP32(2)
+		SUB_KERNEL_12xFP32_8xFP32(3)
+
+		add(imm(4*12*4), rax)// 4 iterations x 12 elements x 4 bytes
+		add(imm(4*8*4), rbx)// 4 iterations x 8 elements x 4 bytes
+		dec(r14)
+		jne(UNROLLED_x4)
+
+		label(FINALLOOP)
+		movq(var(k_left), r14)// load the number of 1-unrolled iterations
+		test(r14, r14)
+		je(EPILOGUE)
+
+		label(UNROLLED_x1)
+		SUB_KERNEL_12xFP32_8xFP32(0)
+		add(imm(1*12*4), rax)// 1 iteration x 12 elements x 4 bytes
+		add(imm(1*8*4), rbx)// 1 iteration x 8 elements x 4 bytes
+		dec(r14)
+		jne(UNROLLED_x1)
+
+		label(EPILOGUE)
+		// permute back to original layout
+		PERMUTE_6x8xFP32(ymm4, ymm5, ymm6, ymm7, ymm8, ymm9)
+		PERMUTE_6x8xFP32(ymm10, ymm11, ymm12, ymm13, ymm14, ymm15)
+
+		movq(var(bias_ptr), rax)// load address of bias pointer
+		vmovaps(mem(rax), ymm2)// load bias value
+		ADD_BIAS_12x8xFP32(ymm2)
+		RELU_12x8xFP32()
+
+		// transpose and store into packed fragment of D
+		movq(var(temp_ptr), rcx)// temp pointer is in rcx
+		AVX_4x8_TRANSPOSE()
+		vmovups(xmm4, mem(rcx, (0*12+0)*4))
+		vmovups(xmm5, mem(rcx, (1*12+0)*4))
+		vmovups(xmm6, mem(rcx, (2*12+0)*4))
+		vmovups(xmm7, mem(rcx, (3*12+0)*4))
+		vmovups(xmm0, mem(rcx, (4*12+0)*4))
+		vmovups(xmm1, mem(rcx, (5*12+0)*4))
+		vmovups(xmm2, mem(rcx, (6*12+0)*4))
+		vmovups(xmm3, mem(rcx, (7*12+0)*4))
+
+		AVX_8x8_TRANSPOSE_INV()
+		vmovups(ymm0, mem(rcx, (0*12+4)*4))
+		vmovups(ymm1, mem(rcx, (1*12+4)*4))
+		vmovups(ymm2, mem(rcx, (2*12+4)*4))
+		vmovups(ymm3, mem(rcx, (3*12+4)*4))
+		vmovups(ymm4, mem(rcx, (4*12+4)*4))
+		vmovups(ymm5, mem(rcx, (5*12+4)*4))
+		vmovups(ymm6, mem(rcx, (6*12+4)*4))
+		vmovups(ymm7, mem(rcx, (7*12+4)*4))
+		vzeroupper()
+
+		end_asm(
+				:// outputs
+				:// inputs
+				[A_ptr] "m"(A_ptr),
+				[B_ptr] "m"(B_ptr),
+				[temp_ptr] "m"(temp_ptr),
+				[k_iter] "m"(k_iter),
+				[k_left] "m"(k_left),
+				[bias_ptr] "m"(bias_ptr)
+				:// clobbers
+				"cc", "memory", "%ymm0", "%ymm1", "%ymm2", "%ymm3", "%ymm4", "%ymm5", "%ymm6", "%ymm7", "%ymm8", "%ymm9", "%ymm10", "%ymm11", "%ymm12",
+				"%ymm13", "%ymm14", "%ymm15", "%rax", "%rbx", "%rcx", "%r11", "%r13", "%r14", "%r15")
+	}
+	void quantize_avx2_8xK(Fragment &dst, const Fragment &src, const Fragment &scales) noexcept
+	{
+		assert(src.is_fp32());
+		assert(dst.stride() == 8);
+		assert(ml::cpu::is_aligned(dst.data(), 32));
+
+		uint64_t k_iter = dst.rows() / 8;
+		uint64_t k_left = (dst.rows() % 8 + 1) / 2;
+		const void *src_ptr = src.data();
+		const void *scales_ptr = scales.data();
+		void *dst_ptr = dst.data();
+
+		begin_asm()
+		movq(var(scales_ptr), rcx) // scales pointer is in rcx
+		vmovups(mem(rcx), ymm15)// load scales into ymm15
+
+		movq(var(src_ptr), rax)// src pointer is in rax
+		movq(var(dst_ptr), rbx)// dst pointer is in rbx
+
+		movq(var(k_iter), r14)// load the number of 8-unrolled iterations
+		test(r14, r14)
+		je(FINALLOOP)
+
+		label(UNROLLED8)
+		vmovaps(mem(rax, 0*8*4), ymm0)
+		vmovaps(mem(rax, 1*8*4), ymm1)
+		vmovaps(mem(rax, 2*8*4), ymm2)
+		vmovaps(mem(rax, 3*8*4), ymm3)
+		vmovaps(mem(rax, 4*8*4), ymm4)
+		vmovaps(mem(rax, 5*8*4), ymm5)
+		vmovaps(mem(rax, 6*8*4), ymm6)
+		vmovaps(mem(rax, 7*8*4), ymm7)
+
+		vmulps(ymm0, ymm15, ymm0)
+		vmulps(ymm1, ymm15, ymm1)
+		vmulps(ymm2, ymm15, ymm2)
+		vmulps(ymm3, ymm15, ymm3)
+		vmulps(ymm4, ymm15, ymm4)
+		vmulps(ymm5, ymm15, ymm5)
+		vmulps(ymm6, ymm15, ymm6)
+		vmulps(ymm7, ymm15, ymm7)
+
+		vcvtps2dq(ymm0, ymm0)
+		vcvtps2dq(ymm1, ymm1)
+		vcvtps2dq(ymm2, ymm2)
+		vcvtps2dq(ymm3, ymm3)
+		vcvtps2dq(ymm4, ymm4)
+		vcvtps2dq(ymm5, ymm5)
+		vcvtps2dq(ymm6, ymm6)
+		vcvtps2dq(ymm7, ymm7)
+
+		vpslld(imm(16), ymm0, ymm0)
+		vpslld(imm(16), ymm2, ymm2)
+		vpslld(imm(16), ymm4, ymm4)
+		vpslld(imm(16), ymm6, ymm6)
+		vorps(ymm0, ymm1, ymm0)
+		vorps(ymm2, ymm3, ymm2)
+		vorps(ymm4, ymm5, ymm4)
+		vorps(ymm6, ymm7, ymm6)
+
+		add(imm(8*8*4), rax)// add stride to src pointer
+		add(imm(4*8*4), rbx)// add stride to dst pointer
+		dec(r14)
+		jne(UNROLLED8)
+
+		label(FINALLOOP)
+		movq(var(k_left), r14)// load the number of 2-unrolled iterations
+		test(r14, r14)
+		je(EPILOGUE)
+
+		label(UNROLLED2)
+		vmovaps(mem(rax, 0*8*4), ymm0)
+		vmovaps(mem(rax, 1*8*4), ymm1)
+
+		vmulps(ymm0, ymm15, ymm0)
+		vmulps(ymm1, ymm15, ymm1)
+
+		vcvtps2dq(ymm0, ymm0)
+		vcvtps2dq(ymm1, ymm1)
+
+		vpslld(imm(16), ymm0, ymm0)
+		vorps(ymm0, ymm1, ymm0)
+
+		add(imm(2*8*4), rax)// add stride to src pointer
+		add(imm(1*8*4), rbx)// add stride to dst pointer
+		dec(r14)
+		jne(UNROLLED2)
+
+		label(EPILOGUE)
+		vzeroupper()
+
+		end_asm(:// outputs
+				:// inputs
+				[src_ptr] "m"(src_ptr),
+				[dst_ptr] "m"(dst_ptr),
+				[scales_ptr] "m"(scales_ptr),
+				[k_iter] "m"(k_iter),
+				[k_left] "m"(k_left)
+				:// clobbers
+				"cc", "memory", "%ymm0", "%ymm1", "%ymm2", "%ymm3", "%ymm4", "%ymm5", "%ymm6", "%ymm7",
+				"%ymm8", "%ymm9", "%ymm10", "%ymm11", "%ymm12", "%ymm13", "%ymm14", "%ymm15", "%rax", "%rbx", "%rcx",
+				"%r12", "%r13", "%r14", "%r15")
 	}
 
 	void intgemm_avx2_12x8(Fragment &D, const Fragment &alpha, const Fragment &A, const Fragment &B, const void *beta_ptr, const Fragment &C,

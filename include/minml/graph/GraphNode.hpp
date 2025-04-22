@@ -38,9 +38,10 @@ namespace ml
 			time_point m_timer_stop;
 			int64_t m_total_time = 0;
 			int64_t m_total_count = 0;
+			int m_skip = 0;
 		public:
 			TimedStat() = default;
-			TimedStat(const std::string &name) :
+			TimedStat(const std::string &name, int skip = 0) :
 					m_name(name)
 			{
 			}
@@ -51,9 +52,14 @@ namespace ml
 			}
 			void stop() noexcept
 			{
-				m_timer_stop = std::chrono::steady_clock::now();
-				m_total_time += std::chrono::duration<int64_t, std::nano>(m_timer_stop - m_timer_start).count();
-				m_total_count++;
+				if (m_skip == 0)
+				{
+					m_timer_stop = std::chrono::steady_clock::now();
+					m_total_time += std::chrono::duration<int64_t, std::nano>(m_timer_stop - m_timer_start).count();
+					m_total_count++;
+				}
+				else
+					m_skip--;
 			}
 			std::string toString() const;
 	};
