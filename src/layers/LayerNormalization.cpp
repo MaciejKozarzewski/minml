@@ -46,11 +46,17 @@ namespace ml
 	}
 	Shape LayerNormalization::getWeightShape() const
 	{
-		return Shape( { getInputShape().lastDim() });
+		if (m_use_gamma)
+			return Shape( { getInputShape().lastDim() });
+		else
+			return Shape();
 	}
 	Shape LayerNormalization::getBiasShape() const
 	{
-		return Shape( { getInputShape().lastDim() });
+		if (m_use_beta)
+			return Shape( { getInputShape().lastDim() });
+		else
+			return Shape();
 	}
 
 	std::string LayerNormalization::name() const

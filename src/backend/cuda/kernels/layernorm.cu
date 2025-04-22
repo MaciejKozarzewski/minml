@@ -68,14 +68,20 @@ namespace
 
 		for (int j = N * threadIdx.x; j < last_dim; j += N * blockDim.x)
 		{
-			vector_copy<N>(shared_weights + j, weights + j);
-			vector_copy<N>(shared_bias + j, bias + j);
+			if (weights != nullptr)
+				vector_copy<N>(shared_weights + j, weights + j);
+			else
+				store_vec(shared_weights + j, one<T, N>());
+			if (bias != nullptr)
+				vector_copy<N>(shared_bias + j, bias + j);
+			else
+				store_vec(shared_bias + j, zero<T, N>());
 		}
 		__syncthreads();
 
 		__shared__ cg::block_tile_memory<256> btm;
 		cg::thread_block thb = cg::this_thread_block(btm);
-		cg::thread_block_tile < 256 > tile = cg::tiled_partition<256>(thb);
+		cg::thread_block_tile<256> tile = cg::tiled_partition<256>(thb);
 
 		for (int i = blockIdx.x; i < first_dim; i += gridDim.x)
 		{
@@ -120,8 +126,8 @@ namespace
 
 		for (int j = N * threadIdx.x; j < last_dim; j += N * blockDim.x)
 		{
-			const vec<T, N> w = load_vec<T, N>(weights + j);
-			const vec<T, N> b = load_vec<T, N>(bias + j);
+			const vec<T, N> w = (weights != nullptr) ? load_vec<T, N>(weights + j) : one<T, N>();
+			const vec<T, N> b = (bias != nullptr) ? load_vec<T, N>(bias + j) : zero<T, N>();
 			store_vec(shared_weights + j, w);
 			store_vec(shared_bias + j, b);
 		}
@@ -129,7 +135,7 @@ namespace
 
 		__shared__ cg::block_tile_memory<256> btm;
 		cg::thread_block thb = cg::this_thread_block(btm);
-		cg::thread_block_tile < 256 > tile = cg::tiled_partition<256>(thb);
+		cg::thread_block_tile<256> tile = cg::tiled_partition<256>(thb);
 
 		for (int i = blockIdx.x; i < first_dim; i += gridDim.x)
 		{
@@ -160,6 +166,53 @@ namespace
 			}
 		}
 	}
+	template<typename T, int N>
+	__launch_bounds__(256, 4)
+	__global__ void kernel_layernorm_forward_vect_v4(const T *input, T *output, const T *weights, const T *bias, int first_dim, int last_dim)
+	{
+		assert(blockDim.x * N == last_dim);
+
+		extern __shared__ char shared_array[];
+
+		T *shared_weights = reinterpret_cast<T*>(shared_array);
+		T *shared_bias = shared_weights + last_dim;
+
+		if (threadIdx.y == 0)
+			for (int j = N * threadIdx.x; j < last_dim; j += N * blockDim.x)
+			{
+				const vec<T, N> w = load_vec<T, N>(weights + j);
+				const vec<T, N> b = load_vec<T, N>(bias + j);
+				store_vec(shared_weights + j, w);
+				store_vec(shared_bias + j, b);
+			}
+		__syncthreads();
+
+		const int tid = N * threadIdx.x;
+
+		for (int i = blockIdx.y * blockDim.y + threadIdx.y; i < first_dim; i += gridDim.y * blockDim.y)
+		{
+			vec<T, N> in = (tid < last_dim) ? vec<T, N>(input + i * last_dim + tid) : zero<T, N>();
+
+			float avg = horizontal_add(in);
+			for (int k = 16; k >= 1; k /= 2)
+				avg += __shfl_xor_sync(0xffffffff, avg, k);
+			avg /= last_dim;
+
+			in -= vec<T, N>(avg);
+			float var = horizontal_add(square(in));
+			for (int k = 16; k >= 1; k /= 2)
+				var += __shfl_xor_sync(0xffffffff, var, k);
+			const T inv_stddev = get_inv_stddev(var, last_dim, 1.0e-6f);
+
+			if (tid < last_dim)
+			{
+				const vec<T, N> gamma(shared_weights + tid);
+				const vec<T, N> beta(shared_bias + tid);
+				const vec<T, N> out = gamma * in * inv_stddev + beta;
+				out.store(output + i * last_dim + tid);
+			}
+		}
+	}
 	template<int N>
 	__global__ void kernel_layernorm_backward_v2(const float *input, float *gradient_prev, float *gradient_next, const float *weights,
 			float *weights_update, float *bias_update, int first_dim, int last_dim)
@@ -176,7 +229,7 @@ namespace
 
 		__shared__ cg::block_tile_memory<256> btm;
 		cg::thread_block thb = cg::this_thread_block(btm);
-		cg::thread_block_tile < 256 > tile = cg::tiled_partition<256>(thb);
+		cg::thread_block_tile<256> tile = cg::tiled_partition<256>(thb);
 
 		vec<float, N> thread_weights_update(0.0f);
 		vec<float, N> thread_bias_update(0.0f);
@@ -349,10 +402,12 @@ namespace ml
 
 		dim3 blockDim2(32, 32);
 		dim3 gridDim2((last_dim + 31) / 32);
-		kernel_reduce_first_dim<<<gridDim2, blockDim2, 0, stream >>>(getPointer<float>(weights_update), partial_weights_update, workspace_first_dim,
-				last_dim);
-		kernel_reduce_first_dim<<<gridDim2, blockDim2, 0, stream >>>(getPointer<float>(bias_update), partial_bias_update, workspace_first_dim,
-				last_dim);
+		if (weights_update != nullptr)
+			kernel_reduce_first_dim<<<gridDim2, blockDim2, 0, stream >>>(getPointer<float>(weights_update), partial_weights_update,
+					workspace_first_dim, last_dim);
+		if (bias_update != nullptr)
+			kernel_reduce_first_dim<<<gridDim2, blockDim2, 0, stream >>>(getPointer<float>(bias_update), partial_bias_update, workspace_first_dim,
+					last_dim);
 
 		assert(cudaGetLastError() == cudaSuccess);
 	}
