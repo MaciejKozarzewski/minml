@@ -433,6 +433,12 @@ namespace ml
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
+	void cuda_fused_lion_optimize(mlContext_t context, float scale, const mlTensor_t *gradients, mlTensor_t *weights, mlTensor_t *momentums,
+			mlTensor_t *weights_copy, float learning_rate, float beta1, float beta2, int step, int num_tensors,
+			float weight_decay)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
 	int cuda_is_nan_or_inf(mlContext_t context, const mlTensor_t tensor)
 	{
 		throw NotImplemented(METHOD_NAME);

@@ -173,7 +173,8 @@ namespace ml
 			m_targets[i].moveTo(newDevice);
 		for (size_t i = 0; i < m_masks.size(); i++)
 			m_masks[i].moveTo(newDevice);
-		getOptimizer().moveTo(newDevice);
+		if (m_optimizer != nullptr)
+			m_optimizer->moveTo(newDevice);
 		m_workspace = nullptr;
 	}
 	void Graph::convertTo(DataType newType)
@@ -186,7 +187,8 @@ namespace ml
 			m_targets[i] = Tensor();
 		for (size_t i = 0; i < m_masks.size(); i++)
 			m_masks[i] = Tensor();
-		m_optimizer.convertTo(context(), newType);
+		if (m_optimizer != nullptr)
+			m_optimizer->convertTo(context(), newType);
 	}
 	void Graph::setInputShape(const Shape &shape)
 	{
@@ -207,17 +209,23 @@ namespace ml
 		for (int i = 0; i < numberOfNodes(); i++)
 			getNode(i).getLayer().init();
 	}
-	void Graph::setOptimizer(const RAdam &opt)
+	void Graph::setOptimizer(const Optimizer &opt)
 	{
-		m_optimizer = opt;
+		SerializedObject so;
+		const Json json = opt.serialize(so);
+		if (json["name"].getString() == "RAdam")
+			m_optimizer = std::make_unique<RAdam>();
+		if (json["name"].getString() == "Lion")
+			m_optimizer = std::make_unique<Lion>();
+		m_optimizer->unserialize(json, so);
 	}
 	void Graph::setGradientScaler(const GradientScaler &scaler)
 	{
 		m_gradient_scaler = scaler;
 	}
-	RAdam& Graph::getOptimizer()
+	Optimizer& Graph::getOptimizer()
 	{
-		return m_optimizer;
+		return *m_optimizer;
 	}
 	GradientScaler& Graph::getGradientScaler()
 	{
@@ -324,7 +332,7 @@ namespace ml
 		if (inv_gradient_scale != 0.0f)
 		{
 //			std::cout << "---gradients ok, updating weights with scale " << m_gradient_scaler.getScale() << "\n";
-			m_optimizer.apply(context(), params, param_gradients, inv_gradient_scale);
+			getOptimizer().apply(context(), params, param_gradients, inv_gradient_scale);
 			// only now we can update statistics of batchnorm layers. Otherwise they would contain incorrect values.
 			for (size_t i = 0; i < m_nodes.size(); i++)
 				if (m_nodes[i]->getLayer().name() == "BatchNormalization")
@@ -466,7 +474,7 @@ namespace ml
 			result["nodes"][i] = save_node(m_nodes[i].get(), binary_data);
 		if (isTrainable())
 		{
-			result["optimizer"] = m_optimizer.serialize(binary_data);
+			result["optimizer"] = m_optimizer->serialize(binary_data);
 			result["gradient_scaler"] = m_gradient_scaler.serialize(binary_data);
 			result["loss_function"] = Json::array();
 			for (size_t i = 0; i < m_loss_weights.size(); i++)
@@ -501,7 +509,11 @@ namespace ml
 
 		if (isTrainable())
 		{
-			m_optimizer.unserialize(json["optimizer"], binary_data);
+			if (json["optimizer"]["name"].getString() == "RAdam")
+				m_optimizer = std::make_unique<RAdam>();
+			if (json["optimizer"]["name"].getString() == "Lion")
+				m_optimizer = std::make_unique<Lion>();
+			getOptimizer().unserialize(json["optimizer"], binary_data);
 			m_gradient_scaler.unserialize(json["gradient_scaler"], binary_data);
 			for (int i = 0; i < json["loss_function"].size(); i++)
 			{

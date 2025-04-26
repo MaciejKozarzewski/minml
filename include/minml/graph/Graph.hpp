@@ -52,7 +52,7 @@ namespace ml
 			std::vector<Tensor> m_masks;
 			std::vector<std::unique_ptr<LossFunction>> m_losses;
 			std::vector<float> m_loss_weights;
-			RAdam m_optimizer;
+			std::unique_ptr<Optimizer> m_optimizer;
 			GradientScaler m_gradient_scaler;
 
 			DataType m_datatype = DataType::FLOAT32;
@@ -98,9 +98,9 @@ namespace ml
 			void setInputShape(const std::vector<Shape> &list);
 
 			void init();
-			void setOptimizer(const RAdam &opt);
+			void setOptimizer(const Optimizer &opt);
 			void setGradientScaler(const GradientScaler &scaler);
-			RAdam& getOptimizer();
+			Optimizer& getOptimizer();
 			GradientScaler& getGradientScaler();
 
 			void predict(int batchSize);

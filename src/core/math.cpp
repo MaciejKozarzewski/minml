@@ -1224,6 +1224,28 @@ namespace ml
 				break;
 		}SYNC();
 	}
+	void lionOptimize(const Context &context, float scale, const std::vector<Tensor> &gradients, std::vector<Tensor> &weights,
+			std::vector<Tensor> &momentums, std::vector<Tensor> &weights_copy, float learning_rate, float beta1, float beta2, int step,
+			float weight_decay)
+	{
+		assert(gradients.size() == weights.size());
+		assert(gradients.size() == momentums.size());
+		std::vector<mlTensor_t> _gradients = get(gradients);
+		std::vector<mlTensor_t> _weights = get(weights);
+		std::vector<mlTensor_t> _momentums = get(momentums);
+		std::vector<mlTensor_t> _weights_copy = get(weights_copy);
+		switch (context.device().type())
+		{
+			case DeviceType::CPU:
+				break;
+			case DeviceType::CUDA:
+				cuda_fused_lion_optimize(get(context), scale, _gradients.data(), _weights.data(), _momentums.data(),
+						weights_copy.empty() ? nullptr : _weights_copy.data(), learning_rate, beta1, beta2, step, _gradients.size(), weight_decay);
+				break;
+			case DeviceType::OPENCL:
+				break;
+		}SYNC();
+	}
 	std::vector<int> isNanOrInf(const Context &context, const std::vector<Tensor> &tensors)
 	{
 		std::vector<int> result(tensors.size(), 0);

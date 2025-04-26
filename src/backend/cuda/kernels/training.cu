@@ -32,7 +32,10 @@ namespace
 		const uint32_t exponent = reinterpret_cast<uint32_t*>(&x)[0] & 0x7f800000;
 		return (exponent == 0) ? 0.0f : x;
 	}
-
+	__device__ float sign(float x)
+	{
+		return (x >= 0.0f) ? 1.0f : -1.0f;
+	}
 	__device__ float safe_log(float x)
 	{
 		return logf(1.0e-8f + x);
@@ -75,7 +78,7 @@ namespace
 		assert(blockDim.x == 256);
 		__shared__ cg::block_tile_memory<256> btm;
 		cg::thread_block thb = cg::this_thread_block(btm);
-		cg::thread_block_tile < 256 > tile = cg::tiled_partition<256>(thb);
+		cg::thread_block_tile<256> tile = cg::tiled_partition<256>(thb);
 
 		const int tid = blockIdx.x * blockDim.x + threadIdx.x;
 		const int stride = gridDim.x * blockDim.x;
@@ -98,7 +101,7 @@ namespace
 		assert(blockDim.x == 256);
 		__shared__ cg::block_tile_memory<256> btm;
 		cg::thread_block thb = cg::this_thread_block(btm);
-		cg::thread_block_tile < 256 > tile = cg::tiled_partition<256>(thb);
+		cg::thread_block_tile<256> tile = cg::tiled_partition<256>(thb);
 
 		float acc = 0.0f;
 		for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < elements; i += gridDim.x * blockDim.x)
@@ -118,7 +121,7 @@ namespace
 		assert(blockDim.x == 256);
 		__shared__ cg::block_tile_memory<256> btm;
 		cg::thread_block thb = cg::this_thread_block(btm);
-		cg::thread_block_tile < 256 > tile = cg::tiled_partition<256>(thb);
+		cg::thread_block_tile<256> tile = cg::tiled_partition<256>(thb);
 
 		float acc = 0.0f;
 		for (int i = threadIdx.x; i < elements; i += blockDim.x)
@@ -178,6 +181,31 @@ namespace
 				weight_copy[i] = w;
 		}
 	}
+	__global__ void kernel_fused_learn_lion(float scale, radam_tensors *tensors, float learning_rate, float beta1, float beta2, int step,
+			float weight_decay)
+	{
+		const float *gradient = tensors[blockIdx.y].gradient;
+		float *weight = tensors[blockIdx.y].weight;
+		float *momentum = tensors[blockIdx.y].momentum;
+		const int elements = tensors[blockIdx.y].elements;
+		half *weight_copy = tensors[blockIdx.y].weight_copy;
+
+		for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < elements; i += gridDim.x * blockDim.x)
+		{
+			float w = weight[i];
+			const float g = scale * gradient[i] + weight_decay * w;
+			const float m = momentum[i];
+
+			const float c = beta1 * m + (1.0f - beta1) * g;
+
+			w = round_small_to_zero(w - learning_rate * sign(c));
+
+			momentum[i] = beta2 * m + (1.0f - beta2) * g;
+			weight[i] = w;
+			if (weight_copy != nullptr)
+				weight_copy[i] = w;
+		}
+	}
 
 	struct nan_inf_tensors
 	{
@@ -217,7 +245,7 @@ namespace
 		assert(blockDim.x == 256);
 		__shared__ cg::block_tile_memory<256> btm;
 		cg::thread_block thb = cg::this_thread_block(btm);
-		cg::thread_block_tile < 256 > tile = cg::tiled_partition<256>(thb);
+		cg::thread_block_tile<256> tile = cg::tiled_partition<256>(thb);
 
 		const T *data = reinterpret_cast<const T*>(tensors[blockIdx.x].data);
 		const int elements = tensors[blockIdx.x].elements;
@@ -334,8 +362,8 @@ namespace ml
 		cuda_mean_squared_gradient(context, alpha, output, target, mask, beta, gradient);
 	}
 
-	void cuda_fused_radam_optimize(mlContext_t context, float scale, const mlTensor_t *gradient, mlTensor_t *weights, mlTensor_t *momentum,
-			mlTensor_t *variance, mlTensor_t *weights_copy, float learning_rate, float beta1, float beta2, int step, int num_tensors,
+	void cuda_fused_radam_optimize(mlContext_t context, float scale, const mlTensor_t *gradients, mlTensor_t *weights, mlTensor_t *momentums,
+			mlTensor_t *variances, mlTensor_t *weights_copy, float learning_rate, float beta1, float beta2, int step, int num_tensors,
 			float weight_decay)
 	{
 		assert(step > 0);
@@ -346,14 +374,14 @@ namespace ml
 		radam_tensors *cpu_workspace = reinterpret_cast<radam_tensors*>(cuda::Context::getCpuWorkspace(context));
 		for (int i = 0; i < num_tensors; i++)
 		{
-			assert(is_fp32(gradient[i]));
+			assert(is_fp32(gradients[i]));
 			assert(is_fp32(weights[i]));
-			assert(is_fp32(momentum[i]));
-			assert(is_fp32(variance[i]));
-			cpu_workspace[i].gradient = data<float>(gradient[i]);
+			assert(is_fp32(momentums[i]));
+			assert(is_fp32(variances[i]));
+			cpu_workspace[i].gradient = data<float>(gradients[i]);
 			cpu_workspace[i].weight = data<float>(weights[i]);
-			cpu_workspace[i].momentum = data<float>(momentum[i]);
-			cpu_workspace[i].variance = data<float>(variance[i]);
+			cpu_workspace[i].momentum = data<float>(momentums[i]);
+			cpu_workspace[i].variance = data<float>(variances[i]);
 			if (weights_copy != nullptr)
 			{
 				assert(is_fp16(weights_copy[i]));
@@ -361,7 +389,7 @@ namespace ml
 			}
 			else
 				cpu_workspace[i].weight_copy = nullptr;
-			cpu_workspace[i].elements = volume(gradient[i]);
+			cpu_workspace[i].elements = volume(gradients[i]);
 		}
 
 		radam_tensors *device_workspace = cuda::Context::getWorkspace<radam_tensors>(context);
@@ -373,6 +401,44 @@ namespace ml
 		kernel_fused_learn_radam<<<gridDim, blockDim, 0, stream>>>(scale, device_workspace, learning_rate, beta1, beta2, step, weight_decay);
 		assert(cudaGetLastError() == cudaSuccess);
 	}
+	void cuda_fused_lion_optimize(mlContext_t context, float scale, const mlTensor_t *gradients, mlTensor_t *weights, mlTensor_t *momentums,
+			mlTensor_t *weights_copy, float learning_rate, float beta1, float beta2, int step, int num_tensors, float weight_decay)
+	{
+		assert(step > 0);
+		if (num_tensors <= 0)
+			return;
+		cudaStream_t stream = cuda::Context::getStream(context);
+
+		radam_tensors *cpu_workspace = reinterpret_cast<radam_tensors*>(cuda::Context::getCpuWorkspace(context));
+		for (int i = 0; i < num_tensors; i++)
+		{
+			assert(is_fp32(gradients[i]));
+			assert(is_fp32(weights[i]));
+			assert(is_fp32(momentums[i]));
+			cpu_workspace[i].gradient = data<float>(gradients[i]);
+			cpu_workspace[i].weight = data<float>(weights[i]);
+			cpu_workspace[i].momentum = data<float>(momentums[i]);
+			cpu_workspace[i].variance = nullptr;
+			if (weights_copy != nullptr)
+			{
+				assert(is_fp16(weights_copy[i]));
+				cpu_workspace[i].weight_copy = data<half>(weights_copy[i]);
+			}
+			else
+				cpu_workspace[i].weight_copy = nullptr;
+			cpu_workspace[i].elements = volume(gradients[i]);
+		}
+
+		radam_tensors *device_workspace = cuda::Context::getWorkspace<radam_tensors>(context);
+		cudaError_t status = cudaMemcpyAsync(device_workspace, cpu_workspace, sizeof(radam_tensors) * num_tensors, cudaMemcpyHostToDevice, stream);
+		assert(status == cudaSuccess);
+
+		dim3 blockDim(256);
+		dim3 gridDim(32, num_tensors);
+		kernel_fused_learn_lion<<<gridDim, blockDim, 0, stream>>>(scale, device_workspace, learning_rate, beta1, beta2, step, weight_decay);
+		assert(cudaGetLastError() == cudaSuccess);
+	}
+
 	void cuda_fused_is_nan_or_inf(mlContext_t context, const mlTensor_t *tensor, int *result, int num_tensors)
 	{
 		if (num_tensors <= 0)
@@ -413,7 +479,8 @@ namespace ml
 			result[i] = cpu_workspace[i].flag;
 	}
 
-	void cuda_combined_loss(mlContext_t context, float *result, const mlTensor_t *outputs, const mlTensor_t *targets, const mlTensor_t *masks, const float *weights)
+	void cuda_combined_loss(mlContext_t context, float *result, const mlTensor_t *outputs, const mlTensor_t *targets, const mlTensor_t *masks,
+			const float *weights)
 	{
 
 	}

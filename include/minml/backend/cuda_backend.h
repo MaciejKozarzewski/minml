@@ -255,6 +255,9 @@ namespace ml
 		DLL_PUBLIC void cuda_fused_radam_optimize(mlContext_t context, float scale, const mlTensor_t *gradients, mlTensor_t *weights,
 				mlTensor_t *momentums, mlTensor_t *variances, mlTensor_t *weights_copy, float learning_rate, float beta1, float beta2, int step,
 				int num_tensors, float weight_decay);
+		DLL_PUBLIC void cuda_fused_lion_optimize(mlContext_t context, float scale, const mlTensor_t *gradients, mlTensor_t *weights,
+				mlTensor_t *momentums, mlTensor_t *weights_copy, float learning_rate, float beta1, float beta2, int step, int num_tensors,
+				float weight_decay);
 		DLL_PUBLIC void cuda_fused_is_nan_or_inf(mlContext_t context, const mlTensor_t *tensors, int *result, int num_tensors);
 		DLL_PUBLIC void cuda_fused_l2_regularization(mlContext_t context, mlTensor_t *gradients, const mlTensor_t *params, float scale,
 				int num_tensors);
