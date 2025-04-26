@@ -672,7 +672,6 @@ namespace ml
 		dim3 gridDim((last_dim + 31) / 32);
 		kernel_batchnorm_update <<<gridDim, blockDim, 0, stream>>>(data<AvgVarStats<float>>(running_stat), data<float>(avg_var), first_dim, last_dim);
 		assert(cudaGetLastError() == cudaSuccess);
-		cudaDeviceSynchronize();
 	}
 	void cuda_fold_batchnorm(mlContext_t context, mlTensor_t layer_weights, mlTensor_t layer_bias, const mlTensor_t bn_weights,
 			const mlTensor_t bn_bias, const mlTensor_t bn_avg_var)
