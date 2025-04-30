@@ -40,6 +40,7 @@ namespace ml
 				int64_t cores() const noexcept;
 				std::string to_string() const;
 				static const cpu_x86& get();
+				static void flush_denormals_to_zero(bool b) noexcept;
 		};
 	}
 }

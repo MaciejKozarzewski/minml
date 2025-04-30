@@ -73,6 +73,7 @@ namespace ml
 			static int numberOfCudaDevices();
 			static int numberOfOpenCLDevices();
 			static void setNumberOfThreads(int t);
+			static void flushDenormalsToZero(bool b);
 			static std::string hardwareInfo();
 
 			friend bool operator==(const Device &lhs, const Device &rhs) noexcept;

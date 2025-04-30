@@ -16,12 +16,11 @@
 
 #include <cstring>
 #include <vector>
-#include <iostream>
 
 namespace ml
 {
 
-	Device::Device(DeviceType type, int index) noexcept:
+	Device::Device(DeviceType type, int index) noexcept :
 			m_type(type),
 			m_index(index)
 	{
@@ -130,6 +129,10 @@ namespace ml
 	void Device::setNumberOfThreads(int t)
 	{
 		cpu_set_number_of_threads(t);
+	}
+	void Device::flushDenormalsToZero(bool b)
+	{
+		cpu_flush_denormals_to_zero(b);
 	}
 	std::string Device::hardwareInfo()
 	{

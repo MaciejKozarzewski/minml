@@ -93,6 +93,10 @@ namespace ml
 
 	} /* namespace cpu */
 
+	void cpu_flush_denormals_to_zero(bool b)
+	{
+		cpu_x86::flush_denormals_to_zero(b);
+	}
 	void cpu_set_number_of_threads(int number)
 	{
 		omp_set_num_threads(number);

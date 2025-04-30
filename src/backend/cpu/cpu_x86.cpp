@@ -13,6 +13,7 @@
 #include <iomanip>
 #include <map>
 #include <cassert>
+#include <x86intrin.h>
 
 #ifdef _WIN32
 #  include <windows.h>
@@ -355,6 +356,10 @@ namespace ml
 		{
 			static const cpu_x86 features;
 			return features;
+		}
+		void cpu_x86::flush_denormals_to_zero(bool b) noexcept
+		{
+			_MM_SET_FLUSH_ZERO_MODE(b ? _MM_FLUSH_ZERO_ON : _MM_FLUSH_ZERO_OFF);
 		}
 
 	} /* namespace cpu */
