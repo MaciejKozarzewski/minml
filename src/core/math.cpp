@@ -468,6 +468,7 @@ namespace ml
 //									tmp += beta * output.get( { b, h, w, f });
 //								output.at( { b, h, w, f }) = tmp;
 //							}
+				cpu_depthwise_conv_forward(get(context), alpha, get(input), get(weights), get(bias), beta, get(output));
 				break;
 			}
 			case DeviceType::CUDA:

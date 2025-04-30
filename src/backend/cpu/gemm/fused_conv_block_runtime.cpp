@@ -18,6 +18,7 @@
 #include <limits>
 #include <cmath>
 #include <cstring>
+#include <x86intrin.h>
 
 namespace
 {
@@ -172,6 +173,28 @@ namespace
 			return Fragment();
 	}
 
+	void fill_indices_table(int *indices, int batch_size, int height, int width) noexcept
+	{
+		int idx = 0;
+		for (int b = 0; b < batch_size; b++)
+			for (int h = 0; h < height; h++)
+				for (int w = 0; w < width; w++)
+				{
+					indices[idx + 0] = b;
+					indices[idx + 1] = h;
+					indices[idx + 2] = w;
+					idx += 3;
+				}
+	}
+	double sum_fragment(const Fragment &fragment)
+	{
+		assert(fragment.is_fp32());
+		double result = 0.0;
+		for (int i = 0; i < fragment.rows(); i++)
+			for (int j = 0; j < fragment.columns(); j++)
+				result += fragment.at<float>(i, j);
+		return result;
+	}
 }
 
 namespace ml
@@ -183,6 +206,9 @@ namespace ml
 	}
 	void FCBRuntime::run()
 	{
+		int args[6] = { batch_size, height, width, channels, dw_kernel_size, dw_kernel_size };
+		fill_indices_table(indices, batch_size, height, width);
+
 		const float alpha = 1.0f;
 		const float beta = 1.0f;
 		Fragment alpha_fragment(&alpha, DTYPE_FLOAT32, 0);
@@ -195,13 +221,10 @@ namespace ml
 		{
 			const int m_left = std::min(inner_tile.M, batch_size * height * width - inner_m);
 
-			// pack input fragment for dw conv
-			// pack weights and bias of dw conv
-			// run dw conv kernel
+			dwconv_kernel(dw_out_matrix, input_matrix, dwconv_weights, dwconv_bias, args, indices + 3 * inner_m);
+			pack_fragment_input(dwconv_output_fragment, inner_m);
 
-			// now we have packed input for first conv
-			dwconv_output_fragment.mark_as_packed_with_size(Size2D(channels, inner_tile.M));
-			first_conv_output_fragment.mark_as_packed_with_size(Size2D(hidden_dim, inner_tile.M));
+			first_conv_output_fragment.mark_as_packed_with_size(Size2D(hidden_dim, std::min(inner_tile.M, m_left)));
 
 			ArrayOfFragments::Iterator w1_frag_iter = w1_fragments.get_iterator();
 			ArrayOfFragments::Iterator b1_frag_iter = b1_fragments.get_iterator();
@@ -260,8 +283,8 @@ namespace ml
 		b1_fragments.create(workspace_allocator, DTYPE_FLOAT32, Size2D(1, inner_tile.N), 64);
 		b2_fragments.create(workspace_allocator, DTYPE_FLOAT32, Size2D(1, inner_tile.N), 64);
 
-		const int dwconv_kernel = dwconv_weights.rows();
-		input_fragment = Fragment(workspace_allocator.get(size_of(DTYPE_FLOAT32) * inner_tile.M * dwconv_kernel, 4096), DTYPE_FLOAT32, inner_tile.M);
+		const int dw_out_size = inner_tile.M * channels;
+		dw_out_matrix = Matrix(workspace_allocator.get(dw_out_size * size_of(DTYPE_FLOAT32), 4096), DTYPE_FLOAT32, inner_tile.M, channels, channels);
 
 		const int dwconv_rows = round_to_multiple_of(channels, inner_tile.N);
 		dwconv_output_fragment = Fragment(workspace_allocator.get(size_of(DTYPE_FLOAT32) * inner_tile.M * dwconv_rows, 4096), DTYPE_FLOAT32,
@@ -274,16 +297,16 @@ namespace ml
 		const Size2D tmp(inner_tile.M, inner_tile.N);
 		const int fragment_size = size_of(output_matrix.dtype()) * tmp.rows * tmp.columns;
 		edge_output_fragment = Fragment(workspace_allocator.get(fragment_size, 64), output_matrix.dtype(), output_matrix.stride());
+
+		indices = reinterpret_cast<int*>(workspace_allocator.get(3 * sizeof(int) * batch_size * height * width, 4096));
 	}
-	void FCBRuntime::pack_fragment_input(Fragment &fragment, int m, int k)
+	void FCBRuntime::pack_fragment_input(Fragment &fragment, int m)
 	{
-//		const int k_to_pack = head_dim;
-//		const int m_to_pack = std::min(inner_tile.M, tokens - m);
-//		fragment.mark_as_packed_with_size(Size2D(k_to_pack, m_to_pack));
-//
-//		const MatrixOp op = MatrixOp::TRANSPOSE;
-//		const Position2D pos = get_position(k, m, op);
-//		q_packing(fragment, Q, pos, op);
+		const int k_to_pack = channels;
+		const int m_to_pack = std::min(inner_tile.M, batch_size * height * width - m);
+		fragment.mark_as_packed_with_size(Size2D(k_to_pack, m_to_pack));
+
+		input_packing(fragment, dw_out_matrix, Position2D(0, 0), MatrixOp::TRANSPOSE);
 	}
 	void FCBRuntime::pack_fragment_weights(const Matrix &weights, Fragment &fragment, int n)
 	{
@@ -316,7 +339,7 @@ namespace ml
 	}
 	void FCBRuntime::pack_fragment_bias(const Matrix &bias, Fragment &fragment, int n)
 	{
-		const int n_to_pack = std::min(inner_tile.N, total_size.N - n);
+		const int n_to_pack = std::min(inner_tile.N, bias.columns() - n);
 		fragment.mark_as_packed_with_size(Size2D(1, n_to_pack));
 
 		const Position2D pos = get_position(0, n, MatrixOp::NORMAL);
@@ -324,15 +347,15 @@ namespace ml
 	}
 	void FCBRuntime::unpack_fragment_out(Fragment &fragment, int m, int n)
 	{
-		const int rows_to_unpack = std::min(inner_tile.M, total_size.M - m);
-		const int cols_to_unpack = std::min(inner_tile.N, total_size.N - n);
+		const int rows_to_unpack = std::min(inner_tile.M, batch_size * height * width - m);
+		const int cols_to_unpack = std::min(inner_tile.N, channels - n);
 
 		const bool is_tile_full = (rows_to_unpack == inner_tile.M) and (cols_to_unpack == inner_tile.N);
 		if (not is_tile_full)
 			unpack_def_MxK(output_matrix, Position2D(m, n), fragment);
 	}
 
-	FCBRuntime get_fcb_runtime(mlContext_t context, mlDataType_t dtype, int tokens, int head_dim)
+	FCBRuntime get_fcb_runtime(mlContext_t context, mlDataType_t dtype)
 	{
 		const std::vector<FCBRuntime> &table = get_fcb_runtime_table(context);
 		FCBRuntime result;
@@ -357,7 +380,7 @@ namespace ml
 			const mlTensor_t first_conv_weights, const mlTensor_t first_conv_bias, const mlTensor_t second_conv_weights,
 			const mlTensor_t second_conv_bias, mlTensor_t output)
 	{
-		FCBRuntime rt = get_fcb_runtime(context, input.dtype, 0, 0);
+		FCBRuntime rt = get_fcb_runtime(context, input.dtype);
 		rt.setInput(input);
 		rt.setDepthwiseConv(dwconv_weights, dwconv_bias);
 		rt.setFirstConv(first_conv_weights, first_conv_bias);
@@ -365,6 +388,26 @@ namespace ml
 		rt.setOutput(output);
 		rt.setup(context);
 		rt.run();
+	}
+
+	void cpu_depthwise_conv_forward(mlContext_t context, float alpha, const mlTensor_t x, const mlTensor_t w, const mlTensor_t b, float beta,
+			mlTensor_t y)
+	{
+		const int first_dim = volume_without_last_dim(x);
+		const int last_dim = get_last_dim(x);
+		assert(w.dim[0] == w.dim[1]); // square kernel
+
+		Matrix input_matrix(x.data, x.dtype, 1, last_dim, last_dim);
+		Matrix weight_matrix(w.data, w.dtype, w.dim[0] * w.dim[1], w.dim[3], w.dim[3]);
+		Matrix bias_matrix(b.data, b.dtype, 1, b.dim[0], b.dim[0]);
+
+		int args[6] = { x.dim[0], x.dim[1], x.dim[2], x.dim[3], w.dim[0], w.dim[1] };
+
+		int *indices = cpu::Context::getWorkspace<int>(context);
+		fill_indices_table(indices, x.dim[0], x.dim[1], x.dim[2]);
+
+		Matrix output_matrix(y.data, y.dtype, first_dim, last_dim, last_dim);
+		depthwise_conv_avx2_12x8(output_matrix, input_matrix, weight_matrix, bias_matrix, args, indices);
 	}
 
 } /* namespace ml */

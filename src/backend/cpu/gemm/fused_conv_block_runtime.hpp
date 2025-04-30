@@ -32,11 +32,10 @@ namespace ml
 			Matrix first_conv_weights, first_conv_bias;
 			Matrix second_conv_weights, second_conv_bias;
 
-			TileDimensions total_size;
+			Matrix dw_out_matrix;
+			ArrayOfFragments w1_fragments, b1_fragments;
+			ArrayOfFragments w2_fragments, b2_fragments;
 
-			ArrayOfFragments w1_fragments, b1_fragments, w2_fragments, b2_fragments;
-
-			Fragment input_fragment;
 			Fragment dwconv_output_fragment;
 			Fragment first_conv_output_fragment;
 			Fragment edge_output_fragment;
@@ -46,11 +45,14 @@ namespace ml
 			int width = 0;
 			int channels = 0;
 			int hidden_dim = 0;
+			int dw_kernel_size = 0;
+			int *indices = nullptr;
 
 		public:
 			using packing_function = std::function<void(Fragment&, const Matrix&, const Position2D&, MatrixOp)>;
 			using unpacking_function = std::function<void(Matrix&, const Position2D&,const Fragment&)>;
-			using dwconv_function = std::function<void(Fragment&, const Fragment&, const Fragment&, const Fragment&, bool)>;
+			using dwconv_function = std::function<void(Matrix &, const Matrix &, const Matrix &, const Matrix &, const int *,
+					void *)>;
 			using conv1_function = std::function<void(Fragment&, const Fragment&, const Fragment&, const Fragment&)>;
 			using conv2_function = std::function<void(Fragment &, const Fragment&, const Fragment &, const Fragment &, const void *,
 					const Fragment &, const Fragment &, bool)>;
@@ -97,6 +99,7 @@ namespace ml
 				assert(weights.dim[0] == weights.dim[1]); // square kernel
 				assert(weights.dim[2] == channels);
 				assert(weights.dtype == dtype);
+				dw_kernel_size = weights.dim[0];
 				dwconv_weights = Matrix(weights.data, weights.dtype, weights.dim[0] * weights.dim[1], weights.dim[2], weights.dim[2]);
 
 				assert(bias.rank == 1);
@@ -138,14 +141,14 @@ namespace ml
 			void run();
 		private:
 			void create_fragments(mlContext_t context);
-			void pack_fragment_input(Fragment &fragment, int m, int k);
+			void pack_fragment_input(Fragment &fragment, int m);
 			void pack_fragment_weights(const Matrix &weights, Fragment &fragment, int n);
 			void pack_fragment_out(Matrix &out, Fragment &fragment, int m, int n);
 			void pack_fragment_bias(const Matrix &bias, Fragment &fragment, int n);
 			void unpack_fragment_out(Fragment &fragment, int m, int n);
 	};
 
-	FCBRuntime get_fcb_runtime(mlContext_t context, mlDataType_t dtype, int tokens, int head_dim);
+	FCBRuntime get_fcb_runtime(mlContext_t context, mlDataType_t dtype);
 }
 
 #endif /* BACKEND_CPU_GEMM_FUSED_CONV_BLOCK_RUNTIME_HPP_ */

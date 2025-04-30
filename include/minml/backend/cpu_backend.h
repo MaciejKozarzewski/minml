@@ -18,6 +18,7 @@ namespace ml
 	{
 #endif
 
+		void cpu_flush_denormals_to_zero(bool b);
 		void cpu_set_number_of_threads(int number);
 		int cpu_get_number_of_cores();
 		/*
@@ -79,8 +80,8 @@ namespace ml
 				const mlTensor_t second_conv_bias, mlTensor_t output);
 
 		// depthwise convolution
-		void cpu_depthwise_conv_forward(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, mlShape_t weights_shape, const void *input,
-				const void *weights, const void *bias, void *output);
+		void cpu_depthwise_conv_forward(mlContext_t context, float alpha, const mlTensor_t x, const mlTensor_t w, const mlTensor_t b,
+				float beta, mlTensor_t y);
 		void cpu_depthwise_conv_backward(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, const void *gradient_next,
 				const void *weights, void *gradient_prev);
 		void cpu_depthwise_conv_update(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, const void *input,

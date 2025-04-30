@@ -83,9 +83,10 @@ namespace ml
 	void mha_qk_avx2_12x8(Fragment &temp, const void *alpha_ptr, const Fragment &Q, const Fragment &K, const Fragment &bias,
 			Fragment &softmax_sum) noexcept;
 	void mha_softmax_avx2_12x8(Fragment &temp, Fragment &softmax_sum) noexcept;
+
 	// batched depthwise convolution kernel
-	void depthwise_conv_avx2_12x8(Fragment &C, const Fragment &alpha, const Fragment &A, const Fragment &B, bool transpose) noexcept;
-	void depthwise_conv_avx2_6x8_v2(Fragment &C, const Fragment &A, const Fragment &B, const Fragment &bias) noexcept;
+	void depthwise_conv_avx2_12x8(Matrix &output, const Matrix &input, const Matrix &weights, const Matrix &bias, const int *args,
+			void *workspace) noexcept;
 	void fused_conv_block_stage_1_avx2_12x8(Fragment &temp, const Fragment &A, const Fragment &B, const Fragment &bias) noexcept;
 	void quantize_avx2_8xK(Fragment &dst, const Fragment &src, const Fragment &scales) noexcept;
 
