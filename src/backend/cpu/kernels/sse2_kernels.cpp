@@ -205,14 +205,14 @@ namespace ml
 		je(EPILOGUE)
 
 		label(UNROLLED)
-		movups(mem(rax, 0*8*4), xmm0)
-		movups(mem(rax, 1*8*4), xmm1)
-		movups(mem(rax, 2*8*4), xmm2)
-		movups(mem(rax, 3*8*4), xmm3)
-		movups(mem(rax, 4*8*4), xmm4)
-		movups(mem(rax, 5*8*4), xmm5)
-		movups(mem(rax, 6*8*4), xmm6)
-		movups(mem(rax, 7*8*4), xmm7)
+		movups(mem(rax, 0*4*4), xmm0)
+		movups(mem(rax, 1*4*4), xmm1)
+		movups(mem(rax, 2*4*4), xmm2)
+		movups(mem(rax, 3*4*4), xmm3)
+		movups(mem(rax, 4*4*4), xmm4)
+		movups(mem(rax, 5*4*4), xmm5)
+		movups(mem(rax, 6*4*4), xmm6)
+		movups(mem(rax, 7*4*4), xmm7)
 
 		mulps(xmm8, xmm0)
 		mulps(xmm9, xmm1)
@@ -232,7 +232,6 @@ namespace ml
 		jne(UNROLLED)
 
 		label(EPILOGUE)
-		vzeroupper()
 
 		end_asm(
 				:// outputs
@@ -286,7 +285,6 @@ namespace ml
 		jne(UNROLLED)
 
 		label(EPILOGUE)
-		vzeroupper()
 
 		end_asm(
 				:// outputs
