@@ -338,7 +338,7 @@ namespace ml
 		dim3 blockDim(256);
 		dim3 gridDim(std::min(512, first_dim));
 
-		cudaStream_t stream = ml::cuda::Context::getStream(context);
+		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
 
 		switch (dtype)
 		{
@@ -376,13 +376,13 @@ namespace ml
 		const int first_dim = volume_without_last_dim(shape);
 		const int last_dim = get_last_dim(shape);
 
-		cudaStream_t stream = ml::cuda::Context::getStream(context);
+		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
 
 		dim3 blockDim(256);
 
-		float *workspace = ml::cuda::Context::getWorkspace<float>(context);
+		float *workspace = ml::cuda_backend::Context::getWorkspace<float>(context);
 		const int workspace_first_dim = std::min((size_t) std::min(first_dim, 512),
-				cuda::Context::getWorkspaceSize(context) / (sizeof(float) * 2 * last_dim));
+				ml::cuda_backend::Context::getWorkspaceSize(context) / (sizeof(float) * 2 * last_dim));
 		float *partial_weights_update = workspace;
 		float *partial_bias_update = workspace + workspace_first_dim * last_dim;
 		const int shared_mem = sizeof(float) * 5 * last_dim;

@@ -62,7 +62,11 @@ namespace vectors
 			}
 			__device__ vec2h operator-() const
 			{
+#if __CUDA_ARCH__ >= FP16_MIN_ARCH
 				return vec2h(-x0);
+#else
+				return vec2h();
+#endif
 			}
 			__device__ vec2h operator~() const
 			{

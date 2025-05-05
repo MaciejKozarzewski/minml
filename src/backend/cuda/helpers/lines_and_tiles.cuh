@@ -13,7 +13,7 @@
 
 #include <cassert>
 
-namespace internal
+namespace hidden_internal
 {
 	template<typename T, int N>
 	struct Storage
@@ -77,7 +77,7 @@ namespace internal
 }
 
 template<typename T, int N>
-struct Line: internal::Storage<T, N>
+struct Line: hidden_internal::Storage<T, N>
 {
 		__host__ __device__ constexpr int size() const
 		{
@@ -101,7 +101,7 @@ struct Line: internal::Storage<T, N>
 };
 
 template<typename T, int Rows, int Cols>
-struct Tile: internal::Storage<Line<T, Cols>, Rows>
+struct Tile: hidden_internal::Storage<Line<T, Cols>, Rows>
 {
 		__host__ __device__ constexpr int rows() const
 		{

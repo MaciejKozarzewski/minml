@@ -87,7 +87,7 @@ namespace ml
 		assert(input != nullptr);
 		assert(output != nullptr);
 
-		cudaStream_t stream = cuda::Context::getStream(context);
+		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
 		assert(shape.rank == 2);
 		const int first_dim = get_first_dim(shape);
 		const int last_dim = get_last_dim(shape);

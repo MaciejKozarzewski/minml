@@ -16,15 +16,15 @@
 
 namespace
 {
-	ml::cuda::Context* get(ml::mlContext_t context)
+	ml::cuda_backend::Context* get(ml::mlContext_t context)
 	{
-		return reinterpret_cast<ml::cuda::Context*>(context);
+		return reinterpret_cast<ml::cuda_backend::Context*>(context);
 	}
 }
 
 namespace ml
 {
-	namespace cuda
+	namespace cuda_backend
 	{
 		Context::Context(int device_index) :
 				m_device_index(device_index)
@@ -196,6 +196,6 @@ namespace ml
 		}
 #endif
 
-	} /* namespace cuda */
+	} /* namespace cuda_backend */
 } /* namespace ml */
 

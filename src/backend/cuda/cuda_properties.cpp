@@ -239,17 +239,17 @@ namespace ml
 			{
 				case DTYPE_FLOAT16:
 				{
-					const int sm_ver = cuda::get_compute_capability(index);
+					const int sm_ver = ml::cuda_backend::get_compute_capability(index);
 					return sm_ver == 53 || sm_ver == 60 || sm_ver >= 62;
 				}
 				case DTYPE_FLOAT32:
 					return true;
 				case DTYPE_FLOAT64:
-					return cuda::get_compute_capability(index) >= 50;
+					return ml::cuda_backend::get_compute_capability(index) >= 50;
 				case DTYPE_INT32:
 					return true;
 				case DTYPE_INT8:
-					return cuda::get_compute_capability(index) >= 61;
+					return ml::cuda_backend::get_compute_capability(index) >= 61;
 			}
 		}
 		return false;
@@ -272,10 +272,10 @@ namespace ml
 	}
 	void cuda_enable_tf32(mlContext_t context, bool b)
 	{
-		ml::cuda::Context::enableTF32(context, b);
+		ml::cuda_backend::Context::enableTF32(context, b);
 	}
 
-	namespace cuda
+	namespace cuda_backend
 	{
 		int get_compute_capability(int device_index)
 		{
@@ -284,8 +284,8 @@ namespace ml
 
 		bool has_tensor_cores(mlContext_t context)
 		{
-			const int index = cuda::Context::getDeviceIndex(context);
-			const int sm_ver = cuda::get_compute_capability(index);
+			const int index = ml::cuda_backend::Context::getDeviceIndex(context);
+			const int sm_ver = ml::cuda_backend::get_compute_capability(index);
 			if (sm_ver >= 75)
 			{
 				if (sm_ver == 75)
@@ -302,7 +302,7 @@ namespace ml
 		}
 		bool allows_tf32(mlContext_t context)
 		{
-			return cuda::Context::allowsTF32(context);
+			return ml::cuda_backend::Context::allowsTF32(context);
 		}
 
 	}

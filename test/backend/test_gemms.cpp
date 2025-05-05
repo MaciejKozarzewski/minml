@@ -189,6 +189,7 @@ namespace ml
 			Context context(device);
 			data.moveTo(context.device());
 			gemm(context, 'n', 'n', data.C_tested, data.A, data.B, 1.1, 0.1);
+			context.synchronize();
 			EXPECT_LT(data.getDifference(), 1.0e-4);
 		}
 	}
@@ -206,6 +207,7 @@ namespace ml
 			Context context(device);
 			data.moveTo(context.device());
 			gemm(context, 'n', 't', data.C_tested, data.A, data.B, 1.1, 0.1);
+			context.synchronize();
 			EXPECT_LT(data.getDifference(), 1.0e-4);
 		}
 	}
@@ -223,6 +225,7 @@ namespace ml
 			Context context(device);
 			data.moveTo(context.device());
 			gemm(context, 't', 'n', data.C_tested, data.A, data.B, 1.1, 0.1);
+			context.synchronize();
 			EXPECT_LT(data.getDifference(), 1.0e-4);
 		}
 	}
@@ -240,6 +243,7 @@ namespace ml
 			Context context(device);
 			data.moveTo(context.device());
 			gemm(context, 't', 't', data.C_tested, data.A, data.B, 1.1, 0.1);
+			context.synchronize();
 			EXPECT_LT(data.getDifference(), 1.0e-4);
 		}
 	}
@@ -261,6 +265,7 @@ namespace ml
 			Context context(device);
 			data.moveTo(context.device());
 			gemm(context, 'n', 'n', data.C_tested, data.A, data.B, 1.1, 0.1);
+			context.synchronize();
 			EXPECT_LT(data.getDifference(), 1.0e-4);
 		}
 	}
@@ -281,6 +286,7 @@ namespace ml
 			Context context(device);
 			data.moveTo(context.device());
 			gemm(context, 'n', 't', data.C_tested, data.A, data.B, 1.1, 0.1);
+			context.synchronize();
 			EXPECT_LT(data.getDifference(), 1.0e-4);
 		}
 	}
@@ -301,6 +307,7 @@ namespace ml
 			Context context(device);
 			data.moveTo(context.device());
 			gemm(context, 't', 'n', data.C_tested, data.A, data.B, 1.1, 0.1);
+			context.synchronize();
 			EXPECT_LT(data.getDifference(), 1.0e-4);
 		}
 	}
@@ -321,6 +328,7 @@ namespace ml
 			Context context(device);
 			data.moveTo(context.device());
 			gemm(context, 't', 't', data.C_tested, data.A, data.B, 1.1, 0.1);
+			context.synchronize();
 			EXPECT_LT(data.getDifference(), 1.0e-4);
 		}
 	}
@@ -339,6 +347,7 @@ namespace ml
 			Context context(device);
 			data.moveTo(context.device());
 			gemm_ex(context, data.D_tested, 1.1f, 'n', data.A, 't', data.B, 0.1f, data.C_tested, data.bias, ActivationType::RELU);
+			context.synchronize();
 			EXPECT_LT(data.getDifferenceEx(), 1.0e-4);
 		}
 	}
@@ -359,6 +368,7 @@ namespace ml
 			Context context(device);
 			data.moveTo(context.device());
 			gemm_ex(context, data.D_tested, 1.1f, 'n', data.A, 't', data.B, 0.1f, data.C_tested, data.bias, ActivationType::RELU);
+			context.synchronize();
 			EXPECT_LT(data.getDifferenceEx(), 1.0e-4);
 		}
 	}

@@ -19,7 +19,7 @@ namespace ml
 		cudaEvent_t *result = new cudaEvent_t();
 		cudaError_t status = cudaEventCreate(result);
 		assert(status == cudaSuccess);
-		status = cudaEventRecord(*result, cuda::Context::getStream(context));
+		status = cudaEventRecord(*result, ml::cuda_backend::Context::getStream(context));
 		assert(status == cudaSuccess);
 		return reinterpret_cast<mlEvent_t*>(result);
 	}

@@ -88,6 +88,7 @@ namespace ml
 			testing::initForTest(matrix, 1.0f);
 
 			im2row(context, matrix, input, kernel_size, false, nullptr);
+			context.synchronize();
 			EXPECT_EQ(testing::diffForTest(correct, matrix), 0.0f);
 		}
 	}
@@ -115,6 +116,7 @@ namespace ml
 			testing::initForTest(matrix, 1.0f);
 
 			im2row(context, matrix, input, kernel_size, true, nullptr);
+			context.synchronize();
 			EXPECT_EQ(testing::diffForTest(correct, matrix), 0.0f);
 		}
 	}
@@ -142,6 +144,7 @@ namespace ml
 			testing::initForTest(matrix, 1.0f);
 
 			im2row(context, matrix, input, kernel_size, false, nullptr);
+			context.synchronize();
 			EXPECT_EQ(testing::diffForTest(correct, matrix), 0.0f);
 		}
 	}
@@ -169,6 +172,7 @@ namespace ml
 			testing::initForTest(matrix, 1.0f);
 
 			im2row(context, matrix, input, kernel_size, true, nullptr);
+			context.synchronize();
 			EXPECT_EQ(testing::diffForTest(correct, matrix), 0.0f);
 		}
 	}

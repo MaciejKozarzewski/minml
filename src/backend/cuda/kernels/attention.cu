@@ -393,7 +393,7 @@ namespace
 		cublasOperation_t transa = ml::is_transpose(opA) ? CUBLAS_OP_T : CUBLAS_OP_N;
 		cublasOperation_t transb = ml::is_transpose(opB) ? CUBLAS_OP_T : CUBLAS_OP_N;
 
-		cublasHandle_t handle = ml::cuda::Context::getHandle(context);
+		cublasHandle_t handle = ml::cuda_backend::Context::getHandle(context);
 		cublasStatus_t err = cublasSetMathMode(handle, CUBLAS_DEFAULT_MATH);
 		assert(err == CUBLAS_STATUS_SUCCESS);
 		switch (dtype)
@@ -411,7 +411,7 @@ namespace
 			{
 				const float _alpha = alpha;
 				const float _beta = beta;
-				if (ml::cuda::Context::allowsTF32(context))
+				if (ml::cuda_backend::Context::allowsTF32(context))
 				{
 					cublasStatus_t status = cublasGemmBatchedEx(handle, transb, transa, N, M, K, &_alpha, ml::getPointer<void*>(B), CUDA_R_32F, ldb,
 							ml::getPointer<void*>(A), CUDA_R_32F, lda, &_beta, ml::getPointer<void*>(C), CUDA_R_32F, ldc, batch_count,
@@ -526,7 +526,7 @@ namespace ml
 		const int qkv_stride = input_shape.dim[3];
 
 		const int num_pointers = batch_size * num_heads;
-		void **pointers = getPointer<void*>(cuda::Context::getWorkspace(context));
+		void **pointers = getPointer<void*>(ml::cuda_backend::Context::getWorkspace(context));
 
 		void **q_ptr = pointers + 0 * num_pointers;
 		void **k_ptr = pointers + 1 * num_pointers;
@@ -534,7 +534,7 @@ namespace ml
 		void **qk_ptr = pointers + 3 * num_pointers;
 		void **out_ptr = pointers + 4 * num_pointers;
 
-		cudaStream_t stream = cuda::Context::getStream(context);
+		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
 
 		void *qk_tensor_ptr = (backward_data == nullptr) ? workspace : backward_data;
 
@@ -591,7 +591,7 @@ namespace ml
 		void *update_workspace = reinterpret_cast<void*>(reinterpret_cast<uint8_t*>(workspace) + 2 * offset);
 
 		const int num_pointers = batch_size * num_heads;
-		void **pointers = getPointer<void*>(cuda::Context::getWorkspace(context));
+		void **pointers = getPointer<void*>(ml::cuda_backend::Context::getWorkspace(context));
 
 		void **q_ptr = pointers + 0 * num_pointers;
 		void **k_ptr = pointers + 1 * num_pointers;
@@ -608,7 +608,7 @@ namespace ml
 //		float *q_rms_workspace = reinterpret_cast<float*>(pointers + 10 * num_pointers);
 //		float *k_rms_workspace = q_rms_workspace + num_pointers * tokens;
 
-		cudaStream_t stream = cuda::Context::getStream(context);
+		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
 
 		const float scale = 1.0f / std::sqrt(head_dim);
 		kernel_calculate_pointers<<<1, 1024, 0, stream>>>(q_ptr, k_ptr, v_ptr, const_cast<void*>(input), qk_ptr, qk_tensor_ptr, out_ptr, nullptr,

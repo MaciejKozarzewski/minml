@@ -64,11 +64,19 @@ namespace ml
 		}
 		__device__ __forceinline__ half relu(half x)
 		{
+#if __CUDA_ARCH__ >= 700
 			return __hmax(half(0.0f), x);
+#else
+			return half{};
+#endif
 		}
 		__device__ __forceinline__ half2 relu(half2 x)
 		{
+#if __CUDA_ARCH__ >= 700
 			return __hmax2(half2(0.0f, 0.0f), x);
+#else
+			return half2{};
+#endif
 		}
 
 		__device__ __forceinline__ float tanh(float x)
@@ -77,15 +85,23 @@ namespace ml
 		}
 		__device__ __forceinline__ half tanh(half x)
 		{
+#if __CUDA_ARCH__ >= 700
 			const half p = hexp(x);
 			const half m = hexp(-x);
 			return (p - m) / (p + m);
+#else
+			return half{};
+#endif
 		}
 		__device__ __forceinline__ half2 tanh(half2 x)
 		{
+#if __CUDA_ARCH__ >= 700
 			const half2 p = h2exp(x);
 			const half2 m = h2exp(-x);
 			return (p - m) / (p + m);
+#else
+			return half2{};
+#endif
 		}
 
 		__device__ __forceinline__ float sigmoid(float x)
@@ -94,13 +110,21 @@ namespace ml
 		}
 		__device__ __forceinline__ half sigmoid(half x)
 		{
+#if __CUDA_ARCH__ >= 700
 			const half one(1.0f);
 			return one / (one + hexp(-x));
+#else
+			return half{};
+#endif
 		}
 		__device__ __forceinline__ half2 sigmoid(half2 x)
 		{
+#if __CUDA_ARCH__ >= 700
 			const half2 one(1.0f, 1.0f);
 			return one / (one + h2exp(-x));
+#else
+			return half2{};
+#endif
 		}
 
 		__device__ __forceinline__ float leaky_relu(float x)
@@ -109,11 +133,19 @@ namespace ml
 		}
 		__device__ __forceinline__ half leaky_relu(half x)
 		{
+#if __CUDA_ARCH__ >= 700
 			return (x >= half(0.0f)) ? x : half(0.1f) * x;
+#else
+			return half{};
+#endif
 		}
 		__device__ __forceinline__ half2 leaky_relu(half2 x)
 		{
+#if __CUDA_ARCH__ >= 700
 			return half2(leaky_relu(x.x), leaky_relu(x.y));
+#else
+			return half2{};
+#endif
 		}
 	}
 }

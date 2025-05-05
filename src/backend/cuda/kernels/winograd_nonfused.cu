@@ -38,6 +38,7 @@ namespace
 	__global__ void kernel_transform_weights(T *__restrict__ matrices, const T *__restrict__ weights, int output_filters, int input_filters,
 			bool invert)
 	{
+#if __CUDA_ARCH__ >= 700
 		constexpr int TileSize = KernelSize + TransformSize - 1;
 
 		Tile<T, KernelSize, KernelSize> tile;
@@ -68,12 +69,14 @@ namespace
 					matrices[matrices_indexer.at(row, col, blockIdx.y, f)] = transform(col, line);
 			}
 		}
+#endif
 	}
 
 	template<int KernelSize, int TransformSize, typename T>
 	__global__ void kernel_transform_input(T *__restrict__ matrices, const T *__restrict__ input, int batch_size, int height, int width,
 			int input_filters)
 	{
+#if __CUDA_ARCH__ >= 700
 		constexpr int TileSize = KernelSize + TransformSize - 1;
 		constexpr int Padding = KernelSize / 2;
 
@@ -103,11 +106,13 @@ namespace
 					matrices[matrices_indexer.at(row, col, tile_index, f)] = transform(col, line);
 			}
 		}
+#endif
 	}
 	template<int KernelSize, int TransformSize, typename T>
 	__global__ void kernel_transform_output(const T *__restrict__ matrices, T *__restrict__ output, const T *__restrict__ add,
 			const T *__restrict__ bias, mlActivationType_t activation, int batch_size, int height, int width, int output_filters)
 	{
+#if __CUDA_ARCH__ >= 700
 		constexpr int TileSize = KernelSize + TransformSize - 1;
 
 		Tile<T, TileSize, TileSize> tile;
@@ -165,12 +170,14 @@ namespace
 				}
 			}
 		}
+#endif
 	}
 
 	template<int KernelSize, int TransformSize, typename T>
 	__global__ void kernel_transform_gradient(T *__restrict__ matrices, const T *__restrict__ gradient, int batch_size, int height, int width,
 			int output_filters)
 	{
+#if __CUDA_ARCH__ >= 700
 		constexpr int TileSize = KernelSize + TransformSize - 1;
 
 		Tile<T, TransformSize, TransformSize> tile;
@@ -198,11 +205,13 @@ namespace
 					matrices[matrices_indexer.at(row, col, tile_index, f)] = transform(col, line);
 			}
 		}
+#endif
 	}
 
 	template<int KernelSize, int TransformSize, typename T, typename U>
 	__global__ void kernel_transform_update(const T *__restrict__ matrices, U *__restrict__ update, int output_filters, int input_filters)
 	{
+#if __CUDA_ARCH__ >= 700
 		constexpr int TileSize = KernelSize + TransformSize - 1;
 
 		Tile<T, TileSize, TileSize> tile;
@@ -225,6 +234,7 @@ namespace
 					update[update_indexer.at(blockIdx.y, row, col, f)] = transform(col, line);
 			}
 		}
+#endif
 	}
 
 	/*
@@ -260,7 +270,7 @@ namespace
 
 		dim3 blockSize(std::min(128, filters_in));
 		dim3 gridSize(1, filters_out);
-		cudaStream_t stream = cuda::Context::getStream(context);
+		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
 
 		if (kernel_size == 3)
 		{
@@ -287,7 +297,7 @@ namespace
 
 		const int tiles_h = get_number_of_tiles(height, tile_size);
 		const int tiles_w = get_number_of_tiles(width, tile_size);
-		cudaStream_t stream = cuda::Context::getStream(context);
+		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
 
 		dim3 blockSize(std::min(128, filters));
 		dim3 gridSize(tiles_h, tiles_w, x.dim[0]);
@@ -319,7 +329,7 @@ namespace
 
 		const int tiles_h = get_number_of_tiles(height, tile_size);
 		const int tiles_w = get_number_of_tiles(width, tile_size);
-		cudaStream_t stream = cuda::Context::getStream(context);
+		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
 
 		dim3 blockSize(std::min(128, filters));
 		dim3 gridSize(tiles_h, tiles_w, batch_size);
@@ -353,7 +363,7 @@ namespace
 
 		const int tiles_h = get_number_of_tiles(height, tile_size);
 		const int tiles_w = get_number_of_tiles(width, tile_size);
-		cudaStream_t stream = cuda::Context::getStream(context);
+		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
 
 		dim3 blockSize(std::min(128, filters));
 		dim3 gridSize(tiles_h, tiles_w, dy.dim[0]);
@@ -383,7 +393,7 @@ namespace
 
 		dim3 blockSize(std::min(128, filters_in));
 		dim3 gridSize(1, filters_out);
-		cudaStream_t stream = cuda::Context::getStream(context);
+		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
 
 		if (kernel_size == 3)
 		{

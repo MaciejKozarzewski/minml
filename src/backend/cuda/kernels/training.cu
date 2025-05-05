@@ -280,13 +280,13 @@ namespace ml
 	{
 		const int elements = volume(output);
 
-		assert(cuda::Context::getWorkspaceSize(context) >= 1024 * sizeof(float));
+		assert(ml::cuda_backend::Context::getWorkspaceSize(context) >= 1024 * sizeof(float));
 
-		float *workspace = cuda::Context::getWorkspace<float>(context);
+		float *workspace = ml::cuda_backend::Context::getWorkspace<float>(context);
 
 		dim3 blockDim(256);
-		dim3 gridDim = cuda::gridSize<1024>(elements, blockDim.x);
-		cudaStream_t stream = cuda::Context::getStream(context);
+		dim3 gridDim = ml::cuda_backend::gridSize<1024>(elements, blockDim.x);
+		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
 
 		switch (output.dtype)
 		{
@@ -307,13 +307,13 @@ namespace ml
 	{
 		const int elements = volume(output);
 
-		assert(cuda::Context::getWorkspaceSize(context) >= 1024 * sizeof(float));
+		assert(ml::cuda_backend::Context::getWorkspaceSize(context) >= 1024 * sizeof(float));
 
-		float *workspace = cuda::Context::getWorkspace<float>(context);
+		float *workspace = ml::cuda_backend::Context::getWorkspace<float>(context);
 
 		dim3 blockDim(256);
-		dim3 gridDim = cuda::gridSize<1024>(elements, blockDim.x);
-		cudaStream_t stream = cuda::Context::getStream(context);
+		dim3 gridDim = ml::cuda_backend::gridSize<1024>(elements, blockDim.x);
+		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
 
 		switch (output.dtype)
 		{
@@ -336,8 +336,8 @@ namespace ml
 		const int elements = volume(output);
 
 		dim3 blockDim(256);
-		dim3 gridDim = cuda::gridSize<1024>(elements, blockDim.x);
-		cudaStream_t stream = cuda::Context::getStream(context);
+		dim3 gridDim = ml::cuda_backend::gridSize<1024>(elements, blockDim.x);
+		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
 
 		switch (output.dtype)
 		{
@@ -369,9 +369,9 @@ namespace ml
 		assert(step > 0);
 		if (num_tensors <= 0)
 			return;
-		cudaStream_t stream = cuda::Context::getStream(context);
+		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
 
-		radam_tensors *cpu_workspace = reinterpret_cast<radam_tensors*>(cuda::Context::getCpuWorkspace(context));
+		radam_tensors *cpu_workspace = reinterpret_cast<radam_tensors*>(ml::cuda_backend::Context::getCpuWorkspace(context));
 		for (int i = 0; i < num_tensors; i++)
 		{
 			assert(is_fp32(gradients[i]));
@@ -392,7 +392,7 @@ namespace ml
 			cpu_workspace[i].elements = volume(gradients[i]);
 		}
 
-		radam_tensors *device_workspace = cuda::Context::getWorkspace<radam_tensors>(context);
+		radam_tensors *device_workspace = ml::cuda_backend::Context::getWorkspace<radam_tensors>(context);
 		cudaError_t status = cudaMemcpyAsync(device_workspace, cpu_workspace, sizeof(radam_tensors) * num_tensors, cudaMemcpyHostToDevice, stream);
 		assert(status == cudaSuccess);
 
@@ -407,9 +407,9 @@ namespace ml
 		assert(step > 0);
 		if (num_tensors <= 0)
 			return;
-		cudaStream_t stream = cuda::Context::getStream(context);
+		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
 
-		radam_tensors *cpu_workspace = reinterpret_cast<radam_tensors*>(cuda::Context::getCpuWorkspace(context));
+		radam_tensors *cpu_workspace = reinterpret_cast<radam_tensors*>(ml::cuda_backend::Context::getCpuWorkspace(context));
 		for (int i = 0; i < num_tensors; i++)
 		{
 			assert(is_fp32(gradients[i]));
@@ -429,7 +429,7 @@ namespace ml
 			cpu_workspace[i].elements = volume(gradients[i]);
 		}
 
-		radam_tensors *device_workspace = cuda::Context::getWorkspace<radam_tensors>(context);
+		radam_tensors *device_workspace = ml::cuda_backend::Context::getWorkspace<radam_tensors>(context);
 		cudaError_t status = cudaMemcpyAsync(device_workspace, cpu_workspace, sizeof(radam_tensors) * num_tensors, cudaMemcpyHostToDevice, stream);
 		assert(status == cudaSuccess);
 
@@ -443,9 +443,9 @@ namespace ml
 	{
 		if (num_tensors <= 0)
 			return;
-		cudaStream_t stream = cuda::Context::getStream(context);
+		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
 
-		nan_inf_tensors *cpu_workspace = reinterpret_cast<nan_inf_tensors*>(cuda::Context::getCpuWorkspace(context));
+		nan_inf_tensors *cpu_workspace = reinterpret_cast<nan_inf_tensors*>(ml::cuda_backend::Context::getCpuWorkspace(context));
 		for (int i = 0; i < num_tensors; i++)
 		{
 			cpu_workspace[i].data = tensor[i].data;
@@ -453,7 +453,7 @@ namespace ml
 			cpu_workspace[i].flag = 0u;
 		}
 
-		nan_inf_tensors *device_workspace = cuda::Context::getWorkspace<nan_inf_tensors>(context);
+		nan_inf_tensors *device_workspace = ml::cuda_backend::Context::getWorkspace<nan_inf_tensors>(context);
 		cudaError_t status = cudaMemcpyAsync(device_workspace, cpu_workspace, sizeof(nan_inf_tensors) * num_tensors, cudaMemcpyHostToDevice, stream);
 		assert(status == cudaSuccess);
 

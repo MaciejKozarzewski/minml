@@ -62,42 +62,6 @@ namespace
 		const int tid = N * (blockIdx.x * blockDim.x + threadIdx.x);
 		if (tid < last_dim)
 		{
-//			const vec<T, N> _mean = load_vec<T, N>(avg_var + tid);
-//			const vec<T, N> _variance = load_vec<T, N>(avg_var + tid + last_dim);
-//			const vec<T, N> _gamma = (weights != nullptr) ? vec<T, N>(weights + tid) : one<T, N>();
-//			const vec<T, N> _beta = (bias != nullptr) ? vec<T, N>(bias + tid) : zero<T, N>();
-//
-//			const vec<T, N> epsilon(1.0e-6f);
-//
-//			const vec<T, N> scale = _gamma / vectors::sqrt(_variance + epsilon);
-//			const vec<T, N> shift = -_mean * scale + _beta;
-//
-//			for (int i = blockIdx.y * blockDim.y + threadIdx.y; i < first_dim; i += gridDim.y * blockDim.y)
-//			{
-//				const int tmp_idx = i * last_dim + tid;
-//				vec<T, N> tmp(input + tmp_idx);
-//				tmp = tmp * scale + shift;
-//				switch (act)
-//				{
-//					case ml::ACTIVATION_SIGMOID:
-//						tmp = vectors::sigmoid(tmp);
-//						break;
-//					case ml::ACTIVATION_TANH:
-//						tmp = vectors::tanh(tmp);
-//						break;
-//					case ml::ACTIVATION_RELU:
-//						tmp = vectors::relu(tmp);
-//						break;
-//					case ml::ACTIVATION_LEAKY_RELU:
-//						tmp = select(tmp > zero<T, N>(), tmp, tmp * vec<T, N>(0.1f));
-//						break;
-//				}
-//				tmp *= vec<T, N>(alpha);
-//				if (beta != 0.0f)
-//					tmp += vec<T, N>(beta) * vec<T, N>(output + tmp_idx);
-//				tmp.store(output + tmp_idx);
-//			}
-
 			const vec<float, N> _mean = load_vec<float, N>(avg_var + tid);
 			const vec<float, N> _variance = load_vec<float, N>(avg_var + tid + last_dim);
 			const vec<float, N> _gamma = (weights != nullptr) ? load_vec<float, N>(weights + tid) : one<float, N>();
@@ -240,40 +204,6 @@ namespace
 		vec<float, N> d_mu_acc(0.0f);
 		if (tid < last_dim)
 		{
-//			const vec<T, N> epsilon(1.0e-6f);
-//			const vec<T, N> _mean = load_vec<T, N>(avg_var + tid);
-//			const vec<T, N> _stddev = vectors::sqrt(load_vec<T, N>(avg_var + tid + last_dim) + epsilon);
-//			const vec<T, N> _gamma = (weights != nullptr) ? vec<T, N>(weights + tid) : one<T, N>();
-//			const vec<T, N> _beta = (bias != nullptr) ? vec<T, N>(bias + tid) : zero<T, N>();
-//
-//			for (int i = blockDim.y * blockIdx.y + threadIdx.y; i < first_dim; i += blockDim.y * gridDim.y)
-//			{
-//				const int tmp_idx = i * last_dim + tid;
-//				vec<T, N> grad(gradient_next + tmp_idx);
-//				const vec<T, N> inp(input + tmp_idx);
-//				const vec<T, N> hat_inp = (inp - _mean) / _stddev;
-//				vec<T, N> out = _gamma * hat_inp + _beta;
-//				switch (act)
-//				{
-//					case ml::ACTIVATION_SIGMOID:
-//						out = vectors::sigmoid(out);
-//						grad *= out * (one<T, N>() - out);
-//						break;
-//					case ml::ACTIVATION_TANH:
-//						grad *= (one<T, N>() - square(vectors::tanh(out)));
-//						break;
-//					case ml::ACTIVATION_RELU:
-//						grad = select(out > zero<T, N>(), grad, zero<T, N>());
-//						break;
-//					case ml::ACTIVATION_LEAKY_RELU:
-//						grad = select(out > zero<T, N>(), grad, grad * vec<T, N>(0.1f));
-//						break;
-//				}
-//				d_sigma_acc += convert<float, T, N>(grad * hat_inp);
-//				d_mu_acc += convert<float, T, N>(grad);
-//				grad.store(gradient_next + tmp_idx);
-//			}
-
 			const vec<float, N> epsilon(1.0e-6f);
 			const vec<float, N> _mean = load_vec<float, N>(avg_var + tid);
 			const vec<float, N> _stddev = vectors::sqrt(load_vec<float, N>(avg_var + tid + last_dim) + epsilon);
@@ -436,7 +366,7 @@ namespace
 		const float scale = gamma / stddev;
 		const float shift = -mean * scale + beta;
 		for (int i = threadIdx.x; i < last_dim; i += blockDim.x)
-			layer_weights[blockIdx.x * last_dim + i] *= scale;
+			layer_weights[blockIdx.x * last_dim + i] = static_cast<float>(layer_weights[blockIdx.x * last_dim + i]) * scale;
 
 		if (threadIdx.x == 0)
 			layer_bias[blockIdx.x] = static_cast<float>(layer_bias[blockIdx.x]) * scale + shift;
@@ -451,7 +381,7 @@ namespace
 				const float stddev = sqrt(static_cast<float>(bn_avg_var[j + last_dim]) + 1.0e-6f);
 				const float gamma = (bn_weights != nullptr) ? static_cast<float>(bn_weights[j]) : 1.0f;
 				const float scale = gamma / stddev;
-				layer_weights[i * last_dim + j] *= scale;
+				layer_weights[i * last_dim + j] = static_cast<float>(layer_weights[i * last_dim + j]) * scale;
 
 				if (i == 0)
 				{
@@ -478,7 +408,7 @@ namespace ml
 		dim3 gridDim_x1((last_dim + 31) / 32, std::min(256, (first_dim + 7) / 8));
 		dim3 gridDim_x4((last_dim + 127) / 128, std::min(256, (first_dim + 7) / 8));
 
-		cudaStream_t stream = ml::cuda::Context::getStream(context);
+		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
 		switch (x.dtype)
 		{
 			case DTYPE_FLOAT16:
@@ -515,9 +445,9 @@ namespace ml
 		const int last_dim = get_last_dim(x);
 		assert(running_stats.dim[0] == 3 * last_dim);
 
-		AvgVarStats<float> *workspace = ml::cuda::Context::getWorkspace<AvgVarStats<float>>(context);
+		AvgVarStats<float> *workspace = ml::cuda_backend::Context::getWorkspace<AvgVarStats<float>>(context);
 		const int workspace_first_dim = std::min((size_t) 256,
-				ml::cuda::Context::getWorkspaceSize(context) / (sizeof(AvgVarStats<float> ) * last_dim));
+				ml::cuda_backend::Context::getWorkspaceSize(context) / (sizeof(AvgVarStats<float> ) * last_dim));
 		assert(workspace_first_dim > 0);
 
 		AvgVarStats<float> *running_stats_ptr = data<AvgVarStats<float>>(running_stats);
@@ -526,7 +456,7 @@ namespace ml
 		dim3 gridDim1_x1((last_dim + 31) / 32, workspace_first_dim);
 		dim3 gridDim1_x4((last_dim + 127) / 128, workspace_first_dim);
 
-		cudaStream_t stream = ml::cuda::Context::getStream(context);
+		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
 
 		switch (x.dtype)
 		{
@@ -569,11 +499,11 @@ namespace ml
 		const int first_dim = volume_without_last_dim(x);
 		const int last_dim = get_last_dim(x);
 
-		float *avg_var = ml::cuda::Context::getWorkspace<float>(context);
+		float *avg_var = ml::cuda_backend::Context::getWorkspace<float>(context);
 		float *d_sigma_mu = avg_var + 2 * last_dim;
-		const int workspace_first_dim = std::min((size_t) 256, ml::cuda::Context::getWorkspaceSize(context) / (2 * sizeof(float) * last_dim) - 2);
+		const int workspace_first_dim = std::min((size_t) 256, ml::cuda_backend::Context::getWorkspaceSize(context) / (2 * sizeof(float) * last_dim) - 2);
 
-		cudaStream_t stream = ml::cuda::Context::getStream(context);
+		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
 		const AvgVarStats<float> *running_stats_ptr = data<AvgVarStats<float>>(running_stats);
 
 		kernel_calculate_avg_var<float> <<<1, 1024, 0, stream>>>(avg_var, running_stats_ptr, last_dim);
@@ -666,7 +596,7 @@ namespace ml
 		const int first_dim = get_first_dim(running_stat);
 		const int last_dim = get_last_dim(running_stat) / 3;
 
-		cudaStream_t stream = ml::cuda::Context::getStream(context);
+		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
 
 		dim3 blockDim(32, 32);
 		dim3 gridDim((last_dim + 31) / 32);
@@ -677,7 +607,7 @@ namespace ml
 			const mlTensor_t bn_bias, const mlTensor_t bn_avg_var)
 	{
 		assert(bn_avg_var.dtype == DTYPE_FLOAT32);
-		cudaStream_t stream = ml::cuda::Context::getStream(context);
+		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
 		if (layer_weights.rank == 3)
 		{ // depthwise conv2D
 			const int first_dim = volume_without_last_dim(layer_weights);

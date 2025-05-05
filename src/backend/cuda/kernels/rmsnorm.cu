@@ -224,7 +224,7 @@ namespace ml
 		dim3 blockDim(256);
 		dim3 gridDim(std::min(1024, first_dim));
 
-		cudaStream_t stream = ml::cuda::Context::getStream(context);
+		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
 
 		const bool use_gamma = (weights != nullptr);
 
@@ -263,13 +263,13 @@ namespace ml
 
 		dim3 blockDim(32, 4);
 
-		float *workspace = ml::cuda::Context::getWorkspace<float>(context);
+		float *workspace = ml::cuda_backend::Context::getWorkspace<float>(context);
 		const int workspace_first_dim = std::min((size_t) std::min((first_dim + (int) blockDim.y - 1) / (int) blockDim.y, 128),
-				cuda::Context::getWorkspaceSize(context) / (sizeof(float) * last_dim));
+				ml::cuda_backend::Context::getWorkspaceSize(context) / (sizeof(float) * last_dim));
 
 		dim3 gridDim(1, workspace_first_dim);
 
-		cudaStream_t stream = ml::cuda::Context::getStream(context);
+		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
 
 		float *partial_weights_update = workspace;
 		const bool use_gamma = (weights != nullptr);

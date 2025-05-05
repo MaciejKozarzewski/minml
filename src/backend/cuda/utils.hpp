@@ -23,7 +23,7 @@
 
 namespace ml
 {
-	namespace cuda
+	namespace cuda_backend
 	{
 		class Context
 		{

@@ -111,7 +111,7 @@ namespace ml
 		const int LDB = get_last_dim(B);
 		const int LDC = get_last_dim(C);
 
-		cublasHandle_t handle = cuda::Context::getHandle(context);
+		cublasHandle_t handle = ml::cuda_backend::Context::getHandle(context);
 		cublasStatus_t err = cublasSetMathMode(handle, CUBLAS_DEFAULT_MATH);
 		assert(err == CUBLAS_STATUS_SUCCESS);
 		switch (C.dtype)
@@ -147,7 +147,7 @@ namespace ml
 				const float _beta = beta;
 				if (is_fp32(A))
 				{
-					if (ml::cuda::Context::allowsTF32(context))
+					if (ml::cuda_backend::Context::allowsTF32(context))
 					{
 						cublasStatus_t status = cublasGemmEx(handle, op_B, op_A, M, N, K, &_alpha, B.data, CUDA_R_32F, LDB, A.data, CUDA_R_32F, LDA,
 								&_beta, C.data, CUDA_R_32F, LDC, CUBLAS_COMPUTE_32F_FAST_TF32, CUBLAS_GEMM_DEFAULT);
@@ -200,7 +200,7 @@ namespace ml
 		const int strideB = get_batch_stride(B);
 		const int strideC = get_batch_stride(C);
 
-		cublasHandle_t handle = cuda::Context::getHandle(context);
+		cublasHandle_t handle = ml::cuda_backend::Context::getHandle(context);
 		cublasStatus_t err = cublasSetMathMode(handle, CUBLAS_DEFAULT_MATH);
 		assert(err == CUBLAS_STATUS_SUCCESS);
 		switch (C.dtype)
@@ -224,7 +224,7 @@ namespace ml
 				const float _beta = beta;
 				if (is_fp32(A))
 				{
-					if (ml::cuda::Context::allowsTF32(context))
+					if (ml::cuda_backend::Context::allowsTF32(context))
 					{
 						cublasStatus_t status = cublasGemmStridedBatchedEx(handle, op_B, op_A, M, N, K, &_alpha, B.data, CUDA_R_32F, LDB, strideB,
 								A.data, CUDA_R_32F, LDA, strideA, &_beta, C.data, CUDA_R_32F, LDC, strideC, batch, CUBLAS_COMPUTE_32F_FAST_TF32,
@@ -273,7 +273,7 @@ namespace ml
 		const int LDB = get_last_dim(shape_B);
 		const int LDC = get_last_dim(shape_C);
 
-		cublasHandle_t handle = cuda::Context::getHandle(context);
+		cublasHandle_t handle = ml::cuda_backend::Context::getHandle(context);
 		cublasStatus_t err = cublasSetMathMode(handle, CUBLAS_DEFAULT_MATH);
 		assert(err == CUBLAS_STATUS_SUCCESS);
 		switch (dtype)
@@ -313,7 +313,7 @@ namespace ml
 			{
 				const float _alpha = alpha;
 				const float _beta = beta;
-				if (ml::cuda::Context::allowsTF32(context))
+				if (ml::cuda_backend::Context::allowsTF32(context))
 				{
 					cublasStatus_t status = cublasGemmEx(handle, op_B, op_A, M, N, K, &_alpha, getPointer<void>(B), CUDA_R_32F, LDB,
 							getPointer<void>(A), CUDA_R_32F, LDA, &_beta, getPointer<void>(C), CUDA_R_32F, LDC, CUBLAS_COMPUTE_32F_FAST_TF32,
@@ -361,7 +361,7 @@ namespace ml
 		const int strideB = get_batch_stride(shape_B);
 		const int strideC = get_batch_stride(shape_C);
 
-		cublasHandle_t handle = cuda::Context::getHandle(context);
+		cublasHandle_t handle = ml::cuda_backend::Context::getHandle(context);
 		cublasStatus_t err = cublasSetMathMode(handle, CUBLAS_DEFAULT_MATH);
 		assert(err == CUBLAS_STATUS_SUCCESS);
 		switch (dtype)
@@ -379,7 +379,7 @@ namespace ml
 			{
 				const float _alpha = alpha;
 				const float _beta = beta;
-				if (ml::cuda::Context::allowsTF32(context))
+				if (ml::cuda_backend::Context::allowsTF32(context))
 				{
 					cublasStatus_t status = cublasGemmStridedBatchedEx(handle, op_B, op_A, M, N, K, &_alpha, getPointer<void>(B), CUDA_R_32F, LDB,
 							strideB, getPointer<void>(A), CUDA_R_32F, LDA, strideA, &_beta, getPointer<void>(C), CUDA_R_32F, LDC, strideC, batch,

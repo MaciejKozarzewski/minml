@@ -19,8 +19,6 @@
 
 namespace
 {
-	using namespace ml::cuda;
-
 	template<typename T>
 	__global__ void kernel_setall(T *ptr, int length, T value)
 	{
@@ -183,11 +181,12 @@ namespace ml
 	{
 		assert(dst != nullptr);
 		void *tmp_dst = getPointer<uint8_t>(dst) + dst_offset;
+		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
 		if (src == nullptr)
 		{
 			if (context == nullptr)
 			{
-				cuda::Context::use(context);
+				ml::cuda_backend::Context::use(context);
 				cudaError_t status = cudaMemset(tmp_dst, 0, dst_count);
 				assert(status == cudaSuccess);
 				status = cudaDeviceSynchronize(); // if launched from default stream this operation must be synchronous
@@ -195,7 +194,7 @@ namespace ml
 			}
 			else
 			{
-				cudaError_t status = cudaMemsetAsync(tmp_dst, 0, dst_count, cuda::Context::getStream(context));
+				cudaError_t status = cudaMemsetAsync(tmp_dst, 0, dst_count, stream);
 				assert(status == cudaSuccess);
 			}
 		}
@@ -207,16 +206,16 @@ namespace ml
 			switch (src_count)
 			{
 				case 1:
-					setall_launcher<uint8_t>(cuda::Context::getStream(context), tmp_dst, dst_count, src);
+					setall_launcher<uint8_t>(stream, tmp_dst, dst_count, src);
 					break;
 				case 2:
-					setall_launcher<uint16_t>(cuda::Context::getStream(context), tmp_dst, dst_count, src);
+					setall_launcher<uint16_t>(stream, tmp_dst, dst_count, src);
 					break;
 				case 4:
-					setall_launcher<uint32_t>(cuda::Context::getStream(context), tmp_dst, dst_count, src);
+					setall_launcher<uint32_t>(stream, tmp_dst, dst_count, src);
 					break;
 				case 8:
-					setall_launcher<uint64_t>(cuda::Context::getStream(context), tmp_dst, dst_count, src);
+					setall_launcher<uint64_t>(stream, tmp_dst, dst_count, src);
 					break;
 			}
 		}
@@ -234,7 +233,7 @@ namespace ml
 		else
 		{
 			cudaError_t status = cudaMemcpyAsync(getPointer<uint8_t>(dst) + dst_offset, getPointer<uint8_t>(src) + src_offset, count,
-					cudaMemcpyDeviceToDevice, cuda::Context::getStream(context));
+					cudaMemcpyDeviceToDevice, ml::cuda_backend::Context::getStream(context));
 			assert(status == cudaSuccess);
 
 		}
@@ -251,7 +250,7 @@ namespace ml
 		else
 		{
 			cudaError_t status = cudaMemcpyAsync(getPointer<uint8_t>(dst) + dst_offset, src, count, cudaMemcpyHostToDevice,
-					cuda::Context::getStream(context));
+					ml::cuda_backend::Context::getStream(context));
 			assert(status == cudaSuccess);
 
 		}
@@ -268,7 +267,7 @@ namespace ml
 		else
 		{
 			cudaError_t status = cudaMemcpyAsync(dst, getPointer<const uint8_t>(src) + src_offset, count, cudaMemcpyDeviceToHost,
-					cuda::Context::getStream(context));
+					ml::cuda_backend::Context::getStream(context));
 			assert(status == cudaSuccess);
 
 		}

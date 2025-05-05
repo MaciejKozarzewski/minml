@@ -68,6 +68,7 @@ namespace
 			__device__ void accumulate(Line<T, OutputTile> &acc, const Line<T, KernelSize + OutputTile - 1> &input,
 					const Line<T, KernelSize> &filter) const
 			{
+#if __CUDA_ARCH__ >= FP16_MIN_ARCH
 				for (int i = 0; i < OutputTile; i++)
 				{
 					T tmp = acc[i];
@@ -75,6 +76,7 @@ namespace
 						tmp += input[i + j] * filter[j];
 					acc[i] = tmp;
 				}
+#endif
 			}
 	};
 
@@ -82,6 +84,7 @@ namespace
 	__global__ void kernel_depthwise_conv_forward(float beta, T *y_ptr, float alpha, const T *x_ptr, const T *w_ptr, const T *b_ptr, int height,
 			int width, int channels, bool invert_filter)
 	{
+#if __CUDA_ARCH__ >= FP16_MIN_ARCH
 		assert(blockDim.x == 32);
 		assert(blockDim.y == TileSize);
 		constexpr int InputSize = TileSize + KernelSize - 1;
@@ -149,10 +152,12 @@ namespace
 				}
 			}
 		}
+#endif
 	}
 	template<int TileSize, int KernelSize, typename T, typename U>
 	__global__ void kernel_depthwise_conv_update(T *dw_ptr, const U *x_ptr, const U *dy_ptr, int batch_size, int height, int width, int channels)
 	{
+#if __CUDA_ARCH__ >= FP16_MIN_ARCH
 		assert(blockDim.x == 32);
 		assert(blockDim.y == KernelSize);
 		constexpr int InputSize = TileSize + KernelSize - 1;
@@ -214,10 +219,12 @@ namespace
 			for (int i = 0; i < KernelSize; i++)
 				dw_ptr[update_indexer.at(blockIdx.y, threadIdx.y, i, f)] = update_acc[i];
 		}
+#endif
 	}
 	template<typename T>
 	__global__ void kernel_sum_update(float beta, T *dst, float alpha, const float *src, int first_dim, int last_dim)
 	{
+#if __CUDA_ARCH__ >= FP16_MIN_ARCH
 		assert(blockDim.x == 32);
 		assert(blockDim.y == 32);
 		assert(gridDim.y == 1);
@@ -247,6 +254,7 @@ namespace
 				tmp += beta * static_cast<float>(dst[last_dim_idx]);
 			dst[last_dim_idx] = static_cast<T>(tmp);
 		}
+#endif
 	}
 
 	using namespace ml;
@@ -265,7 +273,7 @@ namespace
 		const int channels = w.dim[2];
 		assert(w.dim[0] == w.dim[1]);
 
-		cudaStream_t stream = ml::cuda::Context::getStream(context);
+		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
 
 		constexpr int channels_per_thread = std::is_same<T, half2>::value ? 2 : 1;
 		const int channels_per_block = 32 * channels_per_thread;
@@ -305,9 +313,9 @@ namespace
 		const int channels = dw.dim[2];
 		assert(dw.dim[0] == dw.dim[1]);
 
-		cudaStream_t stream = ml::cuda::Context::getStream(context);
-		float *workspace = getPointer<float>(ml::cuda::Context::getWorkspace(context));
-		const int workspace_size = ml::cuda::Context::getWorkspaceSize(context);
+		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
+		float *workspace = getPointer<float>(ml::cuda_backend::Context::getWorkspace(context));
+		const int workspace_size = ml::cuda_backend::Context::getWorkspaceSize(context);
 
 		const int last_dim = filter_size * filter_size * channels;
 		const int max_blocks = workspace_size / (sizeof(float) * last_dim);

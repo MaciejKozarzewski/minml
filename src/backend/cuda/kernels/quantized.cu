@@ -169,7 +169,7 @@ namespace
 
 		const int f = blockIdx.z * blockDim.x + threadIdx.x;
 
-		if (threadIdx.y == 0 and f < channels)
+		if (threadIdx.y == 0 && f < channels)
 		{
 			scale_tile[threadIdx.x] = (scales == nullptr) ? 1.0f : scales[f];
 			bias_tile[threadIdx.x] = (bias == nullptr) ? 0.0f : bias[f];
@@ -459,9 +459,9 @@ namespace ml
 		const int elements = volume(shape);
 		const int vect = (elements % 4 == 0) ? 4 : 1;
 		dim3 blockDim(256);
-		dim3 gridDim = cuda::gridSize<1024>(elements, blockDim.x * vect);
+		dim3 gridDim = ml::cuda_backend::gridSize<1024>(elements, blockDim.x * vect);
 
-		cudaStream_t stream = cuda::Context::getStream(context);
+		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
 
 		switch (dtype)
 		{
@@ -494,7 +494,7 @@ namespace ml
 	}
 	void cuda_dequantize(mlContext_t context, mlDataType_t dtype, const void *input, void *output, int elements, float scale, float shift)
 	{
-		cudaStream_t stream = cuda::Context::getStream(context);
+		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
 		dim3 blockDim(256);
 		dim3 gridDim(std::min(1024, (elements + 255) / 256));
 
@@ -525,7 +525,7 @@ namespace ml
 		const int channels = weights_shape.dim[2];
 		assert(weights_shape.dim[0] == weights_shape.dim[1]);
 
-		cudaStream_t stream = cuda::Context::getStream(context);
+		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
 
 		constexpr int TileSize = 4;
 
@@ -563,7 +563,7 @@ namespace ml
 	void cuda_quantized_scale_shift_act(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, mlQuantizationData_t output_qd,
 			const void *input, const void *scales, const void *bias, mlActivationType_t act, const void *ext, mlQuantizationData_t ext_qd)
 	{
-		cudaStream_t stream = cuda::Context::getStream(context);
+		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
 
 		const int first_dim = volume_without_last_dim(shape);
 		const int last_dim = get_last_dim(shape);
@@ -601,20 +601,20 @@ namespace ml
 		const int width = input_shape.dim[2];
 		const int channels = input_shape.dim[3];
 
-		cudaStream_t stream = cuda::Context::getStream(context);
+		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
 		dim3 blockSize(128);
 		dim3 gridSize(batch_size, height, width);
 
-		int *workspace = ml::cuda::Context::getWorkspace<int>(context);
+		int *workspace = ml::cuda_backend::Context::getWorkspace<int>(context);
 		if ((dtype == DTYPE_FLOAT16 || dtype == DTYPE_FLOAT32) && (channels % 4 == 0))
 		{
-			assert(ml::cuda::Context::getWorkspaceSize(context) >= height * width * kernel_size * kernel_size * channels / 4 * sizeof(int));
+			assert(ml::cuda_backend::Context::getWorkspaceSize(context) >= height * width * kernel_size * kernel_size * channels / 4 * sizeof(int));
 			kernel_calculate_receptive_field_offsets<<<dim3(height, width), dim3(32, kernel_size), 0, stream>>>(workspace, height, width,
 					channels / 4, kernel_size, kernel_size, invert);
 		}
 		else
 		{
-			assert(ml::cuda::Context::getWorkspaceSize(context) >= height * width * kernel_size * kernel_size * channels * sizeof(int));
+			assert(ml::cuda_backend::Context::getWorkspaceSize(context) >= height * width * kernel_size * kernel_size * channels * sizeof(int));
 			kernel_calculate_receptive_field_offsets<<<dim3(height, width), dim3(32, kernel_size), 0, stream>>>(workspace, height, width, channels,
 					kernel_size, kernel_size, invert);
 		}
@@ -646,7 +646,7 @@ namespace ml
 
 //		const int last_dim = get_last_dim(input_shape);
 //
-//		cudaStream_t stream = cuda::Context::getStream(context);
+//		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
 //		dim3 blockSize(256);
 //		dim3 gridSize(std::min(2048, (volume(input_shape) + 255) / 256));
 //

@@ -162,7 +162,7 @@ namespace
 	void convert_helper(cudaStream_t stream, void *dst, const void *src, mlDataType_t src_dtype, int elements)
 	{
 		const dim3 blockDim(256);
-		const dim3 gridDim = cuda::gridSize<1024>(elements, 256);
+		const dim3 gridDim = ml::cuda_backend::gridSize<1024>(elements, 256);
 		switch (src_dtype)
 		{
 			case DTYPE_FLOAT16:
@@ -199,7 +199,7 @@ namespace ml
 		const int last_dim = get_last_dim(shape);
 		dim3 blockDim = std::min(last_dim, 256);
 		dim3 gridDim = std::min(first_dim, 1024);
-		cudaStream_t stream = cuda::Context::getStream(context);
+		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
 
 		switch (dst_dtype)
 		{
@@ -231,7 +231,7 @@ namespace ml
 	{
 		if (elements == 0)
 			return;
-		cudaStream_t stream = cuda::Context::getStream(context);
+		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
 
 		if (dst_dtype == src_dtype && dst != src)
 		{ // same type, different locations, can just copy memory
@@ -272,7 +272,7 @@ namespace ml
 		assert(input != output);
 
 		dim3 blockDim(64, 8);
-		cudaStream_t stream = cuda::Context::getStream(context);
+		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
 
 		switch (dtype)
 		{
@@ -317,14 +317,14 @@ namespace ml
 		const int channels_out = get_last_dim(output_shape);
 		assert(channels_in * patch_size_h * patch_size_w == channels_out);
 
-		cudaStream_t stream = cuda::Context::getStream(context);
+		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
 
 		const int output_elements = output_shape.dim[1] * output_shape.dim[2] * output_shape.dim[3];
 		dim3 blockDim(256);
 		dim3 gridDim((output_elements + blockDim.x - 1) / blockDim.x);
 
-		int *offsets = getPointer<int>(cuda::Context::getWorkspace(context));
-		assert(output_elements * sizeof(int) <= cuda::Context::getWorkspaceSize(context));
+		int *offsets = getPointer<int>(ml::cuda_backend::Context::getWorkspace(context));
+		assert(output_elements * sizeof(int) <= ml::cuda_backend::Context::getWorkspaceSize(context));
 
 		kernel_calculate_space2depth_offsets<<<gridDim, blockDim, 0, stream>>>(offsets, height, width, channels_in, patch_size_h, patch_size_w);
 		assert(cudaGetLastError() == cudaSuccess);
@@ -358,14 +358,14 @@ namespace ml
 		const int channels_out = get_last_dim(output_shape);
 		assert(channels_out * patch_size_h * patch_size_w == channels_in);
 
-		cudaStream_t stream = cuda::Context::getStream(context);
+		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
 
 		const int input_elements = input_shape.dim[1] * input_shape.dim[2] * input_shape.dim[3];
 		dim3 blockDim(256);
 		dim3 gridDim((input_elements + blockDim.x - 1) / blockDim.x);
 
-		int *offsets = getPointer<int>(cuda::Context::getWorkspace(context));
-		assert(input_elements * sizeof(int) <= cuda::Context::getWorkspaceSize(context));
+		int *offsets = getPointer<int>(ml::cuda_backend::Context::getWorkspace(context));
+		assert(input_elements * sizeof(int) <= ml::cuda_backend::Context::getWorkspaceSize(context));
 
 		kernel_calculate_space2depth_offsets<<<gridDim, blockDim, 0, stream>>>(offsets, height, width, channels_out, patch_size_h, patch_size_w);
 		assert(cudaGetLastError() == cudaSuccess);

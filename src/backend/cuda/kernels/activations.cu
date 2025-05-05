@@ -125,9 +125,9 @@ namespace
 	void dispatch_activation_forward(mlContext_t context, float alpha, const mlTensor_t &x, float beta, mlTensor_t &y)
 	{
 		const int elements = volume(x);
-		cudaStream_t stream = ml::cuda::Context::getStream(context);
+		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
 		dim3 blockDim(256);
-		dim3 gridDim = ml::cuda::gridSize<1024>(elements, 256);
+		dim3 gridDim = ml::cuda_backend::gridSize<1024>(elements, 256);
 
 		switch (x.dtype)
 		{
@@ -154,9 +154,9 @@ namespace
 	void dispatch_activation_backward(mlContext_t context, float alpha, const mlTensor_t dy, const mlTensor_t y, float beta, mlTensor_t dx)
 	{
 		const int elements = volume(dx);
-		cudaStream_t stream = ml::cuda::Context::getStream(context);
+		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
 		dim3 blockDim(256);
-		dim3 gridDim = ml::cuda::gridSize<1024>(elements, 256);
+		dim3 gridDim = ml::cuda_backend::gridSize<1024>(elements, 256);
 		switch (dx.dtype)
 		{
 			case DTYPE_FLOAT16:
@@ -186,7 +186,7 @@ namespace
 	void dispatch_add_to_last_dim(mlContext_t context, float alpha, const mlTensor_t x, const mlTensor_t b, float beta, mlTensor_t y,
 			mlActivationType_t act)
 	{
-		cudaStream_t stream = ml::cuda::Context::getStream(context);
+		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
 		const int first_dim = volume_without_last_dim(x);
 		const int last_dim = get_last_dim(x);
 		dim3 blockDim(32, 8);

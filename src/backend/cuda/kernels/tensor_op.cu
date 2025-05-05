@@ -285,13 +285,13 @@ namespace
 		const int last_dim = volume(dst);
 		const int first_dim = volume(src) / last_dim;
 
-		assert(ml::cuda::Context::getWorkspaceSize(context) >= last_dim * sizeof(T));
+		assert(ml::cuda_backend::Context::getWorkspaceSize(context) >= last_dim * sizeof(T));
 
-		T *workspace = ml::cuda::Context::getWorkspace<T>(context);
-		const int workspace_first_dim = std::min((size_t) 256, ml::cuda::Context::getWorkspaceSize(context) / (sizeof(T) * last_dim));
+		T *workspace = ml::cuda_backend::Context::getWorkspace<T>(context);
+		const int workspace_first_dim = std::min((size_t) 256, ml::cuda_backend::Context::getWorkspaceSize(context) / (sizeof(T) * last_dim));
 
 		dim3 blockDim(32, 32);
-		cudaStream_t stream = ml::cuda::Context::getStream(context);
+		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
 
 		dim3 gridDim1((last_dim + 32 * N - 1) / (32 * N), workspace_first_dim);
 		dim3 gridDim2((last_dim + 32 * N - 1) / (32 * N));
@@ -313,8 +313,8 @@ namespace ml
 
 		const int length = volume(shape);
 		dim3 blockDim(256);
-		dim3 gridDim = cuda::gridSize<1024>(length, blockDim.x);
-		cudaStream_t stream = cuda::Context::getStream(context);
+		dim3 gridDim = ml::cuda_backend::gridSize<1024>(length, blockDim.x);
+		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
 
 		switch (dtype)
 		{
@@ -342,8 +342,8 @@ namespace ml
 
 		const int length = volume(shape);
 		dim3 blockDim(256);
-		dim3 gridDim = cuda::gridSize<1024>(length, blockDim.x);
-		cudaStream_t stream = cuda::Context::getStream(context);
+		dim3 gridDim = ml::cuda_backend::gridSize<1024>(length, blockDim.x);
+		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
 
 		switch (dtype)
 		{
@@ -410,7 +410,7 @@ namespace ml
 	void cuda_window_partitioning(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, mlShape_t output_shape, const void *input,
 			void *output, mlShape_t offset)
 	{
-		cudaStream_t stream = cuda::Context::getStream(context);
+		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
 
 		const int batch_size = input_shape.dim[0];
 		const int height = input_shape.dim[1];
@@ -443,7 +443,7 @@ namespace ml
 	void cuda_window_merging(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, mlShape_t output_shape, const void *input, void *output,
 			mlShape_t offset)
 	{
-		cudaStream_t stream = cuda::Context::getStream(context);
+		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
 
 		const int batch_size = output_shape.dim[0];
 		const int height = output_shape.dim[1];
@@ -488,7 +488,7 @@ namespace ml
 		dim3 blockDim(256);
 		dim3 gridDim(512);
 
-		cudaStream_t stream = cuda::Context::getStream(context);
+		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
 		switch (size_of(dtype))
 		{
 			case 1:
@@ -516,11 +516,11 @@ namespace ml
 		const int first_dim = volume_without_last_dim(y);
 		const int last_dim = get_last_dim(y);
 
-		assert(ml::cuda::Context::getWorkspaceSize(context) >= last_dim * sizeof(float));
+		assert(ml::cuda_backend::Context::getWorkspaceSize(context) >= last_dim * sizeof(float));
 
-		cudaStream_t stream = ml::cuda::Context::getStream(context);
-		float *workspace = ml::cuda::Context::getWorkspace<float>(context);
-		const int workspace_first_dim = std::min((size_t) 512, ml::cuda::Context::getWorkspaceSize(context) / (sizeof(float) * last_dim));
+		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
+		float *workspace = ml::cuda_backend::Context::getWorkspace<float>(context);
+		const int workspace_first_dim = std::min((size_t) 512, ml::cuda_backend::Context::getWorkspaceSize(context) / (sizeof(float) * last_dim));
 
 		dim3 blockDim1(32, 8);
 		dim3 gridDim1_x1((last_dim + 31) / 32, workspace_first_dim);

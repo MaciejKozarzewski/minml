@@ -118,7 +118,7 @@ namespace ml
 		const int width = x.dim[2];
 		const int channels = x.dim[3];
 
-		cudaStream_t stream = cuda::Context::getStream(context);
+		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
 
 		dim3 blockDim(32, std::min(size * size, 8));
 		dim3 gridDim(batch_size, (height + size - 1) / size, (width + size - 1) / size);
@@ -162,7 +162,7 @@ namespace ml
 		const int width = dx.dim[2];
 		const int channels = dx.dim[3];
 
-		cudaStream_t stream = cuda::Context::getStream(context);
+		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
 
 		dim3 blockDim(32, std::min(size * size, 8));
 		dim3 gridDim(batch_size, (height + size - 1) / size, (width + size - 1) / size);

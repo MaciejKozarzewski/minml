@@ -39,13 +39,21 @@ namespace vectors
 	}
 	DEVICE_INLINE uint32_t as_uint(half2 x)
 	{
+#if __CUDA_ARCH__ >= FP16_MIN_ARCH
 		assert(sizeof(x) == sizeof(uint32_t));
 		return reinterpret_cast<uint32_t*>(&x)[0];
+#else
+		return uint32_t{};
+#endif
 	}
 	DEVICE_INLINE uint16_t as_uint(half x)
 	{
+#if __CUDA_ARCH__ >= FP16_MIN_ARCH
 		assert(sizeof(x) == sizeof(uint16_t));
 		return reinterpret_cast<uint16_t*>(&x)[0];
+#else
+		return uint16_t{};
+#endif
 	}
 
 	DEVICE_INLINE double as_double(uint64_t x)
@@ -60,13 +68,21 @@ namespace vectors
 	}
 	DEVICE_INLINE half2 as_half2(uint32_t x)
 	{
+#if __CUDA_ARCH__ >= FP16_MIN_ARCH
 		assert(sizeof(x) == sizeof(half2));
 		return reinterpret_cast<half2*>(&x)[0];
+#else
+		return half2{};
+#endif
 	}
 	DEVICE_INLINE half as_half(uint16_t x)
 	{
+#if __CUDA_ARCH__ >= FP16_MIN_ARCH
 		assert(sizeof(x) == sizeof(half));
 		return reinterpret_cast<half*>(&x)[0];
+#else
+		return half{};
+#endif
 	}
 
 	DEVICE_INLINE double bit_invert(double x)
@@ -79,11 +95,19 @@ namespace vectors
 	}
 	DEVICE_INLINE half2 bit_invert(half2 x)
 	{
+#if __CUDA_ARCH__ >= FP16_MIN_ARCH
 		return as_half2(~as_uint(x));
+#else
+		return half2{};
+#endif
 	}
 	DEVICE_INLINE half bit_invert(half x)
 	{
+#if __CUDA_ARCH__ >= FP16_MIN_ARCH
 		return as_half(~as_uint(x));
+#else
+		return half{};
+#endif
 	}
 
 	template<typename T>
@@ -92,7 +116,11 @@ namespace vectors
 	template<>
 	DEVICE_INLINE half to_mask(bool b)
 	{
+#if __CUDA_ARCH__ >= FP16_MIN_ARCH
 		return b ? as_half(0xFFFFu) : as_half(0x0000u);
+#else
+		return half{};
+#endif
 	}
 	template<>
 	DEVICE_INLINE float to_mask(bool b)
@@ -115,33 +143,57 @@ namespace vectors
 	template<>
 	DEVICE_INLINE half logical_or(half lhs, half rhs)
 	{
+#if __CUDA_ARCH__ >= FP16_MIN_ARCH
 		return as_half(as_uint(lhs) | as_uint(rhs));
+#else
+		return half{};
+#endif
 	}
 	template<>
 	DEVICE_INLINE half logical_and(half lhs, half rhs)
 	{
+#if __CUDA_ARCH__ >= FP16_MIN_ARCH
 		return as_half(as_uint(lhs) & as_uint(rhs));
+#else
+		return half{};
+#endif
 	}
 	template<>
 	DEVICE_INLINE half logical_xor(half lhs, half rhs)
 	{
+#if __CUDA_ARCH__ >= FP16_MIN_ARCH
 		return as_half(as_uint(lhs) ^ as_uint(rhs));
+#else
+		return half{};
+#endif
 	}
 
 	template<>
 	DEVICE_INLINE half2 logical_or(half2 lhs, half2 rhs)
 	{
+#if __CUDA_ARCH__ >= FP16_MIN_ARCH
 		return as_half2(as_uint(lhs) | as_uint(rhs));
+#else
+		return half2{};
+#endif
 	}
 	template<>
 	DEVICE_INLINE half2 logical_and(half2 lhs, half2 rhs)
 	{
+#if __CUDA_ARCH__ >= FP16_MIN_ARCH
 		return as_half2(as_uint(lhs) & as_uint(rhs));
+#else
+		return half2{};
+#endif
 	}
 	template<>
 	DEVICE_INLINE half2 logical_xor(half2 lhs, half2 rhs)
 	{
+#if __CUDA_ARCH__ >= FP16_MIN_ARCH
 		return as_half2(as_uint(lhs) ^ as_uint(rhs));
+#else
+		return half2{};
+#endif
 	}
 
 	template<>
@@ -192,35 +244,67 @@ namespace vectors
 	 */
 	DEVICE_INLINE half2 half2_to_mask(bool bx, bool by)
 	{
+#if __CUDA_ARCH__ >= FP16_MIN_ARCH
 		return half2(bx ? as_half(0xFFFFu) : as_half(0x0000u), by ? as_half(0xFFFFu) : as_half(0x0000u));
+#else
+		return half2{};
+#endif
 	}
 	DEVICE_INLINE half2 half2_compare_eq(const half2 &lhs, const half2 &rhs)
 	{
+#if __CUDA_ARCH__ >= FP16_MIN_ARCH
 		return half2_to_mask(lhs.x == rhs.x, lhs.y == rhs.y);
+#else
+		return half2{};
+#endif
 	}
 	DEVICE_INLINE half2 half2_compare_neq(const half2 &lhs, const half2 &rhs)
 	{
+#if __CUDA_ARCH__ >= FP16_MIN_ARCH
 		return half2_to_mask(lhs.x != rhs.x, lhs.y != rhs.y);
+#else
+		return half2{};
+#endif
 	}
 	DEVICE_INLINE half2 half2_compare_gt(const half2 &lhs, const half2 &rhs)
 	{
+#if __CUDA_ARCH__ >= FP16_MIN_ARCH
 		return half2_to_mask(lhs.x > rhs.x, lhs.y > rhs.y);
+#else
+		return half2{};
+#endif
 	}
 	DEVICE_INLINE half2 half2_compare_ge(const half2 &lhs, const half2 &rhs)
 	{
+#if __CUDA_ARCH__ >= FP16_MIN_ARCH
 		return half2_to_mask(lhs.x >= rhs.x, lhs.y >= rhs.y);
+#else
+		return half2{};
+#endif
 	}
 	DEVICE_INLINE half2 half2_compare_lt(const half2 &lhs, const half2 &rhs)
 	{
+#if __CUDA_ARCH__ >= FP16_MIN_ARCH
 		return half2_to_mask(lhs.x < rhs.x, lhs.y < rhs.y);
+#else
+		return half2{};
+#endif
 	}
 	DEVICE_INLINE half2 half2_compare_le(const half2 &lhs, const half2 &rhs)
 	{
+#if __CUDA_ARCH__ >= FP16_MIN_ARCH
 		return half2_to_mask(lhs.x <= rhs.x, lhs.y <= rhs.y);
+#else
+		return half2{};
+#endif
 	}
 	DEVICE_INLINE half2 half2_select(const half2 &cond, const half2 &a, const half2 &b)
 	{
+#if __CUDA_ARCH__ >= FP16_MIN_ARCH
 		return half2(is_true(cond.x) ? a.x : b.x, is_true(cond.y) ? a.y : b.y);
+#else
+		return half2{};
+#endif
 	}
 
 }
