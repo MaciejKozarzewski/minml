@@ -1858,8 +1858,529 @@ namespace ml
 	}
 
 	// batched depthwise convolution kernel
-	void depthwise_conv_avx_10x8(Fragment &C, const Fragment &alpha, const Fragment &A, const Fragment &B) noexcept
+
+#define DWCONV_MAIN_LOOP_FP32() \
+	vmovups(mem(rax, 0*8*4), ymm8) \
+	vmovups(mem(rax, 1*8*4), ymm9) \
+	vmovups(mem(rax, 2*8*4), ymm10) \
+	vmovups(mem(rax, 3*8*4), ymm11) \
+	vmovups(mem(rbx, 0*8*4), ymm12) \
+	vmovups(mem(rbx, 1*8*4), ymm13) \
+	vmovups(mem(rbx, 2*8*4), ymm14) \
+	vmovups(mem(rbx, 3*8*4), ymm15) \
+	vmulps(ymm8, ymm12, ymm8) \
+	vmulps(ymm9, ymm13, ymm9) \
+	vmulps(ymm10, ymm14, ymm10) \
+	vmulps(ymm11, ymm15, ymm11) \
+	vaddps(ymm8, ymm0, ymm0) \
+	vaddps(ymm9, ymm1, ymm1) \
+	vaddps(ymm10, ymm2, ymm2) \
+	vaddps(ymm11, ymm3, ymm3) \
+	vmovups(mem(rax, 4*8*4), ymm8) \
+	vmovups(mem(rax, 5*8*4), ymm9) \
+	vmovups(mem(rax, 6*8*4), ymm10) \
+	vmovups(mem(rax, 7*8*4), ymm11) \
+	vmovups(mem(rbx, 4*8*4), ymm12) \
+	vmovups(mem(rbx, 5*8*4), ymm13) \
+	vmovups(mem(rbx, 6*8*4), ymm14) \
+	vmovups(mem(rbx, 7*8*4), ymm15) \
+	vmulps(ymm8, ymm12, ymm8) \
+	vmulps(ymm9, ymm13, ymm9) \
+	vmulps(ymm10, ymm14, ymm10) \
+	vmulps(ymm11, ymm15, ymm11) \
+	vaddps(ymm8, ymm4, ymm4) \
+	vaddps(ymm9, ymm5, ymm5) \
+	vaddps(ymm10, ymm6, ymm6) \
+	vaddps(ymm11, ymm7, ymm7)
+#define DWCONV_MAIN_LOOP_FP16() \
+	vmovups(mem(rax, 0*8*2), xmm8) \
+	vmovups(mem(rax, 1*8*2), xmm9) \
+	vmovups(mem(rax, 2*8*2), xmm10) \
+	vmovups(mem(rax, 3*8*2), xmm11) \
+	vmovups(mem(rbx, 0*8*2), xmm12) \
+	vmovups(mem(rbx, 1*8*2), xmm13) \
+	vmovups(mem(rbx, 2*8*2), xmm14) \
+	vmovups(mem(rbx, 3*8*2), xmm15) \
+	vcvtph2ps(xmm8, ymm8) \
+	vcvtph2ps(xmm9, ymm9) \
+	vcvtph2ps(xmm10, ymm10) \
+	vcvtph2ps(xmm11, ymm11) \
+	vcvtph2ps(xmm12, ymm12) \
+	vcvtph2ps(xmm13, ymm13) \
+	vcvtph2ps(xmm14, ymm14) \
+	vcvtph2ps(xmm15, ymm15) \
+	vmulps(ymm8, ymm12, ymm8) \
+	vmulps(ymm9, ymm13, ymm9) \
+	vmulps(ymm10, ymm14, ymm10) \
+	vmulps(ymm11, ymm15, ymm11) \
+	vaddps(ymm8, ymm0, ymm0) \
+	vaddps(ymm9, ymm1, ymm1) \
+	vaddps(ymm10, ymm2, ymm2) \
+	vaddps(ymm11, ymm3, ymm3) \
+	vmovups(mem(rax, 4*8*2), xmm8) \
+	vmovups(mem(rax, 5*8*2), xmm9) \
+	vmovups(mem(rax, 6*8*2), xmm10) \
+	vmovups(mem(rax, 7*8*2), xmm11) \
+	vmovups(mem(rbx, 4*8*2), xmm12) \
+	vmovups(mem(rbx, 5*8*2), xmm13) \
+	vmovups(mem(rbx, 6*8*2), xmm14) \
+	vmovups(mem(rbx, 7*8*2), xmm15) \
+	vcvtph2ps(xmm8, ymm8) \
+	vcvtph2ps(xmm9, ymm9) \
+	vcvtph2ps(xmm10, ymm10) \
+	vcvtph2ps(xmm11, ymm11) \
+	vcvtph2ps(xmm12, ymm12) \
+	vcvtph2ps(xmm13, ymm13) \
+	vcvtph2ps(xmm14, ymm14) \
+	vcvtph2ps(xmm15, ymm15) \
+	vmulps(ymm8, ymm12, ymm8) \
+	vmulps(ymm9, ymm13, ymm9) \
+	vmulps(ymm10, ymm14, ymm10) \
+	vmulps(ymm11, ymm15, ymm11) \
+	vaddps(ymm8, ymm4, ymm4) \
+	vaddps(ymm9, ymm5, ymm5) \
+	vaddps(ymm10, ymm6, ymm6) \
+	vaddps(ymm11, ymm7, ymm7)
+
+#define DWCONV_LOAD_BIAS_FP32() \
+	vmovups(mem(rdx, 0*8*4), ymm0) \
+	vmovups(mem(rdx, 1*8*4), ymm1) \
+	vmovups(mem(rdx, 2*8*4), ymm2) \
+	vmovups(mem(rdx, 3*8*4), ymm3) \
+	vmovups(mem(rdx, 4*8*4), ymm4) \
+	vmovups(mem(rdx, 5*8*4), ymm5) \
+	vmovups(mem(rdx, 6*8*4), ymm6) \
+	vmovups(mem(rdx, 7*8*4), ymm7)
+#define DWCONV_LOAD_BIAS_FP16() \
+	vmovups(mem(rdx, 0*8*2), xmm0) \
+	vmovups(mem(rdx, 1*8*2), xmm1) \
+	vmovups(mem(rdx, 2*8*2), xmm2) \
+	vmovups(mem(rdx, 3*8*2), xmm3) \
+	vmovups(mem(rdx, 4*8*2), xmm4) \
+	vmovups(mem(rdx, 5*8*2), xmm5) \
+	vmovups(mem(rdx, 6*8*2), xmm6) \
+	vmovups(mem(rdx, 7*8*2), xmm7) \
+	vcvtph2ps(xmm0, ymm0) \
+	vcvtph2ps(xmm1, ymm1) \
+	vcvtph2ps(xmm2, ymm2) \
+	vcvtph2ps(xmm3, ymm3) \
+	vcvtph2ps(xmm4, ymm4) \
+	vcvtph2ps(xmm5, ymm5) \
+	vcvtph2ps(xmm6, ymm6) \
+	vcvtph2ps(xmm7, ymm7)
+
+#define DWCONV_STORE_OUTPUT_FP32() \
+	vmovups(ymm0, mem(rcx, 0*8*4)) \
+	vmovups(ymm1, mem(rcx, 1*8*4)) \
+	vmovups(ymm2, mem(rcx, 2*8*4)) \
+	vmovups(ymm3, mem(rcx, 3*8*4)) \
+	vmovups(ymm4, mem(rcx, 4*8*4)) \
+	vmovups(ymm5, mem(rcx, 5*8*4)) \
+	vmovups(ymm6, mem(rcx, 6*8*4)) \
+	vmovups(ymm7, mem(rcx, 7*8*4))
+#define DWCONV_STORE_OUTPUT_FP16() \
+	vcvtps2ph(imm(0x03), ymm0, xmm0) \
+	vcvtps2ph(imm(0x03), ymm1, xmm1) \
+	vcvtps2ph(imm(0x03), ymm2, xmm2) \
+	vcvtps2ph(imm(0x03), ymm3, xmm3) \
+	vcvtps2ph(imm(0x03), ymm4, xmm4) \
+	vcvtps2ph(imm(0x03), ymm5, xmm5) \
+	vcvtps2ph(imm(0x03), ymm6, xmm6) \
+	vcvtps2ph(imm(0x03), ymm7, xmm7) \
+	vmovups(xmm0, mem(rcx, 0*8*2)) \
+	vmovups(xmm1, mem(rcx, 1*8*2)) \
+	vmovups(xmm2, mem(rcx, 2*8*2)) \
+	vmovups(xmm3, mem(rcx, 3*8*2)) \
+	vmovups(xmm4, mem(rcx, 4*8*2)) \
+	vmovups(xmm5, mem(rcx, 5*8*2)) \
+	vmovups(xmm6, mem(rcx, 6*8*2)) \
+	vmovups(xmm7, mem(rcx, 7*8*2)) \
+
+	void depthwise_conv_avx_10x8(Matrix &output, const Matrix &input, const Matrix &weights, const Matrix &bias, const int *args,
+			void *workspace) noexcept
 	{
+		assert(args != nullptr);
+		const int batch_size = args[0];
+		const int height = args[1];
+		const int width = args[2];
+		const uint64_t channels = args[3];
+		const int kernel_height = args[4];
+		const int kernel_width = args[5];
+
+		const int padding_h = (kernel_height - 1) / 2;
+		const int padding_w = (kernel_width - 1) / 2;
+
+		assert(output.is_fp32() || output.is_fp16());
+		assert(input.is_fp32() || input.is_fp16());
+		assert(weights.is_fp32() || weights.is_fp16());
+		assert(bias.is_fp32() || bias.is_fp16());
+		assert(channels % 64 == 0);
+
+		const uint8_t *b_ptr = reinterpret_cast<const uint8_t*>(bias.data());
+
+		const uint64_t stride_w = input.stride_in_bytes();
+
+		for (int i = 0; i < output.rows(); i++)
+		{
+			uint8_t *output_ptr = reinterpret_cast<uint8_t*>(output.data()) + i * output.stride_in_bytes();
+
+			const int origin_b = reinterpret_cast<int*>(workspace)[3 * i + 0];
+			const int origin_h = reinterpret_cast<int*>(workspace)[3 * i + 1];
+			const int origin_w = reinterpret_cast<int*>(workspace)[3 * i + 2];
+
+			const int kh0 = padding_h - std::min(origin_h, padding_h);
+			const int kh1 = padding_h + std::min(height - 1 - origin_h, padding_h);
+
+			const int kw0 = padding_w - std::min(origin_w, padding_w);
+			const int kw1 = padding_w + std::min(width - 1 - origin_w, padding_w);
+
+			const uint64_t elements_h = 1 + kh1 - kh0;
+			const uint64_t elements_w = 1 + kw1 - kw0;
+
+			const int h0 = origin_h + kh0 - padding_h;
+			const int w0 = origin_w + kw0 - padding_w;
+
+			const uint64_t in_stride_h = (width - elements_w) * stride_w;
+			const uint64_t w_stride_h = (kernel_width - elements_w) * stride_w;
+
+			const uint8_t *in_ptr = reinterpret_cast<const uint8_t*>(input.data()) + ((origin_b * height + h0) * width + w0) * stride_w;
+			const uint8_t *w_ptr = reinterpret_cast<const uint8_t*>(weights.data()) + (kh0 * kernel_width + kw0) * stride_w;
+
+			const uint64_t in_stride_back = elements_h * width * stride_w;
+			const uint64_t w_stride_back = elements_h * kernel_width * stride_w;
+
+			const uint64_t c_iter = channels / 64;
+
+			if (input.is_fp32())
+			{
+				begin_asm()
+				movq(var(input_ptr), rax)
+				movq(var(weights_ptr), rbx)
+				movq(var(output_ptr), rcx)
+				movq(var(bias_ptr), rdx)
+
+				movq(var(stride_w), r11)
+
+				movq(var(in_stride_h), r12)
+				movq(var(w_stride_h), r13)
+
+				movq(var(in_stride_back), r14)
+				movq(var(w_stride_back), r15)
+
+				movq(var(c_iter), r8)
+				label(CHANNELLOOP)
+
+				DWCONV_LOAD_BIAS_FP32()
+
+				movq(var(elements_h), r9)
+				label(VERTICALLOOP)
+
+				movq(var(elements_w), r10)
+				label(HORIZONTALLOOP)
+
+				DWCONV_MAIN_LOOP_FP32()
+
+				add(r11, rax) // add channels
+				add(r11, rbx)// add channels
+				dec(r10)
+				jne(HORIZONTALLOOP)
+
+				add(r12, rax)// add channels
+				add(r13, rbx)// add channels
+				dec(r9)
+				jne(VERTICALLOOP)
+
+				sub(r14, rax)
+				sub(r15, rbx)
+				add(imm(8*8*4), rax)
+				add(imm(8*8*4), rbx)
+
+				DWCONV_STORE_OUTPUT_FP32()
+
+				add(imm(8*8*4), rcx)
+				add(imm(8*8*4), rdx)
+				dec(r8)
+				jne(CHANNELLOOP)
+
+				vzeroupper()
+
+				end_asm(
+						:// outputs
+						:// inputs
+						[input_ptr] "m"(in_ptr),
+						[weights_ptr] "m"(w_ptr),
+						[output_ptr] "m"(output_ptr),
+						[bias_ptr] "m"(b_ptr),
+						[stride_w] "m"(stride_w),
+						[in_stride_h] "m"(in_stride_h),
+						[w_stride_h] "m"(w_stride_h),
+						[in_stride_back] "m"(in_stride_back),
+						[w_stride_back] "m"(w_stride_back),
+						[c_iter] "m"(c_iter),
+						[elements_h] "m"(elements_h),
+						[elements_w] "m"(elements_w)
+						:// clobbers
+						"cc", "memory", "%ymm0", "%ymm1", "%ymm2", "%ymm3", "%ymm4", "%ymm5", "%ymm6", "%ymm7", "%ymm8", "%ymm9", "%ymm10", "%ymm11", "%ymm12",
+						"%ymm13", "%ymm14", "%ymm15", "%rax", "%rbx", "%rcx", "%rdx", "%r8", "%r9", "%r10", "%r11", "%r12", "%r13", "%r14", "%r15")
+			}
+			else
+			{
+				if (output.is_fp16())
+				{
+					begin_asm()
+					movq(var(input_ptr), rax)
+					movq(var(weights_ptr), rbx)
+					movq(var(output_ptr), rcx)
+					movq(var(bias_ptr), rdx)
+
+					movq(var(stride_w), r11)
+
+					movq(var(in_stride_h), r12)
+					movq(var(w_stride_h), r13)
+
+					movq(var(in_stride_back), r14)
+					movq(var(w_stride_back), r15)
+
+					movq(var(c_iter), r8)
+					label(CHANNELLOOP)
+
+					DWCONV_LOAD_BIAS_FP16()
+
+					movq(var(elements_h), r9)
+					label(VERTICALLOOP)
+
+					movq(var(elements_w), r10)
+					label(HORIZONTALLOOP)
+
+					DWCONV_MAIN_LOOP_FP16()
+
+					add(r11, rax) // add channels
+					add(r11, rbx)// add channels
+					dec(r10)
+					jne(HORIZONTALLOOP)
+
+					add(r12, rax)// add channels
+					add(r13, rbx)// add channels
+					dec(r9)
+					jne(VERTICALLOOP)
+
+					sub(r14, rax)
+					sub(r15, rbx)
+					add(imm(8*8*2), rax)
+					add(imm(8*8*2), rbx)
+
+					DWCONV_STORE_OUTPUT_FP16()
+
+					add(imm(8*8*2), rcx)
+					add(imm(8*8*2), rdx)
+					dec(r8)
+					jne(CHANNELLOOP)
+
+					vzeroupper()
+
+					end_asm(
+							:// outputs
+							:// inputs
+							[input_ptr] "m"(in_ptr),
+							[weights_ptr] "m"(w_ptr),
+							[output_ptr] "m"(output_ptr),
+							[bias_ptr] "m"(b_ptr),
+							[stride_w] "m"(stride_w),
+							[in_stride_h] "m"(in_stride_h),
+							[w_stride_h] "m"(w_stride_h),
+							[in_stride_back] "m"(in_stride_back),
+							[w_stride_back] "m"(w_stride_back),
+							[c_iter] "m"(c_iter),
+							[elements_h] "m"(elements_h),
+							[elements_w] "m"(elements_w)
+							:// clobbers
+							"cc", "memory", "%ymm0", "%ymm1", "%ymm2", "%ymm3", "%ymm4", "%ymm5", "%ymm6", "%ymm7", "%ymm8", "%ymm9", "%ymm10", "%ymm11", "%ymm12",
+							"%ymm13", "%ymm14", "%ymm15", "%rax", "%rbx", "%rcx", "%rdx", "%r8", "%r9", "%r10", "%r11", "%r12", "%r13", "%r14", "%r15")
+				}
+				else
+				{
+					begin_asm()
+					movq(var(input_ptr), rax)
+					movq(var(weights_ptr), rbx)
+					movq(var(output_ptr), rcx)
+					movq(var(bias_ptr), rdx)
+
+					movq(var(stride_w), r11)
+
+					movq(var(in_stride_h), r12)
+					movq(var(w_stride_h), r13)
+
+					movq(var(in_stride_back), r14)
+					movq(var(w_stride_back), r15)
+
+					movq(var(c_iter), r8)
+					label(CHANNELLOOP)
+
+					DWCONV_LOAD_BIAS_FP16()
+
+					movq(var(elements_h), r9)
+					label(VERTICALLOOP)
+
+					movq(var(elements_w), r10)
+					label(HORIZONTALLOOP)
+
+					DWCONV_MAIN_LOOP_FP16()
+
+					add(r11, rax) // add channels
+					add(r11, rbx)// add channels
+					dec(r10)
+					jne(HORIZONTALLOOP)
+
+					add(r12, rax)// add channels
+					add(r13, rbx)// add channels
+					dec(r9)
+					jne(VERTICALLOOP)
+
+					sub(r14, rax)
+					sub(r15, rbx)
+					add(imm(8*8*2), rax)
+					add(imm(8*8*2), rbx)
+
+					DWCONV_STORE_OUTPUT_FP32()
+
+					add(imm(8*8*4), rcx)
+					add(imm(8*8*2), rdx)
+					dec(r8)
+					jne(CHANNELLOOP)
+
+					vzeroupper()
+
+					end_asm(
+							:// outputs
+							:// inputs
+							[input_ptr] "m"(in_ptr),
+							[weights_ptr] "m"(w_ptr),
+							[output_ptr] "m"(output_ptr),
+							[bias_ptr] "m"(b_ptr),
+							[stride_w] "m"(stride_w),
+							[in_stride_h] "m"(in_stride_h),
+							[w_stride_h] "m"(w_stride_h),
+							[in_stride_back] "m"(in_stride_back),
+							[w_stride_back] "m"(w_stride_back),
+							[c_iter] "m"(c_iter),
+							[elements_h] "m"(elements_h),
+							[elements_w] "m"(elements_w)
+							:// clobbers
+							"cc", "memory", "%ymm0", "%ymm1", "%ymm2", "%ymm3", "%ymm4", "%ymm5", "%ymm6", "%ymm7", "%ymm8", "%ymm9", "%ymm10", "%ymm11", "%ymm12",
+							"%ymm13", "%ymm14", "%ymm15", "%rax", "%rbx", "%rcx", "%rdx", "%r8", "%r9", "%r10", "%r11", "%r12", "%r13", "%r14", "%r15")
+				}
+			}
+		}
 	}
+	void fused_conv_block_stage_1_avx_10x8(Fragment &temp, const Fragment &A, const Fragment &B, const Fragment &bias) noexcept
+	{
+		assert(temp.is_fp32());
+		assert(A.is_fp32());
+		assert(B.is_fp32());
+		assert(bias.is_fp32());
+
+		assert(temp.is_packed());
+		assert(A.is_packed());
+		assert(B.is_packed());
+		assert(bias.is_packed());
+
+		assert(cpu::is_aligned(A.data(), 32));
+		assert(cpu::is_aligned(B.data(), 32));
+		assert(cpu::is_aligned(bias.data(), 32));
+
+		assert(A.rows() == B.rows());
+		assert(A.stride() == 10);
+		assert(B.stride() == 8);
+		assert(temp.columns() == A.columns());
+		assert(temp.rows() == B.columns());
+
+		const void *A_ptr = A.data();
+		const void *B_ptr = B.data();
+		void *temp_ptr = temp.data();
+		const void *bias_ptr = bias.data();
+
+		uint64_t k_iter = A.rows() / 4;
+		uint64_t k_left = A.rows() % 4;
+
+		begin_asm()
+		movq(var(A_ptr), rax)
+		movq(var(B_ptr), rbx)
+		ZERO_ACCUMULATORS()
+
+		movq(var(k_iter), r14) // load the number of 4-unrolled iterations
+		test(r14, r14)
+		je(FINALLOOP)
+
+		label(UNROLLED_x4)
+		SUB_KERNEL_10xFP32_8xFP32(0)
+		SUB_KERNEL_10xFP32_8xFP32(1)
+		SUB_KERNEL_10xFP32_8xFP32(2)
+		SUB_KERNEL_10xFP32_8xFP32(3)
+
+		add(imm(4*10*4), rax)// 4 iterations x 10 elements x 4 bytes
+		add(imm(4*8*4), rbx)// 4 iterations x 8 elements x 4 bytes
+		dec(r14)
+		jne(UNROLLED_x4)
+
+		label(FINALLOOP)
+		movq(var(k_left), r14)// load the number of 1-unrolled iterations
+		test(r14, r14)
+		je(EPILOGUE)
+
+		label(UNROLLED_x1)
+		SUB_KERNEL_10xFP32_8xFP32(0)
+		add(imm(1*10*4), rax)// 1 iteration x 10 elements x 4 bytes
+		add(imm(1*8*4), rbx)// 1 iteration x 8 elements x 4 bytes
+		dec(r14)
+		jne(UNROLLED_x1)
+
+		label(EPILOGUE)
+
+		movq(var(bias_ptr), rax)// load address of bias pointer
+		vmovaps(mem(rax), ymm2)// load bias value
+		ADD_BIAS_10x8xFP32(ymm2)
+		RELU_10x8xFP32()
+
+		// transpose and store into packed fragment of D
+		movq(var(temp_ptr), rcx)// temp pointer is in rcx
+		vunpcklps(ymm7, ymm6, ymm0)
+		vunpckhps(ymm7, ymm6, ymm1)
+		vextractf128(imm(0x1), ymm0, xmm2)// e4 f4 e5 f5
+		vextractf128(imm(0x1), ymm1, xmm3)// e6 f6 e7 f7
+
+		vmovlpd(xmm0, mem(rcx, 4*(0*10+0)))
+		vmovhpd(xmm0, mem(rcx, 4*(1*10+0)))
+		vmovlpd(xmm1, mem(rcx, 4*(2*10+0)))
+		vmovhpd(xmm1, mem(rcx, 4*(3*10+0)))
+		vmovlpd(xmm2, mem(rcx, 4*(4*10+0)))
+		vmovhpd(xmm2, mem(rcx, 4*(5*10+0)))
+		vmovlpd(xmm3, mem(rcx, 4*(6*10+0)))
+		vmovhpd(xmm3, mem(rcx, 4*(7*10+0)))
+
+		AVX_8x8_TRANSPOSE_INV()
+		vmovups(ymm0, mem(rcx, (0*10+2)*4))
+		vmovups(ymm1, mem(rcx, (1*10+2)*4))
+		vmovups(ymm2, mem(rcx, (2*10+2)*4))
+		vmovups(ymm3, mem(rcx, (3*10+2)*4))
+		vmovups(ymm4, mem(rcx, (4*10+2)*4))
+		vmovups(ymm5, mem(rcx, (5*10+2)*4))
+		vmovups(ymm6, mem(rcx, (6*10+2)*4))
+		vmovups(ymm7, mem(rcx, (7*10+2)*4))
+		vzeroupper()
+
+		end_asm(
+				:// outputs
+				:// inputs
+				[A_ptr] "m"(A_ptr),
+				[B_ptr] "m"(B_ptr),
+				[temp_ptr] "m"(temp_ptr),
+				[k_iter] "m"(k_iter),
+				[k_left] "m"(k_left),
+				[bias_ptr] "m"(bias_ptr)
+				:// clobbers
+				"cc", "memory", "%ymm0", "%ymm1", "%ymm2", "%ymm3", "%ymm4", "%ymm5", "%ymm6", "%ymm7", "%ymm8", "%ymm9", "%ymm10", "%ymm11", "%ymm12",
+				"%ymm13", "%ymm14", "%ymm15", "%rax", "%rbx", "%rcx", "%r11", "%r13", "%r14", "%r15")
+	}
+
 } /* namespace ml */
 

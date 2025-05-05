@@ -840,5 +840,273 @@ namespace ml
 //			}
 	}
 
+#define DWCONV_MAIN_LOOP_FP32() \
+	movups(mem(rax, 0*4*4), xmm8) \
+	movups(mem(rax, 1*4*4), xmm9) \
+	movups(mem(rax, 2*4*4), xmm10) \
+	movups(mem(rax, 3*4*4), xmm11) \
+	movups(mem(rbx, 0*4*4), xmm12) \
+	movups(mem(rbx, 1*4*4), xmm13) \
+	movups(mem(rbx, 2*4*4), xmm14) \
+	movups(mem(rbx, 3*4*4), xmm15) \
+	mulps(xmm8, xmm12) \
+	mulps(xmm9, xmm13) \
+	mulps(xmm10, xmm14) \
+	mulps(xmm11, xmm15) \
+	addps(xmm12, xmm0) \
+	addps(xmm13, xmm1) \
+	addps(xmm14, xmm2) \
+	addps(xmm15, xmm3) \
+	movups(mem(rax, 4*4*4), xmm8) \
+	movups(mem(rax, 5*4*4), xmm9) \
+	movups(mem(rax, 6*4*4), xmm10) \
+	movups(mem(rax, 7*4*4), xmm11) \
+	movups(mem(rbx, 4*4*4), xmm12) \
+	movups(mem(rbx, 5*4*4), xmm13) \
+	movups(mem(rbx, 6*4*4), xmm14) \
+	movups(mem(rbx, 7*4*4), xmm15) \
+	mulps(xmm8, xmm12) \
+	mulps(xmm9, xmm13) \
+	mulps(xmm10, xmm14) \
+	mulps(xmm11, xmm15) \
+	addps(xmm12, xmm4) \
+	addps(xmm13, xmm5) \
+	addps(xmm14, xmm6) \
+	addps(xmm15, xmm7)
+
+#define DWCONV_LOAD_BIAS_FP32() \
+	movups(mem(rdx, 0*4*4), xmm0) \
+	movups(mem(rdx, 1*4*4), xmm1) \
+	movups(mem(rdx, 2*4*4), xmm2) \
+	movups(mem(rdx, 3*4*4), xmm3) \
+	movups(mem(rdx, 4*4*4), xmm4) \
+	movups(mem(rdx, 5*4*4), xmm5) \
+	movups(mem(rdx, 6*4*4), xmm6) \
+	movups(mem(rdx, 7*4*4), xmm7)
+
+#define DWCONV_STORE_OUTPUT_FP32() \
+	movups(xmm0, mem(rcx, 0*4*4)) \
+	movups(xmm1, mem(rcx, 1*4*4)) \
+	movups(xmm2, mem(rcx, 2*4*4)) \
+	movups(xmm3, mem(rcx, 3*4*4)) \
+	movups(xmm4, mem(rcx, 4*4*4)) \
+	movups(xmm5, mem(rcx, 5*4*4)) \
+	movups(xmm6, mem(rcx, 6*4*4)) \
+	movups(xmm7, mem(rcx, 7*4*4))
+
+	void depthwise_conv_sse2_4x8(Matrix &output, const Matrix &input, const Matrix &weights, const Matrix &bias, const int *args,
+			void *workspace) noexcept
+	{
+		assert(args != nullptr);
+		const int batch_size = args[0];
+		const int height = args[1];
+		const int width = args[2];
+		const uint64_t channels = args[3];
+		const int kernel_height = args[4];
+		const int kernel_width = args[5];
+
+		const int padding_h = (kernel_height - 1) / 2;
+		const int padding_w = (kernel_width - 1) / 2;
+
+		assert(output.is_fp32() || output.is_fp16());
+		assert(input.is_fp32() || input.is_fp16());
+		assert(weights.is_fp32() || weights.is_fp16());
+		assert(bias.is_fp32() || bias.is_fp16());
+		assert(channels % 32 == 0);
+
+		const uint8_t *b_ptr = reinterpret_cast<const uint8_t*>(bias.data());
+
+		const uint64_t stride_w = input.stride_in_bytes();
+
+		for (int i = 0; i < output.rows(); i++)
+		{
+			uint8_t *output_ptr = reinterpret_cast<uint8_t*>(output.data()) + i * output.stride_in_bytes();
+
+			const int origin_b = reinterpret_cast<int*>(workspace)[3 * i + 0];
+			const int origin_h = reinterpret_cast<int*>(workspace)[3 * i + 1];
+			const int origin_w = reinterpret_cast<int*>(workspace)[3 * i + 2];
+
+			const int kh0 = padding_h - std::min(origin_h, padding_h);
+			const int kh1 = padding_h + std::min(height - 1 - origin_h, padding_h);
+
+			const int kw0 = padding_w - std::min(origin_w, padding_w);
+			const int kw1 = padding_w + std::min(width - 1 - origin_w, padding_w);
+
+			const uint64_t elements_h = 1 + kh1 - kh0;
+			const uint64_t elements_w = 1 + kw1 - kw0;
+
+			const int h0 = origin_h + kh0 - padding_h;
+			const int w0 = origin_w + kw0 - padding_w;
+
+			const uint64_t in_stride_h = (width - elements_w) * stride_w;
+			const uint64_t w_stride_h = (kernel_width - elements_w) * stride_w;
+
+			const uint8_t *in_ptr = reinterpret_cast<const uint8_t*>(input.data()) + ((origin_b * height + h0) * width + w0) * stride_w;
+			const uint8_t *w_ptr = reinterpret_cast<const uint8_t*>(weights.data()) + (kh0 * kernel_width + kw0) * stride_w;
+
+			const uint64_t in_stride_back = elements_h * width * stride_w;
+			const uint64_t w_stride_back = elements_h * kernel_width * stride_w;
+
+			const uint64_t c_iter = channels / 32;
+
+			begin_asm()
+			movq(var(input_ptr), rax)
+			movq(var(weights_ptr), rbx)
+			movq(var(output_ptr), rcx)
+			movq(var(bias_ptr), rdx)
+
+			movq(var(stride_w), r11)
+
+			movq(var(in_stride_h), r12)
+			movq(var(w_stride_h), r13)
+
+			movq(var(in_stride_back), r14)
+			movq(var(w_stride_back), r15)
+
+			movq(var(c_iter), r8)
+			label(CHANNELLOOP)
+
+			DWCONV_LOAD_BIAS_FP32()
+
+			movq(var(elements_h), r9)
+			label(VERTICALLOOP)
+
+			movq(var(elements_w), r10)
+			label(HORIZONTALLOOP)
+
+			DWCONV_MAIN_LOOP_FP32()
+
+			add(r11, rax) // add channels
+			add(r11, rbx)// add channels
+			dec(r10)
+			jne(HORIZONTALLOOP)
+
+			add(r12, rax)// add channels
+			add(r13, rbx)// add channels
+			dec(r9)
+			jne(VERTICALLOOP)
+
+			sub(r14, rax)
+			sub(r15, rbx)
+			add(imm(8*4*4), rax)
+			add(imm(8*4*4), rbx)
+
+			DWCONV_STORE_OUTPUT_FP32()
+
+			add(imm(8*4*4), rcx)
+			add(imm(8*4*4), rdx)
+			dec(r8)
+			jne(CHANNELLOOP)
+
+			end_asm(
+					:// outputs
+					:// inputs
+					[input_ptr] "m"(in_ptr),
+					[weights_ptr] "m"(w_ptr),
+					[output_ptr] "m"(output_ptr),
+					[bias_ptr] "m"(b_ptr),
+					[stride_w] "m"(stride_w),
+					[in_stride_h] "m"(in_stride_h),
+					[w_stride_h] "m"(w_stride_h),
+					[in_stride_back] "m"(in_stride_back),
+					[w_stride_back] "m"(w_stride_back),
+					[c_iter] "m"(c_iter),
+					[elements_h] "m"(elements_h),
+					[elements_w] "m"(elements_w)
+					:// clobbers
+					"cc", "memory", "%xmm0", "%xmm1", "%xmm2", "%xmm3", "%xmm4", "%xmm5", "%xmm6", "%xmm7", "%xmm8", "%xmm9", "%xmm10", "%xmm11", "%xmm12",
+					"%xmm13", "%xmm14", "%xmm15", "%rax", "%rbx", "%rcx", "%rdx", "%r8", "%r9", "%r10", "%r11", "%r12", "%r13", "%r14", "%r15")
+		}
+	}
+	void fused_conv_block_stage_1_sse2_4x8(Fragment &temp, const Fragment &A, const Fragment &B, const Fragment &bias) noexcept
+	{
+		assert(temp.is_fp32());
+		assert(A.is_fp32());
+		assert(B.is_fp32());
+		assert(bias.is_fp32());
+
+		assert(temp.is_packed());
+		assert(A.is_packed());
+		assert(B.is_packed());
+		assert(bias.is_packed());
+
+		assert(cpu::is_aligned(A.data(), 32));
+		assert(cpu::is_aligned(B.data(), 32));
+		assert(cpu::is_aligned(bias.data(), 32));
+
+		assert(A.rows() == B.rows());
+		assert(A.stride() == 4);
+		assert(B.stride() == 8);
+		assert(temp.columns() == A.columns());
+		assert(temp.rows() == B.columns());
+
+		const void *A_ptr = A.data();
+		const void *B_ptr = B.data();
+		void *temp_ptr = temp.data();
+		const void *bias_ptr = bias.data();
+
+		uint64_t k_iter = A.rows() / 4;
+		uint64_t k_left = A.rows() % 4;
+
+		begin_asm()
+		movq(var(A_ptr), rax)
+		movq(var(B_ptr), rbx)
+		ZERO_ACCUMULATORS()
+
+		movq(var(k_iter), r14) // load the number of 4-unrolled iterations
+		test(r14, r14)
+		je(FINALLOOP)
+
+		label(UNROLLED_x4)
+		SUB_KERNEL_4xFP32_8xFP32(0)
+		SUB_KERNEL_4xFP32_8xFP32(1)
+		SUB_KERNEL_4xFP32_8xFP32(2)
+		SUB_KERNEL_4xFP32_8xFP32(3)
+
+		add(imm(4*4*4), rax)// 4 iterations x 4 elements x 4 bytes
+		add(imm(4*8*4), rbx)// 4 iterations x 8 elements x 4 bytes
+		dec(r14)
+		jne(UNROLLED_x4)
+
+		label(FINALLOOP)
+		movq(var(k_left), r14)// load the number of 1-unrolled iterations
+		test(r14, r14)
+		je(EPILOGUE)
+
+		label(UNROLLED_x1)
+		SUB_KERNEL_4xFP32_8xFP32(0)
+		add(imm(1*4*4), rax)// 1 iteration x 4 elements x 4 bytes
+		add(imm(1*8*4), rbx)// 1 iteration x 8 elements x 4 bytes
+		dec(r14)
+		jne(UNROLLED_x1)
+
+		label(EPILOGUE)
+
+		movq(var(bias_ptr), rax)// load address of bias pointer
+		movaps(mem(rax), xmm2)// load bias value
+		movaps(mem(rax, 1*4*4), xmm3)
+		ADD_BIAS_4x8xFP32(xmm2, xmm3)
+		RELU_4x8xFP32()
+
+		// transpose and store into packed fragment of D
+		movq(var(temp_ptr), rbx)// temp pointer is in rbx
+		TRANSPOSE_4x4xFP32(xmm8, xmm10, xmm12, xmm14, xmm0, xmm1)
+		TRANSPOSE_4x4xFP32(xmm9, xmm11, xmm13, xmm15, xmm0, xmm1)
+
+		STORE_8x4xFP32(xmm8, xmm10, xmm12, xmm14, xmm9, xmm11, xmm13, xmm15)
+
+		end_asm(
+				:// outputs
+				:// inputs
+				[A_ptr] "m"(A_ptr),
+				[B_ptr] "m"(B_ptr),
+				[temp_ptr] "m"(temp_ptr),
+				[k_iter] "m"(k_iter),
+				[k_left] "m"(k_left),
+				[bias_ptr] "m"(bias_ptr)
+				:// clobbers
+				"cc", "memory", "%xmm0", "%xmm1", "%xmm2", "%xmm3", "%xmm4", "%xmm5", "%xmm6", "%xmm7", "%xmm8", "%xmm9", "%xmm10", "%xmm11", "%xmm12",
+				"%xmm13", "%xmm14", "%xmm15", "%rax", "%rbx", "%rcx", "%r11", "%r13", "%r14", "%r15")
+	}
 } /* namespace ml */
 

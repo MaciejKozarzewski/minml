@@ -46,43 +46,48 @@ namespace
 		return (x + y - 1) / y;
 	}
 
-//	std::vector<FCBRuntime> get_sse2_mha_runtime()
-//	{
-//		std::vector<FCBRuntime> result(1);
-//		// 4x8
-//		result[0].type_configuration = { DTYPE_FLOAT32, DTYPE_FLOAT32, DTYPE_FLOAT32, DTYPE_FLOAT32, DTYPE_FLOAT32 };
-//		result[0].inner_tile = { 4, 8, 256 };
-//		result[0].softmax_qk_kernel = mha_qk_sse2_4x8;
-//		result[0].mult_by_v_kernel = gemm_sse2_4x8;
-//		result[0].q_packing = pack_sse2_4xK;
-//		result[0].kv_packing = pack_sse2_8xK;
-//		result[0].perf_estimator = PerfEstimator(15.8, 14.2);
-//
-//		return result;
-//	}
-//	std::vector<FCBRuntime> get_avx_mha_runtime()
-//	{
-//		std::vector<FCBRuntime> result(2);
-//		// 10x8 fp32
-//		result[0].type_configuration = { DTYPE_FLOAT32, DTYPE_FLOAT32, DTYPE_FLOAT32, DTYPE_FLOAT32, DTYPE_FLOAT32 };
-//		result[0].inner_tile = { 10, 8, 256 };
-//		result[0].softmax_qk_kernel = mha_qk_avx_10x8;
-//		result[0].mult_by_v_kernel = gemm_avx_10x8;
-//		result[0].q_packing = pack_avx_10xK;
-//		result[0].kv_packing = pack_avx_8xK;
-//		result[0].perf_estimator = PerfEstimator(31.6, 16.7);
-//
-//		// 10x8 fp16/fp32
-//		result[1].type_configuration = { DTYPE_FLOAT16, DTYPE_FLOAT16, DTYPE_FLOAT16, DTYPE_FLOAT16, DTYPE_FLOAT32 };
-//		result[1].inner_tile = { 10, 8, 512 };
-//		result[1].softmax_qk_kernel = mha_qk_avx_10x8;
-//		result[1].mult_by_v_kernel = gemm_avx_10x8;
-//		result[1].q_packing = pack_avx_10xK;
-//		result[1].kv_packing = pack_avx_8xK;
-//		result[1].perf_estimator = PerfEstimator(31.4, 14.6);
-//
-//		return result;
-//	}
+	std::vector<FCBRuntime> get_sse2_fcb_runtime()
+	{
+		std::vector<FCBRuntime> result(1);
+
+		// 4x8 fp32
+		result[0].dtype = DTYPE_FLOAT32;
+		result[0].inner_tile = { 4, 8, 1024 };
+		result[0].dwconv_kernel = depthwise_conv_sse2_4x8;
+		result[0].first_conv_kernel = fused_conv_block_stage_1_sse2_4x8;
+		result[0].second_conv_kernel = gemm_sse2_4x8;
+		result[0].input_packing = pack_sse2_4xK;
+		result[0].weights_packing = pack_sse2_8xK;
+		result[0].perf_estimator = PerfEstimator(15.8, 14.2);
+
+		return result;
+	}
+	std::vector<FCBRuntime> get_avx_fcb_runtime()
+	{
+		std::vector<FCBRuntime> result(2);
+
+		// 10x8 fp32
+		result[0].dtype = DTYPE_FLOAT32;
+		result[0].inner_tile = { 10, 8, 1024 };
+		result[0].dwconv_kernel = depthwise_conv_avx_10x8;
+		result[0].first_conv_kernel = fused_conv_block_stage_1_avx_10x8;
+		result[0].second_conv_kernel = gemm_avx_10x8;
+		result[0].input_packing = pack_avx_10xK;
+		result[0].weights_packing = pack_avx_8xK;
+		result[0].perf_estimator = PerfEstimator(31.6, 16.7);
+
+		// 10x8 fp16/fp32
+		result[1].dtype = DTYPE_FLOAT16;
+		result[1].inner_tile = { 10, 8, 1024 };
+		result[1].dwconv_kernel = depthwise_conv_avx_10x8;
+		result[1].first_conv_kernel = fused_conv_block_stage_1_avx_10x8;
+		result[1].second_conv_kernel = gemm_avx_10x8;
+		result[1].input_packing = pack_avx_10xK;
+		result[1].weights_packing = pack_avx_8xK;
+		result[1].perf_estimator = PerfEstimator(31.4, 14.6);
+
+		return result;
+	}
 	std::vector<FCBRuntime> get_avx2_fma_fcb_runtime()
 	{
 		std::vector<FCBRuntime> result(2);
@@ -109,30 +114,32 @@ namespace
 
 		return result;
 	}
-//	std::vector<FCBRuntime> get_avx512f_mha_runtime()
-//	{
-//		std::vector<FCBRuntime> result(2);
-//
-//		// 24x16 fp32
-//		result[0].type_configuration = { DTYPE_FLOAT32, DTYPE_FLOAT32, DTYPE_FLOAT32, DTYPE_FLOAT32, DTYPE_FLOAT32 };
-//		result[0].inner_tile = { 24, 16, 1024 };
-//		result[0].softmax_qk_kernel = mha_qk_avx512f_24x16;
-//		result[0].mult_by_v_kernel = gemm_avx512f_24x16;
-//		result[0].q_packing = pack_avx512f_24xK;
-//		result[0].kv_packing = pack_avx512f_16xK;
-//		result[0].perf_estimator = PerfEstimator(114.3, 42.8);
-//
-//		// 24x16 fp16/fp32
-//		result[1].type_configuration = { DTYPE_FLOAT16, DTYPE_FLOAT16, DTYPE_FLOAT16, DTYPE_FLOAT16, DTYPE_FLOAT32 };
-//		result[1].inner_tile = { 24, 16, 1024 };
-//		result[1].softmax_qk_kernel = mha_qk_avx512f_24x16;
-//		result[1].mult_by_v_kernel = gemm_avx512f_24x16;
-//		result[1].q_packing = pack_avx512f_24xK;
-//		result[1].kv_packing = pack_avx512f_16xK;
-//		result[1].perf_estimator = PerfEstimator(114.3, 42.8);
-//
-//		return result;
-//	}
+	std::vector<FCBRuntime> get_avx512f_fcb_runtime()
+	{
+		std::vector<FCBRuntime> result(2);
+
+		// 24x16 fp32
+		result[0].dtype = DTYPE_FLOAT32;
+		result[0].inner_tile = { 24, 16, 1024 };
+		result[0].dwconv_kernel = depthwise_conv_avx512f_24x16;
+		result[0].first_conv_kernel = fused_conv_block_stage_1_avx512f_24x16;
+		result[0].second_conv_kernel = gemm_avx512f_24x16;
+		result[0].input_packing = pack_avx512f_24xK;
+		result[0].weights_packing = pack_avx512f_16xK;
+		result[0].perf_estimator = PerfEstimator(114.3, 42.8);
+
+		// 24x16 fp16/fp32
+		result[1].dtype = DTYPE_FLOAT16;
+		result[1].inner_tile = { 24, 16, 1024 };
+		result[1].dwconv_kernel = depthwise_conv_avx512f_24x16;
+		result[1].first_conv_kernel = fused_conv_block_stage_1_avx512f_24x16;
+		result[1].second_conv_kernel = gemm_avx512f_24x16;
+		result[1].input_packing = pack_avx512f_24xK;
+		result[1].weights_packing = pack_avx512f_16xK;
+		result[1].perf_estimator = PerfEstimator(114.3, 42.8);
+
+		return result;
+	}
 
 	template<typename T>
 	void join_vectors(std::vector<T> &dst, const std::vector<T> &src)
@@ -146,14 +153,14 @@ namespace
 		{
 			std::vector<FCBRuntime> result;
 			const cpu::SimdLevel simd = cpu::Context::getSimdLevel(context);
-//			if (simd >= cpu::SimdLevel::AVX512F)
-//				join_vectors(result, get_avx512f_mha_runtime());
+			if (simd >= cpu::SimdLevel::AVX512F)
+				join_vectors(result, get_avx512f_fcb_runtime());
 			if (simd >= cpu::SimdLevel::AVX2)
 				join_vectors(result, get_avx2_fma_fcb_runtime());
-//			if (simd >= cpu::SimdLevel::AVX)
-//				join_vectors(result, get_avx_mha_runtime());
-//			if (simd >= cpu::SimdLevel::SSE2)
-//				join_vectors(result, get_sse2_mha_runtime());
+			if (simd >= cpu::SimdLevel::AVX)
+				join_vectors(result, get_avx_fcb_runtime());
+			if (simd >= cpu::SimdLevel::SSE2)
+				join_vectors(result, get_sse2_fcb_runtime());
 			return result;
 		}();
 		assert(runtime_table.size() > 0);
@@ -221,7 +228,8 @@ namespace ml
 		{
 			const int m_left = std::min(inner_tile.M, batch_size * height * width - inner_m);
 
-			dwconv_kernel(dw_out_matrix, input_matrix, dwconv_weights, dwconv_bias, args, indices + 3 * inner_m);
+			Matrix tmp_out(dw_out_matrix.data(), dw_out_matrix.dtype(), m_left, dw_out_matrix.columns(), dw_out_matrix.stride());
+			dwconv_kernel(tmp_out, input_matrix, dwconv_weights, dwconv_bias, args, indices + 3 * inner_m);
 			pack_fragment_input(dwconv_output_fragment, inner_m);
 
 			first_conv_output_fragment.mark_as_packed_with_size(Size2D(hidden_dim, std::min(inner_tile.M, m_left)));
@@ -407,7 +415,28 @@ namespace ml
 		fill_indices_table(indices, x.dim[0], x.dim[1], x.dim[2]);
 
 		Matrix output_matrix(y.data, y.dtype, first_dim, last_dim, last_dim);
-		depthwise_conv_avx2_12x8(output_matrix, input_matrix, weight_matrix, bias_matrix, args, indices);
+		const cpu::SimdLevel simd = cpu::Context::getSimdLevel(context);
+		if (simd >= cpu::SimdLevel::AVX512F)
+		{
+			depthwise_conv_avx512f_24x16(output_matrix, input_matrix, weight_matrix, bias_matrix, args, indices);
+			return;
+		}
+		if (simd >= cpu::SimdLevel::AVX2)
+		{
+			depthwise_conv_avx2_12x8(output_matrix, input_matrix, weight_matrix, bias_matrix, args, indices);
+			return;
+		}
+		if (simd >= cpu::SimdLevel::AVX)
+		{
+			depthwise_conv_avx_10x8(output_matrix, input_matrix, weight_matrix, bias_matrix, args, indices);
+			return;
+		}
+		if (simd >= cpu::SimdLevel::SSE2)
+		{
+			depthwise_conv_sse2_4x8(output_matrix, input_matrix, weight_matrix, bias_matrix, args, indices);
+			return;
+		}
+
 	}
 
 } /* namespace ml */

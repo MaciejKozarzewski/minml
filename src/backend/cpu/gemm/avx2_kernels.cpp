@@ -2474,16 +2474,6 @@ namespace ml
 
 	// batched depthwise convolution kernel
 
-#define DWCONV_ZERO_ACCUMULATORS() \
-	vxorps(ymm0, ymm0, ymm0) \
-	vxorps(ymm1, ymm1, ymm1) \
-	vxorps(ymm2, ymm2, ymm2) \
-	vxorps(ymm3, ymm3, ymm3) \
-	vxorps(ymm4, ymm4, ymm4) \
-	vxorps(ymm5, ymm5, ymm5) \
-	vxorps(ymm6, ymm6, ymm6) \
-	vxorps(ymm7, ymm7, ymm7)
-
 #define DWCONV_MAIN_LOOP_FP32() \
 	vmovups(mem(rax, 0*8*4), ymm8) \
 	vmovups(mem(rax, 1*8*4), ymm9) \
@@ -2577,16 +2567,6 @@ namespace ml
 	vcvtph2ps(xmm5, ymm5) \
 	vcvtph2ps(xmm6, ymm6) \
 	vcvtph2ps(xmm7, ymm7)
-
-#define DWCONV_ADD_BIAS() \
-	vaddps(ymm0, ymm8, ymm0) \
-	vaddps(ymm1, ymm9, ymm1) \
-	vaddps(ymm2, ymm10, ymm2) \
-	vaddps(ymm3, ymm11, ymm3) \
-	vaddps(ymm4, ymm12, ymm4) \
-	vaddps(ymm5, ymm13, ymm5) \
-	vaddps(ymm6, ymm14, ymm6) \
-	vaddps(ymm7, ymm15, ymm7)
 
 #define DWCONV_STORE_OUTPUT_FP32() \
 	vmovups(ymm0, mem(rcx, 0*8*4)) \
