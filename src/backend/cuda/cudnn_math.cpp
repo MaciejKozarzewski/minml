@@ -350,8 +350,8 @@ namespace
 
 	void transpose_matrix(mlContext_t context, mlDataType_t dtype, void *output, const void *input, int rows, int columns)
 	{
-		cublasLtHandle_t handle = cuda::Context::getCublasLtHandle(context);
-		cudaStream_t stream = cuda::Context::getStream(context);
+		cublasLtHandle_t handle = ml::cuda_backend::Context::getCublasLtHandle(context);
+		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
 		const float alpha = 1.0f;
 		const float beta = 0.0f;
 
@@ -417,11 +417,11 @@ namespace ml
 
 			const void *C = (add == nullptr) ? output : add;
 
-			cublasLtHandle_t handle = cuda::Context::getCublasLtHandle(context);
-			cudaStream_t stream = cuda::Context::getStream(context);
+			cublasLtHandle_t handle = ml::cuda_backend::Context::getCublasLtHandle(context);
+			cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
 
-			const size_t workspace_size = cuda::Context::getWorkspaceSize(context);
-			void *workspace = cuda::Context::getWorkspace(context);
+			const size_t workspace_size = ml::cuda_backend::Context::getWorkspaceSize(context);
+			void *workspace = ml::cuda_backend::Context::getWorkspace(context);
 
 			cublasStatus_t status = cublasLtMatmul(handle, computeDesc, &alpha, weights, Bdesc, input, Adesc, &beta, C, Cdesc, output, Ddesc, nullptr,
 					workspace, workspace_size, stream);
@@ -429,19 +429,19 @@ namespace ml
 		}
 		else
 		{
-			cudnnHandle_t handle = cuda::Context::getCudnnHandle(context);
+			cudnnHandle_t handle = ml::cuda_backend::Context::getCudnnHandle(context);
 
 			const TensorDescriptor xDesc(input_shape, dtype);
 			const FilterDescriptor wDesc(weights_shape, dtype);
 			const TensorDescriptor yDesc(output_shape, dtype);
 
-			const ConvolutionDescriptor convDesc(cuda::Context::getCudnnHandle(context), xDesc, wDesc, yDesc, dtype, weights_shape.dim[1], 1);
+			const ConvolutionDescriptor convDesc(ml::cuda_backend::Context::getCudnnHandle(context), xDesc, wDesc, yDesc, dtype, weights_shape.dim[1], 1);
 
 			const cudnnConvolutionFwdAlgoPerfStruct perf = get_conv_forward_algo(handle, xDesc, wDesc, yDesc, convDesc);
 
-			cuda::Context::setWorkspaceSize(context, perf.memory);
-			const size_t workspace_size = cuda::Context::getWorkspaceSize(context);
-			void *workspace = cuda::Context::getWorkspace(context);
+			ml::cuda_backend::Context::setWorkspaceSize(context, perf.memory);
+			const size_t workspace_size = ml::cuda_backend::Context::getWorkspaceSize(context);
+			void *workspace = ml::cuda_backend::Context::getWorkspace(context);
 
 			const float alpha1 = 1.0f;
 			if (bias == nullptr)
@@ -479,8 +479,8 @@ namespace ml
 	{
 		if (is_transpose(opB) && !is_transpose(opA))
 		{
-			const size_t workspace_size = cuda::Context::getWorkspaceSize(context);
-			void *workspace = cuda::Context::getWorkspace(context);
+			const size_t workspace_size = ml::cuda_backend::Context::getWorkspaceSize(context);
+			void *workspace = ml::cuda_backend::Context::getWorkspace(context);
 			const MatrixLayout Adesc(shape_A, dtype);
 			const MatrixLayout Bdesc(shape_B, dtype);
 			const MatrixLayout Cdesc(shape_C, dtype);
@@ -514,8 +514,8 @@ namespace ml
 				}
 			}
 
-			cublasLtHandle_t handle = cuda::Context::getCublasLtHandle(context);
-			cudaStream_t stream = cuda::Context::getStream(context);
+			cublasLtHandle_t handle = ml::cuda_backend::Context::getCublasLtHandle(context);
+			cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
 			cublasStatus_t status = cublasLtMatmul(handle, computeDesc, &_alpha, B, Bdesc, A, Adesc, &_beta, C, Cdesc, D, Ddesc, nullptr, workspace,
 					workspace_size, stream);
 			assert(status == CUBLAS_STATUS_SUCCESS);
@@ -559,7 +559,7 @@ namespace ml
 		const int channels = weights_shape.dim[2];
 		assert(weights_shape.dim[0] == weights_shape.dim[1]);
 
-		cudnnHandle_t handle = cuda::Context::getCudnnHandle(context);
+		cudnnHandle_t handle = ml::cuda_backend::Context::getCudnnHandle(context);
 
 		const mlShape_t output_shape = input_shape;
 
@@ -571,10 +571,10 @@ namespace ml
 
 		const cudnnConvolutionFwdAlgoPerfStruct perf = get_conv_forward_algo(handle, xDesc, wDesc, yDesc, convDesc);
 
-		cuda::Context::setWorkspaceSize(context, perf.memory);
+		ml::cuda_backend::Context::setWorkspaceSize(context, perf.memory);
 		const size_t transposed_weights_size = volume(weights_shape) * size_of(dtype);
-		const size_t workspace_size = cuda::Context::getWorkspaceSize(context) - transposed_weights_size;
-		void *transposed_weights = cuda::Context::getWorkspace(context);
+		const size_t workspace_size = ml::cuda_backend::Context::getWorkspaceSize(context) - transposed_weights_size;
+		void *transposed_weights = ml::cuda_backend::Context::getWorkspace(context);
 		void *workspace = reinterpret_cast<uint8_t*>(transposed_weights) + transposed_weights_size;
 
 		transpose_matrix(context, dtype, transposed_weights, weights, filter_size * filter_size, channels);
@@ -614,7 +614,7 @@ namespace ml
 		const int channels = weights_shape.dim[2];
 		assert(weights_shape.dim[0] == weights_shape.dim[1]);
 
-		cudnnHandle_t handle = cuda::Context::getCudnnHandle(context);
+		cudnnHandle_t handle = ml::cuda_backend::Context::getCudnnHandle(context);
 
 		const mlShape_t output_shape = input_shape;
 
@@ -627,10 +627,10 @@ namespace ml
 
 		const cudnnConvolutionBwdDataAlgoPerfStruct perf = get_conv_backward_data_algo(handle, dxDesc, wDesc, dyDesc, convDesc);
 
-		cuda::Context::setWorkspaceSize(context, perf.memory);
+		ml::cuda_backend::Context::setWorkspaceSize(context, perf.memory);
 		const size_t transposed_weights_size = volume(weights_shape) * size_of(DTYPE_FLOAT32);
-		const size_t workspace_size = cuda::Context::getWorkspaceSize(context) - transposed_weights_size;
-		void *transposed_weights = cuda::Context::getWorkspace(context);
+		const size_t workspace_size = ml::cuda_backend::Context::getWorkspaceSize(context) - transposed_weights_size;
+		void *transposed_weights = ml::cuda_backend::Context::getWorkspace(context);
 		void *workspace = reinterpret_cast<uint8_t*>(transposed_weights) + transposed_weights_size;
 
 		transpose_matrix(context, DTYPE_FLOAT32, transposed_weights, weights, filter_size * filter_size, channels);
@@ -654,7 +654,7 @@ namespace ml
 		const int channels = weights_shape.dim[2];
 		assert(weights_shape.dim[0] == weights_shape.dim[1]);
 
-		cudnnHandle_t handle = cuda::Context::getCudnnHandle(context);
+		cudnnHandle_t handle = ml::cuda_backend::Context::getCudnnHandle(context);
 
 		const mlShape_t output_shape = input_shape;
 
@@ -667,10 +667,10 @@ namespace ml
 
 		const cudnnConvolutionBwdFilterAlgoPerfStruct perf = get_conv_backward_filter_algo(handle, xDesc, dwDesc, dyDesc, convDesc);
 
-		cuda::Context::setWorkspaceSize(context, perf.memory);
+		ml::cuda_backend::Context::setWorkspaceSize(context, perf.memory);
 		const size_t transposed_weights_size = volume(weights_shape) * size_of(DTYPE_FLOAT32);
-		const size_t workspace_size = cuda::Context::getWorkspaceSize(context) - transposed_weights_size;
-		void *transposed_weights = cuda::Context::getWorkspace(context);
+		const size_t workspace_size = ml::cuda_backend::Context::getWorkspaceSize(context) - transposed_weights_size;
+		void *transposed_weights = ml::cuda_backend::Context::getWorkspace(context);
 		void *workspace = reinterpret_cast<uint8_t*>(transposed_weights) + transposed_weights_size;
 
 		const float alpha = 1.0f;
