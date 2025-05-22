@@ -135,6 +135,10 @@ namespace ml
 	{
 		return reinterpret_cast<const T*>(tensor.data);
 	}
+	[[maybe_unused]] static bool is_empty(const mlTensor_t &tensor) noexcept
+	{
+		return tensor.data == nullptr;
+	}
 	[[maybe_unused]] static bool is_fp16(const mlTensor_t &tensor) noexcept
 	{
 		return tensor.dtype == DTYPE_FLOAT16;

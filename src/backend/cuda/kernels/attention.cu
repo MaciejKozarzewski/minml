@@ -40,6 +40,14 @@ namespace
 		const int tmp = x % y;
 		return (tmp == 0) ? x : (x + y - tmp);
 	}
+	__host__ __device__ float to_float(int32_t x)
+	{
+		return reinterpret_cast<const float*>(&x)[0];
+	}
+	__host__ __device__ uint32_t to_uint32(float x)
+	{
+		return reinterpret_cast<const uint32_t*>(&x)[0];
+	}
 
 	__device__ void* apply_offset(void *ptr, int offsetInBytes)
 	{
@@ -76,11 +84,13 @@ namespace
 
 	template<typename T, bool UseBias>
 	__global__ void kernel_softmax_forward_in_place(T *input, const T *weights, int batch_size, int num_heads, int height, int width,
-			int weights_size, const float *mask)
+			int weights_size, const uint32_t *mask)
 	{
 		extern __shared__ char shared_array[];
 
-		float *shared_input = reinterpret_cast<float*>(shared_array);
+		uint32_t *shared_mask = reinterpret_cast<uint32_t*>(shared_array);
+		float *shared_input = reinterpret_cast<float*>(shared_mask + height * width);
+
 		float *shared_biases = nullptr;
 		Index2D *indices = nullptr;
 
@@ -106,8 +116,18 @@ namespace
 			const Indexer<2> weight_indexer(num_heads, tmp);
 			for (int i = 4 * tid; i < tmp; i += 4 * block_size)
 				vector_copy<4>(shared_biases + i, weights + weight_indexer.at(head_idx, i));
-			__syncthreads();
 		}
+
+		if (mask != nullptr)
+		{
+			const Indexer<2> mask_indexer(batch_size, tokens);
+			for (int i = tid; i < tokens; i += block_size)
+				shared_mask[i] = mask[mask_indexer.at(batch_idx, i)];
+		}
+		else
+			for (int i = tid; i < tokens; i += block_size)
+				shared_mask[i] = 0xFFFFFFFFu;
+		__syncthreads();
 
 		const Indexer<4> input_indexer(batch_size, num_heads, tokens, tokens);
 		const int idx = input_indexer.at(batch_idx, head_idx, token_idx, 0);
@@ -135,6 +155,8 @@ namespace
 		const Indexer<2> weight_indexer(weights_size, round_up(weights_size, 4));
 		const int range = (weights_size - 1) / 2;
 
+		const uint32_t mask1 = shared_mask[token_idx + threadIdx.y];
+
 		float max_value = -1e+32f;
 		for (int j = threadIdx.x; j < tokens; j += blockDim.x)
 		{
@@ -147,12 +169,6 @@ namespace
 				tmp += shared_biases[weight_indexer.at(offset_x, offset_y)];
 			}
 
-			if (mask != nullptr)
-			{
-				const Indexer<4> mask_indexer(batch_size, num_heads, tokens, tokens);
-				tmp += mask[mask_indexer.at(batch_idx, head_idx, token_idx + threadIdx.y, j)];
-			}
-
 			max_value = max(max_value, tmp);
 			shared_input[threadIdx.y * tokens + j] = tmp;
 		}
@@ -163,11 +179,10 @@ namespace
 		for (int j = threadIdx.x; j < tokens; j += blockDim.x)
 		{
 			float tmp = exp(shared_input[threadIdx.y * tokens + j] - max_value);
-//			if (mask != nullptr)
-//			{
-//				const float m = mask[batch_idx * tokens * tokens + (token_idx + threadIdx.y) * tokens + threadIdx.x];
-//				tmp = bitwise_and(tmp, m);
-//			}
+
+			const uint32_t mask2 = shared_mask[j];
+			tmp = to_float(to_uint(tmp) & (mask1 & mask2));
+
 			partial_sum += tmp;
 			shared_input[threadIdx.y * tokens + j] = tmp;
 		}
@@ -202,7 +217,7 @@ namespace
 	{
 		__shared__ cg::block_tile_memory<128> btm;
 		cg::thread_block thb = cg::this_thread_block(btm);
-		cg::thread_block_tile < 128 > tile = cg::tiled_partition < 128 > (thb);
+		cg::thread_block_tile < 128 > tile = cg::tiled_partition<128>(thb);
 
 		extern __shared__ char shared_array[];
 
@@ -464,20 +479,20 @@ namespace
 			{
 				if (use_bias)
 					kernel_softmax_forward_in_place<half, true> <<<gridDim, blockDim, shared_mem, stream>>>(ml::getPointer<half>(input),
-							ml::getPointer<half>(weights), batch_size, num_heads, height, width, range, ml::getPointer<float>(mask));
+							ml::getPointer<half>(weights), batch_size, num_heads, height, width, range, ml::getPointer<uint32_t>(mask));
 				else
 					kernel_softmax_forward_in_place<half, false> <<<gridDim, blockDim, shared_mem, stream>>>(ml::getPointer<half>(input), nullptr,
-							batch_size, num_heads, height, width, 0, ml::getPointer<float>(mask));
+							batch_size, num_heads, height, width, 0, ml::getPointer<uint32_t>(mask));
 				break;
 			}
 			case ml::DTYPE_FLOAT32:
 			{
 				if (use_bias)
 					kernel_softmax_forward_in_place<float, true> <<<gridDim, blockDim, shared_mem, stream>>>(ml::getPointer<float>(input),
-							ml::getPointer<float>(weights), batch_size, num_heads, height, width, range, ml::getPointer<float>(mask));
+							ml::getPointer<float>(weights), batch_size, num_heads, height, width, range, ml::getPointer<uint32_t>(mask));
 				else
 					kernel_softmax_forward_in_place<float, false> <<<gridDim, blockDim, shared_mem, stream>>>(ml::getPointer<float>(input), nullptr,
-							batch_size, num_heads, height, width, 0, ml::getPointer<float>(mask));
+							batch_size, num_heads, height, width, 0, ml::getPointer<uint32_t>(mask));
 				break;
 			}
 			case ml::DTYPE_FLOAT64:
@@ -684,5 +699,7 @@ namespace ml
 //				kernel_normalize_qk_backward<<<gridDim, blockDim, shared_mem, stream>>>(dk_ptr, k_ptr, tokens, head_dim, qkv_stride, k_rms_workspace);
 //		}
 	}
+
+
 } /* namespace ml */
 

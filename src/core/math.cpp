@@ -929,9 +929,8 @@ namespace ml
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
-				cpu_multi_head_attention_forward(get(context), get_shape(input), get_shape(weights), get_shape(bias), get(input.dtype()),
-						input.data(), output.data(), weights.data(), bias.data(), mask.data(), workspace.data(), backwardData.data(), num_heads,
-						symmetric);
+				cpu_multi_head_attention_forward(get(context), get(input), get(output), get(bias), get(mask), get(workspace), get(backwardData),
+						num_heads);
 				break;
 			case DeviceType::CUDA:
 				cuda_multi_head_attention_forward(get(context), get_shape(input), get_shape(weights), get_shape(bias), get(input.dtype()),
@@ -952,9 +951,8 @@ namespace ml
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
-				cpu_multi_head_attention_backward(get(context), get_shape(input), get_shape(weights), get_shape(bias), input.data(), weights.data(),
-						bias.data(), mask.data(), gradient_prev.data(), gradient_next.data(), weights_update.data(), bias_update.data(),
-						workspace.data(), backwardData.data(), num_heads, symmetric);
+				cpu_multi_head_attention_backward(get(context), get(input), get(bias), get(mask), get(gradient_prev), get(gradient_next),
+						get(bias_update), get(workspace), get(backwardData), num_heads);
 				break;
 			case DeviceType::CUDA:
 				cuda_multi_head_attention_backward(get(context), get_shape(input), get_shape(weights), get_shape(bias), input.data(), weights.data(),

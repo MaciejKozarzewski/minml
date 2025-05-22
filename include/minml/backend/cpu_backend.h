@@ -80,8 +80,8 @@ namespace ml
 				const mlTensor_t second_conv_bias, mlTensor_t output);
 
 		// depthwise convolution
-		void cpu_depthwise_conv_forward(mlContext_t context, float alpha, const mlTensor_t x, const mlTensor_t w, const mlTensor_t b,
-				float beta, mlTensor_t y);
+		void cpu_depthwise_conv_forward(mlContext_t context, float alpha, const mlTensor_t x, const mlTensor_t w, const mlTensor_t b, float beta,
+				mlTensor_t y);
 		void cpu_depthwise_conv_backward(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, const void *gradient_next,
 				const void *weights, void *gradient_prev);
 		void cpu_depthwise_conv_update(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, const void *input,
@@ -133,12 +133,17 @@ namespace ml
 		 * attention
 		 */
 		int cpu_multi_head_attention_get_workspace_size(mlShape_t input_shape, mlShape_t weights_shape, int num_heads, bool training);
-		void cpu_multi_head_attention_forward(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, mlShape_t bias_shape,
-				mlDataType_t dtype, const void *input, void *output, const void *weights, const void *bias, const void *mask, void *workspace,
-				void *backward_data, int num_heads, bool symmetric);
-		void cpu_multi_head_attention_backward(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, mlShape_t bias_shape,
-				const void *input, const void *weights, const void *bias, const void *mask, void *gradient_prev, void *gradient_next,
-				void *weights_update, void *bias_update, void *workspace, void *backward_data, int num_heads, bool symmetric);
+//		void cpu_multi_head_attention_forward(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, mlShape_t bias_shape,
+//				mlDataType_t dtype, const void *input, void *output, const void *weights, const void *bias, const void *mask, void *workspace,
+//				void *backward_data, int num_heads, bool symmetric);
+//		void cpu_multi_head_attention_backward(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, mlShape_t bias_shape,
+//				const void *input, const void *weights, const void *bias, const void *mask, void *gradient_prev, void *gradient_next,
+//				void *weights_update, void *bias_update, void *workspace, void *backward_data, int num_heads, bool symmetric);
+
+		void cpu_multi_head_attention_forward(mlContext_t context, const mlTensor_t x, mlTensor_t y, const mlTensor_t b, const mlTensor_t mask,
+				mlTensor_t workspace, mlTensor_t backward_data, int num_heads);
+		void cpu_multi_head_attention_backward(mlContext_t context, const mlTensor_t x, const mlTensor_t b, const mlTensor_t mask, mlTensor_t dx,
+				const mlTensor_t dy, mlTensor_t db, mlTensor_t workspace, mlTensor_t backward_data, int num_heads);
 
 		/*
 		 * activation
