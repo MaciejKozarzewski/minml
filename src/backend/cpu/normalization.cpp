@@ -457,27 +457,30 @@ namespace ml
 		const int first_dim = volume_without_last_dim(shape);
 		const int last_dim = get_last_dim(shape);
 
-		const float *input_ptr = getPointer<float>(input);
-		const float *weights_ptr = getPointer<float>(weights);
-		float *output_ptr = getPointer<float>(output);
-
-		for (int i = 0; i < first_dim; i++)
+		if (dtype == DTYPE_FLOAT32)
 		{
-			float sum_square = 0.0f;
-			for (int j = 0; j < last_dim; j++)
-				sum_square += square(input_ptr[i * last_dim + j]);
-			const float rms = std::sqrt(sum_square / last_dim);
+			const float *input_ptr = getPointer<float>(input);
+			const float *weights_ptr = getPointer<float>(weights);
+			float *output_ptr = getPointer<float>(output);
 
-			const float inv_rms = 1.0f / (epsilon + rms);
-			if (weights_ptr == nullptr)
+			for (int i = 0; i < first_dim; i++)
 			{
+				float sum_square = 0.0f;
 				for (int j = 0; j < last_dim; j++)
-					output_ptr[i * last_dim + j] = input_ptr[i * last_dim + j] * inv_rms;
-			}
-			else
-			{
-				for (int j = 0; j < last_dim; j++)
-					output_ptr[i * last_dim + j] = weights_ptr[j] * input_ptr[i * last_dim + j] * inv_rms;
+					sum_square += square(input_ptr[i * last_dim + j]);
+				const float rms = std::sqrt(sum_square / last_dim);
+
+				const float inv_rms = 1.0f / (epsilon + rms);
+				if (weights_ptr == nullptr)
+				{
+					for (int j = 0; j < last_dim; j++)
+						output_ptr[i * last_dim + j] = input_ptr[i * last_dim + j] * inv_rms;
+				}
+				else
+				{
+					for (int j = 0; j < last_dim; j++)
+						output_ptr[i * last_dim + j] = weights_ptr[j] * input_ptr[i * last_dim + j] * inv_rms;
+				}
 			}
 		}
 	}
