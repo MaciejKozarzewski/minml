@@ -2979,7 +2979,7 @@ namespace ml
 				"cc", "memory", "%ymm0", "%ymm1", "%ymm2", "%ymm3", "%ymm4", "%ymm5", "%ymm6", "%ymm7", "%ymm8", "%ymm9", "%ymm10", "%ymm11", "%ymm12",
 				"%ymm13", "%ymm14", "%ymm15", "%rax", "%rbx", "%rcx", "%r11", "%r13", "%r14", "%r15")
 	}
-	void quantize_avx2_8xK(Fragment &dst, const Fragment &src, const Fragment &scales) noexcept
+	void quantize_avx2_8xK(Fragment &dst, const Fragment &src) noexcept
 	{
 		assert(src.is_fp32());
 		assert(dst.stride() == 8);
@@ -2988,21 +2988,84 @@ namespace ml
 		uint64_t k_iter = dst.rows() / 8;
 		uint64_t k_left = (dst.rows() % 8 + 1) / 2;
 		const void *src_ptr = src.data();
-		const void *scales_ptr = scales.data();
 		void *dst_ptr = dst.data();
+		const uint32_t tmp[2] = { 0x7FFFFFFF, 4095 };
+		const void *tmp_ptr = &tmp;
 
 		begin_asm()
-		movq(var(scales_ptr), rcx) // scales pointer is in rcx
-		vmovups(mem(rcx), ymm15)// load scales into ymm15
+		movq(var(tmp_ptr), rcx)
+		vbroadcastss(mem(rcx), ymm14)
+		vxorps(ymm15, ymm15, ymm15) // zero scale
 
 		movq(var(src_ptr), rax)// src pointer is in rax
-		movq(var(dst_ptr), rbx)// dst pointer is in rbx
 
 		movq(var(k_iter), r14)// load the number of 8-unrolled iterations
 		test(r14, r14)
 		je(FINALLOOP)
 
 		label(UNROLLED8)
+		vmovaps(mem(rax, 0*8*4), ymm0)
+		vmovaps(mem(rax, 1*8*4), ymm1)
+		vmovaps(mem(rax, 2*8*4), ymm2)
+		vmovaps(mem(rax, 3*8*4), ymm3)
+		vmovaps(mem(rax, 4*8*4), ymm4)
+		vmovaps(mem(rax, 5*8*4), ymm5)
+		vmovaps(mem(rax, 6*8*4), ymm6)
+		vmovaps(mem(rax, 7*8*4), ymm7)
+
+		vandps(ymm0, ymm14, ymm0)// calculate abs(x)
+		vandps(ymm1, ymm14, ymm1)
+		vandps(ymm2, ymm14, ymm2)
+		vandps(ymm3, ymm14, ymm3)
+		vandps(ymm4, ymm14, ymm4)
+		vandps(ymm5, ymm14, ymm5)
+		vandps(ymm6, ymm14, ymm6)
+		vandps(ymm7, ymm14, ymm7)
+
+		vmaxps(ymm0, ymm1, ymm0)// reduce max()
+		vmaxps(ymm2, ymm3, ymm2)
+		vmaxps(ymm4, ymm5, ymm4)
+		vmaxps(ymm6, ymm6, ymm6)
+		vmaxps(ymm0, ymm2, ymm0)
+		vmaxps(ymm4, ymm6, ymm4)
+		vmaxps(ymm0, ymm4, ymm0)
+		vmaxps(ymm0, ymm15, ymm15)
+
+		add(imm(8*8*4), rax)// add stride to src pointer
+		dec(r14)
+		jne(UNROLLED8)
+
+		label(FINALLOOP)
+		movq(var(k_left), r14)// load the number of 2-unrolled iterations
+		test(r14, r14)
+		je(AFTER_SCALE)
+
+		label(UNROLLED2)
+		vmovaps(mem(rax, 0*8*4), ymm0)
+		vmovaps(mem(rax, 1*8*4), ymm1)
+
+		vandps(ymm0, ymm14, ymm0)// calculate abs(x)
+		vandps(ymm1, ymm14, ymm1)// calculate abs(x)
+		vmaxps(ymm0, ymm1, ymm0)
+		vmaxps(ymm0, ymm15, ymm15)
+
+		add(imm(2*8*4), rax)// add stride to src pointer
+		dec(r14)
+		jne(UNROLLED2)
+
+		label(AFTER_SCALE)
+
+		vbroadcastss(mem(rcx, 4), ymm14)
+		vdivps(ymm15, ymm14, ymm15)
+
+		movq(var(src_ptr), rax)// src pointer is in rax
+		movq(var(dst_ptr), rbx)// dst pointer is in rbx
+
+		movq(var(k_iter), r14)// load the number of 8-unrolled iterations
+		test(r14, r14)
+		je(FINALLOOP_2)
+
+		label(UNROLLED8_2)
 		vmovaps(mem(rax, 0*8*4), ymm0)
 		vmovaps(mem(rax, 1*8*4), ymm1)
 		vmovaps(mem(rax, 2*8*4), ymm2)
@@ -3039,17 +3102,22 @@ namespace ml
 		vorps(ymm4, ymm5, ymm4)
 		vorps(ymm6, ymm7, ymm6)
 
+		vmovaps(ymm0, mem(rbx, 0*16*2))
+		vmovaps(ymm2, mem(rbx, 1*16*2))
+		vmovaps(ymm4, mem(rbx, 2*16*2))
+		vmovaps(ymm6, mem(rbx, 3*16*2))
+
 		add(imm(8*8*4), rax)// add stride to src pointer
 		add(imm(4*8*4), rbx)// add stride to dst pointer
 		dec(r14)
-		jne(UNROLLED8)
+		jne(UNROLLED8_2)
 
-		label(FINALLOOP)
+		label(FINALLOOP_2)
 		movq(var(k_left), r14)// load the number of 2-unrolled iterations
 		test(r14, r14)
 		je(EPILOGUE)
 
-		label(UNROLLED2)
+		label(UNROLLED2_2)
 		vmovaps(mem(rax, 0*8*4), ymm0)
 		vmovaps(mem(rax, 1*8*4), ymm1)
 
@@ -3062,10 +3130,12 @@ namespace ml
 		vpslld(imm(16), ymm0, ymm0)
 		vorps(ymm0, ymm1, ymm0)
 
+		vmovaps(ymm0, mem(rbx))
+
 		add(imm(2*8*4), rax)// add stride to src pointer
 		add(imm(1*8*4), rbx)// add stride to dst pointer
 		dec(r14)
-		jne(UNROLLED2)
+		jne(UNROLLED2_2)
 
 		label(EPILOGUE)
 		vzeroupper()
@@ -3074,7 +3144,213 @@ namespace ml
 				:// inputs
 				[src_ptr] "m"(src_ptr),
 				[dst_ptr] "m"(dst_ptr),
-				[scales_ptr] "m"(scales_ptr),
+				[tmp_ptr] "m"(tmp_ptr),
+				[k_iter] "m"(k_iter),
+				[k_left] "m"(k_left)
+				:// clobbers
+				"cc", "memory", "%ymm0", "%ymm1", "%ymm2", "%ymm3", "%ymm4", "%ymm5", "%ymm6", "%ymm7",
+				"%ymm8", "%ymm9", "%ymm10", "%ymm11", "%ymm12", "%ymm13", "%ymm14", "%ymm15", "%rax", "%rbx", "%rcx",
+				"%r12", "%r13", "%r14", "%r15")
+	}
+	void quantize_avx2_12xK(Fragment &dst, const Fragment &src) noexcept
+	{
+		assert(src.is_fp32());
+		assert(dst.stride() == 12);
+		assert(ml::cpu::is_aligned(dst.data(), 32));
+
+		uint64_t k_iter = dst.rows() / 8;
+		uint64_t k_left = (dst.rows() % 8 + 1) / 2;
+		const void *src_ptr = src.data();
+		void *dst_ptr = dst.data();
+		const uint32_t tmp[2] = { 0x7FFFFFFF, 4095 };
+		const void *tmp_ptr = &tmp;
+
+		begin_asm()
+		movq(var(tmp_ptr), rcx)
+		vbroadcastss(mem(rcx), ymm12)
+		vxorps(ymm13, ymm13, ymm13) // zero scale
+		vxorps(ymm14, ymm14, ymm14)// zero scale
+		vxorps(ymm15, ymm15, ymm15)// zero scale
+
+		movq(var(src_ptr), rax)// src pointer is in rax
+
+		movq(var(k_iter), r14)// load the number of 8-unrolled iterations
+		test(r14, r14)
+		je(FINALLOOP)
+
+		label(UNROLLED8)
+		vmovaps(mem(rax, 0*8*4), ymm0)
+		vmovaps(mem(rax, 1*8*4), ymm1)
+		vmovaps(mem(rax, 2*8*4), ymm2)
+		vmovaps(mem(rax, 3*8*4), ymm3)
+		vmovaps(mem(rax, 4*8*4), ymm4)
+		vmovaps(mem(rax, 5*8*4), ymm5)
+		vmovaps(mem(rax, 6*8*4), ymm6)
+		vmovaps(mem(rax, 7*8*4), ymm7)
+		vmovaps(mem(rax, 8*8*4), ymm8)
+		vmovaps(mem(rax, 9*8*4), ymm9)
+		vmovaps(mem(rax, 10*8*4), ymm10)
+		vmovaps(mem(rax, 11*8*4), ymm11)
+
+		vandps(ymm0, ymm12, ymm0)// calculate abs(x)
+		vandps(ymm1, ymm12, ymm1)
+		vandps(ymm2, ymm12, ymm2)
+		vandps(ymm3, ymm12, ymm3)
+		vandps(ymm4, ymm12, ymm4)
+		vandps(ymm5, ymm12, ymm5)
+		vandps(ymm6, ymm12, ymm6)
+		vandps(ymm7, ymm12, ymm7)
+
+		vmaxps(ymm0, ymm3, ymm0)// reduce max()
+		vmaxps(ymm1, ymm4, ymm1)
+		vmaxps(ymm2, ymm5, ymm2)
+		vmaxps(ymm6, ymm9, ymm6)
+		vmaxps(ymm7, ymm10, ymm7)
+		vmaxps(ymm8, ymm11, ymm8)
+		vmaxps(ymm0, ymm6, ymm0)
+		vmaxps(ymm1, ymm7, ymm1)
+		vmaxps(ymm2, ymm8, ymm2)
+		vmaxps(ymm0, ymm13, ymm13)
+		vmaxps(ymm1, ymm14, ymm14)
+		vmaxps(ymm2, ymm15, ymm15)
+
+		add(imm(8*12*4), rax)// add stride to src pointer
+		dec(r14)
+		jne(UNROLLED8)
+
+		label(FINALLOOP)
+		movq(var(k_left), r14)// load the number of 2-unrolled iterations
+		test(r14, r14)
+		je(AFTER_SCALE)
+
+		label(UNROLLED2)
+		vmovaps(mem(rax, 0*8*4), ymm0)
+		vmovaps(mem(rax, 1*8*4), ymm1)
+		vmovaps(mem(rax, 2*8*4), ymm2)
+
+		vandps(ymm0, ymm12, ymm0)// calculate abs(x)
+		vandps(ymm1, ymm12, ymm1)
+		vandps(ymm2, ymm12, ymm2)
+		vmaxps(ymm0, ymm13, ymm13)
+		vmaxps(ymm1, ymm14, ymm14)
+		vmaxps(ymm2, ymm15, ymm15)
+
+		add(imm(2*12*4), rax)// add stride to src pointer
+		dec(r14)
+		jne(UNROLLED2)
+
+		label(AFTER_SCALE)
+
+		vperm2f128(imm(0x21), ymm14, ymm15, ymm12)
+		vmaxps(ymm12, ymm13, ymm13)
+
+		vbroadcastss(mem(rcx, 4), ymm12)
+		vdivps(ymm13, ymm12, ymm13)
+		vdivps(ymm14, ymm12, ymm14)
+		vdivps(xmm15, xmm12, xmm15)
+
+		movq(var(src_ptr), rax)// src pointer is in rax
+		movq(var(dst_ptr), rbx)// dst pointer is in rbx
+
+		movq(var(k_iter), r14)// load the number of 8-unrolled iterations
+		test(r14, r14)
+		je(FINALLOOP_2)
+
+		label(UNROLLED8_2)
+		vmovaps(mem(rax, 0*8*4), ymm0)
+		vmovaps(mem(rax, 1*8*4), ymm1)
+		vmovaps(mem(rax, 2*8*4), ymm2)
+		vmovaps(mem(rax, 3*8*4), ymm3)
+		vmovaps(mem(rax, 4*8*4), ymm4)
+		vmovaps(mem(rax, 5*8*4), ymm5)
+		vmovaps(mem(rax, 6*8*4), ymm6)
+		vmovaps(mem(rax, 7*8*4), ymm7)
+		vmovaps(mem(rax, 8*8*4), ymm8)
+		vmovaps(mem(rax, 9*8*4), ymm9)
+		vmovaps(mem(rax, 10*8*4), ymm10)
+		vmovaps(mem(rax, 11*8*4), ymm11)
+
+		vmulps(ymm0, ymm13, ymm0)
+		vmulps(ymm1, ymm14, ymm1)
+		vmulps(ymm2, ymm15, ymm2)
+		vmulps(ymm3, ymm13, ymm3)
+		vmulps(ymm4, ymm14, ymm4)
+		vmulps(ymm5, ymm15, ymm5)
+		vmulps(ymm6, ymm13, ymm6)
+		vmulps(ymm7, ymm14, ymm7)
+		vmulps(ymm8, ymm15, ymm8)
+		vmulps(ymm9, ymm13, ymm9)
+		vmulps(ymm10, ymm14, ymm10)
+		vmulps(ymm11, ymm15, ymm11)
+
+		vcvtps2dq(ymm0, ymm0)
+		vcvtps2dq(ymm1, ymm1)
+		vcvtps2dq(ymm2, ymm2)
+		vcvtps2dq(ymm3, ymm3)
+		vcvtps2dq(ymm4, ymm4)
+		vcvtps2dq(ymm5, ymm5)
+		vcvtps2dq(ymm6, ymm6)
+		vcvtps2dq(ymm7, ymm7)
+		vcvtps2dq(ymm8, ymm8)
+		vcvtps2dq(ymm9, ymm9)
+		vcvtps2dq(ymm10, ymm10)
+		vcvtps2dq(ymm11, ymm11)
+
+		vpslld(imm(16), ymm0, ymm0)
+		vpslld(imm(16), ymm2, ymm2)
+		vpslld(imm(16), ymm4, ymm4)
+		vpslld(imm(16), ymm6, ymm6)
+		vorps(ymm0, ymm1, ymm0)
+		vorps(ymm2, ymm3, ymm2)
+		vorps(ymm4, ymm5, ymm4)
+		vorps(ymm6, ymm7, ymm6)
+
+		vmovaps(ymm0, mem(rbx, 0*16*2))
+		vmovaps(ymm2, mem(rbx, 1*16*2))
+		vmovaps(ymm4, mem(rbx, 2*16*2))
+		vmovaps(ymm6, mem(rbx, 3*16*2))
+		vmovaps(ymm8, mem(rbx, 4*16*2))
+		vmovaps(ymm10, mem(rbx, 5*16*2))
+
+		add(imm(8*12*4), rax)// add stride to src pointer
+		add(imm(4*12*4), rbx)// add stride to dst pointer
+		dec(r14)
+		jne(UNROLLED8_2)
+
+		label(FINALLOOP_2)
+		movq(var(k_left), r14)// load the number of 2-unrolled iterations
+		test(r14, r14)
+		je(EPILOGUE)
+
+		label(UNROLLED2_2)
+		vmovaps(mem(rax, 0*8*4), ymm0)
+		vmovaps(mem(rax, 1*8*4), ymm1)
+		vmovaps(mem(rax, 2*8*4), ymm2)
+
+		vmulps(ymm0, ymm13, ymm0)
+		vmulps(ymm1, ymm14, ymm1)
+		vmulps(ymm2, ymm15, ymm2)
+
+		vcvtps2dq(ymm0, ymm0)
+		vcvtps2dq(ymm1, ymm1)
+		vcvtps2dq(ymm2, ymm2)
+
+		vpslld(imm(16), ymm0, ymm0)
+		vorps(ymm0, ymm1, ymm0)
+
+		add(imm(2*12*4), rax)// add stride to src pointer
+		add(imm(1*12*4), rbx)// add stride to dst pointer
+		dec(r14)
+		jne(UNROLLED2_2)
+
+		label(EPILOGUE)
+		vzeroupper()
+
+		end_asm(:// outputs
+				:// inputs
+				[src_ptr] "m"(src_ptr),
+				[dst_ptr] "m"(dst_ptr),
+				[tmp_ptr] "m"(tmp_ptr),
 				[k_iter] "m"(k_iter),
 				[k_left] "m"(k_left)
 				:// clobbers

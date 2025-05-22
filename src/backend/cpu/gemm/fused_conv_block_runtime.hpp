@@ -39,6 +39,7 @@ namespace ml
 			Fragment dwconv_output_fragment;
 			Fragment first_conv_output_fragment;
 			Fragment edge_output_fragment;
+			Fragment quantized_fragment;
 
 			int batch_size = 0;
 			int height = 0;

@@ -16,9 +16,9 @@
 #include "gemm_runtime.hpp"
 
 #include <limits>
+#include <cstring>
 #include <cmath>
 #include <cstring>
-#include <x86intrin.h>
 
 namespace
 {
@@ -202,6 +202,37 @@ namespace
 				result += fragment.at<float>(i, j);
 		return result;
 	}
+
+	void find_scales(float *scales, const Matrix &weights) noexcept
+	{
+		const float *w_ptr = reinterpret_cast<const float*>(weights.data());
+		for (int j = 0; j < weights.columns(); j++)
+			scales[j] = w_ptr[j];
+		w_ptr += weights.columns();
+		for (int i = 1; i < weights.rows(); i++)
+		{
+			for (int j = 0; j < weights.columns(); j++)
+				scales[j] = std::max(scales[j], std::abs(w_ptr[j]));
+			w_ptr += weights.columns();
+		}
+		for (int j = 0; j < weights.columns(); j++)
+			scales[j] = 4095.0f / scales[j];
+	}
+	void find_scales(float *scales, const Fragment &fragment) noexcept
+	{
+		const float *w_ptr = reinterpret_cast<const float*>(fragment.data());
+		for (int j = 0; j < fragment.columns(); j++)
+			scales[j] = w_ptr[j];
+		w_ptr += fragment.columns();
+		for (int i = 1; i < fragment.rows(); i++)
+		{
+			for (int j = 0; j < fragment.columns(); j++)
+				scales[j] = std::max(scales[j], std::abs(w_ptr[j]));
+			w_ptr += fragment.columns();
+		}
+		for (int j = 0; j < fragment.columns(); j++)
+			scales[j] = 4095.0f / scales[j];
+	}
 }
 
 namespace ml
@@ -231,6 +262,7 @@ namespace ml
 			Matrix tmp_out(dw_out_matrix.data(), dw_out_matrix.dtype(), m_left, dw_out_matrix.columns(), dw_out_matrix.stride());
 			dwconv_kernel(tmp_out, input_matrix, dwconv_weights, dwconv_bias, args, indices + 3 * inner_m);
 			pack_fragment_input(dwconv_output_fragment, inner_m);
+//			quantize_avx2_12xK(quantized_fragment, dwconv_output_fragment);
 
 			first_conv_output_fragment.mark_as_packed_with_size(Size2D(hidden_dim, std::min(inner_tile.M, m_left)));
 
@@ -252,6 +284,7 @@ namespace ml
 				w1_frag_iter.advance();
 				b1_frag_iter.advance();
 			}
+//			quantize_avx2_12xK(quantized_fragment, first_conv_output_fragment);
 
 			ArrayOfFragments::Iterator w2_frag_iter = w2_fragments.get_iterator();
 			ArrayOfFragments::Iterator b2_frag_iter = b2_fragments.get_iterator();
@@ -306,6 +339,8 @@ namespace ml
 		const int fragment_size = size_of(output_matrix.dtype()) * tmp.rows * tmp.columns;
 		edge_output_fragment = Fragment(workspace_allocator.get(fragment_size, 64), output_matrix.dtype(), output_matrix.stride());
 
+		quantized_fragment = Fragment(workspace_allocator.get(dw_out_size * size_of(DTYPE_FLOAT32), 4096), DTYPE_FLOAT32, inner_tile.M);
+
 		indices = reinterpret_cast<int*>(workspace_allocator.get(3 * sizeof(int) * batch_size * height * width, 4096));
 	}
 	void FCBRuntime::pack_fragment_input(Fragment &fragment, int m)
@@ -325,6 +360,7 @@ namespace ml
 		const MatrixOp op = MatrixOp::TRANSPOSE;
 		const Position2D pos = get_position(0, n, op);
 		weights_packing(fragment, weights, pos, op);
+//		quantize_avx2_8xK(quantized_fragment, fragment);
 	}
 	void FCBRuntime::pack_fragment_out(Matrix &out, Fragment &fragment, int m, int n)
 	{
@@ -405,13 +441,18 @@ namespace ml
 		const int last_dim = get_last_dim(x);
 		assert(w.dim[0] == w.dim[1]); // square kernel
 
+		cpu::WorkspaceAllocator workspace_allocator(context);
+
+		void *zero_line = workspace_allocator.get(sizeof(float) * last_dim, 4096);
+		std::memset(zero_line, 0, sizeof(float) * last_dim);
+
 		Matrix input_matrix(x.data, x.dtype, 1, last_dim, last_dim);
 		Matrix weight_matrix(w.data, w.dtype, w.dim[0] * w.dim[1], w.dim[3], w.dim[3]);
-		Matrix bias_matrix(b.data, b.dtype, 1, b.dim[0], b.dim[0]);
+		Matrix bias_matrix = (b.data == nullptr) ? Matrix(zero_line, b.dtype, 1, last_dim, last_dim) : Matrix(b.data, b.dtype, 1, b.dim[0], b.dim[0]);
 
 		int args[6] = { x.dim[0], x.dim[1], x.dim[2], x.dim[3], w.dim[0], w.dim[1] };
 
-		int *indices = cpu::Context::getWorkspace<int>(context);
+		int *indices = reinterpret_cast<int*>(workspace_allocator.get(first_dim * 3, 4096));
 		fill_indices_table(indices, x.dim[0], x.dim[1], x.dim[2]);
 
 		Matrix output_matrix(y.data, y.dtype, first_dim, last_dim, last_dim);
