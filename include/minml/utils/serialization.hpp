@@ -8,6 +8,7 @@
 #ifndef MINML_UTILS_SERIALIZATION_HPP_
 #define MINML_UTILS_SERIALIZATION_HPP_
 
+#include <cstdint>
 #include <cstring>
 #include <string>
 #include <vector>

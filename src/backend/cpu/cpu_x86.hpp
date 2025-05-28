@@ -8,6 +8,7 @@
 #ifndef BACKEND_CPU_CPU_X86_HPP_
 #define BACKEND_CPU_CPU_X86_HPP_
 
+#include <cstdint>
 #include <string>
 #include <map>
 

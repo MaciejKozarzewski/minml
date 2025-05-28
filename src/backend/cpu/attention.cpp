@@ -400,7 +400,6 @@ namespace ml
 //			return;
 //		}
 
-		assert(input_shape.rank == 4);
 		const int batch_size = x.dim[0];
 		const int height = x.dim[1];
 		const int width = x.dim[2];
@@ -436,7 +435,6 @@ namespace ml
 	void cpu_multi_head_attention_backward(mlContext_t context, const mlTensor_t x, const mlTensor_t b, const mlTensor_t mask, mlTensor_t dx,
 			const mlTensor_t dy, mlTensor_t db, mlTensor_t workspace, mlTensor_t backward_data, int num_heads)
 	{
-		assert(input_shape.rank == 4);
 		const int batch_size = x.dim[0];
 		const int height = x.dim[1];
 		const int width = x.dim[2];
@@ -482,10 +480,7 @@ namespace ml
 				backward_pack.v, qkv_stride, num_pointers);
 
 		if (use_bias)
-		{
-			assert(weights_shape.rank == 3);
 			softmax_backward_in_place<true>(dqk_tensor_ptr, db.data, qk_tensor_ptr, batch_size, num_heads, height, width, range);
-		}
 		else
 			softmax_backward_in_place<false>(dqk_tensor_ptr, nullptr, qk_tensor_ptr, batch_size, num_heads, height, width, 0);
 

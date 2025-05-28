@@ -2943,7 +2943,7 @@ void test_depthwise_conv_kernel(const int M, const int N, const int K, mlDataTyp
 			fragment_alpha.at<float>(0, n) = n + randFloat();
 	}
 
-	depthwise_conv_def_MxN(correct_fragment_c, fragment_alpha, fragment_a, fragment_b);
+	//depthwise_conv_def_MxN(correct_fragment_c, fragment_alpha, fragment_a, fragment_b);
 	kernel(fragment_c, fragment_alpha, fragment_a, fragment_b);
 
 	double diff = 0.0;

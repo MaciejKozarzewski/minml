@@ -181,7 +181,7 @@ namespace
 			float tmp = exp(shared_input[threadIdx.y * tokens + j] - max_value);
 
 			const uint32_t mask2 = shared_mask[j];
-			tmp = to_float(to_uint(tmp) & (mask1 & mask2));
+			tmp = to_float(to_uint32(tmp) & (mask1 & mask2));
 
 			partial_sum += tmp;
 			shared_input[threadIdx.y * tokens + j] = tmp;

@@ -8,6 +8,7 @@
 #ifndef MINML_UTILS_JSON_HPP_
 #define MINML_UTILS_JSON_HPP_
 
+#include <cstdint>
 #include <string>
 #include <variant>
 #include <vector>

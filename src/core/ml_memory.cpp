@@ -14,6 +14,7 @@
 #include <minml/backend/cuda_backend.h>
 #include <minml/backend/opencl_backend.h>
 
+#include <cstdint>
 #include <cstring>
 #include <memory>
 

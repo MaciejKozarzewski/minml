@@ -11,6 +11,7 @@
 #include <minml/backend/backend_types.h>
 
 #include <memory>
+#include <cstdint>
 #include <string>
 #include <cassert>
 

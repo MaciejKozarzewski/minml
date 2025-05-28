@@ -12,6 +12,7 @@
 #include <minml/backend/backend_utils.hpp>
 #include "utilities.hpp"
 
+#include <cstdint>
 #include <iostream>
 #include <cassert>
 

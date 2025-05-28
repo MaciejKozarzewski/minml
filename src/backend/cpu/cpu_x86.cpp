@@ -6,6 +6,7 @@
  */
 
 #include "cpu_x86.hpp"
+
 #include <cstring>
 #include <algorithm>
 #include <iostream>

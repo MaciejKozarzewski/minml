@@ -8,6 +8,7 @@
 #ifndef MINML_CORE_DATATYPE_HPP_
 #define MINML_CORE_DATATYPE_HPP_
 
+#include <cstdint>
 #include <string>
 #include <stdexcept>
 
