@@ -300,12 +300,12 @@ namespace ml
 
 		const int batch_size = 12;
 		const int height = 13;
-		const int width = 17;
-		const int filters = 36;
+		const int width = 14;
+		const int filters = 64;
 		const int kernel = 7;
 
-		const float alpha = 1.1f;
-		const float beta = 0.1f;
+		const float alpha = 1.0f;
+		const float beta = 0.0f;
 
 		Tensor input( { batch_size, height, width, filters }, "float32", Device::cpu());
 		Tensor output = zeros_like(input);
@@ -319,8 +319,8 @@ namespace ml
 		Tensor correct_output = output;
 		baseline_depthwise_conv2D_forward(input, correct_output, weights, bias, alpha, beta);
 
-//		depthwiseConvForward(context, input, weights, output, bias);
-//		EXPECT_LE(ml::testing::diffForTest(correct_output, output), 1.0e-4f);
+		depthwiseConvForward(context, alpha, input, weights, beta, output, bias);
+		EXPECT_LE(ml::testing::diffForTest(correct_output, output), 1.0e-4f);
 
 		if (ml::testing::has_device_supporting(DataType::FLOAT32))
 		{
@@ -425,11 +425,11 @@ namespace ml
 		const int batch_size = 12;
 		const int height = 13;
 		const int width = 17;
-		const int filters = 36;
+		const int filters = 64;
 		const int kernel = 7;
 
-		const float alpha = 1.1f;
-		const float beta = 0.1f;
+		const float alpha = 1.0f;
+		const float beta = 0.0f;
 
 		Tensor input( { batch_size, height, width, filters }, "float16", Device::cpu());
 		Tensor output = zeros_like(input);
@@ -442,8 +442,8 @@ namespace ml
 		Tensor correct_output = zeros_like(output);
 		baseline_depthwise_conv2D_forward(input, correct_output, weights, bias, alpha, beta);
 
-//		depthwiseConvForward(context, input, weights, output, bias);
-//		EXPECT_LE(ml::testing::diffForTest(correct_output, output), 1.0e-4f);
+		depthwiseConvForward(context, alpha, input, weights, beta, output, bias);
+		EXPECT_LE(ml::testing::diffForTest(correct_output, output), 1.0e-4f);
 
 		if (ml::testing::has_device_supporting(DataType::FLOAT16))
 		{

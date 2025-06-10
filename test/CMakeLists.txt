@@ -1,10 +1,16 @@
 add_executable(${TestName}	test_launcher.cpp
+				backend/test_attention.cpp
 				backend/test_conv2D.cpp
+				backend/test_convert.cpp
+				backend/test_depthwise_conv2D.cpp
 				backend/test_gemm_conv.cpp
 				backend/test_gemms.cpp
+				backend/test_global_pooling.cpp
 				backend/test_nonlinearity.cpp
 				backend/test_normalization.cpp
+				backend/test_quantization.cpp
 				backend/test_tensor_op.cpp
+				backend/test_training.cpp
 				backend/test_winograd.cpp
 				core/test_Shape.cpp
 				core/test_Tensor.cpp
