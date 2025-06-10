@@ -85,8 +85,8 @@ __kernel void learn_radam(__global float *weight, const __global float *gradient
 		float correction = 1.0f;
 		if (p > 4.0f)
 		{
-			const float l = std::sqrt((1.0f - pow_beta2) / (variance[i] + 1.0e-8f));
-			const float r = std::sqrt((p - 4.0f) * (p - 2.0f) * p_inf / ((p_inf - 4.0f) * (p_inf - 2.0f) * p));
+			const float l = sqrtf((1.0f - pow_beta2) / (variance[i] + 1.0e-8f));
+			const float r = sqrtf((p - 4.0f) * (p - 2.0f) * p_inf / ((p_inf - 4.0f) * (p_inf - 2.0f) * p));
 			correction = l * r;
 		}
 

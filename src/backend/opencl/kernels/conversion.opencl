@@ -8,7 +8,7 @@ __kernel void unpack_input_fp32(__global float *output, const __global uint *inp
 		{
 			const int int_idx = j / 32;
 			const int bit_idx = j % 32;
-			const uint32_t value = input[i * stride + int_idx] >> bit_idx;
+			const unsigned int value = input[i * stride + int_idx] >> bit_idx;
 			output[i * last_dim + j] = (value & 1) ? 1.0f : 0.0f;
 		}
 }
@@ -21,7 +21,7 @@ __kernel void unpack_input_fp16(__global ushort *output, const __global uint *in
 		{
 			const int int_idx = j / 32;
 			const int bit_idx = j % 32;
-			const uint32_t value = input[i * stride + int_idx] >> bit_idx;
+			const unsigned int value = input[i * stride + int_idx] >> bit_idx;
 			output[i * last_dim + j] = (value & 1) ? 0x3c00 : 0x0000;
 		}
 }
