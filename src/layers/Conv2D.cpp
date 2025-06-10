@@ -324,7 +324,6 @@ namespace ml
 				else
 					explicit_gemm_forward(context(), input[0], output, getWeights().getParam(), getBias().getParam(), *m_workspace.lock(),
 							m_activation, Tensor());
-
 				break;
 			}
 			case ConvolutionAlgorithm::WINOGRAD_NON_FUSED:
@@ -411,40 +410,82 @@ namespace ml
 
 	void Conv2D::choose_algorithm() const
 	{
-#ifdef USE_CUDNN
-		const bool can_use_cudnn = startsWith(context().device().info(), "NVIDIA GeForce RTX") and dtype() == DataType::FLOAT16 and not isTrainable()
-				and m_activation == ActivationType::RELU;
-#else
-		const bool can_use_cudnn = false;
-#endif
-		if (can_use_cudnn)
-			m_forward_algorithm = ConvolutionAlgorithm::IMPLICIT_GEMM;
-		else
+
+		switch (device().type())
 		{
-			if (m_kernel_size == 3)
+			case DeviceType::CPU:
 			{
-				m_forward_algorithm = ConvolutionAlgorithm::WINOGRAD_NON_FUSED;
-				m_backward_algorithm = ConvolutionAlgorithm::WINOGRAD_NON_FUSED;
-				switch (device().type())
+				switch (m_kernel_size)
 				{
-					case DeviceType::CPU:
+					case 1:
+						m_forward_algorithm = ConvolutionAlgorithm::EXPLICIT_GEMM;
+						m_backward_algorithm = ConvolutionAlgorithm::EXPLICIT_GEMM;
+						break;
+					case 3:
+						m_forward_algorithm = ConvolutionAlgorithm::WINOGRAD_NON_FUSED;
+						m_backward_algorithm = ConvolutionAlgorithm::WINOGRAD_NON_FUSED;
 						m_winograd_tile_size = isTrainable() ? 4 : 5;
 						break;
-					case DeviceType::CUDA:
-					case DeviceType::OPENCL:
-						m_winograd_tile_size = 4;
+					case 5:
+						m_forward_algorithm = ConvolutionAlgorithm::EXPLICIT_GEMM;
+						m_backward_algorithm = ConvolutionAlgorithm::WINOGRAD_NON_FUSED;
+						m_winograd_tile_size = 2;
 						break;
 				}
+				break;
 			}
-			else
+			case DeviceType::CUDA:
 			{
-				m_forward_algorithm = ConvolutionAlgorithm::EXPLICIT_GEMM;
-				m_backward_algorithm = ConvolutionAlgorithm::EXPLICIT_GEMM;
-				if (m_kernel_size == 5)
+#ifdef USE_CUDNN
+				const bool can_use_cudnn = startsWith(context().device().info(), "NVIDIA GeForce RTX") and dtype() == DataType::FLOAT16 and not isTrainable()
+					and m_activation == ActivationType::RELU;
+#else
+				const bool can_use_cudnn = false;
+#endif
+				if (can_use_cudnn)
+					m_forward_algorithm = ConvolutionAlgorithm::IMPLICIT_GEMM;
+				else
 				{
-					m_backward_algorithm = ConvolutionAlgorithm::WINOGRAD_NON_FUSED;
-					m_winograd_tile_size = 2;
+					switch (m_kernel_size)
+					{
+						case 1:
+							m_forward_algorithm = ConvolutionAlgorithm::EXPLICIT_GEMM;
+							m_backward_algorithm = ConvolutionAlgorithm::EXPLICIT_GEMM;
+							break;
+						case 3:
+							m_forward_algorithm = ConvolutionAlgorithm::WINOGRAD_NON_FUSED;
+							m_backward_algorithm = ConvolutionAlgorithm::WINOGRAD_NON_FUSED;
+							m_winograd_tile_size = 4;
+							break;
+						case 5:
+							m_forward_algorithm = ConvolutionAlgorithm::EXPLICIT_GEMM;
+							m_backward_algorithm = ConvolutionAlgorithm::WINOGRAD_NON_FUSED;
+							m_winograd_tile_size = 2;
+							break;
+					}
 				}
+				break;
+			}
+			case DeviceType::OPENCL:
+			{
+				switch (m_kernel_size)
+				{
+					case 1:
+						m_forward_algorithm = ConvolutionAlgorithm::EXPLICIT_GEMM;
+						m_backward_algorithm = ConvolutionAlgorithm::EXPLICIT_GEMM;
+						break;
+					case 3:
+						m_forward_algorithm = ConvolutionAlgorithm::WINOGRAD_NON_FUSED;
+						m_backward_algorithm = ConvolutionAlgorithm::WINOGRAD_NON_FUSED;
+						m_winograd_tile_size = 4;
+						break;
+					case 5:
+						m_forward_algorithm = ConvolutionAlgorithm::WINOGRAD_NON_FUSED;
+						m_backward_algorithm = ConvolutionAlgorithm::WINOGRAD_NON_FUSED;
+						m_winograd_tile_size = 2;
+						break;
+				}
+				break;
 			}
 		}
 	}
