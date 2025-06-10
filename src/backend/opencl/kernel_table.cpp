@@ -31,6 +31,9 @@ namespace ml
 		std::string conversion =
 #include "kernels/conversion.opencl"
 		;
+		std::string depthwise_conv =
+#include "kernels/depthwise_conv.opencl"
+		;
 		std::string global_pooling =
 #include "kernels/global_pooling.opencl"
 		;

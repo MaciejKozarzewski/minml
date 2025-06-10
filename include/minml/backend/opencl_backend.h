@@ -76,14 +76,22 @@ namespace ml
 		void opencl_convolution_implicit_gemm_forward(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, mlShape_t weights_shape,
 				const void *input, const void *weights, void *output, const void *bias, const void *add, mlActivationType_t act);
 
-		// implemented in 'global_pooling.cpp'
-		void opencl_global_avg_and_max_pooling_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input);
-		void opencl_global_avg_and_max_pooling_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next,
-				const void *input, const void *output);
-		void opencl_global_broadcasting_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input,
-				const void *bias, mlActivationType_t act);
-		void opencl_global_broadcasting_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, void *gradient_next, const void *output,
-				mlActivationType_t act);
+		/*
+		 * depthwise convolution
+		 */
+		void opencl_depthwise_conv_forward(mlContext_t context, float alpha, const mlTensor_t x, const mlTensor_t w, const mlTensor_t b, float beta,
+				mlTensor_t y);
+		void opencl_depthwise_conv_backward(mlContext_t context, float alpha, const mlTensor_t dy, const mlTensor_t w, float beta, mlTensor_t dx);
+		void opencl_depthwise_conv_update(mlContext_t context, float alpha, const mlTensor_t x, const mlTensor_t dy, float beta, mlTensor_t dw);
+
+		/*
+		 * global pooling
+		 */
+		void opencl_global_average_pooling_forward(mlContext_t context, float alpha, const mlTensor_t x, float beta, mlTensor_t y);
+		void opencl_global_average_pooling_backward(mlContext_t context, float alpha, const mlTensor_t dy, float beta, mlTensor_t dx);
+		void opencl_channel_scaling_forward(mlContext_t context, float alpha, const mlTensor_t x, const mlTensor_t scales, float beta, mlTensor_t y);
+		void opencl_channel_scaling_backward(mlContext_t context, float alpha, const mlTensor_t dy, const mlTensor_t x, const mlTensor_t scales,
+				float beta_dx, mlTensor_t dx, float beta_scales, mlTensor_t dscales);
 
 		// implemented in 'gemms.cpp'
 		void opencl_gemm(mlContext_t context, mlDataType_t dtype, mlShape_t shape_C, void *C, mlShape_t shape_A, const void *A, mlShape_t shape_B,
@@ -103,8 +111,8 @@ namespace ml
 				mlActivationType_t act);
 
 		// batchnorm
-		void opencl_batchnorm_inference(mlContext_t context, mlDataType_t dtype, mlShape_t shape, const void *input, void *output, const void *weights,
-				mlActivationType_t act);
+		void opencl_batchnorm_inference(mlContext_t context, mlDataType_t dtype, mlShape_t shape, const void *input, void *output,
+				const void *weights, mlActivationType_t act);
 		void opencl_batchnorm_forward(mlContext_t context, mlShape_t shape, const void *input, void *output, void *weights, void *running_stats,
 				int running_stat_idx, mlActivationType_t act);
 		void opencl_batchnorm_backward(mlContext_t context, mlShape_t shape, const void *input, const void *output, void *gradient_prev,
@@ -144,14 +152,14 @@ namespace ml
 		void opencl_softmax_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input);
 		void opencl_gelu_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next, const void *input);
 		void opencl_fused_bias_and_activation_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next,
-						const void *output, void *bias_gradient, mlActivationType_t act, float beta_prev, float beta_bias);
+				const void *output, void *bias_gradient, mlActivationType_t act, float beta_prev, float beta_bias);
 
 		// implemented in 'training.cpp'
 		void opencl_emulate_low_precision(mlContext_t context, mlShape_t shape, mlDataType_t dtype, void *dst, const void *src,
 				mlQuantizationData_t qd);
 		void opencl_multiply_tensors(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *dst, const void *src1, const void *src2);
-		void opencl_add_tensors(mlContext_t context, mlDataType_t dtype, mlShape_t shape, float beta, void *dst, float alpha1, const void *src1, float alpha2,
-				const void *src2);
+		void opencl_add_tensors(mlContext_t context, mlDataType_t dtype, mlShape_t shape, float beta, void *dst, float alpha1, const void *src1,
+				float alpha2, const void *src2);
 		void opencl_sum_over_first_dim(mlContext_t context, mlShape_t shape, void *dst, const void *src, float beta);
 
 		float opencl_mean_squared_loss(mlContext_t context, mlShape_t shape, const void *output, const void *target, const void *mask);

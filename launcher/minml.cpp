@@ -2901,7 +2901,7 @@ void test_mha_kernel(const int M, const int N, const int K,
 }
 
 void test_depthwise_conv_kernel(const int M, const int N, const int K, mlDataType_t dtype,
-		std::function<void(Fragment&, const Fragment&, const Fragment&, const Fragment&)> kernel)
+		std::function<void(Fragment&, const Fragment&, const Fragment&, const Fragment&, bool)> kernel)
 {
 	std::unique_ptr<float[]> matrix_c = std::make_unique<float[]>(1024 * 1024);
 	std::unique_ptr<float[]> correct_c = std::make_unique<float[]>(1024 * 1024);
@@ -2910,21 +2910,22 @@ void test_depthwise_conv_kernel(const int M, const int N, const int K, mlDataTyp
 	const size_t size_in_bytes_rhs = sizeof(float) * N * K;
 	void *lhs = gemm::aligned_new(size_in_bytes_lhs, 4096);
 	void *rhs = gemm::aligned_new(size_in_bytes_rhs, 4096);
-	void *alpha_ptr = gemm::aligned_new(sizeof(float) * 1024, 4096);
+	void *bias_ptr = gemm::aligned_new(sizeof(float) * 1024, 4096);
 	std::memset(lhs, 0, size_in_bytes_lhs);
 	std::memset(rhs, 0, size_in_bytes_rhs);
-	std::memset(alpha_ptr, 0, sizeof(float) * 1024);
+	std::memset(bias_ptr, 0, sizeof(float) * 1024);
 
 	Fragment fragment_a(lhs, DTYPE_FLOAT32, M * N);
 	Fragment fragment_b(rhs, DTYPE_FLOAT32, N);
 	Fragment fragment_c(matrix_c.get(), dtype, 1024);
 	Fragment correct_fragment_c(correct_c.get(), dtype, 1024);
-	Fragment fragment_alpha(alpha_ptr, DTYPE_FLOAT32, 1);
+	Fragment fragment_bias(bias_ptr, DTYPE_FLOAT32, 0);
+
 	fragment_a.mark_as_packed_with_size( { K, M * N });
 	fragment_b.mark_as_packed_with_size( { K, N });
 	fragment_c.mark_as_packed_with_size( { M, N });
 	correct_fragment_c.mark_as_packed_with_size( { M, N });
-	fragment_alpha.mark_as_packed_with_size( { 1, N });
+	fragment_bias.mark_as_packed_with_size( { 1, N });
 
 	for (int k = 0; k < K; k++)
 	{
@@ -2935,16 +2936,11 @@ void test_depthwise_conv_kernel(const int M, const int N, const int K, mlDataTyp
 	}
 
 	const float alpha = 1.0f;
-	if (fragment_alpha.rows() == 1)
-		fragment_alpha.at<float>(0, 0) = alpha;
-	else
-	{
-		for (int n = 0; n < N; n++)
-			fragment_alpha.at<float>(0, n) = n + randFloat();
-	}
+	for (int n = 0; n < N; n++)
+		fragment_bias.at<float>(0, n) = randFloat() - 0.5f;
 
-	//depthwise_conv_def_MxN(correct_fragment_c, fragment_alpha, fragment_a, fragment_b);
-	kernel(fragment_c, fragment_alpha, fragment_a, fragment_b);
+	//depthwise_conv_def_MxN(correct_fragment_c, fragment_bias, fragment_a, fragment_b);
+	kernel(fragment_c, fragment_a, fragment_b, fragment_bias, false);
 
 	double diff = 0.0;
 	for (int m = 0; m < M; m++)
@@ -2967,30 +2963,53 @@ void test_depthwise_conv_kernel(const int M, const int N, const int K, mlDataTyp
 			std::cout << '\n';
 		}
 		std::cout << "-------------------------------------------\n";
-
-		std::cout << "Actual\n";
-		for (int m = 0; m < M; m++)
-		{
-			for (int n = 0; n < N; n++)
-				if (fragment_c.dtype() == DTYPE_FLOAT16)
-					std::cout << half_to_float(fragment_c.at<uint16_t>(m, n)) << ' ';
-				else
-					std::cout << fragment_c.at<float>(m, n) << ' ';
-			std::cout << '\n';
-		}
-
-		std::cout << "\ndiff = " << diff << '\n';
-		exit(255);
 	}
-	else
-		std::cout << "depthwise conv kernel = " << M << "x" << N << "x" << K << " : OK\n";
+
+//	double diff = 0.0;
+//	for (int m = 0; m < M; m++)
+//		for (int n = 0; n < N; n++)
+//			if (fragment_c.dtype() == DTYPE_FLOAT16)
+//				diff += std::fabs(half_to_float(correct_fragment_c.at<uint16_t>(m, n)) - half_to_float(fragment_c.at<uint16_t>(m, n)));
+//			else
+//				diff += std::fabs(correct_fragment_c.at<float>(m, n) - fragment_c.at<float>(m, n));
+//	diff /= (M * N);
+//	if (diff > 1.0e-4)
+//	{
+//		std::cout << "Correct\n";
+//		for (int m = 0; m < M; m++)
+//		{
+//			for (int n = 0; n < N; n++)
+//				if (correct_fragment_c.dtype() == DTYPE_FLOAT16)
+//					std::cout << half_to_float(correct_fragment_c.at<uint16_t>(m, n)) << ' ';
+//				else
+//					std::cout << correct_fragment_c.at<float>(m, n) << ' ';
+//			std::cout << '\n';
+//		}
+//		std::cout << "-------------------------------------------\n";
+//
+//		std::cout << "Actual\n";
+//		for (int m = 0; m < M; m++)
+//		{
+//			for (int n = 0; n < N; n++)
+//				if (fragment_c.dtype() == DTYPE_FLOAT16)
+//					std::cout << half_to_float(fragment_c.at<uint16_t>(m, n)) << ' ';
+//				else
+//					std::cout << fragment_c.at<float>(m, n) << ' ';
+//			std::cout << '\n';
+//		}
+//
+//		std::cout << "\ndiff = " << diff << '\n';
+//		exit(255);
+//	}
+//	else
+//		std::cout << "depthwise conv kernel = " << M << "x" << N << "x" << K << " : OK\n";
 
 	const double repeats = 1.0e8;
 	const double start = getTime();
 	int i = 0;
 	for (; i < repeats; i++)
 	{
-		kernel(fragment_c, fragment_alpha, fragment_a, fragment_b);
+		kernel(fragment_c, fragment_a, fragment_b, fragment_bias, false);
 		if ((getTime() - start) > 10.0)
 			break;
 	}
@@ -3001,7 +3020,7 @@ void test_depthwise_conv_kernel(const int M, const int N, const int K, mlDataTyp
 
 	gemm::aligned_free(lhs, 4096);
 	gemm::aligned_free(rhs, 4096);
-	gemm::aligned_free(alpha_ptr, 4096);
+	gemm::aligned_free(bias_ptr, 4096);
 }
 
 void test_depthwise_conv_kernel_v2(const int outputs, const int channels, mlDataType_t dtype,
@@ -3291,6 +3310,7 @@ float test_accuracy(int32_t shift, bool print = false)
 
 int main()
 {
+	ml::Device::flushDenormalsToZero(true);
 	std::cout << "BEGIN" << std::endl;
 	std::cout << ml::Device::hardwareInfo();
 
@@ -3364,12 +3384,14 @@ int main()
 //	return 0;
 	{
 //		Graph graph;
-//		FileLoader fl("/home/maciek/alphagomoku/new_runs_2024/supervised/conv_pvum_8x128_v2/network_opt.bin", false);
+//		FileLoader fl("/home/maciek/alphagomoku/new_runs_2025/test_fast/new_data_v2/network_500.bin", false);
 //		graph.load(fl.getJson()["model"], fl.getBinaryData());
 //		graph.setInputShape( { 1, 15, 15, 32 });
 //		graph.moveTo(Device::cpu());
 ////		graph.init();
-//		graph.convertTo(DataType::FLOAT16);
+//		graph.convertTo(DataType::FLOAT32);
+//		graph.print();
+//		FoldBatchNorm().optimize(graph);
 //		graph.print();
 //
 //		Tensor input(graph.getInputShape(), graph.dtype(), Device::cpu());
@@ -3393,8 +3415,9 @@ int main()
 //		}
 //
 //		graph.getInput().copyFrom(graph.context(), input);
-//		graph.forward(1);
+//		graph.predict(1);
 //		graph.context().synchronize();
+//		return 0;
 //
 //		std::cout << "value = " << graph.getOutput(1).get( { 0, 0 }) << '\n';
 //		std::cout << "uncertainty = " << graph.getOutput(2).get( { 0, 0 }) << '\n';
@@ -3535,21 +3558,46 @@ int main()
 	{
 		Graph graph;
 		const bool symmetric = false;
-		const int batch_size = 8;
+		const int batch_size = 1;
 		const int board_size = 15;
 		int embedding = 128;
 		const int patch_size = 1;
-		const int head_dim = 32;
+		const int head_dim = 8;
 		const int pos_encoding_range = (board_size + patch_size - 1) / patch_size;
+
+//		auto x = graph.addInput( { batch_size, 1, 10, 8 });
+//		x = graph.add(ml::Conv2D(embedding, 1, "relu"), x);
+//
+//		for (int i = 0; i < 4; i++)
+//		{
+//			auto y = graph.add(ml::RMSNormalization(false), x);
+//			y = graph.add(ml::Conv2D(3 * embedding, 1), y);
+//			y = graph.add(ml::MultiHeadAttention(embedding / head_dim, 0, false), y);
+//			x = graph.add(ml::Conv2D(embedding, 1), { y, x });
+//
+//			auto z = graph.add(ml::RMSNormalization(false), x);
+//			z = graph.add(ml::Conv2D(embedding, 1, "relu"), z);
+//			x = graph.add(ml::Conv2D(embedding, 1), { z, x });
+//		}
+//		x = graph.add(ml::Conv2D(1, 1).useBias(false), x);
+//		graph.addOutput(x, CrossEntropyLoss());
+
+//		auto x = graph.addInput( { batch_size, 15, 15, 24 });
+//		x = graph.add(ml::Conv2D(embedding, 3).useBias(false), x);
+//		x = graph.add(ml::BatchNormalization("relu").useGamma(false), x);
+//		x = graph.add(ml::Conv2D(embedding, 1, "relu"), x);
+//		x = graph.add(ml::Conv2D(1, 1), x);
+//		x = graph.add(ml::Softmax( { 1, 2, 3 }), x);
+//		graph.addOutput(x);
 
 		auto x = graph.addInput( { batch_size, board_size, board_size, 8 });
 		x = graph.add(ml::Conv2D(embedding, 5).useBias(false), x);
 		x = graph.add(ml::BatchNormalization("relu").useGamma(false).historySize(1000), x);
 
-//		auto y = graph.add(ml::GlobalAveragePooling(), x);
-//		y = graph.add(ml::Dense(embedding, "relu"), y);
-//		y = graph.add(ml::Dense(embedding, "sigmoid"), y);
-//		x = graph.add(ml::ChannelScaling(), { x, y });
+		auto y = graph.add(ml::GlobalAveragePooling(), x);
+		y = graph.add(ml::Dense(embedding, "relu"), y);
+		y = graph.add(ml::Dense(embedding, "sigmoid"), y);
+		x = graph.add(ml::ChannelScaling(), { x, y });
 
 		for (int i = 0; i < 8; i++)
 		{
@@ -3565,14 +3613,12 @@ int main()
 		}
 
 		// policy head
-		auto p = graph.add(ml::Conv2D(2 * embedding, 1).useBias(false), x);
-		p = graph.add(ml::MultiHeadAttention(embedding / head_dim, pos_encoding_range, true), p);
-//		auto p = graph.add(ml::Conv2D(embedding, 1).useBias(false), x);
-//		p = graph.add(ml::BatchNormalization("relu").useGamma(false).historySize(1000), p);
-//		y = graph.add(ml::GlobalAveragePooling(), p);
-//		y = graph.add(ml::Dense(embedding, "relu"), y);
-//		y = graph.add(ml::Dense(embedding, "sigmoid"), y);
-//		p = graph.add(ml::ChannelScaling(), { p, y });
+		auto p = graph.add(ml::Conv2D(embedding, 1).useBias(false), x);
+		p = graph.add(ml::BatchNormalization("relu").useGamma(false).historySize(1000), p);
+		y = graph.add(ml::GlobalAveragePooling(), p);
+		y = graph.add(ml::Dense(embedding, "relu"), y);
+		y = graph.add(ml::Dense(embedding, "sigmoid"), y);
+		p = graph.add(ml::ChannelScaling(), { p, y });
 		p = graph.add(ml::Conv2D(1, 1), p);
 		p = graph.add(ml::Softmax( { 1, 2, 3 }), p);
 		graph.addOutput(p, CrossEntropyLoss());
@@ -3588,13 +3634,22 @@ int main()
 
 		auto q = graph.add(ml::Conv2D(embedding, 1, "linear").useBias(false), x);
 		q = graph.add(ml::BatchNormalization("relu").useGamma(false).historySize(1000), q);
-//		y = graph.add(ml::GlobalAveragePooling(), q);
-//		y = graph.add(ml::Dense(embedding, "relu"), y);
-//		y = graph.add(ml::Dense(embedding, "sigmoid"), y);
-//		q = graph.add(ml::ChannelScaling(), { q, y });
+		y = graph.add(ml::GlobalAveragePooling(), q);
+		y = graph.add(ml::Dense(embedding, "relu"), y);
+		y = graph.add(ml::Dense(embedding, "sigmoid"), y);
+		q = graph.add(ml::ChannelScaling(), { q, y });
 		q = graph.add(ml::Conv2D(3, 1, "linear"), q);
 		q = graph.add(ml::Softmax( { 3 }), q);
 		graph.addOutput(q, CrossEntropyLoss());
+
+		// value head
+		auto mlh = graph.add(ml::Conv2D(32, 1, "relu"), x);
+		mlh = graph.add(ml::GlobalAveragePooling(), mlh);
+		mlh = graph.add(ml::Dense(128).useBias(false), mlh);
+		mlh = graph.add(ml::BatchNormalization("leaky_relu").historySize(1000), mlh);
+		mlh = graph.add(ml::Dense(board_size * board_size), mlh);
+		mlh = graph.add(ml::Softmax( { 1 }), mlh);
+		graph.addOutput(mlh, CrossEntropyLoss());
 
 		/*
 		 auto x = graph.addInput( { batch_size, board_size, board_size, 8 });
@@ -3802,11 +3857,12 @@ int main()
 		graph.moveTo(Device::cpu());
 		graph.makeTrainable(false);
 		FoldBatchNorm().optimize(graph);
-		FuseConvBlock().optimize(graph);
-		FuseSEBlock().optimize(graph);
+//		FuseConvBlock().optimize(graph);
+//		FuseSEBlock().optimize(graph);
 		graph.print();
+		graph.moveTo(Device::opencl());
 
-		graph.convertTo(DataType::FLOAT16);
+		graph.convertTo(DataType::FLOAT32);
 //		graph.setGradientScaler(GradientScaler(1.0f));
 //		graph.context().enableTF32(true);
 
@@ -3831,7 +3887,7 @@ int main()
 		graph.getInput().copyFrom(graph.context(), input);
 		graph.context().synchronize();
 		graph.predict(batch_size);
-//		return 0;
+		return 0;
 
 //		graph.train(batch_size);
 //		std::this_thread::sleep_for(std::chrono::milliseconds(200));
@@ -3868,7 +3924,7 @@ int main()
 		std::cout << "starting benchmark\n";
 		const double start = getTime();
 		int repeats = 0;
-		for (; repeats < 100000; repeats++)
+		for (; repeats < 1000000; repeats++)
 		{
 			graph.predict(batch_size);
 			graph.context().synchronize();

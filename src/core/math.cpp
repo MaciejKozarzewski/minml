@@ -438,44 +438,13 @@ namespace ml
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
-			{
-//				const int batch = input.dim(0);
-//				const int height = input.dim(1);
-//				const int width = input.dim(2);
-//				const int filters = input.dim(3);
-//
-//				const int kernel_height = weights.dim(0);
-//				const int kernel_width = weights.dim(1);
-//
-//				const int pad_h = -(kernel_height - 1) / 2;
-//				const int pad_w = -(kernel_width - 1) / 2;
-//
-//				output.zeroall();
-//				for (int b = 0; b < batch; b++)
-//					for (int f = 0; f < filters; f++)
-//						for (int h = 0; h < height; h++)
-//							for (int w = 0; w < width; w++)
-//							{
-//								float tmp = 0.0f;
-//								for (int i = 0; i < kernel_height; i++)
-//									for (int j = 0; j < kernel_width; j++)
-//										if ((pad_h + h + i) >= 0 and (pad_h + h + i) < height and (pad_w + w + j) >= 0 and (pad_w + w + j) < width)
-//											tmp += weights.get( { i, j, f }) * input.get( { b, pad_h + h + i, pad_w + w + j, f });
-//								if (not bias.isEmpty())
-//									tmp += bias.get( { f });
-//								tmp *= alpha;
-//								if (beta != 0.0f)
-//									tmp += beta * output.get( { b, h, w, f });
-//								output.at( { b, h, w, f }) = tmp;
-//							}
 				cpu_depthwise_conv_forward(get(context), alpha, get(input), get(weights), get(bias), beta, get(output));
 				break;
-			}
 			case DeviceType::CUDA:
 				cuda_depthwise_conv_forward(get(context), alpha, get(input), get(weights), get(bias), beta, get(output));
 				break;
 			case DeviceType::OPENCL:
-				// TODO
+				opencl_depthwise_conv_forward(get(context), alpha, get(input), get(weights), get(bias), beta, get(output));
 				break;
 		}SYNC();
 	}
@@ -492,7 +461,7 @@ namespace ml
 				cuda_depthwise_conv_backward(get(context), alpha, get(gradient_next), get(weights), beta, get(gradient_prev));
 				break;
 			case DeviceType::OPENCL:
-				// TODO
+				opencl_depthwise_conv_backward(get(context), alpha, get(gradient_next), get(weights), beta, get(gradient_prev));
 				break;
 		}SYNC();
 	}
@@ -509,7 +478,7 @@ namespace ml
 				cuda_depthwise_conv_update(get(context), alpha, get(input), get(gradient_next), beta, get(weights_update));
 				break;
 			case DeviceType::OPENCL:
-				// TODO
+				opencl_depthwise_conv_update(get(context), alpha, get(input), get(gradient_next), beta, get(weights_update));
 				break;
 		}SYNC();
 	}
@@ -556,6 +525,7 @@ namespace ml
 				cuda_global_average_pooling_forward(get(context), alpha, get(input), beta, get(output));
 				break;
 			case DeviceType::OPENCL:
+				opencl_global_average_pooling_forward(get(context), alpha, get(input), beta, get(output));
 				break;
 		}SYNC();
 	}
@@ -586,6 +556,7 @@ namespace ml
 				cuda_channel_scaling_forward(get(context), alpha, get(input), get(scales), beta, get(output));
 				break;
 			case DeviceType::OPENCL:
+				opencl_channel_scaling_forward(get(context), alpha, get(input), get(scales), beta, get(output));
 				break;
 		}SYNC();
 	}
@@ -1370,10 +1341,13 @@ namespace ml
 
 		Tensor output_matrix = output.view( { output.shape().volumeWithoutLastDim(), output.lastDim() });
 		Tensor weight_matrix = weights.view( { weights.firstDim(), weights.shape().volumeWithoutFirstDim() });
-		const float beta = add.isEmpty() ? 0.0f : 1.0f;
-		const Tensor ext = add.isEmpty() ? output_matrix : add.view(output_matrix.shape());
-		gemm_ex(context, output_matrix, 1.0f, 'n', input_matrix, 't', weight_matrix, beta, ext, bias, activation);
-		SYNC();
+		if (add.isEmpty())
+			gemm_ex(context, output_matrix, 1.0f, 'n', input_matrix, 't', weight_matrix, 0.0f, output_matrix, bias, activation);
+		else
+		{
+			const Tensor ext = add.view(output_matrix.shape());
+			gemm_ex(context, output_matrix, 1.0f, 'n', input_matrix, 't', weight_matrix, 1.0f, ext, bias, activation);
+		} SYNC();
 	}
 	void explicit_gemm_backward(const Context &context, Tensor &gradient_prev, Tensor &gradient_next, const Tensor &output, const Tensor &weights,
 			Tensor &workspace, float beta)

@@ -1,6 +1,7 @@
 set(codesrc 	activations.cpp
 				attention.cpp
 				conversion.cpp
+				depthwise_conv.cpp
 				gemms.cpp
 				global_pooling.cpp
 				kernel_table.cpp

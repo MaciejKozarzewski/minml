@@ -161,6 +161,41 @@ namespace ml
 		throw NotImplemented(METHOD_NAME);
 	}
 
+	void opencl_depthwise_conv_forward(mlContext_t context, float alpha, const mlTensor_t x, const mlTensor_t w, const mlTensor_t b, float beta,
+			mlTensor_t y)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+	void opencl_depthwise_conv_backward(mlContext_t context, float alpha, const mlTensor_t dy, const mlTensor_t w, float beta, mlTensor_t dx)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+	void opencl_depthwise_conv_update(mlContext_t context, float alpha, const mlTensor_t x, const mlTensor_t dy, float beta, mlTensor_t dw)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+
+	/*
+	 * global pooling
+	 */
+	void opencl_global_average_pooling_forward(mlContext_t context, float alpha, const mlTensor_t x, float beta, mlTensor_t y)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+	void opencl_global_average_pooling_backward(mlContext_t context, float alpha, const mlTensor_t dy, float beta, mlTensor_t dx)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+	void opencl_channel_scaling_forward(mlContext_t context, float alpha, const mlTensor_t x, const mlTensor_t scales, float beta, mlTensor_t y)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+	void opencl_channel_scaling_backward(mlContext_t context, float alpha, const mlTensor_t dy, const mlTensor_t x, const mlTensor_t scales,
+			float beta_dx, mlTensor_t dx, float beta_scales, mlTensor_t dscales)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+
 	// implemented in 'winograd_fused.cpp'
 	void opencl_convolution_fused_winograd_forward(mlContext_t context, mlDataType_t dtype, mlShape_t input_shape, mlShape_t weights_shape,
 			const void *input, const void *weights, void *output, const void *bias, const void *add, mlActivationType_t act)

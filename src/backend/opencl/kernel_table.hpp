@@ -22,6 +22,7 @@ namespace ml
 			extern std::string batchnorm;
 			extern std::string common;
 			extern std::string conversion;
+			extern std::string depthwise_conv;
 			extern std::string global_pooling;
 			extern std::string indexers;
 			extern std::string lines_and_tiles;

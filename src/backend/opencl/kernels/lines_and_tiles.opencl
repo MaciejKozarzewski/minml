@@ -20,6 +20,22 @@ struct Line6
 {
 	float x0, x1, x2, x3, x4, x5;
 };
+struct Line7
+{
+	float x0, x1, x2, x3, x4, x5, x6;
+};
+struct Line8
+{
+	float x0, x1, x2, x3, x4, x5, x6, x7;
+};
+struct Line9
+{
+	float x0, x1, x2, x3, x4, x5, x6, x7, x8;
+};
+struct Line10
+{
+	float x0, x1, x2, x3, x4, x5, x6, x7, x8, x9;
+};
 
 float get_line2_at(struct Line2 line, int index)
 {
@@ -41,6 +57,22 @@ float get_line6_at(struct Line6 line, int index)
 {
 	return ((float*)(&line))[index];
 }
+float get_line7_at(struct Line7 line, int index)
+{
+	return ((float*)(&line))[index];
+}
+float get_line8_at(struct Line8 line, int index)
+{
+	return ((float*)(&line))[index];
+}
+float get_line9_at(struct Line9 line, int index)
+{
+	return ((float*)(&line))[index];
+}
+float get_line10_at(struct Line10 line, int index)
+{
+	return ((float*)(&line))[index];
+}
 
 void set_line2_at(__private struct Line2 *line, int index, float value)
 {
@@ -59,6 +91,22 @@ void set_line5_at(__private struct Line5 *line, int index, float value)
 	((float*)(line))[index] = value;
 }
 void set_line6_at(__private struct Line6 *line, int index, float value)
+{
+	((float*)(line))[index] = value;
+}
+void set_line7_at(__private struct Line7 *line, int index, float value)
+{
+	((float*)(line))[index] = value;
+}
+void set_line8_at(__private struct Line8 *line, int index, float value)
+{
+	((float*)(line))[index] = value;
+}
+void set_line9_at(__private struct Line9 *line, int index, float value)
+{
+	((float*)(line))[index] = value;
+}
+void set_line10_at(__private struct Line10 *line, int index, float value)
 {
 	((float*)(line))[index] = value;
 }
