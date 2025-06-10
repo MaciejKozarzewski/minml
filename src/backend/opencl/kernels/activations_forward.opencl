@@ -33,6 +33,17 @@ __kernel void relu_forward_fp32(__global storage_type *output, const __global st
 	}
 }
 
+__kernel void leaky_relu_forward_fp32(__global storage_type *output, const __global storage_type *input, int first_dim, int last_dim)
+{
+	const int elements = first_dim * last_dim;
+	for (int i = get_global_id(0); i < elements; i += get_global_size(0))
+	{
+		compute_type x = load(input, i);
+		x = leaky_relu(x);
+		store(x, output, i);
+	}
+}
+
 __kernel void softmax_3_channels_fp32(__global storage_type *output, const __global storage_type *input, int first_dim, int last_dim)
 {
 	const int idx = get_global_id(0);

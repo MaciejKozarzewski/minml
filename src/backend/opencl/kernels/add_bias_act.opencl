@@ -21,7 +21,10 @@ __kernel void add_bias_act_fp32(__global storage_type *output, const __global st
 				case 3: // relu
 					tmp = relu(tmp);
 					break;
-				case 4: // softmax
+				case 4: // leaky_relu
+					tmp = leaky_relu(tmp);
+					break;
+				case 5: // softmax
 					break;
 			}
 			store(tmp, output, i * last_dim + j);	

@@ -82,6 +82,21 @@ namespace ml
 				}
 				break;
 			}
+			case ACTIVATION_LEAKY_RELU:
+			{
+				switch (dtype)
+				{
+//					case DTYPE_FLOAT16:
+//						kernel = program_cache.getKernel(context, "leaky_relu_forward_fp16");
+//						break;
+					case DTYPE_FLOAT32:
+						kernel = program_cache.getKernel(context, "leaky_relu_forward_fp32");
+						break;
+					default:
+						break;
+				}
+				break;
+			}
 		}
 
 		kernel.setArg(0, opencl::getMemoryObject(output).buffer());
@@ -208,9 +223,11 @@ namespace ml
 		const int first_dim = volume_without_last_dim(shape);
 		const int last_dim = get_last_dim(shape);
 
+		const int groups = (last_dim + 127) / 128;
+
 		cl::Kernel kernel;
-		cl::NDRange global = opencl::get_nd_range<std::numeric_limits<int>::max(), 1024>(last_dim, first_dim);
-		cl::NDRange local = opencl::get_nd_range<128, 1>(last_dim, 1);
+		cl::NDRange global(128 * groups, std::min(1024, first_dim));
+		cl::NDRange local(128);
 
 		switch (dtype)
 		{

@@ -69,6 +69,12 @@ compute_type relu(compute_type x)
 {
 	return max(zero(), x);
 }
+compute_type leaky_relu(compute_type x)
+{
+	if (x < zero())
+		x *= (compute_type) 0.1f;
+	return x;
+}
 float square(float x)
 {
 	return x * x;
