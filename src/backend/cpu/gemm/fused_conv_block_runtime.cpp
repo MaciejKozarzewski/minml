@@ -447,7 +447,7 @@ namespace ml
 		std::memset(zero_line, 0, sizeof(float) * last_dim);
 
 		Matrix input_matrix(x.data, x.dtype, 1, last_dim, last_dim);
-		Matrix weight_matrix(w.data, w.dtype, w.dim[0] * w.dim[1], w.dim[3], w.dim[3]);
+		Matrix weight_matrix(w.data, w.dtype, w.dim[0] * w.dim[1], w.dim[2], w.dim[2]);
 		Matrix bias_matrix = (b.data == nullptr) ? Matrix(zero_line, b.dtype, 1, last_dim, last_dim) : Matrix(b.data, b.dtype, 1, b.dim[0], b.dim[0]);
 
 		int args[6] = { x.dim[0], x.dim[1], x.dim[2], x.dim[3], w.dim[0], w.dim[1] };
@@ -457,22 +457,22 @@ namespace ml
 
 		Matrix output_matrix(y.data, y.dtype, first_dim, last_dim, last_dim);
 		const cpu::SimdLevel simd = cpu::Context::getSimdLevel(context);
-		if (simd >= cpu::SimdLevel::AVX512F)
+		if (simd >= cpu::SimdLevel::AVX512F and last_dim % 128 == 0)
 		{
 			depthwise_conv_avx512f_24x16(output_matrix, input_matrix, weight_matrix, bias_matrix, args, indices);
 			return;
 		}
-		if (simd >= cpu::SimdLevel::AVX2)
+		if (simd >= cpu::SimdLevel::AVX2 and last_dim % 64 == 0)
 		{
 			depthwise_conv_avx2_12x8(output_matrix, input_matrix, weight_matrix, bias_matrix, args, indices);
 			return;
 		}
-		if (simd >= cpu::SimdLevel::AVX)
+		if (simd >= cpu::SimdLevel::AVX and last_dim % 64 == 0)
 		{
 			depthwise_conv_avx_10x8(output_matrix, input_matrix, weight_matrix, bias_matrix, args, indices);
 			return;
 		}
-		if (simd >= cpu::SimdLevel::SSE2)
+		if (simd >= cpu::SimdLevel::SSE2 and last_dim % 32 == 0)
 		{
 			depthwise_conv_sse2_4x8(output_matrix, input_matrix, weight_matrix, bias_matrix, args, indices);
 			return;
