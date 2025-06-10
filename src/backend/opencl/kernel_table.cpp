@@ -37,10 +37,10 @@ namespace ml
 		std::string global_pooling =
 #include "kernels/global_pooling.opencl"
 		;
-std::string indexers =
+		std::string indexers =
 #include "kernels/indexers.opencl"
 		;
-std::string lines_and_tiles =
+		std::string lines_and_tiles =
 #include "kernels/lines_and_tiles.opencl"
 		;
 		std::string reductions =

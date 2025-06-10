@@ -28,6 +28,54 @@ namespace
 
 namespace ml
 {
+	void opencl_global_average_pooling_forward(mlContext_t context, float alpha, const mlTensor_t x, float beta, mlTensor_t y)
+	{
+		const int dim0 = x.dim[0];
+		const int dim1 = x.dim[1] * x.dim[2];
+		const int dim2 = x.dim[3];
+
+		cl::Kernel kernel = get_kernel(context, "pooling_avg_forward");
+		cl::NDRange global(32 * ((dim2 + 31) / 32), 32, dim0);
+		cl::NDRange local(32, 32);
+
+		kernel.setArg(0, beta);
+		kernel.setArg(1, opencl::getMemoryObject(y.data).buffer());
+		kernel.setArg(2, alpha);
+		kernel.setArg(3, opencl::getMemoryObject(x.data).buffer());
+		kernel.setArg(4, dim0);
+		kernel.setArg(5, dim1);
+		kernel.setArg(6, dim2);
+
+		opencl::runKernel(context, kernel, global, local);
+	}
+	void opencl_global_average_pooling_backward(mlContext_t context, float alpha, const mlTensor_t dy, float beta, mlTensor_t dx)
+	{
+	}
+	void opencl_channel_scaling_forward(mlContext_t context, float alpha, const mlTensor_t x, const mlTensor_t scales, float beta, mlTensor_t y)
+	{
+		const int dim0 = x.dim[0];
+		const int dim1 = x.dim[1] * x.dim[2];
+		const int dim2 = x.dim[3];
+
+		cl::Kernel kernel = get_kernel(context, "channel_scaling_forward");
+		cl::NDRange global(32 * ((dim2 + 31) / 32), 32, dim0);
+		cl::NDRange local(32, 8);
+
+		kernel.setArg(0, beta);
+		kernel.setArg(1, opencl::getMemoryObject(y.data).buffer());
+		kernel.setArg(2, alpha);
+		kernel.setArg(3, opencl::getMemoryObject(x.data).buffer());
+		kernel.setArg(4, opencl::getMemoryObject(scales.data).buffer());
+		kernel.setArg(5, dim0);
+		kernel.setArg(6, dim1);
+		kernel.setArg(7, dim2);
+
+		opencl::runKernel(context, kernel, global, local);
+	}
+	void opencl_channel_scaling_backward(mlContext_t context, float alpha, const mlTensor_t dy, const mlTensor_t x, const mlTensor_t scales,
+			float beta_dx, mlTensor_t dx, float beta_scales, mlTensor_t dscales)
+	{
+	}
 
 	void opencl_global_avg_and_max_pooling_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input)
 	{

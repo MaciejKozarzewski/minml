@@ -1,5 +1,61 @@
 R"(
 
+__kernel void pooling_avg_forward(float beta, __global float *output, float alpha, const __global float *input, int batch_size, int hw, int channels)
+{
+	local float shared_avg[32 * 32];
+
+	const int last_dim_index = get_group_id(0) * 32 + get_local_id(0);
+	const int idx = get_local_id(1) * 32 + get_local_id(0);
+
+	struct Indexer3D input_indexer = create_indexer_3D(batch_size, hw, channels);
+
+	if (last_dim_index < channels)
+	{
+		compute_type local_avg = zero();
+		for (int i = get_local_id(1); i < hw; i += 32)
+			local_avg += input[get_pos_3D(input_indexer, get_group_id(2), i, last_dim_index)];
+		shared_avg[idx] = local_avg;
+	}
+
+	barrier(CLK_LOCAL_MEM_FENCE);
+	for (int i = 16; i >= 1; i /= 2)
+	{
+		if (get_local_id(1) < i)
+			shared_avg[idx] += shared_avg[idx + i * 32];
+		barrier(CLK_LOCAL_MEM_FENCE);
+	}
+
+	if (get_local_id(1) == 0 && last_dim_index < channels)
+	{
+		struct Indexer2D output_indexer = create_indexer_2D(batch_size, channels);
+		const compute_type local_avg = shared_avg[get_local_id(0)] / (float) hw;
+		output[get_pos_2D(output_indexer, get_group_id(2), last_dim_index)] = local_avg;
+	}
+}
+__kernel void channel_scaling_forward(float beta, __global float *output, float alpha, const __global float *input, const __global float *scales, int batch_size, int hw,
+			int channels)
+{
+	struct Indexer2D scale_indexer = create_indexer_2D(batch_size, channels);
+	struct Indexer3D tensor_indexer = create_indexer_3D(batch_size, hw, channels);
+	const int dim0_index = get_group_id(2);
+	const int dim1_index = get_global_id(1);
+	const int dim2_index = get_global_id(0);
+
+	if (dim2_index < channels)
+	{
+		const float scale = scales[get_pos_2D(scale_indexer, dim0_index, dim2_index)];
+		for (int i = dim1_index; i < hw; i += get_global_size(1))
+		{
+			const int idx = get_pos_3D(tensor_indexer, dim0_index, i, dim2_index);
+			float y = input[idx] * scale * alpha;
+			if (beta != 0.0f)
+				y += output[idx] * beta;
+			output[idx] = y;
+		}
+	}
+}
+
+
 __kernel void pooling_avg_max_forward(__global storage_type *output, const __global storage_type *input, int dim0, int dim1, int dim2)
 {
 	local compute_type shared_avg[32 * 32];
