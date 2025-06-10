@@ -191,21 +191,11 @@ namespace ml
 		std::vector<Tensor> input(numberOfInputs());
 		std::vector<Tensor> gradient_prev(numberOfInputs());
 		std::vector<float> beta(numberOfInputs());
-		size_t offset = 0;
 		for (int i = 0; i < numberOfInputs(); i++)
 		{
 			input[i] = change_batch(batchSize, getInputNode(i)->getOutputTensor());
 			gradient_prev[i] = change_batch(batchSize, getInputNode(i)->getGradientTensor());
 			beta[i] = getInputNode(i)->m_done_backward ? 1.0f : 0.0f;
-//			if (getInputNode(i)->m_done_backward == true)
-//			{
-//				Shape tmp_shape(getInputNode(i)->getOutputShape());
-//				tmp_shape[0] = batchSize;
-//				gradient_prev[i] = backup_tensor.view(tmp_shape, offset);
-//				offset += gradient_prev[i].volume();
-//			}
-//			else
-//				gradient_prev[i] = change_batch(batchSize, getInputNode(i)->getGradientTensor());
 		}
 		Tensor output = change_batch(batchSize, this->getOutputTensor());
 		Tensor gradient_next = change_batch(batchSize, this->getGradientTensor());
@@ -217,17 +207,7 @@ namespace ml
 //				<< m_layer->getOutputShape() << " = " << testing::normForTest(gradient_next) << '\n';
 
 		for (int i = 0; i < numberOfInputs(); i++)
-		{
-//			if (getInputNode(i)->m_done_backward == true)
-//			{
-//				std::cout << m_layer->name() + " " + m_layer->getInputShape() + " x " + m_layer->getWeightShape() + " -> " + m_layer->getOutputShape()
-//						<< '\n';
-//				Tensor tmp = getInputNode(i)->getGradientTensor().view(gradient_prev[i].shape());
-//				addTensors(m_layer->context(), tmp, tmp, gradient_prev[i]); // in-place addition
-//			}
-//			else
 			getInputNode(i)->m_done_backward = true;
-		}
 	}
 	void GraphNode::prepareForBackward()
 	{
