@@ -143,11 +143,6 @@ namespace ml
 //					for (int w = 0; w < width; w++)
 //						for (int out = 0; out < filters; out++)
 //						{
-////							float acc = m_conv_1_bias.isEmpty() ? 0.0f : m_conv_1_bias.get( { out });
-////							for (int in = 0; in < filters; in++)
-////								acc += m_conv_1_weights.get( { out, 0, 0, in }) * output.get( { b, h, w, in });
-////							tmp.at( { b, h, w, out }) = std::max(0.0f, acc);
-//
 //							float max_w = 0.0f, max_o = 0.0f;
 //							for (int in = 0; in < filters; in++)
 //							{
@@ -173,11 +168,6 @@ namespace ml
 //					for (int w = 0; w < width; w++)
 //						for (int out = 0; out < filters; out++)
 //						{
-////							float acc = m_conv_2_bias.isEmpty() ? 0.0f : m_conv_2_bias.get( { out });
-////							for (int in = 0; in < filters; in++)
-////								acc += m_conv_2_weights.get( { out, 0, 0, in }) * tmp.get( { b, h, w, in });
-////							output.at( { b, h, w, out }) = acc + input[0].get( { b, h, w, out });
-//
 //							float max_w = 0.0f, max_o = 0.0f;
 //							for (int in = 0; in < filters; in++)
 //							{
@@ -198,7 +188,7 @@ namespace ml
 //							output.at( { b, h, w, out }) = bias + acc * max_w * max_o / (scale_w * scale_o) + input[0].get( { b, h, w, out });
 //						}
 		}
-		if (device().isCUDA())
+		else
 		{
 			const int batch = input[0].dim(0);
 			const int height = input[0].dim(1);

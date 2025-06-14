@@ -17,6 +17,17 @@
 #include <cstring>
 #include <vector>
 
+namespace
+{
+	int get_device_index(const std::string &str)
+	{
+		for (size_t i = 0; i < str.size(); i++)
+			if (str[i] == ':')
+				return std::atoi(str.data() + i);
+		return 0;
+	}
+}
+
 namespace ml
 {
 
@@ -48,10 +59,10 @@ namespace ml
 		const std::string tmp = toLowerCase(str);
 		if (tmp == "cpu")
 			return Device::cpu();
-		if (startsWith(tmp, "cuda:"))
-			return Device::cuda(std::atoi(str.data() + 5));
-		if (startsWith(tmp, "opencl:"))
-			return Device::opencl(std::atoi(str.data() + 7));
+		if (startsWith(tmp, "cuda"))
+			return Device::cuda(get_device_index(str));
+		if (startsWith(tmp, "opencl"))
+			return Device::opencl(get_device_index(str));
 		throw LogicError(METHOD_NAME, "Illegal device '" + str + "'");
 	}
 

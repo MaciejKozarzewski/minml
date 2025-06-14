@@ -70,9 +70,8 @@ namespace ml
 	int SqueezeAndExcitation::getWorkspaceSize() const noexcept
 	{
 		const int batch_size = getInputShape().firstDim();
-		const int internal_channels_0 = getInputShape().lastDim();
-		const int internal_channels_1 = m_dense_1_weights.firstDim();
-		return batch_size * (internal_channels_0 + internal_channels_1);
+		const int internal_channels = getInputShape().lastDim();
+		return batch_size * internal_channels;
 	}
 	void SqueezeAndExcitation::changeContext(std::shared_ptr<Context> &context)
 	{
@@ -100,7 +99,7 @@ namespace ml
 		const int internal_channels = m_dense_1_weights.firstDim();
 
 		Tensor tmp0 = m_workspace.lock()->view( { batch_size, channels });
-		Tensor tmp1 = m_workspace.lock()->view( { batch_size, internal_channels }, tmp0.volume());
+		Tensor tmp1 = output.view( { batch_size, internal_channels });
 
 		globalAveragePoolingForward(context(), 1.0f, input[0], 0.0f, tmp0);
 		gemm_ex(context(), tmp1, 1, 'n', tmp0, 't', m_dense_1_weights, 0, tmp1, m_dense_1_bias, ActivationType::RELU);

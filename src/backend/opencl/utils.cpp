@@ -99,6 +99,12 @@ namespace ml
 			cl::CommandQueue &queue = opencl::Context::getCommandQueue(context);
 			cl::Event *event = opencl::Context::getLastEvent(context);
 			const cl_int status = queue.enqueueNDRangeKernel(kernel, cl::NullRange, global, local, nullptr, event);
+			if (status != CL_SUCCESS)
+			{
+				std::string name;
+				kernel.getInfo(CL_KERNEL_FUNCTION_NAME, &name);
+				throw ml::opencl::OpenCLRuntimeError(name, __LINE__, status);
+			}
 			CHECK_OPENCL_STATUS(status);
 		}
 
