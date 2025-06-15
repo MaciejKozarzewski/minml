@@ -53,6 +53,11 @@ namespace vectors
 		return vectors::max(zero<T, N>(), x);
 	}
 	template<typename T, int N>
+	DEVICE_INLINE vec<T, N> leaky_relu(const vec<T, N> &x)
+	{
+		return vectors::select(x > zero<T, N>(), x, vec<T, N>(0.1f) * x);
+	}
+	template<typename T, int N>
 	DEVICE_INLINE vec<T, N> approx_gelu(const vec<T, N> &x)
 	{
 		return x * vectors::sigmoid(vec<T, N>(1.6849f) * x);

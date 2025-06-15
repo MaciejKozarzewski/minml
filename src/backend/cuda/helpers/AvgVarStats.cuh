@@ -18,9 +18,9 @@
 template<typename T>
 struct AvgVarStats
 {
-		T samples = get<T>(0.0f);
-		T M = get<T>(0.0f); // mean
-		T M2 = get<T>(0.0f); // variance
+		T samples = T{};
+		T M = T{}; // mean
+		T M2 = T{}; // variance
 
 		AvgVarStats() = default;
 		__device__ AvgVarStats(T n, T mean, T var) :

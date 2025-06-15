@@ -35,25 +35,6 @@ __device__ __forceinline__ bool is_inside(int h, int w, int height, int width)
 	return 0 <= h && h < height && 0 <= w && w < width;
 }
 
-template<typename T>
-__device__ __forceinline__ T get(float x);
-
-template<>
-__device__ __forceinline__ float get(float x)
-{
-	return x;
-}
-template<>
-__device__ __forceinline__ half get(float x)
-{
-	return half(x);
-}
-template<>
-__device__ __forceinline__ half2 get(float x)
-{
-	return half2(x, x);
-}
-
 namespace ml
 {
 	namespace internal

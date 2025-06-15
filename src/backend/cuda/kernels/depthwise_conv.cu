@@ -26,6 +26,15 @@ namespace
 {
 	using namespace vectors;
 
+	__device__ float to_fp32(const vec1f x)
+	{
+		return x.x0;
+	}
+	__device__ float to_fp32(const vec1h x)
+	{
+		return static_cast<float>(x.x0);
+	}
+
 	struct Index2D
 	{
 			int8_t x = 0;
@@ -68,7 +77,6 @@ namespace
 			__device__ void accumulate(Line<T, OutputTile> &acc, const Line<T, KernelSize + OutputTile - 1> &input,
 					const Line<T, KernelSize> &filter) const
 			{
-#if __CUDA_ARCH__ >= FP16_MIN_ARCH
 				for (int i = 0; i < OutputTile; i++)
 				{
 					T tmp = acc[i];
@@ -76,7 +84,6 @@ namespace
 						tmp += input[i + j] * filter[j];
 					acc[i] = tmp;
 				}
-#endif
 			}
 	};
 
@@ -84,7 +91,6 @@ namespace
 	__global__ void kernel_depthwise_conv_forward(float beta, T *y_ptr, float alpha, const T *x_ptr, const T *w_ptr, const T *b_ptr, int height,
 			int width, int channels, bool invert_filter)
 	{
-#if __CUDA_ARCH__ >= FP16_MIN_ARCH
 		assert(blockDim.x == 32);
 		assert(blockDim.y == TileSize);
 		constexpr int InputSize = TileSize + KernelSize - 1;
@@ -97,7 +103,7 @@ namespace
 		if (f < channels)
 		{
 			if (threadIdx.y == 0)
-				bias_tile[threadIdx.x] = (b_ptr == nullptr) ? get<T>(0.0f) : b_ptr[f];
+				bias_tile[threadIdx.x] = (b_ptr == nullptr) ? T(0.0f) : b_ptr[f];
 			for (int i = threadIdx.y; i < KernelSize * KernelSize; i += blockDim.y)
 			{
 				const int tmp = invert_filter ? (KernelSize * KernelSize - 1 - i) : i;
@@ -118,7 +124,7 @@ namespace
 			{
 				const int origin_h = TileSize * blockIdx.x;
 				const int input_offset = Indexer<4>(gridDim.y, height, width, channels).at(blockIdx.y, 0, 0, f);
-				Line<T, TileSize> acc = convolution.set(get<T>(0.0f));
+				Line<T, TileSize> acc = convolution.set(T(0.0f));
 				for (int k = 0; k < KernelSize; k++)
 				{
 					const int h = origin_h + threadIdx.y + k - Padding;
@@ -129,7 +135,7 @@ namespace
 						for (int i = 0; i < InputSize; i++)
 						{
 							const int w = origin_w + i - Padding;
-							inp[i] = is_inside(w, width) ? x_ptr[input_offset + h * h_stride + w * w_stride] : get<T>(0.0f);
+							inp[i] = is_inside(w, width) ? x_ptr[input_offset + h * h_stride + w * w_stride] : T(0.0f);
 						}
 
 						const Line<T, KernelSize> fil = convolution.load_filter(filter_tile, k);
@@ -144,20 +150,18 @@ namespace
 					if (is_inside(h, w, height, width))
 					{
 						const int idx = input_offset + h * h_stride + w * w_stride;
-						T tmp = acc[i] * get<T>(alpha) + bias;
+						T tmp = acc[i] * T(alpha) + bias;
 						if (beta != 0.0f)
-							tmp += get<T>(beta) * y_ptr[idx];
+							tmp += T(beta) * y_ptr[idx];
 						y_ptr[idx] = tmp;
 					}
 				}
 			}
 		}
-#endif
 	}
 	template<int TileSize, int KernelSize, typename T, typename U>
 	__global__ void kernel_depthwise_conv_update(T *dw_ptr, const U *x_ptr, const U *dy_ptr, int batch_size, int height, int width, int channels)
 	{
-#if __CUDA_ARCH__ >= FP16_MIN_ARCH
 		assert(blockDim.x == 32);
 		assert(blockDim.y == KernelSize);
 		constexpr int InputSize = TileSize + KernelSize - 1;
@@ -180,7 +184,7 @@ namespace
 
 		if (f < channels)
 		{
-			Line<T, KernelSize> update_acc = convolution.set(get<T>(0.0f));
+			Line<T, KernelSize> update_acc = convolution.set(T(0.0f));
 			for (int b = blockIdx.y; b < batch_size; b += gridDim.y)
 				for (int origin_h = 0; origin_h < height; origin_h += TileSize)
 					for (int origin_w = 0; origin_w < width; origin_w += TileSize)
@@ -191,9 +195,9 @@ namespace
 							const int h = origin_h + indices_grad[i].x;
 							const int w = origin_w + indices_grad[i].y;
 							if (is_inside(h, w, height, width))
-								gradient_tile[i * 32 + threadIdx.x] = dy_ptr[input_indexer.at(b, h, w, f)];
+								gradient_tile[i * 32 + threadIdx.x] = to_fp32(dy_ptr[input_indexer.at(b, h, w, f)]);
 							else
-								gradient_tile[i * 32 + threadIdx.x] = get<T>(0.0f);
+								gradient_tile[i * 32 + threadIdx.x] = 0.0f;
 						}
 						__syncthreads();
 
@@ -206,7 +210,7 @@ namespace
 								for (int j = 0; j < InputSize; j++)
 								{
 									const int w = origin_w + j - Padding;
-									inp[j] = is_inside(w, width) ? x_ptr[input_indexer.at(blockIdx.y, h, w, f)] : get<U>(0.0f);
+									inp[j] = is_inside(w, width) ? to_fp32(x_ptr[input_indexer.at(blockIdx.y, h, w, f)]) : 0.0f;
 								}
 								const Line<T, TileSize> fil = convolution.load_filter(gradient_tile, i);
 								convolution.accumulate(update_acc, inp, fil);
@@ -219,12 +223,10 @@ namespace
 			for (int i = 0; i < KernelSize; i++)
 				dw_ptr[update_indexer.at(blockIdx.y, threadIdx.y, i, f)] = update_acc[i];
 		}
-#endif
 	}
 	template<typename T>
 	__global__ void kernel_sum_update(float beta, T *dst, float alpha, const float *src, int first_dim, int last_dim)
 	{
-#if __CUDA_ARCH__ >= FP16_MIN_ARCH
 		assert(blockDim.x == 32);
 		assert(blockDim.y == 32);
 		assert(gridDim.y == 1);
@@ -251,10 +253,9 @@ namespace
 		{
 			float tmp = alpha * workspace[0][threadIdx.x];
 			if (beta != 0.0f)
-				tmp += beta * static_cast<float>(dst[last_dim_idx]);
-			dst[last_dim_idx] = static_cast<T>(tmp);
+				tmp += beta * to_fp32(dst[last_dim_idx]);
+			dst[last_dim_idx] = T(tmp);
 		}
-#endif
 	}
 
 	using namespace ml;
@@ -320,7 +321,7 @@ namespace
 		const int last_dim = filter_size * filter_size * channels;
 		const int max_blocks = workspace_size / (sizeof(float) * last_dim);
 
-		constexpr int channels_per_thread = std::is_same<T, half2>::value ? 2 : 1;
+		constexpr int channels_per_thread = std::is_same<T, vec2h>::value ? 2 : 1;
 		const int channels_per_block = 32 * channels_per_thread;
 
 		const int num_blocks = std::min(1024, std::min(batch_size, max_blocks));
@@ -364,14 +365,14 @@ namespace ml
 			case DTYPE_FLOAT16:
 			{
 				if (get_last_dim(w) % 2 == 0)
-					dispatch_dwconv_forward<half2, 4>(context, alpha, x, w, b, beta, y, false);
+					dispatch_dwconv_forward<vec2h, 4>(context, alpha, x, w, b, beta, y, false);
 				else
-					dispatch_dwconv_forward<half, 4>(context, alpha, x, w, b, beta, y, false);
+					dispatch_dwconv_forward<vec1h, 4>(context, alpha, x, w, b, beta, y, false);
 				break;
 			}
 			case DTYPE_FLOAT32:
 			{
-				dispatch_dwconv_forward<float, 4>(context, alpha, x, w, b, beta, y, false);
+				dispatch_dwconv_forward<vec1f, 4>(context, alpha, x, w, b, beta, y, false);
 				break;
 			}
 			default:
@@ -387,14 +388,14 @@ namespace ml
 			case DTYPE_FLOAT16:
 			{
 				if (get_last_dim(w) % 2 == 0)
-					dispatch_dwconv_forward<half2, 4>(context, alpha, dy, w, b, beta, dx, true);
+					dispatch_dwconv_forward<vec2h, 4>(context, alpha, dy, w, b, beta, dx, true);
 				else
-					dispatch_dwconv_forward<half, 4>(context, alpha, dy, w, b, beta, dx, true);
+					dispatch_dwconv_forward<vec1h, 4>(context, alpha, dy, w, b, beta, dx, true);
 				break;
 			}
 			case DTYPE_FLOAT32:
 			{
-				dispatch_dwconv_forward<float, 4>(context, alpha, dy, w, b, beta, dx, true);
+				dispatch_dwconv_forward<vec1f, 4>(context, alpha, dy, w, b, beta, dx, true);
 				break;
 			}
 			default:
@@ -410,14 +411,14 @@ namespace ml
 			{
 				assert(is_fp32(dw) || is_fp16(dw));
 				if (is_fp32(dw))
-					dispatch_dwconv_update<half, float, 4>(context, alpha, x, dy, beta, dw);
+					dispatch_dwconv_update<vec1h, vec1f, 4>(context, alpha, x, dy, beta, dw);
 				else
-					dispatch_dwconv_update<half, half, 4>(context, alpha, x, dy, beta, dw);
+					dispatch_dwconv_update<vec1h, vec1h, 4>(context, alpha, x, dy, beta, dw);
 				break;
 			}
 			case DTYPE_FLOAT32:
 			{
-				dispatch_dwconv_update<float, float, 4>(context, alpha, x, dy, beta, dw);
+				dispatch_dwconv_update<vec1f, vec1f, 4>(context, alpha, x, dy, beta, dw);
 				break;
 			}
 			default:

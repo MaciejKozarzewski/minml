@@ -13,6 +13,7 @@
 
 #include "../helpers/indexers.cuh"
 #include "../helpers/lines_and_tiles.cuh"
+#include "../vec/vec_headers.cuh"
 
 #include <cuda_runtime_api.h>
 #include <cuda_runtime.h>
@@ -28,6 +29,16 @@
 namespace
 {
 	using namespace ml;
+	using namespace vectors;
+
+	__device__ float to_fp32(const vec1f x)
+	{
+		return x.x0;
+	}
+	__device__ float to_fp32(const vec1h x)
+	{
+		return static_cast<float>(x.x0);
+	}
 
 	__device__ bool is_inside(int h, int w, int height, int width)
 	{
@@ -38,7 +49,6 @@ namespace
 	__global__ void kernel_transform_weights(T *__restrict__ matrices, const T *__restrict__ weights, int output_filters, int input_filters,
 			bool invert)
 	{
-#if __CUDA_ARCH__ >= 700
 		constexpr int TileSize = KernelSize + TransformSize - 1;
 
 		Tile<T, KernelSize, KernelSize> tile;
@@ -69,14 +79,12 @@ namespace
 					matrices[matrices_indexer.at(row, col, blockIdx.y, f)] = transform(col, line);
 			}
 		}
-#endif
 	}
 
 	template<int KernelSize, int TransformSize, typename T>
 	__global__ void kernel_transform_input(T *__restrict__ matrices, const T *__restrict__ input, int batch_size, int height, int width,
 			int input_filters)
 	{
-#if __CUDA_ARCH__ >= 700
 		constexpr int TileSize = KernelSize + TransformSize - 1;
 		constexpr int Padding = KernelSize / 2;
 
@@ -89,7 +97,7 @@ namespace
 				{
 					const int h = TransformSize * blockIdx.x - Padding + row;
 					const int w = TransformSize * blockIdx.y - Padding + col;
-					tile.at(col, row) = is_inside(h, w, height, width) ? input[input_indexer.at(blockIdx.z, h, w, f)] : get<T>(0.0f);
+					tile.at(col, row) = is_inside(h, w, height, width) ? input[input_indexer.at(blockIdx.z, h, w, f)] : T(0.0f);
 				}
 
 			const int tile_index = (blockIdx.z * gridDim.x + blockIdx.x) * gridDim.y + blockIdx.y;
@@ -106,19 +114,17 @@ namespace
 					matrices[matrices_indexer.at(row, col, tile_index, f)] = transform(col, line);
 			}
 		}
-#endif
 	}
 	template<int KernelSize, int TransformSize, typename T>
 	__global__ void kernel_transform_output(const T *__restrict__ matrices, T *__restrict__ output, const T *__restrict__ add,
 			const T *__restrict__ bias, mlActivationType_t activation, int batch_size, int height, int width, int output_filters)
 	{
-#if __CUDA_ARCH__ >= 700
 		constexpr int TileSize = KernelSize + TransformSize - 1;
 
 		Tile<T, TileSize, TileSize> tile;
 		for (int f = threadIdx.x; f < output_filters; f += blockDim.x)
 		{
-			const T bias_value = (bias != nullptr) ? bias[f] : get<T>(0.0f);
+			const T bias_value = (bias != nullptr) ? bias[f] : T(0.0f);
 
 			const int tile_index = (blockIdx.z * gridDim.x + blockIdx.x) * gridDim.y + blockIdx.y;
 			const Indexer<4> matrices_indexer(TileSize, TileSize, gridDim.x * gridDim.y * gridDim.z, output_filters);
@@ -151,16 +157,16 @@ namespace
 							switch (activation)
 							{
 								case ACTIVATION_SIGMOID:
-									tmp = ml::internal::sigmoid(tmp);
+									tmp = vectors::sigmoid(tmp);
 									break;
 								case ACTIVATION_TANH:
-									tmp = ml::internal::tanh(tmp);
+									tmp = vectors::tanh(tmp);
 									break;
 								case ACTIVATION_RELU:
-									tmp = ml::internal::relu(tmp);
+									tmp = vectors::relu(tmp);
 									break;
 								case ACTIVATION_LEAKY_RELU:
-									tmp = ml::internal::leaky_relu(tmp);
+									tmp = vectors::leaky_relu(tmp);
 									break;
 							}
 
@@ -170,14 +176,12 @@ namespace
 				}
 			}
 		}
-#endif
 	}
 
 	template<int KernelSize, int TransformSize, typename T>
 	__global__ void kernel_transform_gradient(T *__restrict__ matrices, const T *__restrict__ gradient, int batch_size, int height, int width,
 			int output_filters)
 	{
-#if __CUDA_ARCH__ >= 700
 		constexpr int TileSize = KernelSize + TransformSize - 1;
 
 		Tile<T, TransformSize, TransformSize> tile;
@@ -189,7 +193,7 @@ namespace
 				{
 					const int h = TransformSize * blockIdx.x + row;
 					const int w = TransformSize * blockIdx.y + col;
-					tile.at(col, row) = is_inside(h, w, height, width) ? gradient[gradient_indexer.at(blockIdx.z, h, w, f)] : get<T>(0.0f);
+					tile.at(col, row) = is_inside(h, w, height, width) ? gradient[gradient_indexer.at(blockIdx.z, h, w, f)] : T(0.0f);
 				}
 
 			const int tile_index = (blockIdx.z * gridDim.x + blockIdx.x) * gridDim.y + blockIdx.y;
@@ -205,13 +209,11 @@ namespace
 					matrices[matrices_indexer.at(row, col, tile_index, f)] = transform(col, line);
 			}
 		}
-#endif
 	}
 
 	template<int KernelSize, int TransformSize, typename T, typename U>
 	__global__ void kernel_transform_update(const T *__restrict__ matrices, U *__restrict__ update, int output_filters, int input_filters)
 	{
-#if __CUDA_ARCH__ >= 700
 		constexpr int TileSize = KernelSize + TransformSize - 1;
 
 		Tile<T, TileSize, TileSize> tile;
@@ -231,10 +233,9 @@ namespace
 					line[col] = transform(row, tile.get_row(col));
 
 				for (int col = 0; col < KernelSize; col++)
-					update[update_indexer.at(blockIdx.y, row, col, f)] = transform(col, line);
+					update[update_indexer.at(blockIdx.y, row, col, f)] = U(to_fp32(transform(col, line)));
 			}
 		}
-#endif
 	}
 
 	/*
@@ -246,7 +247,7 @@ namespace
 		return 1;
 	}
 	template<>
-	int vector_length<half2>()
+	int vector_length<vec2h>()
 	{
 		return 2;
 	}
@@ -421,13 +422,13 @@ namespace ml
 			case DTYPE_FLOAT16:
 			{
 				if (get_last_dim(w) % 2 == 0)
-					launch_weight_transform<half2>(context, tile_size, w, matrices, invert);
+					launch_weight_transform<vec2h>(context, tile_size, w, matrices, invert);
 				else
-					launch_weight_transform<half>(context, tile_size, w, matrices, invert);
+					launch_weight_transform<vec1h>(context, tile_size, w, matrices, invert);
 				break;
 			}
 			case DTYPE_FLOAT32:
-				launch_weight_transform<float>(context, tile_size, w, matrices, invert);
+				launch_weight_transform<vec1f>(context, tile_size, w, matrices, invert);
 				break;
 		}
 	}
@@ -439,13 +440,13 @@ namespace ml
 			case DTYPE_FLOAT16:
 			{
 				if (get_last_dim(x) % 2 == 0)
-					launch_input_transform<half2>(context, tile_size, x, matrices);
+					launch_input_transform<vec2h>(context, tile_size, x, matrices);
 				else
-					launch_input_transform<half>(context, tile_size, x, matrices);
+					launch_input_transform<vec1h>(context, tile_size, x, matrices);
 				break;
 			}
 			case DTYPE_FLOAT32:
-				launch_input_transform<float>(context, tile_size, x, matrices);
+				launch_input_transform<vec1f>(context, tile_size, x, matrices);
 				break;
 		}
 	}
@@ -458,13 +459,13 @@ namespace ml
 			case DTYPE_FLOAT16:
 			{
 				if (get_last_dim(y) % 2 == 0)
-					launch_output_transform<half2>(context, tile_size, matrices, bias, ext, y, act);
+					launch_output_transform<vec2h>(context, tile_size, matrices, bias, ext, y, act);
 				else
-					launch_output_transform<half>(context, tile_size, matrices, bias, ext, y, act);
+					launch_output_transform<vec1h>(context, tile_size, matrices, bias, ext, y, act);
 				break;
 			}
 			case DTYPE_FLOAT32:
-				launch_output_transform<float>(context, tile_size, matrices, bias, ext, y, act);
+				launch_output_transform<vec1f>(context, tile_size, matrices, bias, ext, y, act);
 				break;
 		}
 	}
@@ -476,13 +477,13 @@ namespace ml
 			case DTYPE_FLOAT16:
 			{
 				if (get_last_dim(dy) % 2 == 0)
-					launch_gradient_transform<half2>(context, tile_size, dy, matrices);
+					launch_gradient_transform<vec2h>(context, tile_size, dy, matrices);
 				else
-					launch_gradient_transform<half>(context, tile_size, dy, matrices);
+					launch_gradient_transform<vec1h>(context, tile_size, dy, matrices);
 				break;
 			}
 			case DTYPE_FLOAT32:
-				launch_gradient_transform<float>(context, tile_size, dy, matrices);
+				launch_gradient_transform<vec1f>(context, tile_size, dy, matrices);
 				break;
 		}
 	}
@@ -494,110 +495,18 @@ namespace ml
 			{
 				assert(is_fp32(dw) || is_fp16(dw));
 				if (is_fp16(dw))
-					launch_update_transform<half, half>(context, tile_size, matrices, dw);
+					launch_update_transform<vec1h, vec1h>(context, tile_size, matrices, dw);
 				else
-					launch_update_transform<half, float>(context, tile_size, matrices, dw);
+					launch_update_transform<vec1h, vec1f>(context, tile_size, matrices, dw);
 				break;
 			}
 			case DTYPE_FLOAT32:
 			{
 				assert(is_fp32(dw));
-				launch_update_transform<float, float>(context, tile_size, matrices, dw);
+				launch_update_transform<vec1f, vec1f>(context, tile_size, matrices, dw);
 				break;
 			}
 		}
 	}
-
-//	void cuda_winograd_weight_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape, const void *weights,
-//			void *matrices, bool invert)
-//	{
-//		switch (dtype)
-//		{
-//			case DTYPE_FLOAT16:
-//			{
-//				if (get_last_dim(weight_shape) % 2 == 0)
-//					launch_weight_transform<half2>(context, tile_size, weight_shape, weights, matrices, invert);
-//				else
-//					launch_weight_transform<half>(context, tile_size, weight_shape, weights, matrices, invert);
-//				break;
-//			}
-//			case DTYPE_FLOAT32:
-//				launch_weight_transform<float>(context, tile_size, weight_shape, weights, matrices, invert);
-//				break;
-//		}
-//	}
-//	void cuda_winograd_input_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape, mlShape_t input_shape,
-//			const void *input, void *matrices)
-//	{
-//		switch (dtype)
-//		{
-//			case DTYPE_FLOAT16:
-//			{
-//				if (get_last_dim(input_shape) % 2 == 0)
-//					launch_input_transform<half2>(context, tile_size, weight_shape, input_shape, input, matrices);
-//				else
-//					launch_input_transform<half>(context, tile_size, weight_shape, input_shape, input, matrices);
-//				break;
-//			}
-//			case DTYPE_FLOAT32:
-//				launch_input_transform<float>(context, tile_size, weight_shape, input_shape, input, matrices);
-//				break;
-//		}
-//	}
-//	void cuda_winograd_output_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape, mlShape_t output_shape,
-//			const void *matrices, void *output, const void *bias, const void *add, mlActivationType_t act)
-//	{
-//		switch (dtype)
-//		{
-//			case DTYPE_FLOAT16:
-//			{
-//				if (get_last_dim(output_shape) % 2 == 0)
-//					launch_output_transform<half2>(context, tile_size, weight_shape, output_shape, matrices, output, bias, add, act);
-//				else
-//					launch_output_transform<half>(context, tile_size, weight_shape, output_shape, matrices, output, bias, add, act);
-//				break;
-//			}
-//			case DTYPE_FLOAT32:
-//				launch_output_transform<float>(context, tile_size, weight_shape, output_shape, matrices, output, bias, add, act);
-//				break;
-//		}
-//	}
-//	void cuda_winograd_gradient_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape, mlShape_t gradient_shape,
-//			const void *gradient, void *matrices)
-//	{
-//		switch (dtype)
-//		{
-//			case DTYPE_FLOAT16:
-//			{
-//				if (get_last_dim(gradient_shape) % 2 == 0)
-//					launch_gradient_transform<half2>(context, tile_size, dtype, weight_shape, gradient_shape, gradient, matrices);
-//				else
-//					launch_gradient_transform<half>(context, tile_size, dtype, weight_shape, gradient_shape, gradient, matrices);
-//				break;
-//			}
-//			case DTYPE_FLOAT32:
-//				launch_gradient_transform<float>(context, tile_size, dtype, weight_shape, gradient_shape, gradient, matrices);
-//				break;
-//		}
-//	}
-//	void cuda_winograd_update_transform(mlContext_t context, int tile_size, mlDataType_t dtype, mlShape_t weight_shape, const void *matrices,
-//			void *update)
-//	{
-//		switch (dtype)
-//		{
-//			case DTYPE_FLOAT16:
-//			{
-//				if (get_last_dim(weight_shape) % 2 == 0)
-//					launch_update_transform<half2>(context, tile_size, dtype, weight_shape, matrices, update);
-//				else
-//					launch_update_transform<half>(context, tile_size, dtype, weight_shape, matrices, update);
-//				break;
-//			}
-//			case DTYPE_FLOAT32:
-//				launch_update_transform<float>(context, tile_size, dtype, weight_shape, matrices, update);
-//				break;
-//		}
-//	}
-
 } /* namespace ml */
 

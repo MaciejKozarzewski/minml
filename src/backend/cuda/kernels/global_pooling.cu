@@ -29,7 +29,6 @@ namespace
 	template<typename T, int N>
 	__global__ void kernel_average_pooling_forward(float beta, T *output, float alpha, const T *input, int batch_size, int hw, int channels)
 	{
-#if __CUDA_ARCH__ >= FP16_MIN_ARCH
 		assert(channels % N == 0);
 		__shared__ T workspace[32][32 * N + 1];
 
@@ -70,13 +69,11 @@ namespace
 				tmp += vec<T, N>(beta) * vec<T, N>(output + out_idx);
 			tmp.store(output + out_idx);
 		}
-#endif
 	}
 	template<typename T, int N>
 	__global__ void kernel_average_pooling_backward(float beta, T *gradient_prev, float alpha, const T *gradient_next, int batch_size, int hw,
 			int channels)
 	{
-#if __CUDA_ARCH__ >= FP16_MIN_ARCH
 		assert(channels % N == 0);
 		const int hw_index = blockIdx.y * blockDim.y + threadIdx.y;
 		const int channel_index = N * (blockIdx.x * blockDim.x + threadIdx.x);
@@ -96,14 +93,12 @@ namespace
 				tmp.store(gradient_prev + dx_idx);
 			}
 		}
-#endif
 	}
 
 	template<typename T, int N>
 	__global__ void kernel_channel_scaling_forward(float beta, T *output, float alpha, const T *input, const T *scales, int batch_size, int hw,
 			int channels)
 	{
-#if __CUDA_ARCH__ >= FP16_MIN_ARCH
 		assert(channels % N == 0);
 		const Indexer<2> scale_indexer(batch_size, channels);
 		const Indexer<3> tensor_indexer(batch_size, hw, channels);
@@ -124,13 +119,11 @@ namespace
 				y.store(output + idx);
 			}
 		}
-#endif
 	}
 	template<typename T, int N>
 	__global__ void kernel_channel_scaling_backward(float beta1, T *gradient_input, float beta2, T *gradient_scales, float alpha,
 			const T *gradient_next, const T *input, const T *scales, int batch_size, int hw, int channels)
 	{
-#if __CUDA_ARCH__ >= FP16_MIN_ARCH
 		assert(channels % N == 0);
 		assert(blockDim.x == 32 && blockDim.y == 8);
 		__shared__ vec<T, N> workspace[32 * 8];
@@ -176,13 +169,11 @@ namespace
 				dscales += vec<T, N>(beta2) * vec<T, N>(gradient_scales + tmp);
 			dscales.store(gradient_scales + tmp);
 		}
-#endif
 	}
 
 	template<typename T, int N>
 	__global__ void kernel_channel_average_pooling_forward(float beta, T *output, float alpha, const T *input, int first_dim, int last_dim)
 	{
-#if __CUDA_ARCH__ >= FP16_MIN_ARCH
 		assert(last_dim % N == 0);
 		for (int i = blockIdx.y * blockDim.y + threadIdx.y; i < first_dim; i += blockDim.y * gridDim.y)
 		{
@@ -201,13 +192,11 @@ namespace
 				output[i] = avg;
 			}
 		}
-#endif
 	}
 	template<typename T, int N>
 	__global__ void kernel_channel_average_pooling_backward(float beta, T *gradient_prev, float alpha, const T *gradient_next, int first_dim,
 			int last_dim)
 	{
-#if __CUDA_ARCH__ >= FP16_MIN_ARCH
 		assert(last_dim % N == 0);
 		for (int i = blockIdx.y * blockDim.y + threadIdx.y; i < first_dim; i += blockDim.y * gridDim.y)
 		{
@@ -220,13 +209,11 @@ namespace
 				tmp.store(gradient_prev + i * last_dim + j);
 			}
 		}
-#endif
 	}
 
 	template<typename T, int N>
 	__global__ void kernel_spatial_scaling_forward(float beta, T *output, float alpha, const T *input, const T *scales, int first_dim, int last_dim)
 	{
-#if __CUDA_ARCH__ >= FP16_MIN_ARCH
 		assert(last_dim % N == 0);
 		for (int i = blockIdx.y * blockDim.y + threadIdx.y; i < first_dim; i += blockDim.y * gridDim.y)
 		{
@@ -240,13 +227,11 @@ namespace
 				y.store(output + i * last_dim + j);
 			}
 		}
-#endif
 	}
 	template<typename T, int N>
 	__global__ void kernel_spatial_scaling_backward(float beta1, T *gradient_input, float beta2, T *gradient_scales, float alpha,
 			const T *gradient_next, const T *input, const T *scales, int first_dim, int last_dim)
 	{
-#if __CUDA_ARCH__ >= FP16_MIN_ARCH
 		assert(last_dim % N == 0);
 		for (int i = blockIdx.y * blockDim.y + threadIdx.y; i < first_dim; i += blockDim.y * gridDim.y)
 		{
@@ -275,7 +260,6 @@ namespace
 				gradient_scales[i] = dscale;
 			}
 		}
-#endif
 	}
 
 }

@@ -31,7 +31,7 @@ namespace ml
 	{
 			__device__ T operator()(const int row, const Line<T, KernelSize + TransformSize - 1> &column) const
 			{
-				return get<T>(0.0f);
+				return T(0.0f);
 			}
 	};
 
@@ -46,9 +46,9 @@ namespace ml
 					case 0:
 						return column.x0;
 					case 1:
-						return get<T>(0.5f) * (column.x0 + column.x1 + column.x2);
+						return T(0.5f) * (column.x0 + column.x1 + column.x2);
 					case 2:
-						return get<T>(0.5f) * (column.x0 - column.x1 + column.x2);
+						return T(0.5f) * (column.x0 - column.x1 + column.x2);
 					case 3:
 						return column.x2;
 				}
@@ -113,7 +113,7 @@ namespace ml
 			__device__ T operator()(const int row, const Line<T, 4> &column) const
 			{
 				assert(0 <= row && row < 3);
-				const T c05 = get<T>(0.5f);
+				const T c05 = T(0.5f);
 				switch (row)
 				{
 					case 0:
@@ -132,8 +132,8 @@ namespace ml
 			__device__ T operator()(const int row, const Line<T, 3> &column) const
 			{
 				assert(0 <= row && row < 6);
-				const T c13 = get<T>(1.0f / 3.0f);
-				const T c23 = get<T>(2.0f / 3.0f);
+				const T c13 = T(1.0f / 3.0f);
+				const T c23 = T(2.0f / 3.0f);
 				switch (row)
 				{
 					case 0:
@@ -143,11 +143,11 @@ namespace ml
 					case 2:
 						return c23 * (column.x0 - column.x1 + column.x2);
 					case 3:
-						return c13 * (column.x0 + get<T>(2.0f) * column.x1 + get<T>(4.0f) * column.x2);
+						return c13 * (column.x0 + T(2.0f) * column.x1 + T(4.0f) * column.x2);
 					case 4:
-						return c13 * (column.x0 - get<T>(2.0f) * column.x1 + get<T>(4.0f) * column.x2);
+						return c13 * (column.x0 - T(2.0f) * column.x1 + T(4.0f) * column.x2);
 					case 5:
-						return get<T>(2.0f) * column.x2;
+						return T(2.0f) * column.x2;
 				}
 			}
 	};
@@ -160,17 +160,17 @@ namespace ml
 				switch (row)
 				{
 					case 0:
-						return column.x0 - column.x2 + get<T>(0.25f) * (column.x4 - column.x2);
+						return column.x0 - column.x2 + T(0.25f) * (column.x4 - column.x2);
 					case 1:
-						return column.x1 + column.x2 - get<T>(0.25f) * (column.x3 + column.x4);
+						return column.x1 + column.x2 - T(0.25f) * (column.x3 + column.x4);
 					case 2:
-						return column.x2 - column.x1 + get<T>(0.25f) * (column.x3 - column.x4);
+						return column.x2 - column.x1 + T(0.25f) * (column.x3 - column.x4);
 					case 3:
-						return column.x3 - column.x1 + get<T>(0.5f) * (column.x4 - column.x2);
+						return column.x3 - column.x1 + T(0.5f) * (column.x4 - column.x2);
 					case 4:
-						return column.x1 - column.x3 + get<T>(0.5f) * (column.x4 - column.x2);
+						return column.x1 - column.x3 + T(0.5f) * (column.x4 - column.x2);
 					case 5:
-						return column.x1 - column.x3 + get<T>(0.25f) * (column.x5 - column.x3);
+						return column.x1 - column.x3 + T(0.25f) * (column.x5 - column.x3);
 				}
 			}
 	};
@@ -183,13 +183,13 @@ namespace ml
 				switch (row)
 				{
 					case 0:
-						return column.x0 + column.x1 + column.x2 + get<T>(0.25f) * (column.x3 + column.x4);
+						return column.x0 + column.x1 + column.x2 + T(0.25f) * (column.x3 + column.x4);
 					case 1:
-						return column.x1 - column.x2 + get<T>(0.5f) * (column.x3 - column.x4);
+						return column.x1 - column.x2 + T(0.5f) * (column.x3 - column.x4);
 					case 2:
 						return column.x1 + column.x2 + column.x3 + column.x4;
 					case 3:
-						return column.x1 - column.x2 + get<T>(2.0f) * (column.x3 - column.x4 + column.x5);
+						return column.x1 - column.x2 + T(2.0f) * (column.x3 - column.x4 + column.x5);
 				}
 			}
 	};
@@ -199,8 +199,8 @@ namespace ml
 			__device__ T operator()(const int row, const Line<T, 4> &column) const
 			{
 				assert(0 <= row && row < 6);
-				const T c13 = get<T>(1.0f / 3.0f);
-				const T c23 = get<T>(2.0f / 3.0f);
+				const T c13 = T(1.0f / 3.0f);
+				const T c23 = T(2.0f / 3.0f);
 				switch (row)
 				{
 					case 0:
@@ -210,11 +210,11 @@ namespace ml
 					case 2:
 						return c23 * (column.x0 - column.x1 + column.x2 - column.x3);
 					case 3:
-						return c13 * (column.x0 + get<T>(2.0f) * column.x1 + get<T>(4.0f) * column.x2 + get<T>(8.0f) * column.x3);
+						return c13 * (column.x0 + T(2.0f) * column.x1 + T(4.0f) * column.x2 + T(8.0f) * column.x3);
 					case 4:
-						return c13 * (column.x0 - get<T>(2.0f) * column.x1 + get<T>(4.0f) * column.x2 - get<T>(8.0f) * column.x3);
+						return c13 * (column.x0 - T(2.0f) * column.x1 + T(4.0f) * column.x2 - T(8.0f) * column.x3);
 					case 5:
-						return get<T>(2.0f) * column.x3;
+						return T(2.0f) * column.x3;
 				}
 			}
 	};
@@ -227,11 +227,11 @@ namespace ml
 				switch (row)
 				{
 					case 0:
-						return column.x0 + column.x1 + column.x2 + get<T>(0.25f) * (column.x3 + column.x4);
+						return column.x0 + column.x1 + column.x2 + T(0.25f) * (column.x3 + column.x4);
 					case 1:
-						return column.x1 - column.x2 + get<T>(0.5f) * (column.x3 - column.x4);
+						return column.x1 - column.x2 + T(0.5f) * (column.x3 - column.x4);
 					case 2:
-						return column.x1 + column.x2 + column.x3 + column.x4 + get<T>(2.0f) * column.x5;
+						return column.x1 + column.x2 + column.x3 + column.x4 + T(2.0f) * column.x5;
 				}
 			}
 	};
@@ -242,8 +242,8 @@ namespace ml
 			__device__ T operator()(const int row, const Line<T, 5> &column) const
 			{
 				assert(0 <= row && row < 6);
-				const T c16 = get<T>(1.0f / 6.0f);
-				const T c23 = get<T>(2.0f / 3.0f);
+				const T c16 = T(1.0f / 6.0f);
+				const T c23 = T(2.0f / 3.0f);
 				switch (row)
 				{
 					case 0:
@@ -254,14 +254,14 @@ namespace ml
 						return c23 * (column.x0 - column.x1 + column.x2 - column.x3 + column.x4);
 					case 3:
 						return c16
-								* (column.x0 + get<T>(2.0f) * column.x1 + get<T>(4.0f) * column.x2 + get<T>(8.0f) * column.x3
-										+ get<T>(16.0f) * column.x4);
+								* (column.x0 + T(2.0f) * column.x1 + T(4.0f) * column.x2 + T(8.0f) * column.x3
+										+ T(16.0f) * column.x4);
 					case 4:
 						return c16
-								* (column.x0 - get<T>(2.0f) * column.x1 + get<T>(4.0f) * column.x2 - get<T>(8.0f) * column.x3
-										+ get<T>(16.0f) * column.x4);
+								* (column.x0 - T(2.0f) * column.x1 + T(4.0f) * column.x2 - T(8.0f) * column.x3
+										+ T(16.0f) * column.x4);
 					case 5:
-						return get<T>(2.0f) * column.x4;
+						return T(2.0f) * column.x4;
 				}
 			}
 	};
@@ -282,9 +282,9 @@ namespace ml
 				switch (row)
 				{
 					case 0:
-						return column.x0 + column.x1 + column.x2 + get<T>(0.5f) * (column.x3 + column.x4);
+						return column.x0 + column.x1 + column.x2 + T(0.5f) * (column.x3 + column.x4);
 					case 1:
-						return column.x1 - column.x2 + column.x3 - column.x4 + get<T>(2.0f) * column.x5;
+						return column.x1 - column.x2 + column.x3 - column.x4 + T(2.0f) * column.x5;
 				}
 			}
 	};
@@ -294,8 +294,8 @@ namespace ml
 			__device__ T operator()(const int row, const Line<T, 2> &column) const
 			{
 				assert(0 <= row && row < 6);
-				const T c13 = get<T>(1.0f / 3.0f);
-				const T c23 = get<T>(2.0f / 3.0f);
+				const T c13 = T(1.0f / 3.0f);
+				const T c23 = T(2.0f / 3.0f);
 				switch (row)
 				{
 					case 0:
@@ -305,9 +305,9 @@ namespace ml
 					case 2:
 						return c23 * (column.x0 - column.x1);
 					case 3:
-						return c13 * (column.x0 + get<T>(2.0f) * column.x1);
+						return c13 * (column.x0 + T(2.0f) * column.x1);
 					case 4:
-						return c13 * (column.x0 - get<T>(2.0f) * column.x1);
+						return c13 * (column.x0 - T(2.0f) * column.x1);
 					case 5:
 						return column.x1;
 				}
@@ -322,15 +322,15 @@ namespace ml
 				switch (row)
 				{
 					case 0:
-						return column.x0 + column.x1 + column.x2 + get<T>(0.25f) * (column.x3 + column.x4);
+						return column.x0 + column.x1 + column.x2 + T(0.25f) * (column.x3 + column.x4);
 					case 1:
-						return column.x1 - column.x2 + get<T>(0.5f) * (column.x3 - column.x4);
+						return column.x1 - column.x2 + T(0.5f) * (column.x3 - column.x4);
 					case 2:
 						return column.x1 + column.x2 + column.x3 + column.x4;
 					case 3:
-						return column.x1 - column.x2 + get<T>(2.0f) * (column.x3 - column.x4);
+						return column.x1 - column.x2 + T(2.0f) * (column.x3 - column.x4);
 					case 4:
-						return column.x1 + column.x2 + get<T>(4.0f) * (column.x3 + column.x4 + column.x5);
+						return column.x1 + column.x2 + T(4.0f) * (column.x3 + column.x4 + column.x5);
 				}
 			}
 	};
