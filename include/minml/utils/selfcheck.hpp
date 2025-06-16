@@ -20,6 +20,10 @@ namespace ml
 
 	int checkWinogradTransforms(Device device);
 
+	int checkPoolingAndScaling(Device device);
+
+	int checkDepthwiseConv2D(Device device);
+
 	int checkMatrixMultiplication(Device device);
 
 	int checkActivationFuncion(Device device);

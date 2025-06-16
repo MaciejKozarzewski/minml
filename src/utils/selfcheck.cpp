@@ -252,6 +252,111 @@ namespace ml
 		return 0;
 	}
 
+	int checkPoolingAndScaling(Device device)
+	{
+		const std::vector<DataType> dtypes = get_datatypes_list(device);
+
+		constexpr int batch_size = 7;
+		constexpr int height = 12;
+		constexpr int width = 13;
+		constexpr int filters = 128;
+
+		try
+		{
+			std::cout << "Starting checkPoolingAndScaling(" << device.toString() << ")" << std::endl;
+			Context context(device);
+			std::cout << "Created context" << std::endl;
+
+			for (auto dt = dtypes.begin(); dt < dtypes.end(); dt++)
+			{
+				std::cout << "Checking pooling kernels with : data type = " << *dt << std::endl;
+
+				/*
+				 *  global average pooling
+				 */
+				const Shape input_shape( { batch_size, height, width, filters });
+				std::cout << "  Created shape " << input_shape.toString() << std::endl;
+
+				const Tensor input = create_test_tensor(input_shape, device, *dt);
+				std::cout << "  Allocated input tensor=" << input.info() << std::endl;
+				Tensor output = create_test_tensor(input_shape, device, *dt);
+				std::cout << "  Allocated output tensor=" << input.info() << std::endl;
+
+				std::cout << "  Running global average pooling" << std::endl;
+				globalAveragePoolingForward(context, 1.0f, input, 0.0f, output);
+				std::cout << "    WORKS" << std::endl;
+
+				std::cout << "Checking channel scaling kernels with : data type = " << *dt << std::endl;
+				/*
+				 *  channels scaling
+				 */
+				const Shape scales_shape( { batch_size, filters });
+				std::cout << "  Created shape " << scales_shape.toString() << std::endl;
+
+				const Tensor scales = create_test_tensor(scales_shape, device, *dt);
+				std::cout << "  Allocated scales=" << scales.info() << std::endl;
+
+				std::cout << "  Running channel scaling" << std::endl;
+				channelScalingForward(context, 1.0f, input, scales, 0.0f, output);
+				std::cout << "    WORKS" << std::endl;
+			}
+
+		} catch (std::exception &e)
+		{
+			std::cout << "Caught exception '" << e.what() << "'" << std::endl;
+			return 1;
+		}
+		return 0;
+	}
+
+	int checkDepthwiseConv2D(Device device)
+	{
+		const std::vector<DataType> dtypes = get_datatypes_list(device);
+
+		constexpr int batch_size = 7;
+		constexpr int height = 12;
+		constexpr int width = 13;
+		constexpr int filters = 128;
+		constexpr int kernel_size = 7;
+
+		try
+		{
+			std::cout << "Starting checkDepthwiseConv2D(" << device.toString() << ")" << std::endl;
+			Context context(device);
+			std::cout << "Created context" << std::endl;
+
+			for (auto dt = dtypes.begin(); dt < dtypes.end(); dt++)
+			{
+				std::cout << "Checking depthwise conv kernels with : data type = " << *dt << std::endl;
+
+				const Shape input_shape( { batch_size, height, width, filters });
+				const Shape weight_shape( { kernel_size, kernel_size, filters });
+				const Shape bias_shape( { filters });
+				std::cout << "  Created shapes " << input_shape.toString() << ", " << weight_shape.toString() << ", " << bias_shape.toString()
+						<< std::endl;
+
+				const Tensor input = create_test_tensor(input_shape, device, *dt);
+				std::cout << "  Allocated input tensor=" << input.info() << std::endl;
+				const Tensor weights = create_test_tensor(weight_shape, device, *dt);
+				std::cout << "  Allocated weights tensor=" << input.info() << std::endl;
+				const Tensor bias = create_test_tensor(bias_shape, device, *dt);
+				std::cout << "  Allocated bias tensor=" << input.info() << std::endl;
+				Tensor output = create_test_tensor(input_shape, device, *dt);
+				std::cout << "  Allocated output tensor=" << input.info() << std::endl;
+
+				std::cout << "  Running depthwise conv 2D" << std::endl;
+				depthwiseConvForward(context, 1.0f, input, weights, 0.0f, output, bias);
+				std::cout << "    WORKS" << std::endl;
+			}
+
+		} catch (std::exception &e)
+		{
+			std::cout << "Caught exception '" << e.what() << "'" << std::endl;
+			return 1;
+		}
+		return 0;
+	}
+
 	int checkMatrixMultiplication(Device device)
 	{
 		const std::vector<DataType> dtypes = get_datatypes_list(device);
