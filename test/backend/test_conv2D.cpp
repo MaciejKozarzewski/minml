@@ -361,7 +361,7 @@ namespace ml
 
 			output.zeroall();
 
-//			explicit_gemm_forward(context, input, output, weights, bias, workspace, ActivationType::RELU, Tensor());
+			explicit_gemm_forward(context, input, output, weights, bias, workspace, ActivationType::RELU, Tensor());
 			context.synchronize();
 			EXPECT_LE(ml::testing::diffForTest(correct_output, output), 1.0e-4f);
 		}

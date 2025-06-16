@@ -43,6 +43,7 @@ namespace ml
 				assert(0 <= row && row < 4);
 				switch (row)
 				{
+					default:
 					case 0:
 						return column.x0;
 					case 1:
@@ -62,6 +63,7 @@ namespace ml
 				assert(0 <= row && row < 4);
 				switch (row)
 				{
+					default:
 					case 0:
 						return column.x0 - column.x2;
 					case 1:
@@ -81,6 +83,7 @@ namespace ml
 				assert(0 <= row && row < 2);
 				switch (row)
 				{
+					default:
 					case 0:
 						return column.x0 + column.x1 + column.x2;
 					case 1:
@@ -96,6 +99,7 @@ namespace ml
 				assert(0 <= row && row < 4);
 				switch (row)
 				{
+					default:
 					case 0:
 						return column.x0;
 					case 1:
@@ -116,6 +120,7 @@ namespace ml
 				const T c05 = T(0.5f);
 				switch (row)
 				{
+					default:
 					case 0:
 						return column.x0 + c05 * (column.x1 + column.x2);
 					case 1:
@@ -136,6 +141,7 @@ namespace ml
 				const T c23 = T(2.0f / 3.0f);
 				switch (row)
 				{
+					default:
 					case 0:
 						return column.x0;
 					case 1:
@@ -159,6 +165,7 @@ namespace ml
 				assert(0 <= row && row < 6);
 				switch (row)
 				{
+					default:
 					case 0:
 						return column.x0 - column.x2 + T(0.25f) * (column.x4 - column.x2);
 					case 1:
@@ -182,6 +189,7 @@ namespace ml
 				assert(0 <= row && row < 4);
 				switch (row)
 				{
+					default:
 					case 0:
 						return column.x0 + column.x1 + column.x2 + T(0.25f) * (column.x3 + column.x4);
 					case 1:
@@ -203,6 +211,7 @@ namespace ml
 				const T c23 = T(2.0f / 3.0f);
 				switch (row)
 				{
+					default:
 					case 0:
 						return column.x0;
 					case 1:
@@ -226,6 +235,7 @@ namespace ml
 				assert(0 <= row && row < 3);
 				switch (row)
 				{
+					default:
 					case 0:
 						return column.x0 + column.x1 + column.x2 + T(0.25f) * (column.x3 + column.x4);
 					case 1:
@@ -246,6 +256,7 @@ namespace ml
 				const T c23 = T(2.0f / 3.0f);
 				switch (row)
 				{
+					default:
 					case 0:
 						return column.x0;
 					case 1:
@@ -281,6 +292,7 @@ namespace ml
 				assert(0 <= row && row < 2);
 				switch (row)
 				{
+					default:
 					case 0:
 						return column.x0 + column.x1 + column.x2 + T(0.5f) * (column.x3 + column.x4);
 					case 1:
@@ -298,6 +310,7 @@ namespace ml
 				const T c23 = T(2.0f / 3.0f);
 				switch (row)
 				{
+					default:
 					case 0:
 						return column.x0;
 					case 1:
@@ -321,6 +334,7 @@ namespace ml
 				assert(0 <= row && row < 5);
 				switch (row)
 				{
+					default:
 					case 0:
 						return column.x0 + column.x1 + column.x2 + T(0.25f) * (column.x3 + column.x4);
 					case 1:
