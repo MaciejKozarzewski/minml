@@ -46,15 +46,16 @@ namespace
 			workspace[threadIdx.y][N * threadIdx.x + n] = local_sum[n];
 
 		__syncthreads();
+		vec<float, N> reduction_sum;
 		for (int n = 0; n < N; n++)
-			local_sum[n] = workspace[threadIdx.x][N * threadIdx.y + n];
+			reduction_sum[n] = workspace[threadIdx.x][N * threadIdx.y + n];
 		for (int k = 16; k >= 1; k /= 2)
 			for (int n = 0; n < N; n++)
-				local_sum[n] += __shfl_xor_sync(0xffffffff, local_sum[n], k);
+				reduction_sum[n] += __shfl_xor_sync(0xffffffff, reduction_sum[n], k);
 		__syncthreads();
 		if (threadIdx.x == 0)
 			for (int n = 0; n < N; n++)
-				workspace[0][N * threadIdx.y + n] = local_sum[n];
+				workspace[0][N * threadIdx.y + n] = reduction_sum[n];
 		__syncthreads();
 
 		if (threadIdx.y == 0 && last_dim_idx < channels)

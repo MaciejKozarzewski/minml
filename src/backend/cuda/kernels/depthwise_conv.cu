@@ -34,6 +34,27 @@ namespace
 	{
 		return static_cast<float>(x.x0);
 	}
+	template<typename T>
+	__device__ T to_vec(float x)
+	{
+		return T{};
+	}
+
+	template<>
+	__device__ vec1f to_vec<vec1f>(float x)
+	{
+		return vec1f(x);
+	}
+	template<>
+	__device__ vec1h to_vec<vec1h>(float x)
+	{
+		return vec1h(x);
+	}
+	template<>
+	__device__ vec2h to_vec<vec2h>(float x)
+	{
+		return vec2h(x);
+	}
 
 	struct Index2D
 	{
@@ -103,7 +124,7 @@ namespace
 		if (f < channels)
 		{
 			if (threadIdx.y == 0)
-				bias_tile[threadIdx.x] = (b_ptr == nullptr) ? T(0.0f) : b_ptr[f];
+				bias_tile[threadIdx.x] = (b_ptr == nullptr) ? to_vec<T>(0.0f) : b_ptr[f];
 			for (int i = threadIdx.y; i < KernelSize * KernelSize; i += blockDim.y)
 			{
 				const int tmp = invert_filter ? (KernelSize * KernelSize - 1 - i) : i;
@@ -124,7 +145,7 @@ namespace
 			{
 				const int origin_h = TileSize * blockIdx.x;
 				const int input_offset = Indexer<4>(gridDim.y, height, width, channels).at(blockIdx.y, 0, 0, f);
-				Line<T, TileSize> acc = convolution.set(T(0.0f));
+				Line<T, TileSize> acc = convolution.set(to_vec<T>(0.0f));
 				for (int k = 0; k < KernelSize; k++)
 				{
 					const int h = origin_h + threadIdx.y + k - Padding;
@@ -135,7 +156,7 @@ namespace
 						for (int i = 0; i < InputSize; i++)
 						{
 							const int w = origin_w + i - Padding;
-							inp[i] = is_inside(w, width) ? x_ptr[input_offset + h * h_stride + w * w_stride] : T(0.0f);
+							inp[i] = is_inside(w, width) ? x_ptr[input_offset + h * h_stride + w * w_stride] : to_vec<T>(0.0f);
 						}
 
 						const Line<T, KernelSize> fil = convolution.load_filter(filter_tile, k);
@@ -150,9 +171,9 @@ namespace
 					if (is_inside(h, w, height, width))
 					{
 						const int idx = input_offset + h * h_stride + w * w_stride;
-						T tmp = acc[i] * T(alpha) + bias;
+						T tmp = acc[i] * to_vec<T>(alpha) + bias;
 						if (beta != 0.0f)
-							tmp += T(beta) * y_ptr[idx];
+							tmp += to_vec<T>(beta) * y_ptr[idx];
 						y_ptr[idx] = tmp;
 					}
 				}
@@ -184,7 +205,7 @@ namespace
 
 		if (f < channels)
 		{
-			Line<T, KernelSize> update_acc = convolution.set(T(0.0f));
+			Line<T, KernelSize> update_acc = convolution.set(to_vec<T>(0.0f));
 			for (int b = blockIdx.y; b < batch_size; b += gridDim.y)
 				for (int origin_h = 0; origin_h < height; origin_h += TileSize)
 					for (int origin_w = 0; origin_w < width; origin_w += TileSize)
@@ -276,7 +297,7 @@ namespace
 
 		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
 
-		constexpr int channels_per_thread = std::is_same<T, half2>::value ? 2 : 1;
+		constexpr int channels_per_thread = std::is_same<T, vec2h>::value ? 2 : 1;
 		const int channels_per_block = 32 * channels_per_thread;
 
 		const int num_tiles_h = (height + TileSize - 1) / TileSize;
