@@ -36,9 +36,7 @@ namespace ml
 		std::vector<cl::Device> get_devices_for_platform(const cl::Platform &p)
 		{
 			// necessary to suppress unwanted printing from 'getDevices'
-#if defined(_WIN32)
-			freopen("NUL", "w", stdout); // redirect stdout to the windows version of /dev/null
-#elif defined(__linux__)
+#if defined(__linux__)
 			FILE *tmp = stderr;
 			stderr = tmpfile();
 #endif
@@ -47,9 +45,7 @@ namespace ml
 			const cl_int status = p.getDevices(CL_DEVICE_TYPE_GPU, &result);
 			CHECK_OPENCL_STATUS(status);
 
-#if defined(_WIN32)
-			freopen("CON", "w", stdout); // redirect stdout back to the console
-#elif defined(__linux__)
+#if defined(__linux__)
 			fclose(stderr);
 			stderr = tmp;
 #endif
