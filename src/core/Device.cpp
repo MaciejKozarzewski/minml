@@ -23,7 +23,7 @@ namespace
 	{
 		for (size_t i = 0; i < str.size(); i++)
 			if (str[i] == ':')
-				return std::atoi(str.data() + i);
+				return std::atoi(str.data() + i + 1);
 		return 0;
 	}
 }
@@ -60,9 +60,9 @@ namespace ml
 		if (tmp == "cpu")
 			return Device::cpu();
 		if (startsWith(tmp, "cuda"))
-			return Device::cuda(get_device_index(str));
+			return Device::cuda(get_device_index(tmp));
 		if (startsWith(tmp, "opencl"))
-			return Device::opencl(get_device_index(str));
+			return Device::opencl(get_device_index(tmp));
 		throw LogicError(METHOD_NAME, "Illegal device '" + str + "'");
 	}
 
