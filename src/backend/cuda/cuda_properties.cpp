@@ -126,24 +126,17 @@ namespace
 			print_field(tmp, "maxThreadsPerBlock", prop->maxThreadsPerBlock, "Maximum number of threads per block");
 			print_array(tmp, "maxThreadsDim", prop->maxThreadsDim, 3, "Maximum size of each dimension of a block");
 			print_array(tmp, "maxGridSize", prop->maxGridSize, 3, "Maximum size of each dimension of a grid");
-			print_field(tmp, "clockRate", prop->clockRate, "Clock frequency in kilohertz");
 			print_field(tmp, "totalConstMem", prop->totalConstMem, "Constant memory available on device in bytes");
 			print_field(tmp, "major", prop->major, "Major compute capability");
 			print_field(tmp, "minor", prop->minor, "Minor compute capability");
 			print_field(tmp, "textureAlignment", prop->textureAlignment, "Alignment requirement for textures");
 			print_field(tmp, "texturePitchAlignment", prop->texturePitchAlignment,
 					"Pitch alignment requirement for texture references bound to pitched memory");
-			print_field(tmp, "deviceOverlap", prop->deviceOverlap,
-					"Device can concurrently copy memory and execute a kernel. Deprecated. Use instead asyncEngineCount.");
 			print_field(tmp, "multiProcessorCount", prop->multiProcessorCount, "Number of multiprocessors on device");
-			print_field(tmp, "kernelExecTimeoutEnabled", prop->kernelExecTimeoutEnabled, "Specified whether there is a run time limit on kernels");
 			print_field(tmp, "integrated", prop->integrated, "Device is integrated as opposed to discrete");
 			print_field(tmp, "canMapHostMemory", prop->canMapHostMemory, "Device can map host memory with cudaHostAlloc/cudaHostGetDevicePointer");
-			print_field(tmp, "computeMode", prop->computeMode, "Compute mode (See ::cudaComputeMode)");
 			print_field(tmp, "maxTexture1D", prop->maxTexture1D, "Maximum 1D texture size");
 			print_field(tmp, "maxTexture1DMipmap", prop->maxTexture1DMipmap, "Maximum 1D mipmapped texture size");
-			print_field(tmp, "maxTexture1DLinear", prop->maxTexture1DLinear,
-					"Deprecated, do not use. Use cudaDeviceGetTexture1DLinearMaxWidth() or cuDeviceGetTexture1DLinearMaxWidth() instead.");
 			print_array(tmp, "maxTexture2D", prop->maxTexture2D, 2, " Maximum 2D texture dimensions");
 			print_array(tmp, "maxTexture2DMipmap", prop->maxTexture2DMipmap, 2, "Maximum 2D mipmapped texture dimensions");
 			print_array(tmp, "maxTexture2DLinear", prop->maxTexture2DLinear, 3,
@@ -172,7 +165,6 @@ namespace
 			print_field(tmp, "tccDriver", prop->tccDriver, "1 if device is a Tesla device using TCC driver, 0 otherwise");
 			print_field(tmp, "asyncEngineCount", prop->asyncEngineCount, "Number of asynchronous engines");
 			print_field(tmp, "unifiedAddressing", prop->unifiedAddressing, "Device shares a unified address space with the host");
-			print_field(tmp, "memoryClockRate", prop->memoryClockRate, "Peak memory clock frequency in kilohertz");
 			print_field(tmp, "memoryBusWidth", prop->memoryBusWidth, "Global memory bus width in bits");
 			print_field(tmp, "l2CacheSize", prop->l2CacheSize, "Size of L2 cache in bytes");
 			print_field(tmp, "persistingL2CacheMaxSize", prop->persistingL2CacheMaxSize,
@@ -189,8 +181,6 @@ namespace
 					"Unique identifier for a group of devices on the same multi-GPU board");
 			print_field(tmp, "hostNativeAtomicSupported", prop->hostNativeAtomicSupported,
 					"Link between the device and the host supports native atomic operations");
-			print_field(tmp, "singleToDoublePrecisionPerfRatio", prop->singleToDoublePrecisionPerfRatio,
-					"Ratio of single precision performance (in floating-point operations per second) to double precision performance");
 			print_field(tmp, "pageableMemoryAccess", prop->pageableMemoryAccess,
 					"Device supports coherently accessing pageable memory without calling cudaHostRegister on it");
 			print_field(tmp, "concurrentManagedAccess", prop->concurrentManagedAccess,
@@ -200,8 +190,6 @@ namespace
 					"Device can access host registered memory at the same virtual address as the CPU");
 			print_field(tmp, "cooperativeLaunch", prop->cooperativeLaunch,
 					"Device supports launching cooperative kernels via ::cudaLaunchCooperativeKernel");
-			print_field(tmp, "cooperativeMultiDeviceLaunch", prop->cooperativeMultiDeviceLaunch,
-					"Deprecated, cudaLaunchCooperativeKernelMultiDevice is deprecated.");
 			print_field(tmp, "sharedMemPerBlockOptin", prop->sharedMemPerBlockOptin,
 					"Per device maximum shared memory per block usable by special opt in");
 			print_field(tmp, "pageableMemoryAccessUsesHostPageTables", prop->pageableMemoryAccessUsesHostPageTables,
