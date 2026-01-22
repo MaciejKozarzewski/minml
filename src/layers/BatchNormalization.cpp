@@ -61,8 +61,6 @@ namespace ml
 
 	void BatchNormalization::setInputShape(const std::vector<Shape> &shapes)
 	{
-		if (shapes.size() != 1)
-			throw IllegalArgument(METHOD_NAME, "BatchNormalization layer expects single input shape");
 		if (m_historical_stats.isEmpty() and isTrainable())
 			m_historical_stats = Tensor(Shape( { m_history_size, 3 * shapes[0].lastDim() }), DataType::FLOAT32, device());
 		if (m_avg_var.isEmpty())
@@ -152,7 +150,12 @@ namespace ml
 	}
 	void BatchNormalization::forward(const std::vector<Tensor> &input, Tensor &output)
 	{
-		assert(input.size() == 1);
+		float beta = 0.0f;
+		if (input.size() == 2)
+		{
+			output.copyFrom(context(), input[1]);
+			beta = 1.0f;
+		}
 
 		if (isTrainable())
 		{
@@ -160,16 +163,20 @@ namespace ml
 				throw LogicError(METHOD_NAME, "cannot calculate batch normalization on tensor of shape " + input[0].shape().toString());
 
 			Tensor stats = get_statistics(m_historical_stats, m_history_id);
-			batchnormForward(context(), 1.0f, input[0], getWeights().getParam(), getBias().getParam(), 0.0f, output, stats, m_activation);
+			batchnormForward(context(), 1.0f, input[0], getWeights().getParam(), getBias().getParam(), beta, output, stats, m_activation);
 		}
 		else
-			batchnormInference(context(), 1.0f, input[0], getWeights().getParam(), getBias().getParam(), m_avg_var, 0.0f, output, m_activation);
+			batchnormInference(context(), 1.0f, input[0], getWeights().getParam(), getBias().getParam(), m_avg_var, beta, output, m_activation);
 	}
 	void BatchNormalization::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev,
 			Tensor &gradient_next, const std::vector<float> &beta)
 	{
-		assert(input.size() == 1);
-		assert(gradient_prev.size() == 1);
+		assert(input.size() == gradient_prev.size());
+		if (input.size() == 2)
+		{
+			Tensor empty;
+			fusedBiasActCopyBackward(context(), gradient_next, output, beta[1], gradient_prev[1], 0.0f, empty, ActivationType::LINEAR);
+		}
 
 		const Tensor stats = get_statistics(m_historical_stats, m_history_id);
 		batchnormBackward(context(), 1.0f, input[0], output, gradient_next, getWeights().getParam(), getBias().getParam(), beta[0], gradient_prev[0],
