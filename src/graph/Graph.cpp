@@ -461,6 +461,10 @@ namespace ml
 		m_output_nodes.clear();
 
 		m_workspace.reset();
+		m_targets.clear();
+		m_masks.clear();
+		m_losses.clear();
+		m_loss_weights.clear();
 
 		m_datatype = DataType::FLOAT32;
 	}
