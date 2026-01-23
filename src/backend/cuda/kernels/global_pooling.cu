@@ -31,8 +31,6 @@ namespace
 	{
 		assert(channels % N == 0);
 		__shared__ U workspace[32][32 * N + 1];
-		if (blockIdx.z != 16)
-			return;
 
 		const int last_dim_idx = N * (32 * blockIdx.x + threadIdx.x);
 
