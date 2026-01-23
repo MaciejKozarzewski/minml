@@ -787,14 +787,19 @@ namespace ml
 	}
 	void Tensor::unserialize(const Json &json, const SerializedObject &binary_data)
 	{
-		if (shape() != Shape(json["shape"]) or dtype() != typeFromString(json["dtype"]))
+		const Shape new_shape = Shape(json["shape"]);
+		const DataType new_dtype = typeFromString(json["dtype"]);
+		const size_t new_size_in_bytes = new_shape.volume() * sizeOf(new_dtype);
+		if (sizeInBytes() != new_size_in_bytes)
+		{
 			ml::free(device(), m_data);
+			m_data = ml::malloc(device(), new_size_in_bytes);
+		}
 
-		m_shape = Shape(json["shape"]);
-		m_dtype = typeFromString(json["dtype"]);
+		m_shape = new_shape;
+		m_dtype = new_dtype;
 		m_is_owning = true;
 		m_is_page_locked = false;
-		m_data = ml::malloc(device(), sizeInBytes());
 		m_stride = Stride(m_shape);
 
 		if (device().isCPU())
