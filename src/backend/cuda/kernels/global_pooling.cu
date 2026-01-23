@@ -26,27 +26,29 @@ namespace
 	using namespace vectors;
 	using namespace ml;
 
-	template<typename T, int N>
+	template<typename T, int N, typename U>
 	__global__ void kernel_average_pooling_forward(float beta, T *output, float alpha, const T *input, int batch_size, int hw, int channels)
 	{
 		assert(channels % N == 0);
-		__shared__ T workspace[32][32 * N + 1];
+		__shared__ U workspace[32][32 * N + 1];
+		if (blockIdx.z != 16)
+			return;
 
 		const int last_dim_idx = N * (32 * blockIdx.x + threadIdx.x);
 
 		const Indexer<3> input_indexer(batch_size, hw, channels);
 
-		vec<T, N> local_sum(0.0f);
+		vec<U, N> local_sum(0.0f);
 		if (last_dim_idx < channels)
 		{
 			for (int i = threadIdx.y; i < hw; i += 32)
-				local_sum += vec<T, N>(input + input_indexer.at(blockIdx.z, i, last_dim_idx));
+				local_sum += load_vec<U, N>(input + input_indexer.at(blockIdx.z, i, last_dim_idx));
 		}
 		for (int n = 0; n < N; n++)
 			workspace[threadIdx.y][N * threadIdx.x + n] = local_sum[n];
 
 		__syncthreads();
-		vec<float, N> reduction_sum;
+		vec<U, N> reduction_sum;
 		for (int n = 0; n < N; n++)
 			reduction_sum[n] = workspace[threadIdx.x][N * threadIdx.y + n];
 		for (int k = 16; k >= 1; k /= 2)
@@ -62,13 +64,13 @@ namespace
 		{
 			const Indexer<2> output_indexer(batch_size, channels);
 			const int out_idx = output_indexer.at(blockIdx.z, last_dim_idx);
-			vec<T, N> tmp;
+			vec<U, N> tmp;
 			for (int n = 0; n < N; n++)
 				tmp[n] = workspace[0][N * threadIdx.x + n];
-			tmp *= vec<T, N>(alpha / static_cast<float>(hw));
+			tmp *= vec<U, N>(alpha / static_cast<float>(hw));
 			if (beta != 0.0f)
-				tmp += vec<T, N>(beta) * vec<T, N>(output + out_idx);
-			tmp.store(output + out_idx);
+				tmp += vec<U, N>(beta) * load_vec<U, N>(output + out_idx);
+			store_vec(output + out_idx, tmp);
 		}
 	}
 	template<typename T, int N>
@@ -282,31 +284,32 @@ namespace ml
 		dim3 blockDim(32, 32);
 		dim3 gridDim_x4((channels + 127) / 128, 1, batch_size);
 		dim3 gridDim_x1((channels + 31) / 32, 1, batch_size);
+
 		switch (x.dtype)
 		{
 			case DTYPE_FLOAT16:
 			{
 				if (channels % 4 == 0)
-					kernel_average_pooling_forward<half, 4> <<<gridDim_x4, blockDim, 0, stream >>>(beta, data<half>(y), alpha, data<half>(x),
+					kernel_average_pooling_forward<half, 4, float> <<<gridDim_x4, blockDim, 0, stream >>>(beta, data<half>(y), alpha, data<half>(x),
 							batch_size, hw, channels);
 				else
-					kernel_average_pooling_forward<half, 1> <<<gridDim_x1, blockDim, 0, stream >>>(beta, data<half>(y), alpha, data<half>(x),
+					kernel_average_pooling_forward<half, 1, float> <<<gridDim_x1, blockDim, 0, stream >>>(beta, data<half>(y), alpha, data<half>(x),
 							batch_size, hw, channels);
 				break;
 			}
 			case DTYPE_FLOAT32:
 			{
 				if (channels % 4 == 0)
-					kernel_average_pooling_forward<float, 4> <<<gridDim_x4, blockDim, 0, stream >>>(beta, data<float>(y), alpha, data<float>(x),
+					kernel_average_pooling_forward<float, 4, float> <<<gridDim_x4, blockDim, 0, stream >>>(beta, data<float>(y), alpha, data<float>(x),
 							batch_size, hw, channels);
 				else
-					kernel_average_pooling_forward<float, 1> <<<gridDim_x1, blockDim, 0, stream >>>(beta, data<float>(y), alpha, data<float>(x),
+					kernel_average_pooling_forward<float, 1, float> <<<gridDim_x1, blockDim, 0, stream >>>(beta, data<float>(y), alpha, data<float>(x),
 							batch_size, hw, channels);
 				break;
 			}
 			case DTYPE_FLOAT64:
 			{
-				kernel_average_pooling_forward<double, 1> <<<gridDim_x1, blockDim, 0, stream >>>(beta, data<double>(y), alpha, data<double>(x),
+				kernel_average_pooling_forward<double, 1, double> <<<gridDim_x1, blockDim, 0, stream >>>(beta, data<double>(y), alpha, data<double>(x),
 						batch_size, hw, channels);
 				break;
 			}
