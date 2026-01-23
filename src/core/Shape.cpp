@@ -24,8 +24,8 @@ namespace ml
 		std::memset(m_dim, 0, sizeof(m_dim));
 		if (m_rank < 0)
 			throw IllegalArgument(METHOD_NAME, "length", "must be greater or equal 0", m_rank);
-		if (m_rank > max_dimension)
-			throw IllegalArgument(METHOD_NAME, "length", "must not exceed " + std::to_string(max_dimension), m_rank);
+		if (m_rank > MAX_TENSOR_RANK)
+			throw IllegalArgument(METHOD_NAME, "length", "must not exceed " + std::to_string(MAX_TENSOR_RANK), m_rank);
 
 		for (int i = 0; i < m_rank; i++)
 			m_dim[i] = json[i];
@@ -169,7 +169,7 @@ namespace ml
 	{
 		if (index < 0 or index > rank())
 			throw IndexOutOfBounds(METHOD_NAME, "index", index, m_rank);
-		if (rank() == max_dimension)
+		if (rank() == MAX_TENSOR_RANK)
 			throw IllegalArgument(METHOD_NAME, "cannot expand");
 
 		m_rank++;
@@ -179,7 +179,7 @@ namespace ml
 	}
 	void Shape::squeeze()
 	{
-		int new_dim[max_dimension];
+		int new_dim[MAX_TENSOR_RANK];
 		std::memset(new_dim, 0, sizeof(new_dim));
 		int new_rank = 0;
 		for (int i = 0; i < rank(); i++)
@@ -216,6 +216,37 @@ namespace ml
 	size_t Shape::getMemory() const noexcept
 	{
 		return sizeof(this);
+	}
+
+	Stride::Stride()
+	{
+		for (int i = 0; i < MAX_TENSOR_RANK; i++)
+			m_strides[i] = 0;
+	}
+	Stride::Stride(const Shape &shape)
+	{
+		for (int i = 0; i < MAX_TENSOR_RANK; i++)
+			m_strides[i] = 0;
+		uint32_t tmp = 1;
+		for (int i = shape.rank() - 1; i >= 0; i--)
+		{
+			m_strides[i] = tmp;
+			tmp *= static_cast<uint32_t>(shape[i]);
+		}
+	}
+	int Stride::operator[](int index) const noexcept
+	{
+		assert(0 <= index && index < MAX_TENSOR_RANK);
+		return m_strides[index];
+	}
+	int& Stride::operator[](int index) noexcept
+	{
+		assert(0 <= index && index < MAX_TENSOR_RANK);
+		return m_strides[index];
+	}
+	const int* Stride::data() const noexcept
+	{
+		return m_strides;
 	}
 
 	std::ostream& operator<<(std::ostream &stream, const Shape &s)

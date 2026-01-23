@@ -19,12 +19,12 @@ class Json;
 
 namespace ml
 {
+	static constexpr int MAX_TENSOR_RANK = 6;
+
 	class Shape
 	{
-		public:
-			static const int max_dimension = 6;
 		private:
-			int m_dim[max_dimension];
+			int m_dim[MAX_TENSOR_RANK];
 			int m_rank = 0;
 		public:
 			Shape();
@@ -60,6 +60,19 @@ namespace ml
 
 			// common to all classes
 			size_t getMemory() const noexcept;
+	};
+
+	class Stride
+	{
+		private:
+			int m_strides[MAX_TENSOR_RANK];
+		public:
+			Stride();
+			Stride(const Shape &shape);
+
+			int operator[](int index) const noexcept;
+			int& operator[](int index) noexcept;
+			const int* data() const noexcept;
 	};
 
 	template<int N>

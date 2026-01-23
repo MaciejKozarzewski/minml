@@ -135,7 +135,7 @@ namespace
 		result.rank = shape.rank();
 		for (int i = 0; i < shape.rank(); i++)
 			result.dim[i] = shape[i];
-		for (int i = shape.rank(); i < Shape::max_dimension; i++)
+		for (int i = shape.rank(); i < MAX_TENSOR_RANK; i++)
 			result.dim[i] = 0;
 		return result;
 	}

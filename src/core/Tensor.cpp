@@ -353,7 +353,6 @@ namespace ml
 	 */
 	Tensor::Tensor() noexcept
 	{
-		std::memset(m_stride, 0, sizeof(m_stride));
 	}
 	Tensor::Tensor(const Shape &shape) :
 			Tensor(shape, DataType::FLOAT32, Device::cpu())
@@ -363,11 +362,11 @@ namespace ml
 			m_device(device),
 			m_shape(shape),
 			m_dtype(dtype),
-			m_is_owning(true)
+			m_is_owning(true),
+			m_stride(shape)
 	{
 		m_data = ml::malloc(device, sizeInBytes());
 		zeroall();
-		create_stride();
 	}
 	Tensor::Tensor(const Shape &shape, const std::string &dtype, Device device) :
 			Tensor(shape, typeFromString(dtype), device)
@@ -382,9 +381,9 @@ namespace ml
 			m_device(other.m_device),
 			m_shape(other.m_shape),
 			m_dtype(other.m_dtype),
-			m_is_owning(other.m_is_owning)
+			m_is_owning(other.m_is_owning),
+			m_stride(other.m_stride)
 	{
-		create_stride();
 		if (other.isOwning())
 		{
 			m_data = ml::malloc(device(), sizeInBytes());
@@ -398,9 +397,9 @@ namespace ml
 			m_device(other.m_device),
 			m_shape(other.m_shape),
 			m_dtype(other.m_dtype),
-			m_is_owning(other.m_is_owning)
+			m_is_owning(other.m_is_owning),
+			m_stride(other.m_stride)
 	{
-		create_stride();
 		other.m_data = nullptr;
 		other.m_is_owning = false;
 	}
@@ -437,7 +436,7 @@ namespace ml
 			this->m_is_owning = other.m_is_owning;
 			if (other.isPageLocked())
 				pageLock();
-			create_stride();
+			m_stride = Stride(shape());
 		}
 		return *this;
 	}
@@ -451,7 +450,7 @@ namespace ml
 			std::swap(this->m_dtype, other.m_dtype);
 			std::swap(this->m_is_owning, other.m_is_owning);
 			std::swap(this->m_is_page_locked, other.m_is_page_locked);
-			create_stride();
+			std::swap(this->m_stride, other.m_stride);
 		}
 		return *this;
 	}
@@ -557,7 +556,7 @@ namespace ml
 			throw ShapeMismatch(METHOD_NAME, "trying to reshape " + shape().toString() + " into " + newShape.toString());
 
 		this->m_shape = newShape;
-		create_stride();
+		m_stride = Stride(newShape);
 	}
 
 	void Tensor::convertTo(const Context &context, DataType newType)
@@ -728,7 +727,7 @@ namespace ml
 		result.m_dtype = dtype();
 		result.m_is_owning = false;
 		result.m_is_page_locked = isPageLocked();
-		result.create_stride();
+		result.m_stride = Stride(shape);
 		return result;
 	}
 	Tensor Tensor::view(const Shape &shape, std::initializer_list<int> position) const
@@ -796,6 +795,7 @@ namespace ml
 		m_is_owning = true;
 		m_is_page_locked = false;
 		m_data = ml::malloc(device(), sizeInBytes());
+		m_stride = Stride(m_shape);
 
 		if (device().isCPU())
 			binary_data.load(data(), json["binary_offset"].getLong(), sizeInBytes());
@@ -829,17 +829,6 @@ namespace ml
 			result += m_stride[i] * static_cast<uint32_t>(ptr[i]);
 		}
 		return result;
-	}
-	void Tensor::create_stride() noexcept
-	{
-		uint32_t tmp = 1;
-		for (int i = Shape::max_dimension - 1; i >= m_shape.rank(); i--)
-			m_stride[i] = 0;
-		for (int i = m_shape.rank() - 1; i >= 0; i--)
-		{
-			m_stride[i] = tmp;
-			tmp *= static_cast<uint32_t>(m_shape[i]);
-		}
 	}
 	void Tensor::deallocate_if_owning()
 	{

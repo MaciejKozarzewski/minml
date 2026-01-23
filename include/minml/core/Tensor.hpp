@@ -36,7 +36,7 @@ namespace ml
 			bool m_is_owning = false;
 			bool m_is_page_locked = false;
 
-			uint32_t m_stride[Shape::max_dimension];
+			Stride m_stride;
 		public:
 			class const_reference
 			{
@@ -148,7 +148,6 @@ namespace ml
 			size_t getIndexOf(std::initializer_list<int> idx) const;
 		private:
 			size_t get_index(const int *ptr, size_t size) const;
-			void create_stride() noexcept;
 			void deallocate_if_owning();
 
 	};
