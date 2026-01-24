@@ -30,7 +30,7 @@ namespace ml
 	void RMSNormalization::setInputShape(const std::vector<Shape> &shapes)
 	{
 		if (shapes.size() != 1)
-			throw IllegalArgument(METHOD_NAME, "LayerNormalization layer expects single input shape");
+			throw IllegalArgument(METHOD_NAME, "RMSNormalization layer expects single input shape");
 		m_input_shapes = shapes;
 	}
 	Shape RMSNormalization::getOutputShape() const
@@ -65,7 +65,8 @@ namespace ml
 
 	void RMSNormalization::init()
 	{
-		getWeights().getParam().setall(1.0f);
+		if (m_use_gamma)
+			getWeights().getParam().setall(1.0f);
 	}
 	void RMSNormalization::forward(const std::vector<Tensor> &input, Tensor &output)
 	{

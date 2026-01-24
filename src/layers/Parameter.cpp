@@ -12,14 +12,14 @@
 namespace ml
 {
 
+	Parameter::Parameter(const Shape &shape, DataType dtype, Device device) :
+			m_param(shape, dtype, device)
+	{
+	}
 	Parameter::Parameter(const Json &json, const SerializedObject &binary_data)
 	{
 		if (json.hasKey("param"))
 			m_param.unserialize(json["param"], binary_data);
-	}
-	Parameter::Parameter(const Shape &shape, DataType dtype, Device device) :
-			m_param(shape, dtype, device)
-	{
 	}
 
 	Shape Parameter::shape() const noexcept

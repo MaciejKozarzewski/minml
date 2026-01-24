@@ -179,8 +179,8 @@ namespace ml
 	Json Layer::saveParameters(SerializedObject &binary_data) const
 	{
 		Json result;
-		result["weights"] = m_weights->serialize(binary_data);
-		result["bias"] = m_bias->serialize(binary_data);
+		result["weights"] = (m_weights == nullptr) ? Json::null() : m_weights->serialize(binary_data);
+		result["bias"] = (m_bias == nullptr) ? Json::null() : m_bias->serialize(binary_data);
 		result["channel_scales"] = m_channel_scales.isEmpty() ? Json::null() : m_channel_scales.serialize(binary_data);
 		return result;
 	}
