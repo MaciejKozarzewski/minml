@@ -40,7 +40,7 @@ else()
 		target_link_libraries(${CUDA_BACKEND_NAME} PUBLIC cudnn_ops cudnn_cnn cudnn_graph cublasLt)
 	endif()
 
-	set_target_properties(${CUDA_BACKEND_NAME} PROPERTIES CUDA_STANDARD 14)
+	set_target_properties(${CUDA_BACKEND_NAME} PROPERTIES CUDA_STANDARD 17)
 	set_target_properties(${CUDA_BACKEND_NAME} PROPERTIES CUDA_STANDARD_REQUIRED YES)
 	set_target_properties(${CUDA_BACKEND_NAME} PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 	set_target_properties(${CUDA_BACKEND_NAME} PROPERTIES CUDA_RESOLVE_DEVICE_SYMBOLS ON)

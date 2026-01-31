@@ -65,7 +65,7 @@ namespace
 			vec<U, N> tmp;
 			for (int n = 0; n < N; n++)
 				tmp[n] = workspace[0][N * threadIdx.x + n];
-			tmp *= vec<U, N>(alpha / static_cast<float>(hw));
+			tmp *= vec<U, N>(alpha / static_cast<U>(hw));
 			if (beta != 0.0f)
 				tmp += vec<U, N>(beta) * load_vec<U, N>(output + out_idx);
 			store_vec(output + out_idx, tmp);
@@ -172,24 +172,24 @@ namespace
 		}
 	}
 
-	template<typename T, int N>
+	template<typename T, int N, typename U>
 	__global__ void kernel_channel_average_pooling_forward(float beta, T *output, float alpha, const T *input, int first_dim, int last_dim)
 	{
 		assert(last_dim % N == 0);
 		for (int i = blockIdx.y * blockDim.y + threadIdx.y; i < first_dim; i += blockDim.y * gridDim.y)
 		{
-			vec<T, N> local_sum(0.0f);
+			vec<U, N> local_sum(0.0f);
 			for (int j = N * threadIdx.x; j < last_dim; j += N * blockDim.x)
-				local_sum += vec<T, N>(input + i * last_dim + j);
+				local_sum += load_vec<U, N>(input + i * last_dim + j);
 
-			float avg = horizontal_add(local_sum);
+			U avg = horizontal_add(local_sum);
 			for (int k = 16; k >= 1; k /= 2)
 				avg += __shfl_xor_sync(0xffffffff, avg, k);
 			if (threadIdx.x == 0)
 			{
 				avg *= alpha / last_dim;
 				if (beta != 0.0f)
-					avg += beta * static_cast<float>(output[i]);
+					avg += beta * static_cast<U>(output[i]);
 				output[i] = avg;
 			}
 		}
@@ -462,26 +462,26 @@ namespace ml
 			case DTYPE_FLOAT16:
 			{
 				if (last_dim % 4 == 0)
-					kernel_channel_average_pooling_forward<half, 4> <<<gridDim, blockDim, 0, stream >>>(beta, data<half>(y), alpha, data<half>(x),
+					kernel_channel_average_pooling_forward<half, 4, float> <<<gridDim, blockDim, 0, stream >>>(beta, data<half>(y), alpha, data<half>(x),
 							first_dim, last_dim);
 				else
-					kernel_channel_average_pooling_forward<half, 1> <<<gridDim, blockDim, 0, stream >>>(beta, data<half>(y), alpha, data<half>(x),
+					kernel_channel_average_pooling_forward<half, 1, float> <<<gridDim, blockDim, 0, stream >>>(beta, data<half>(y), alpha, data<half>(x),
 							first_dim, last_dim);
 				break;
 			}
 			case DTYPE_FLOAT32:
 			{
 				if (last_dim % 4 == 0)
-					kernel_channel_average_pooling_forward<float, 4> <<<gridDim, blockDim, 0, stream >>>(beta, data<float>(y), alpha, data<float>(x),
+					kernel_channel_average_pooling_forward<float, 4, float> <<<gridDim, blockDim, 0, stream >>>(beta, data<float>(y), alpha, data<float>(x),
 							first_dim, last_dim);
 				else
-					kernel_channel_average_pooling_forward<float, 1> <<<gridDim, blockDim, 0, stream >>>(beta, data<float>(y), alpha, data<float>(x),
+					kernel_channel_average_pooling_forward<float, 1, float> <<<gridDim, blockDim, 0, stream >>>(beta, data<float>(y), alpha, data<float>(x),
 							first_dim, last_dim);
 				break;
 			}
 			case DTYPE_FLOAT64:
 			{
-				kernel_channel_average_pooling_forward<double, 1> <<<gridDim, blockDim, 0, stream >>>(beta, data<double>(y), alpha, data<double>(x),
+				kernel_channel_average_pooling_forward<double, 1, double> <<<gridDim, blockDim, 0, stream >>>(beta, data<double>(y), alpha, data<double>(x),
 						first_dim, last_dim);
 				break;
 			}
