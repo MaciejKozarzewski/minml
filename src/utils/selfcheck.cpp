@@ -403,7 +403,7 @@ namespace ml
 		return 0;
 	}
 
-	int checkActivationFuncion(Device device)
+	int checkActivationFunction(Device device)
 	{
 		const std::vector<DataType> dtypes = get_datatypes_list(device);
 

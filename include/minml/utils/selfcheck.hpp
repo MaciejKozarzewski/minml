@@ -26,7 +26,7 @@ namespace ml
 
 	int checkMatrixMultiplication(Device device);
 
-	int checkActivationFuncion(Device device);
+	int checkActivationFunction(Device device);
 
 } /* namespace ml */
 
