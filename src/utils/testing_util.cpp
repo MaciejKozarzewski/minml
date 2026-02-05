@@ -127,6 +127,13 @@ namespace
 		return result;
 	}
 
+	double norm_for_test_fp64(const double *ptr, size_t length)
+	{
+		double result = 0.0;
+		for (size_t i = 0; i < length; i++)
+			result += std::abs(ptr[i]);
+		return result;
+	}
 	double norm_for_test_fp32(const float *ptr, size_t length)
 	{
 		double result = 0.0;
@@ -315,6 +322,8 @@ namespace ml
 					return norm_for_test_fp16(reinterpret_cast<uint16_t*>(tmp.data()), tmp.volume());
 				case DataType::FLOAT32:
 					return norm_for_test_fp32(reinterpret_cast<float*>(tmp.data()), tmp.volume());
+				case DataType::FLOAT64:
+					return norm_for_test_fp64(reinterpret_cast<double*>(tmp.data()), tmp.volume());
 				default:
 					throw DataTypeNotSupported(METHOD_NAME, tensor.dtype());
 			}
