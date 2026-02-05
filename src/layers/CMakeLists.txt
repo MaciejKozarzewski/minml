@@ -20,6 +20,7 @@ target_sources(${LibName} PRIVATE 	AbsolutePositionalEncoding.cpp
 								PositionalEncoding.cpp
 								quantization.cpp
 								RMSNormalization.cpp
+								Router.cpp
 								Softmax.cpp
 								SpaceToDepth.cpp
 								SpatialScaling.cpp

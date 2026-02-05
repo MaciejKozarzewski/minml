@@ -327,6 +327,7 @@ namespace ml
 		static const MultiHeadAttention mha(0, 0, false);
 		static const Input input;
 		static const RMSNormalization rmsnorm;
+		static const Router router(0);
 		static const PositionalEncoding positional_encoding;
 		static const Softmax softmax( { 0 });
 		static const SpaceToDepth space_to_depth(0);
@@ -374,6 +375,8 @@ namespace ml
 			result = positional_encoding.clone(json);
 		if (name == rmsnorm.name())
 			result = rmsnorm.clone(json);
+		if (name == router.name())
+			result = router.clone(json);
 		if (name == softmax.name())
 			result = softmax.clone(json);
 		if (name == space_to_depth.name())
