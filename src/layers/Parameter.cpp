@@ -46,7 +46,7 @@ namespace ml
 	Tensor& Parameter::getGradient()
 	{
 		if (m_gradient.isEmpty())
-			m_gradient = Tensor(shape(), DataType::FLOAT32, device());
+			m_gradient = Tensor(shape(), dtype(), device());
 		return m_gradient;
 	}
 
