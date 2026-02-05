@@ -18,6 +18,7 @@
 #include <cassert>
 #include <memory>
 #include <algorithm>
+#include <utility>
 
 namespace
 {
@@ -550,13 +551,31 @@ namespace ml
 		}
 		m_device = newDevice;
 	}
-	void Tensor::reshape(const Shape &newShape)
+	Tensor& Tensor::reshape(const Shape &newShape)
 	{
 		if (this->m_shape.volume() != newShape.volume())
 			throw ShapeMismatch(METHOD_NAME, "trying to reshape " + shape().toString() + " into " + newShape.toString());
 
 		this->m_shape = newShape;
 		m_stride = Stride(newShape);
+		return *this;
+	}
+	Tensor& Tensor::flatten()
+	{
+		return reshape( { volume() });
+	}
+	Tensor& Tensor::flatten(std::initializer_list<int> dims)
+	{
+		Shape new_shape = shape();
+		new_shape.flatten(dims);
+		return reshape(new_shape);
+	}
+	Tensor& Tensor::flatten(std::initializer_list<int> dims0, std::initializer_list<int> dims1)
+	{
+		Shape new_shape = shape();
+		new_shape.flatten(dims1);
+		new_shape.flatten(dims0);
+		return reshape(new_shape);
 	}
 
 	void Tensor::convertTo(const Context &context, DataType newType)

@@ -109,7 +109,10 @@ namespace ml
 			const Shape& shape() const noexcept;
 
 			void moveTo(Device newDevice);
-			void reshape(const Shape &newShape);
+			Tensor& reshape(const Shape &newShape);
+			Tensor& flatten();
+			Tensor& flatten(std::initializer_list<int> dims);
+			Tensor& flatten(std::initializer_list<int> dims0, std::initializer_list<int> dims1);
 
 			void convertTo(const Context &context, DataType newType);
 			void reinterpretAs(DataType newType);

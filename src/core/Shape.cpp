@@ -12,6 +12,19 @@
 
 #include <cstring>
 
+namespace
+{
+	bool are_consecutive(const int *ptr, size_t len) noexcept
+	{
+		if (len == 0)
+			return true;
+		for (size_t i = 0; i < len - 1; i++)
+			if ((ptr[i] + 1) != ptr[i + 1])
+				return false;
+		return true;
+	}
+}
+
 namespace ml
 {
 	Shape::Shape()
@@ -158,38 +171,68 @@ namespace ml
 
 	void Shape::removeDim(int index)
 	{
-		if (index < 0 or index >= rank())
+		if (index < 0 or index >= m_rank)
 			throw IndexOutOfBounds(METHOD_NAME, "index", index, m_rank);
 
-		for (int i = index; i < rank() - 1; i++)
-			m_dim[i] = m_dim[i + 1];
 		m_rank--;
+		for (int i = index; i < m_rank; i++)
+			m_dim[i] = m_dim[i + 1];
+
 	}
 	void Shape::insertDim(int index, int dim)
 	{
-		if (index < 0 or index > rank())
+		if (index < 0 or index > m_rank)
 			throw IndexOutOfBounds(METHOD_NAME, "index", index, m_rank);
-		if (rank() == MAX_TENSOR_RANK)
+		if (m_rank == MAX_TENSOR_RANK)
 			throw IllegalArgument(METHOD_NAME, "cannot expand");
 
-		m_rank++;
-		for (int i = rank() - 1; i > index; i--)
+		for (int i = m_rank; i > index; i--)
 			m_dim[i] = m_dim[i - 1];
+		m_rank++;
 		m_dim[index] = dim;
 	}
 	void Shape::squeeze()
 	{
-		int new_dim[MAX_TENSOR_RANK];
-		std::memset(new_dim, 0, sizeof(new_dim));
-		int new_rank = 0;
-		for (int i = 0; i < rank(); i++)
-			if (m_dim[i] != 1)
-			{
-				new_dim[new_rank] = m_dim[i];
-				new_rank++;
-			}
-		std::memcpy(m_dim, new_dim, sizeof(int) * new_rank);
-		m_rank = new_rank;
+		int shift = 0;
+		for (int i = 0; i < m_rank; i++)
+			if (m_dim[i] == 1)
+				shift++;
+			else
+				m_dim[i - shift] = m_dim[i];
+		m_rank -= shift;
+		for (int i = m_rank; i < MAX_TENSOR_RANK; i++)
+			m_dim[i] = 0;
+	}
+	void Shape::flatten()
+	{
+		if (m_rank == 0)
+			return;
+		m_dim[0] = volume();
+		m_rank = 1;
+		for (int i = m_rank; i < MAX_TENSOR_RANK; i++)
+			m_dim[i] = 0;
+	}
+	void Shape::flatten(std::initializer_list<int> dims)
+	{
+		if (m_rank == 0 or dims.size() <= 1)
+			return;
+		if (not are_consecutive(dims.begin(), dims.size()))
+			throw LogicError(METHOD_NAME, "Dimensions to flatten must be ordered, consecutive integers");
+
+		int volume = 1;
+		for (size_t i = 0; i < dims.size(); i++)
+			volume *= m_dim[dims.begin()[i]];
+
+		const int shift = dims.size() - 1;
+		const int first = dims.begin()[0];
+
+		m_dim[first] = volume;
+		for (int i = first + 1; i < m_rank; i++)
+			m_dim[i] = m_dim[i + shift];
+		m_rank -= shift;
+
+		for (int i = m_rank; i < MAX_TENSOR_RANK; i++)
+			m_dim[i] = 0;
 	}
 
 	bool operator==(const Shape &lhs, const Shape &rhs) noexcept
@@ -206,13 +249,13 @@ namespace ml
 		return !(lhs == rhs);
 	}
 
-	//serialization interface
+//serialization interface
 	Json Shape::serialize() const
 	{
 		return Json(m_dim, m_rank);
 	}
 
-	//common to all classes
+//common to all classes
 	size_t Shape::getMemory() const noexcept
 	{
 		return sizeof(this);

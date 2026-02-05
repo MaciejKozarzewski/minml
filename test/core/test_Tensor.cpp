@@ -262,5 +262,24 @@ namespace ml
 		EXPECT_EQ(view.get( { 2, 1 }), 1.0f);
 	}
 
+	TEST(TestTensor, flatten)
+	{
+		Tensor t0( { 11, 12, 13, 14 }, "float32", Device::cpu());
+		t0.flatten();
+		EXPECT_EQ(t0.shape(), Shape( { 11 * 12 * 13 * 14 }));
+
+		Tensor t1( { 11, 12, 13, 14 }, "float32", Device::cpu());
+		t1.flatten( { 0, 1, 2 });
+		EXPECT_EQ(t1.shape(), Shape( { 11 * 12 * 13, 14 }));
+
+		Tensor t2( { 11, 12, 13, 14 }, "float32", Device::cpu());
+		t2.flatten( { 2, 3 });
+		EXPECT_EQ(t2.shape(), Shape( { 11, 12, 13 * 14 }));
+
+		Tensor t3( { 11, 12, 13, 14 }, "float32", Device::cpu());
+		t3.flatten( { 0, 1 }, { 2, 3 });
+		EXPECT_EQ(t3.shape(), Shape( { 11 * 12, 13 * 14 }));
+	}
+
 } /* namespace ml */
 

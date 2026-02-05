@@ -172,6 +172,45 @@ namespace ml
 		s4.squeeze();
 		EXPECT_EQ(s4.rank(), 0);
 	}
+	TEST(TestShape, flatten)
+	{
+		Shape s1( { 4, 5, 6, 7 });
+		s1.flatten();
+		EXPECT_EQ(s1.rank(), 1);
+		EXPECT_EQ(s1[0], 4 * 5 * 6 * 7);
+
+		Shape s2;
+		s2.flatten();
+		EXPECT_EQ(s2.rank(), 0);
+
+		Shape s3( { 4, 5, 6, 7 });
+		s3.flatten( { 0, 1 });
+		EXPECT_EQ(s3.rank(), 3);
+		EXPECT_EQ(s3[0], 4 * 5);
+		EXPECT_EQ(s3[1], 6);
+		EXPECT_EQ(s3[2], 7);
+
+		Shape s4( { 4, 5, 6, 7 });
+		s4.flatten( { 0, 1, 2 });
+		EXPECT_EQ(s4.rank(), 2);
+		EXPECT_EQ(s4[0], 4 * 5 * 6);
+		EXPECT_EQ(s4[1], 7);
+
+		Shape s5( { 4, 5, 6, 7 });
+		s5.flatten( { 2, 3 });
+		EXPECT_EQ(s5.rank(), 3);
+		EXPECT_EQ(s5[0], 4);
+		EXPECT_EQ(s5[1], 5);
+		EXPECT_EQ(s5[2], 6 * 7);
+
+		Shape s6( { 4, 5, 6, 7 });
+		s6.flatten( { 0 });
+		EXPECT_EQ(s6.rank(), 4);
+		EXPECT_EQ(s6[0], 4);
+		EXPECT_EQ(s6[1], 5);
+		EXPECT_EQ(s6[2], 6);
+		EXPECT_EQ(s6[3], 7);
+	}
 
 } /* namespace ml */
 
