@@ -379,6 +379,10 @@ namespace ml
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
+	void cuda_softmax_backward(mlContext_t context, float alpha, const mlTensor_t dy, const mlTensor_t y, float beta, mlTensor_t dx)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
 	void cuda_fused_act_bias_copy_backward(mlContext_t context, mlTensor_t dy, const mlTensor_t y, float beta_dx, mlTensor_t dx, float beta_dw,
 			mlTensor_t dw, mlActivationType_t act)
 	{

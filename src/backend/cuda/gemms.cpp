@@ -121,8 +121,8 @@ namespace ml
 				assert(K % 4 == 0);
 				assert(A.dtype == DTYPE_INT8);
 				assert(B.dtype == DTYPE_INT8);
-				const int32_t _alpha = static_cast<int32_t>(alpha);
-				const int32_t _beta = static_cast<int32_t>(beta);
+				const int32_t _alpha = 1;
+				const int32_t _beta = 0;
 				cublasStatus_t status = cublasGemmEx(handle, op_B, op_A, M, N, K, &_alpha, B.data, CUDA_R_8I, LDB, A.data, CUDA_R_8I, LDA, &_beta,
 						C.data, CUDA_R_32I, LDC, CUBLAS_COMPUTE_32I, CUBLAS_GEMM_DEFAULT);
 				assert(status == CUBLAS_STATUS_SUCCESS);

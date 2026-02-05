@@ -375,6 +375,7 @@ namespace ml
 
 	void cpu_softmax_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input)
 	{
+		assert(shape.rank == 2);
 		const int first_dim = get_first_dim(shape);
 		const int last_dim = get_last_dim(shape);
 
