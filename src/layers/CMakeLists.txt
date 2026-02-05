@@ -1,4 +1,5 @@
-target_sources(${LibName} PRIVATE 	Add.cpp
+target_sources(${LibName} PRIVATE 	AbsolutePositionalEncoding.cpp
+								Add.cpp
 								AveragePooling.cpp
 								BatchNormalization.cpp
 								ChannelAveragePooling.cpp

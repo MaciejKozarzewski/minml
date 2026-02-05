@@ -20,6 +20,7 @@
 #include <minml/training/Regularizer.hpp>
 #include <minml/training/Initializer.hpp>
 
+#include <minml/layers/AbsolutePositionalEncoding.hpp>
 #include <minml/layers/Add.hpp>
 #include <minml/layers/AveragePooling.hpp>
 #include <minml/layers/BatchNormalization.hpp>
@@ -37,6 +38,7 @@
 #include <minml/layers/MultiHeadAttention.hpp>
 #include <minml/layers/PositionalEncoding.hpp>
 #include <minml/layers/RMSNormalization.hpp>
+#include <minml/layers/Router.hpp>
 #include <minml/layers/Softmax.hpp>
 #include <minml/layers/SpaceToDepth.hpp>
 #include <minml/layers/SpatialScaling.hpp>
@@ -308,6 +310,7 @@ namespace ml
 
 	std::unique_ptr<Layer> loadLayer(const Json &json, const SerializedObject &binary_data)
 	{
+		static const AbsolutePositionalEncoding absolute_position_encoding;
 		static const Add add;
 		static const AveragePooling average_pooling(0);
 		static const BatchNormalization batchnorm;
@@ -335,6 +338,8 @@ namespace ml
 		const std::string name = json["name"];
 		std::unique_ptr<Layer> result;
 
+		if (name == absolute_position_encoding.name())
+			result = absolute_position_encoding.clone(json);
 		if (name == add.name())
 			result = add.clone(json);
 		if (name == average_pooling.name())
