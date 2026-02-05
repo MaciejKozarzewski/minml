@@ -1029,6 +1029,24 @@ namespace ml
 				break;
 		}SYNC();
 	}
+	void softmaxBackward(const Context &context, float alpha, const Tensor &gradient_next, const Tensor &output, float beta, Tensor &gradient_prev)
+	{
+		static Timer timer("softmaxBackward");
+		TimerGuard tg(timer);
+		switch (context.device().type())
+		{
+			case DeviceType::CPU:
+//				cpu_softmax_forward(get(context), get(input.dtype()), get_shape(input), output.data(), input.data());
+				break;
+			case DeviceType::CUDA:
+				cuda_softmax_backward(get(context), alpha, get(gradient_next), get(output), beta, get(gradient_prev));
+//				cuda_softmax_forward(get(context), get(input.dtype()), get_shape(input), output.data(), input.data());
+				break;
+			case DeviceType::OPENCL:
+//				opencl_softmax_forward(get(context), get(input.dtype()), get_shape(input), output.data(), input.data());
+				break;
+		}SYNC();
+	}
 	void fusedBiasActCopyBackward(const Context &context, Tensor &gradient_next, const Tensor &output, float beta_prev, Tensor &gradient_prev,
 			float beta_bias_update, Tensor &bias_update, ActivationType act)
 	{
@@ -1347,7 +1365,7 @@ namespace ml
 		{
 			const Tensor ext = add.view(output_matrix.shape());
 			gemm_ex(context, output_matrix, 1.0f, 'n', input_matrix, 't', weight_matrix, 1.0f, ext, bias, activation);
-		} SYNC();
+		}SYNC();
 	}
 	void explicit_gemm_backward(const Context &context, Tensor &gradient_prev, Tensor &gradient_next, const Tensor &output, const Tensor &weights,
 			Tensor &workspace, float beta)

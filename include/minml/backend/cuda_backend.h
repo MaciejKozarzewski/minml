@@ -228,6 +228,7 @@ namespace ml
 		DLL_PUBLIC void cuda_activation_backward(mlContext_t context, float alpha, const mlTensor_t dy, const mlTensor_t y, float beta, mlTensor_t dx,
 				mlActivationType_t act);
 		DLL_PUBLIC void cuda_softmax_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input);
+		DLL_PUBLIC void cuda_softmax_backward(mlContext_t context, float alpha, const mlTensor_t dy, const mlTensor_t y, float beta, mlTensor_t dx);
 		DLL_PUBLIC void cuda_fused_act_bias_copy_backward(mlContext_t context, mlTensor_t dy, const mlTensor_t y, float beta_dx, mlTensor_t dx,
 				float beta_dw, mlTensor_t dw, mlActivationType_t act);
 

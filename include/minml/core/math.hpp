@@ -125,6 +125,7 @@ namespace ml
 	void activationBackward(const Context &context, float alpha, const Tensor &gradient_next, const Tensor &output, float beta, Tensor &gradient_prev,
 			ActivationType act);
 	void softmaxForward(const Context &context, Tensor &output, const Tensor &input);
+	void softmaxBackward(const Context &context, float alpha, const Tensor &gradient_next, const Tensor &output, float beta, Tensor &gradient_prev);
 	void fusedBiasActCopyBackward(const Context &context, Tensor &gradient_next, const Tensor &output, float beta_prev, Tensor &gradient_prev,
 			float beta_bias_update, Tensor &bias_update, ActivationType act);
 
