@@ -1001,7 +1001,8 @@ namespace ml
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
-				cpu_activation_backward(get(context), get_shape(gradient_prev), gradient_prev.data(), gradient_next.data(), output.data(), get(act));
+				cpu_activation_backward(get(context), get(gradient_next.dtype()), get_shape(gradient_prev), gradient_prev.data(),
+						gradient_next.data(), output.data(), get(act));
 				break;
 			case DeviceType::CUDA:
 				cuda_activation_backward(get(context), alpha, get(gradient_next), get(output), beta, get(gradient_prev), get(act));
@@ -1036,14 +1037,12 @@ namespace ml
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
-//				cpu_softmax_forward(get(context), get(input.dtype()), get_shape(input), output.data(), input.data());
+				cpu_softmax_backward(get(context), alpha, get(gradient_next), get(output), beta, get(gradient_prev));
 				break;
 			case DeviceType::CUDA:
 				cuda_softmax_backward(get(context), alpha, get(gradient_next), get(output), beta, get(gradient_prev));
-//				cuda_softmax_forward(get(context), get(input.dtype()), get_shape(input), output.data(), input.data());
 				break;
 			case DeviceType::OPENCL:
-//				opencl_softmax_forward(get(context), get(input.dtype()), get_shape(input), output.data(), input.data());
 				break;
 		}SYNC();
 	}
@@ -1085,7 +1084,7 @@ namespace ml
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
-//				cpu_sum_over_first_dim(get(context), get_shape(src), dst.data(), src.data(), beta);
+				cpu_sum_over_first_dim(get(context), alpha, get(src), beta, get(dst));
 				break;
 			case DeviceType::CUDA:
 				cuda_sum_over_first_dim(get(context), alpha, get(src), beta, get(dst));
@@ -1260,6 +1259,77 @@ namespace ml
 			case DeviceType::CPU:
 				break;
 			case DeviceType::CUDA:
+				break;
+			case DeviceType::OPENCL:
+				break;
+		}SYNC();
+	}
+
+	/*
+	 * mixture of experts
+	 */
+	void selectTopK(const Context &context, const Tensor &input, Tensor &indices, Tensor &values)
+	{
+		switch (context.device().type())
+		{
+			case DeviceType::CPU:
+				break;
+			case DeviceType::CUDA:
+				cuda_select_top_k(get(context), get(input), get(indices), get(values));
+				break;
+			case DeviceType::OPENCL:
+				break;
+		}SYNC();
+	}
+	void gatherTokensForward(const Context &context, const Tensor &input, const Tensor &indices, float beta, Tensor &output)
+	{
+		switch (context.device().type())
+		{
+			case DeviceType::CPU:
+				break;
+			case DeviceType::CUDA:
+				cuda_gather_tokens_forward(get(context), get(input), get(indices), beta, get(output));
+				break;
+			case DeviceType::OPENCL:
+				break;
+		}SYNC();
+	}
+	void gatherTokensBackward(const Context &context, const Tensor &gradient_next, const Tensor &indices, float beta, Tensor &gradient_prev)
+	{
+		switch (context.device().type())
+		{
+			case DeviceType::CPU:
+				break;
+			case DeviceType::CUDA:
+				cuda_gather_tokens_backward(get(context), get(gradient_next), get(indices), beta, get(gradient_prev));
+				break;
+			case DeviceType::OPENCL:
+				break;
+		}SYNC();
+	}
+	void scatterTokensForward(const Context &context, const Tensor &input, const Tensor &indices, const Tensor &scales, float beta, Tensor &output)
+	{
+		switch (context.device().type())
+		{
+			case DeviceType::CPU:
+				break;
+			case DeviceType::CUDA:
+				cuda_scatter_tokens_forward(get(context), get(input), get(indices), get(scales), beta, get(output));
+				break;
+			case DeviceType::OPENCL:
+				break;
+		}SYNC();
+	}
+	void scatterTokensBackward(const Context &context, const Tensor &gradient_next, const Tensor &input, const Tensor &indices, const Tensor &scales,
+			float beta1, Tensor &gradient_prev, float beta2, Tensor &scales_gradient)
+	{
+		switch (context.device().type())
+		{
+			case DeviceType::CPU:
+				break;
+			case DeviceType::CUDA:
+				cuda_scatter_tokens_backward(get(context), get(input), get(indices), get(scales), get(gradient_next), beta1, get(gradient_prev),
+						beta2, get(scales_gradient));
 				break;
 			case DeviceType::OPENCL:
 				break;

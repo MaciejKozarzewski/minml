@@ -233,6 +233,17 @@ namespace ml
 				float beta_dw, mlTensor_t dw, mlActivationType_t act);
 
 		/*
+		 * mixture of experts
+		 */
+		DLL_PUBLIC void cuda_select_top_k(mlContext_t context, const mlTensor_t x, mlTensor_t indices, mlTensor_t values);
+		DLL_PUBLIC void cuda_gather_tokens_forward(mlContext_t context, const mlTensor_t x, const mlTensor_t indices, float beta, mlTensor_t y);
+		DLL_PUBLIC void cuda_gather_tokens_backward(mlContext_t context, const mlTensor_t dy, const mlTensor_t indices, float beta, mlTensor_t dx);
+		DLL_PUBLIC void cuda_scatter_tokens_forward(mlContext_t context, const mlTensor_t x, const mlTensor_t indices, const mlTensor_t scales,
+				float beta, mlTensor_t y);
+		DLL_PUBLIC void cuda_scatter_tokens_backward(mlContext_t context, const mlTensor_t x, const mlTensor_t indices, const mlTensor_t scales,
+				const mlTensor_t dy, float beta1, mlTensor_t dx, float beta2, mlTensor_t dscales);
+
+		/*
 		 * tensor op
 		 */
 		DLL_PUBLIC void cuda_emulate_low_precision(mlContext_t context, mlShape_t shape, mlDataType_t dtype, void *dst, const void *src,

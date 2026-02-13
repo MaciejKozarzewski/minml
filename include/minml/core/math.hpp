@@ -48,6 +48,9 @@ namespace ml
 			const Tensor &first_conv_weights, const Tensor &first_conv_bias, const Tensor &second_conv_weights, const Tensor &second_conv_bias,
 			Tensor &output);
 
+	/*
+	 * depthwise convolution
+	 */
 	void depthwiseConvForward(const Context &context, float alpha, const Tensor &input, const Tensor &weights, float beta, Tensor &output,
 			const Tensor &bias);
 	void depthwiseConvBackward(const Context &context, float alpha, const Tensor &gradient_next, const Tensor &weights, float beta,
@@ -55,6 +58,9 @@ namespace ml
 	void depthwiseConvUpdate(const Context &context, float alpha, const Tensor &input, const Tensor &gradient_next, float beta,
 			Tensor &weights_update);
 
+	/*
+	 * pooling and channel scaling
+	 */
 	void averagePoolingForward(const Context &context, float alpha, const Tensor &input, float beta, Tensor &output, int size);
 	void averagePoolingBackward(const Context &context, float alpha, const Tensor &gradient_next, float beta, Tensor &gradient_prev, int size);
 
@@ -69,6 +75,9 @@ namespace ml
 	void spatialScalingBackward(const Context &context, float alpha, const Tensor &gradient_next, const Tensor &input, const Tensor &scales,
 			float beta_input, Tensor &gradient_prev, float beta_scales, Tensor &gradient_scales);
 
+	/*
+	 * matrix multiplication
+	 */
 	void gemm(const Context &context, char opA, char opB, Tensor &C, const Tensor &A, const Tensor &B, float alpha, float beta);
 	void gemmBatched(const Context &context, char opA, char opB, Tensor &C, const Tensor &A, const Tensor &B, float alpha, float beta);
 
@@ -80,6 +89,9 @@ namespace ml
 
 	void addBiasAct(const Context &context, float alpha, const Tensor &input, const Tensor &bias, float beta, Tensor &output, ActivationType act);
 
+	/*
+	 * batch normalization
+	 */
 	void batchnormInference(const Context &context, float alpha, const Tensor &input, const Tensor &weights, const Tensor &bias,
 			const Tensor &avg_var, float beta, Tensor &output, ActivationType act);
 	void batchnormForward(const Context &context, float alpha, const Tensor &input, const Tensor &weights, const Tensor &bias, float beta,
@@ -156,6 +168,16 @@ namespace ml
 			float weight_decay);
 	std::vector<int> isNanOrInf(const Context &context, const std::vector<Tensor> &tensors);
 	void l2Regularization(const Context &context, std::vector<Tensor> &gradients, const std::vector<Tensor> &params, float scale);
+
+	/*
+	 * mixture of experts
+	 */
+	void selectTopK(const Context &context, const Tensor &input, Tensor &indices, Tensor &values);
+	void gatherTokensForward(const Context &context, const Tensor &input, const Tensor &indices, float beta, Tensor &output);
+	void gatherTokensBackward(const Context &context, const Tensor &gradient_next, const Tensor &indices, float beta, Tensor &gradient_prev);
+	void scatterTokensForward(const Context &context, const Tensor &input, const Tensor &indices, const Tensor &scales, float beta, Tensor &output);
+	void scatterTokensBackward(const Context &context, const Tensor &gradient_next, const Tensor &input, const Tensor &indices, const Tensor &scales,
+			float beta1, Tensor &gradient_prev, float beta2, Tensor &scales_gradient);
 
 	/*
 	 * quantized

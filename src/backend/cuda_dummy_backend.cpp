@@ -390,6 +390,32 @@ namespace ml
 	}
 
 	/*
+	 * mixture of experts
+	 */
+	void cuda_select_top_k(mlContext_t context, const mlTensor_t x, mlTensor_t indices, mlTensor_t values)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+	void cuda_gather_tokens_forward(mlContext_t context, const mlTensor_t x, const mlTensor_t indices, float beta, mlTensor_t y)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+	void cuda_gather_tokens_backward(mlContext_t context, const mlTensor_t dy, const mlTensor_t indices, float beta, mlTensor_t dx)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+	void cuda_scatter_tokens_forward(mlContext_t context, const mlTensor_t x, const mlTensor_t indices, const mlTensor_t scales, float beta,
+			mlTensor_t y)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+	void cuda_scatter_tokens_backward(mlContext_t context, const mlTensor_t x, const mlTensor_t indices, const mlTensor_t scales, const mlTensor_t dy,
+			float beta1, mlTensor_t dx, float beta2, mlTensor_t dscales)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+
+	/*
 	 * tensor op
 	 */
 	void cuda_emulate_low_precision(mlContext_t context, mlShape_t shape, mlDataType_t dtype, void *dst, const void *src, mlQuantizationData_t qd)
@@ -438,8 +464,7 @@ namespace ml
 		throw NotImplemented(METHOD_NAME);
 	}
 	void cuda_fused_lion_optimize(mlContext_t context, float scale, const mlTensor_t *gradients, mlTensor_t *weights, mlTensor_t *momentums,
-			mlTensor_t *weights_copy, float learning_rate, float beta1, float beta2, int step, int num_tensors,
-			float weight_decay)
+			mlTensor_t *weights_copy, float learning_rate, float beta1, float beta2, int step, int num_tensors, float weight_decay)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
