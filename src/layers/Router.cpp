@@ -11,6 +11,7 @@
 #include <minml/core/math.hpp>
 #include <minml/core/ml_exceptions.hpp>
 #include <minml/utils/json.hpp>
+#include <minml/utils/testing_util.hpp>
 
 namespace ml
 {
@@ -30,11 +31,7 @@ namespace ml
 	{
 		if (m_input_shapes.size() != 1)
 			throw UninitializedObject(METHOD_NAME, "input shape has not been set");
-		const int batch_size = getInputShape().firstDim();
-		int tokens = 1;
-		for (int i = 1; i < getInputShape().rank() - 1; i++)
-			tokens *= getInputShape().dim(i);
-		return Shape( { batch_size, m_experts, tokens });
+		return Shape( { getInputShape().dim(0), m_experts, getInputShape().dim(1), getInputShape().dim(2) });
 	}
 	Shape Router::getWeightShape() const
 	{
@@ -60,15 +57,16 @@ namespace ml
 	}
 	int Router::getWorkspaceSize() const noexcept
 	{
-		return getInputShape().firstDim() * m_experts * getInputShape().lastDim();
+		return getInputShape().firstDim() * getWeightShape().volume();
 	}
 	void Router::forward(const std::vector<Tensor> &input, Tensor &output)
 	{
 		assert(input.size() == 1);
 
 		const Tensor flattened_input = input[0].view().flatten( { 1, 2 });
-		gemmBatched(context(), 'n', 't', output, getWeights().getParam(), flattened_input, 1.0f, 0.0f);
-		Tensor y = output.view( { output.dim(0) * output.dim(1), output.dim(2) });
+		Tensor flattened_output = output.view().flatten( { 2, 3 });
+		gemmBatched(context(), 'n', 't', flattened_output, getWeights().getParam(), flattened_input, 1.0f, 0.0f);
+		Tensor y = output.view().flatten( { 0, 1 }, { 2, 3 });
 		softmaxForward(context(), y, y);
 	}
 	void Router::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next,
@@ -77,20 +75,24 @@ namespace ml
 		assert(input.size() == 1);
 		assert(gradient_prev.size() == 1);
 
-		const Tensor flattened_y = output.view().flatten( { 0, 1 });
-		Tensor flattened_dy = gradient_next.view().flatten( { 0, 1 });
-		softmaxBackward(context(), 1.0f, flattened_dy, flattened_y, 0.0f, flattened_dy);
+		{ /* artificial scope for variables */
+			const Tensor flattened_y = output.view().flatten( { 0, 1 }, { 2, 3 }); // (NE) x (HW)
+			Tensor flattened_dy = gradient_next.view().flatten( { 0, 1 }, { 2, 3 }); // (NE) x (HW)
+			softmaxBackward(context(), 1.0f, flattened_dy, flattened_y, 0.0f, flattened_dy);
+		}
 
-		const Tensor flattened_x = input[0].view().flatten( { 1, 2 });
-		Tensor flattened_dx = gradient_prev[0].view().flatten( { 1, 2 });
-		gemmBatched(context(), 't', 'n', flattened_dx, gradient_next, getWeights().getParam(), 1.0f, beta[0]);
+		const Tensor flattened_x = input[0].view().flatten( { 1, 2 }); // N x (HW) x C
+		Tensor flattened_dx = gradient_prev[0].view().flatten( { 1, 2 }); // N x (HW) x C
+		const Tensor flattened_y = output.view().flatten( { 2, 3 }); // N x E x (HW)
+		Tensor flattened_dy = gradient_next.view().flatten( { 2, 3 }); // N x E x (HW)
+		gemmBatched(context(), 't', 'n', flattened_dx, flattened_dy, getWeights().getParam(), 1.0f, beta[0]);
 
 		Tensor tmp_dw = m_workspace.lock()->view( { input[0].firstDim(), m_experts, input[0].lastDim() });
-		gemmBatched(context(), 'n', 'n', tmp_dw, gradient_next, flattened_dx, 1.0f, 0.0f);
+		gemmBatched(context(), 'n', 'n', tmp_dw, flattened_dy, flattened_x, 1.0f, 0.0f);
 
-		Tensor flattened_dw = getWeights().getGradient().view().flatten();
-		Tensor flattened_tmp_dw = tmp_dw.view().flatten( { 1, 2 });
-		sumOverFirstDim(context(), 1.0f, flattened_dw, 0.0f, flattened_tmp_dw);
+		Tensor flattened_dw = getWeights().getGradient().view().flatten(); // (EC)
+		Tensor flattened_tmp_dw = tmp_dw.view().flatten( { 1, 2 }); // N x (EC)
+		sumOverFirstDim(context(), 1.0f, flattened_tmp_dw, 0.0f, flattened_dw);
 	}
 
 } /* namespace ml */

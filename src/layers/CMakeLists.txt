@@ -9,11 +9,13 @@ target_sources(${LibName} PRIVATE 	AbsolutePositionalEncoding.cpp
 								DepthToSpace.cpp
 								DepthwiseConv2D.cpp
 								FusedConvBlock.cpp
+								GatherTopK.cpp
 								GlobalAveragePooling.cpp
 								Input.cpp
 								Layer.cpp
 								LayerNormalization.cpp
 								LearnableGlobalPooling.cpp
+								MixtureOfExperts.cpp
 								MultiHeadAttention.cpp
 								Multiply.cpp
 								Parameter.cpp
@@ -21,6 +23,7 @@ target_sources(${LibName} PRIVATE 	AbsolutePositionalEncoding.cpp
 								quantization.cpp
 								RMSNormalization.cpp
 								Router.cpp
+								ScatterTopK.cpp
 								Softmax.cpp
 								SpaceToDepth.cpp
 								SpatialScaling.cpp
