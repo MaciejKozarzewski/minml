@@ -102,16 +102,18 @@ namespace
 				tmp += dy * y;
 			}
 			const U partial_sum = cg::reduce(tile, tmp, cg::plus<U>());
+			__syncthreads();
 
 			for (int j = tile.thread_rank(); j < last_dim; j += tile.size())
 			{
 				const U y = tmp_y[j];
 				const U dy = tmp_dy[j];
-				U dx = static_cast<U>(alpha) * y * (dy - tmp);
+				U dx = static_cast<U>(alpha) * y * (dy - partial_sum);
 				if (beta != 0.0f)
 					dx += static_cast<U>(beta) * static_cast<U>(gradient_prev[i * last_dim + j]);
 				gradient_prev[i * last_dim + j] = static_cast<T>(dx);
 			}
+			__syncthreads();
 		}
 	}
 }
