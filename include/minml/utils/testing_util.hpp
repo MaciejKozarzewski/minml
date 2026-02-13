@@ -18,7 +18,8 @@ namespace ml /* forward declarations */
 	class Device;
 	class Layer;
 	class Shape;
-	enum class DataType;
+	enum class DataType
+	;
 }
 
 namespace ml
@@ -48,6 +49,31 @@ namespace ml
 				double check(int n, double epsilon, const std::string &mode, bool verbose = false);
 			private:
 				double compute_gradient(Tensor &t, int idx, double epsilon);
+		};
+
+		class LayerCheck
+		{
+				std::unique_ptr<Layer> m_layer;
+				std::vector<float> betas;
+				std::vector<Tensor> input, gradient_prev;
+				Tensor output, gradient_next;
+				std::shared_ptr<Tensor> workspace;
+				std::shared_ptr<Context> context;
+				bool forward_was_run = false;
+			public:
+				LayerCheck(const Layer &layer);
+				void setInputShape(const Shape &shape);
+				void setInputShape(const std::vector<Shape> &shapes);
+				void setup(Device device, DataType dtype);
+				void init(bool zero_beta = false);
+				void initFrom(const LayerCheck &lc);
+				void forward(bool verbose = false);
+				void backward(bool verbose = false);
+
+				friend double output_diff(const LayerCheck &lhs, const LayerCheck &rhs);
+				friend double gradient_prev_diff(const LayerCheck &lhs, const LayerCheck &rhs, int idx);
+				friend double weight_gradient_diff(const LayerCheck &lhs, const LayerCheck &rhs);
+				friend double bias_gradient_diff(const LayerCheck &lhs, const LayerCheck &rhs);
 		};
 	}
 }
