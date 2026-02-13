@@ -68,6 +68,24 @@ namespace
 		const float z = ml::cpu::cross_entropy(output.z, target.z);
 		return x + y + z;
 	}
+
+	template<typename T>
+	void kernel_sum_over_first_dim(T *workspace, float alpha, const T *src, float beta, T *dst, int first_dim, int last_dim)
+	{
+		for (int j = 0; j < last_dim; j++)
+			workspace[j] = 0.0f;
+
+		for (int i = 0; i < first_dim; i++)
+			for (int j = 0; j < last_dim; j++)
+				workspace[j] += src[i * last_dim + j];
+
+		if (beta == 0.0f)
+			for (int j = 0; j < last_dim; j++)
+				dst[j] = alpha * workspace[j];
+		else
+			for (int j = 0; j < last_dim; j++)
+				dst[j] = dst[j] * beta + alpha * workspace[j];
+	}
 }
 
 namespace ml
@@ -124,33 +142,30 @@ namespace ml
 				break;
 		}
 	}
-	void cpu_sum_over_first_dim(mlContext_t context, mlShape_t shape, void *dst, const void *src, float beta)
+	void cpu_sum_over_first_dim(mlContext_t context, float alpha, const mlTensor_t src, float beta, mlTensor_t dst)
 	{
-		assert(dst != nullptr);
-		assert(src != nullptr);
+		const int first_dim = volume_without_last_dim(src);
+		const int last_dim = get_last_dim(src);
 
-		const int first_dim = volume_without_last_dim(shape);
-		const int last_dim = get_last_dim(shape);
+		assert(cpu::Context::getWorkspaceSize(context) >= last_dim * size_of(src.dtype));
 
-		assert(cpu::Context::getWorkspaceSize(context) >= last_dim * sizeof(float));
-
-		float *tmp_ptr = cpu::Context::getWorkspace<float>(context);
-		const float *src_ptr = getPointer<float>(src);
-
-		for (int j = 0; j < last_dim; j++)
-			tmp_ptr[j] = 0.0f;
-
-		for (int i = 0; i < first_dim; i++)
-			for (int j = 0; j < last_dim; j++)
-				tmp_ptr[j] += src_ptr[i * last_dim + j];
-
-		float *dst_ptr = getPointer<float>(dst);
-		if (beta == 0.0f)
-			for (int j = 0; j < last_dim; j++)
-				dst_ptr[j] = tmp_ptr[j];
-		else
-			for (int j = 0; j < last_dim; j++)
-				dst_ptr[j] = dst_ptr[j] * beta + tmp_ptr[j];
+		switch (src.dtype)
+		{
+			default:
+				break;
+			case DTYPE_FLOAT32:
+			{
+				float *workspace = cpu::Context::getWorkspace<float>(context);
+				kernel_sum_over_first_dim(workspace, alpha, data<float>(src), beta, data<float>(dst), first_dim, last_dim);
+				break;
+			}
+			case DTYPE_FLOAT64:
+			{
+				double *workspace = cpu::Context::getWorkspace<double>(context);
+				kernel_sum_over_first_dim(workspace, alpha, data<double>(src), beta, data<double>(dst), first_dim, last_dim);
+				break;
+			}
+		}
 	}
 	float cpu_mean_squared_loss(mlContext_t context, mlShape_t shape, const void *output, const void *target, const void *mask)
 	{
@@ -169,7 +184,7 @@ namespace ml
 			const float m = (mask == nullptr) ? 1.0f : mask_ptr[i];
 			result += m * square(output_ptr[i] - target_ptr[i]);
 		}
-		return 0.5f * result ;
+		return 0.5f * result;
 	}
 	void cpu_mean_squared_gradient(mlContext_t context, mlShape_t shape, void *gradient, const void *output, const void *target, const void *mask,
 			float weight)

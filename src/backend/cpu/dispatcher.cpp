@@ -264,7 +264,6 @@ namespace ml
 
 	}
 
-
 	void cpu_add_bias_act(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input, const void *bias,
 			mlActivationType_t act)
 	{
@@ -280,10 +279,11 @@ namespace ml
 				break;
 			}
 			case DTYPE_FLOAT32:
-			{
 				cpu::def_kernel_add_bias_act_fp32(output, input, bias, first_dim, last_dim, act);
 				break;
-			}
+			case DTYPE_FLOAT64:
+				cpu::def_kernel_add_bias_act_fp64(output, input, bias, first_dim, last_dim, act);
+				break;
 			default:
 				break;
 		}
@@ -302,14 +302,27 @@ namespace ml
 			case DTYPE_FLOAT32:
 				cpu::def_kernel_activation_forward_fp32(output, input, volume(shape), act);
 				break;
+			case DTYPE_FLOAT64:
+				cpu::def_kernel_activation_forward_fp64(output, input, volume(shape), act);
+				break;
 			default:
 				break;
 		}
 	}
-	void cpu_activation_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next, const void *output,
-			mlActivationType_t act)
+	void cpu_activation_backward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *gradient_prev, const void *gradient_next,
+			const void *output, mlActivationType_t act)
 	{
-		cpu::def_kernel_activation_backward_fp32(gradient_prev, gradient_next, nullptr, output, volume(shape), act);
+		switch (dtype)
+		{
+			case DTYPE_FLOAT32:
+				cpu::def_kernel_activation_backward_fp32(gradient_prev, gradient_next, nullptr, output, volume(shape), act);
+				break;
+			case DTYPE_FLOAT64:
+				cpu::def_kernel_activation_backward_fp64(gradient_prev, gradient_next, nullptr, output, volume(shape), act);
+				break;
+			default:
+				break;
+		}
 	}
 	void cpu_fused_bias_and_activation_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, void *gradient_next, const void *output,
 			void *bias_gradient, mlActivationType_t act, float beta_prev, float beta_bias)
@@ -405,5 +418,10 @@ namespace ml
 				break;
 		}
 	}
+	void cpu_softmax_backward(mlContext_t context, float alpha, const mlTensor_t dy, const mlTensor_t y, float beta, mlTensor_t dx)
+	{
+
+	}
+
 } /* namespace avocado */
 

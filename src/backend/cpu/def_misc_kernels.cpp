@@ -188,6 +188,43 @@ namespace
 				break;
 		}
 	}
+	template<typename T>
+	void kernel_activation_backward(void *dx, const void *dy, const void *x, const void *y, size_t elements, ml::mlActivationType_t activation)
+	{
+		T *prev_ptr = reinterpret_cast<T*>(dx);
+		const T *next_ptr = reinterpret_cast<const T*>(dy);
+		const T *in_ptr = reinterpret_cast<const T*>(x);
+		const T *out_ptr = reinterpret_cast<const T*>(y);
+		switch (activation)
+		{
+			case ml::ACTIVATION_LINEAR:
+				if (dx != dy)
+					std::memcpy(dx, dy, sizeof(float) * elements);
+				break;
+			case ml::ACTIVATION_SIGMOID:
+				for (size_t i = 0; i < elements; i++)
+					prev_ptr[i] = next_ptr[i] * out_ptr[i] * (1.0f - out_ptr[i]);
+				break;
+			case ml::ACTIVATION_TANH:
+				for (size_t i = 0; i < elements; i++)
+					prev_ptr[i] = next_ptr[i] * (1.0f + out_ptr[i]) * (1.0f - out_ptr[i]);
+				break;
+			case ml::ACTIVATION_RELU:
+				for (size_t i = 0; i < elements; i++)
+					prev_ptr[i] = (out_ptr[i] == 0.0f) ? 0.0f : next_ptr[i];
+				break;
+			case ml::ACTIVATION_LEAKY_RELU:
+				for (size_t i = 0; i < elements; i++)
+					prev_ptr[i] = (out_ptr[i] < 0.0f) ? 0.1f * next_ptr[i] : next_ptr[i];
+				break;
+			case ml::ACTIVATION_EXP:
+				for (size_t i = 0; i < elements; i++)
+					prev_ptr[i] = out_ptr[i] * next_ptr[i];
+				break;
+			default:
+				break;
+		}
+	}
 
 	template<typename T, ml::mlActivationType_t ACT>
 	void kernel_add_bias_act(void *output, const void *input, const void *bias, int first_dim, int last_dim)
@@ -285,43 +322,20 @@ namespace ml
 		{
 			kernel_activation_forward<float>(dst, src, elements, activation);
 		}
+		void def_kernel_activation_forward_fp64(void *dst, const void *src, size_t elements, mlActivationType_t activation)
+		{
+			kernel_activation_forward<double>(dst, src, elements, activation);
+		}
 
 		void def_kernel_activation_backward_fp32(void *gradient_prev, const void *gradient_next, const void *input, const void *output,
 				size_t elements, mlActivationType_t activation)
 		{
-			float *prev_ptr = reinterpret_cast<float*>(gradient_prev);
-			const float *next_ptr = reinterpret_cast<const float*>(gradient_next);
-			const float *in_ptr = reinterpret_cast<const float*>(input);
-			const float *out_ptr = reinterpret_cast<const float*>(output);
-			switch (activation)
-			{
-				case ACTIVATION_LINEAR:
-					if (gradient_prev != gradient_next)
-						std::memcpy(gradient_prev, gradient_next, sizeof(float) * elements);
-					break;
-				case ACTIVATION_SIGMOID:
-					for (size_t i = 0; i < elements; i++)
-						prev_ptr[i] = next_ptr[i] * out_ptr[i] * (1.0f - out_ptr[i]);
-					break;
-				case ACTIVATION_TANH:
-					for (size_t i = 0; i < elements; i++)
-						prev_ptr[i] = next_ptr[i] * (1.0f + out_ptr[i]) * (1.0f - out_ptr[i]);
-					break;
-				case ACTIVATION_RELU:
-					for (size_t i = 0; i < elements; i++)
-						prev_ptr[i] = (out_ptr[i] == 0.0f) ? 0.0f : next_ptr[i];
-					break;
-				case ACTIVATION_LEAKY_RELU:
-					for (size_t i = 0; i < elements; i++)
-						prev_ptr[i] = (out_ptr[i] < 0.0f) ? 0.1f * next_ptr[i] : next_ptr[i];
-					break;
-				case ACTIVATION_EXP:
-					for (size_t i = 0; i < elements; i++)
-						prev_ptr[i] = out_ptr[i] * next_ptr[i];
-					break;
-				default:
-					break;
-			}
+			kernel_activation_backward<float>(gradient_prev, gradient_next, input, output, elements, activation);
+		}
+		void def_kernel_activation_backward_fp64(void *gradient_prev, const void *gradient_next, const void *input, const void *output,
+				size_t elements, mlActivationType_t activation)
+		{
+			kernel_activation_backward<double>(gradient_prev, gradient_next, input, output, elements, activation);
 		}
 
 		void def_kernel_add_bias_act_fp32(void *output, const void *input, const void *bias, int first_dim, int last_dim, mlActivationType_t act)
@@ -346,6 +360,31 @@ namespace ml
 					break;
 				case ACTIVATION_EXP:
 					kernel_add_bias_act<float, ACTIVATION_EXP>(output, input, bias, first_dim, last_dim);
+					break;
+			}
+		}
+		void def_kernel_add_bias_act_fp64(void *output, const void *input, const void *bias, int first_dim, int last_dim, mlActivationType_t act)
+		{
+			switch (act)
+			{
+				default:
+				case ACTIVATION_LINEAR:
+					kernel_add_bias_act<double, ACTIVATION_LINEAR>(output, input, bias, first_dim, last_dim);
+					break;
+				case ACTIVATION_SIGMOID:
+					kernel_add_bias_act<double, ACTIVATION_SIGMOID>(output, input, bias, first_dim, last_dim);
+					break;
+				case ACTIVATION_TANH:
+					kernel_add_bias_act<double, ACTIVATION_TANH>(output, input, bias, first_dim, last_dim);
+					break;
+				case ACTIVATION_RELU:
+					kernel_add_bias_act<double, ACTIVATION_RELU>(output, input, bias, first_dim, last_dim);
+					break;
+				case ACTIVATION_LEAKY_RELU:
+					kernel_add_bias_act<double, ACTIVATION_LEAKY_RELU>(output, input, bias, first_dim, last_dim);
+					break;
+				case ACTIVATION_EXP:
+					kernel_add_bias_act<double, ACTIVATION_EXP>(output, input, bias, first_dim, last_dim);
 					break;
 			}
 		}

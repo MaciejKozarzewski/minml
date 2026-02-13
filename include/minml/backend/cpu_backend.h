@@ -150,9 +150,10 @@ namespace ml
 		 */
 		void cpu_activation_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input,
 				mlActivationType_t act);
-		void cpu_activation_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, const void *gradient_next, const void *output,
-				mlActivationType_t act);
+		void cpu_activation_backward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *gradient_prev, const void *gradient_next,
+				const void *output, mlActivationType_t act);
 		void cpu_softmax_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input);
+		void cpu_softmax_backward(mlContext_t context, float alpha, const mlTensor_t dy, const mlTensor_t y, float beta, mlTensor_t dx);
 		void cpu_fused_bias_and_activation_backward(mlContext_t context, mlShape_t shape, void *gradient_prev, void *gradient_next,
 				const void *output, void *bias_gradient, mlActivationType_t act, float beta_prev, float beta_bias);
 
@@ -167,7 +168,7 @@ namespace ml
 		void cpu_multiply_tensors(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *dst, const void *src1, const void *src2);
 		void cpu_add_tensors(mlContext_t context, mlDataType_t dtype, mlShape_t shape, float beta, void *dst, float alpha1, const void *src1,
 				float alpha2, const void *src2);
-		void cpu_sum_over_first_dim(mlContext_t context, mlShape_t shape, void *dst, const void *src, float beta);
+		void cpu_sum_over_first_dim(mlContext_t context, float alpha, const mlTensor_t src, float beta, mlTensor_t dst);
 
 		float cpu_mean_squared_loss(mlContext_t context, mlShape_t shape, const void *output, const void *target, const void *mask);
 		void cpu_mean_squared_gradient(mlContext_t context, mlShape_t shape, void *gradient, const void *output, const void *target, const void *mask,

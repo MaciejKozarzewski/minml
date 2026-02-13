@@ -31,11 +31,15 @@ namespace ml
 		void def_kernel_softmax_fp16(void *dst, const void *src, int first_dim, int last_dim, void *workspace);
 
 		void def_kernel_activation_forward_fp32(void *dst, const void *src, size_t elements, mlActivationType_t activation);
+		void def_kernel_activation_forward_fp64(void *dst, const void *src, size_t elements, mlActivationType_t activation);
 
 		void def_kernel_activation_backward_fp32(void *gradient_prev, const void *gradient_next, const void *input, const void *output,
 				size_t elements, mlActivationType_t activation);
+		void def_kernel_activation_backward_fp64(void *gradient_prev, const void *gradient_next, const void *input, const void *output,
+				size_t elements, mlActivationType_t activation);
 
 		void def_kernel_add_bias_act_fp32(void *output, const void *input, const void *bias, int first_dim, int last_dim, mlActivationType_t act);
+		void def_kernel_add_bias_act_fp64(void *output, const void *input, const void *bias, int first_dim, int last_dim, mlActivationType_t act);
 
 		/*
 		 * AVX kernels
