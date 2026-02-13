@@ -194,6 +194,11 @@ namespace vectors
 	{
 		return vec1h(is_true(cond.x0) ? a.x0 : b.x0);
 	}
+
+	DEVICE_INLINE void atomic_add(half *address, const vec1h &value)
+	{
+		atomicAdd(address + 0, value.x0);
+	}
 #else
 	/*
 	 * comparison operators
@@ -305,6 +310,10 @@ namespace vectors
 	DEVICE_INLINE vec1h select(const vec1h &cond, const vec1h &a, const vec1h &b)
 	{
 		return vec1h();
+	}
+
+	DEVICE_INLINE void atomic_add(half *address, const vec1h &value)
+	{
 	}
 #endif
 

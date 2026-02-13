@@ -240,6 +240,12 @@ namespace vectors
 	{
 		return vec4h(half2_select(cond.x0, a.x0, b.x0), half2_select(cond.x1, a.x1, b.x1));
 	}
+
+	DEVICE_INLINE void atomic_add(half *address, const vec4h &value)
+	{
+		atomicAdd(reinterpret_cast<half2*>(address) + 0, value.x0);
+		atomicAdd(reinterpret_cast<half2*>(address) + 1, value.x1);
+	}
 #else
 	/*
 	 * comparison operators
@@ -351,6 +357,10 @@ namespace vectors
 	DEVICE_INLINE vec4h select(const vec4h &cond, const vec4h &a, const vec4h &b)
 	{
 		return vec4h();
+	}
+
+	DEVICE_INLINE void atomic_add(half *address, const vec4h &value)
+	{
 	}
 #endif
 } /* namespace vectors */

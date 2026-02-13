@@ -202,6 +202,11 @@ namespace vectors
 	{
 		return vec2h(half2_select(cond.x0, a.x0, b.x0));
 	}
+
+	DEVICE_INLINE void atomic_add(half *address, const vec2h &value)
+	{
+		atomicAdd(reinterpret_cast<half2*>(address), value.x0);
+	}
 #else
 	/*
 	 * comparison operators
@@ -313,6 +318,10 @@ namespace vectors
 	DEVICE_INLINE vec2h select(const vec2h &cond, const vec2h &a, const vec2h &b)
 	{
 		return vec2h();
+	}
+
+	DEVICE_INLINE void atomic_add(half *address, const vec2h &value)
+	{
 	}
 #endif
 } /* namespace vectors */

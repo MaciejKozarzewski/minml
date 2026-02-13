@@ -247,6 +247,14 @@ namespace vectors
 		return vec8h(half2_select(cond.x0, a.x0, b.x0), half2_select(cond.x1, a.x1, b.x1),
 				half2_select(cond.x2, a.x2, b.x2), half2_select(cond.x3, a.x3, b.x3));
 	}
+
+	DEVICE_INLINE void atomic_add(half *address, const vec8h &value)
+	{
+		atomicAdd(reinterpret_cast<half2*>(address) + 0, value.x0);
+		atomicAdd(reinterpret_cast<half2*>(address) + 1, value.x1);
+		atomicAdd(reinterpret_cast<half2*>(address) + 2, value.x2);
+		atomicAdd(reinterpret_cast<half2*>(address) + 3, value.x3);
+	}
 #else
 	DEVICE_INLINE vec8h operator==(const vec8h &lhs, const vec8h &rhs)
 	{
@@ -355,6 +363,10 @@ namespace vectors
 	DEVICE_INLINE vec8h select(const vec8h &cond, const vec8h &a, const vec8h &b)
 	{
 		return vec8h();
+	}
+
+	DEVICE_INLINE void atomic_add(half *address, const vec8h &value)
+	{
 	}
 #endif
 } /* namespace vectors */
