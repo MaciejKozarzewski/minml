@@ -16,6 +16,7 @@
 #include <minml/layers/Router.hpp>
 #include <minml/layers/GatherTopK.hpp>
 #include <minml/layers/ScatterTopK.hpp>
+#include <minml/layers/MixtureOfExperts.hpp>
 #include <minml/utils/json.hpp>
 #include <minml/utils/testing_util.hpp>
 
@@ -554,7 +555,6 @@ namespace
 				if (dtype() == DataType::FLOAT32)
 				{
 					const Tensor indices = top_k_indices<float>(flattened_router_output, top_k);
-					std::cout << ml::testing::normForTest(indices) << '\n';
 					scatter_tokens_backward<float>(gradient_prev[0], gradient_next, input[0], indices, gradient_prev[1], input[1]);
 				}
 				else
@@ -597,7 +597,7 @@ namespace
 			}
 			Shape getOutputShape() const
 			{
-				const int batch_size = getInputShape().dim(0);
+				const int batch_size = getInputShape().dim(1);
 				const int top_k = getInputShape().dim(2);
 				return Shape( { m_experts, batch_size, top_k, m_neurons });
 			}
@@ -830,6 +830,41 @@ namespace ml
 
 		EXPECT_LE(gradient_prev_diff(baseline, under_test, 0), 1.0e-4f);
 		EXPECT_LE(gradient_prev_diff(baseline, under_test, 1), 1.0e-4f);
+		EXPECT_LE(weight_gradient_diff(baseline, under_test), 1.0e-4f);
+		EXPECT_LE(bias_gradient_diff(baseline, under_test), 1.0e-4f);
+	}
+
+	TEST(TestMixtureOfExperts, forward_and_backward)
+	{
+		const int batch_size = 3;
+		const int top_k = 17;
+		const int channels = 56;
+		const int neurons = 80;
+		const int experts = 7;
+
+		const Shape input_shape( { experts, batch_size, top_k, channels });
+
+		testing::LayerCheck baseline { BaselineMoE(experts, neurons, "relu") };
+		testing::LayerCheck under_test { MixtureOfExperts(experts, neurons, "relu") };
+
+		baseline.setInputShape(input_shape);
+		under_test.setInputShape(input_shape);
+
+		baseline.setup(Device::cpu(), DataType::FLOAT32);
+		under_test.setup(Device::cuda(), DataType::FLOAT32);
+
+		baseline.init();
+		under_test.initFrom(baseline);
+
+		baseline.forward();
+		under_test.forward();
+
+		EXPECT_LE(output_diff(baseline, under_test), 1.0e-4f);
+
+		baseline.backward();
+		under_test.backward();
+
+		EXPECT_LE(gradient_prev_diff(baseline, under_test, 0), 1.0e-4f);
 		EXPECT_LE(weight_gradient_diff(baseline, under_test), 1.0e-4f);
 		EXPECT_LE(bias_gradient_diff(baseline, under_test), 1.0e-4f);
 	}

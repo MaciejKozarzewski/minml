@@ -11,6 +11,7 @@
 #include "../utils.hpp"
 #include "../vec/vec_headers.cuh"
 #include "../helpers/misc.cuh"
+#include "../helpers/indexers.cuh"
 
 #include <cuda_runtime_api.h>
 #include <cuda_runtime.h>
@@ -105,12 +106,17 @@ namespace
 	__global__ void kernel_add_to_last_dim(float beta, T *output, float alpha, const T *input, const T *bias, int first_dim, int last_dim)
 	{
 		assert(last_dim % N == 0);
+		const Indexer<2> bias_indexer(gridDim.z, last_dim);
+		const Indexer<3> in_out_indexer(gridDim.z, first_dim, last_dim);
+
+		const int group_idx = blockIdx.z;
+
 		for (int j = (blockIdx.x * blockDim.x + threadIdx.x) * N; j < last_dim; j += gridDim.x * blockDim.x * N)
 		{
-			const vec<T, N> _bias(bias + j);
+			const vec<T, N> _bias(bias + bias_indexer.at(group_idx, j));
 			for (int i = blockIdx.y * blockDim.y + threadIdx.y; i < first_dim; i += gridDim.y * blockDim.y)
 			{
-				const int offset = i * last_dim + j;
+				const int offset = in_out_indexer.at(group_idx, i, j);
 				vec<T, N> tmp(input + offset);
 				tmp = activation_forward<ACT>(tmp + _bias) * vec<T, N>(alpha);
 				if (beta != 0.0f)
@@ -186,12 +192,28 @@ namespace
 	void dispatch_add_to_last_dim(mlContext_t context, float alpha, const mlTensor_t x, const mlTensor_t b, float beta, mlTensor_t y,
 			mlActivationType_t act)
 	{
+		assert(same_shape(x, y));
+		assert(x.rank == 2 || x.rank == 3);
+		if (x.rank == 3)
+		{
+			assert(b.rank == 2);
+			assert(b.dim[0] == x.dim[0]);
+			assert(b.dim[1] == x.dim[2]);
+		}
+		else
+		{
+			assert(b.rank == 1);
+			assert(b.dim[0] == x.dim[1]);
+		}
+
 		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
-		const int first_dim = volume_without_last_dim(x);
+		const int group_dim = (x.rank == 3) ? x.dim[0] : 1;
+		const int first_dim = (x.rank == 3) ? x.dim[1] : x.dim[0];
 		const int last_dim = get_last_dim(x);
 		dim3 blockDim(32, 8);
-		dim3 gridDim_x1((last_dim + 31) / 32, std::min(1024, (first_dim + 7) / 8));
-		dim3 gridDim_x4((last_dim + 127) / 128, std::min(1024, (first_dim + 7) / 8));
+		dim3 gridDim_x1((last_dim + 31) / 32, std::min(1024, (first_dim + 7) / 8), group_dim);
+		dim3 gridDim_x4((last_dim + 127) / 128, std::min(1024, (first_dim + 7) / 8), group_dim);
+
 		switch (x.dtype)
 		{
 			case ml::DTYPE_FLOAT16:

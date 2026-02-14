@@ -21,11 +21,27 @@ namespace
 
 	void baseline_add_bias_act(Tensor &dst, const Tensor &src, ActivationType act)
 	{
-		const int first_dim = dst.shape().volumeWithoutLastDim();
-		const int last_dim = dst.shape().lastDim();
-		for (int i = 0; i < first_dim; i++)
-			for (int j = 0; j < last_dim; j++)
-				dst.at( { i, j }) = (float) dst.at( { i, j }) + (float) src.at( { j });
+		assert(dst.rank() == 2 || dst.rank() == 3);
+		if (dst.rank() == 2)
+		{
+			assert(src.rank() == 1);
+			const int first_dim = dst.dim(0);
+			const int last_dim = dst.lastDim();
+			for (int i = 0; i < first_dim; i++)
+				for (int j = 0; j < last_dim; j++)
+					dst.at( { i, j }) = (float) dst.at( { i, j }) + (float) src.at( { j });
+		}
+		else
+		{
+			assert(src.rank() == 2);
+			const int group_dim = dst.dim(0);
+			const int first_dim = dst.dim(1);
+			const int last_dim = dst.lastDim();
+			for (int g = 0; g < group_dim; g++)
+				for (int i = 0; i < first_dim; i++)
+					for (int j = 0; j < last_dim; j++)
+						dst.at( { g, i, j }) = (float) dst.at( { g, i, j }) + (float) src.at( { g, j });
+		}
 		activationForward(Context(), 1.0f, dst, 0.0f, dst, act);
 	}
 	void baseline_sum_over_first_dim(float beta, Tensor &dst, float alpha, const Tensor &src)

@@ -426,8 +426,12 @@ namespace ml
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
-	void cuda_add_tensors(mlContext_t context, mlDataType_t dtype, mlShape_t shape, float beta, void *dst, float alpha1, const void *src1,
-			float alpha2, const void *src2)
+	void cuda_scale_tensor(mlContext_t context, float alpha, mlTensor_t x)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+	void cuda_add_tensors(mlContext_t context, float alpha1, const mlTensor_t x1, float alpha2, const mlTensor_t x2, float alpha3,
+			const mlTensor_t x3, float beta, mlTensor_t y)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}

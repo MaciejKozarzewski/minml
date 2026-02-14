@@ -175,7 +175,10 @@ namespace ml
 		if (input.size() == 2)
 		{
 			Tensor empty;
-			fusedBiasActCopyBackward(context(), gradient_next, output, beta[1], gradient_prev[1], 0.0f, empty, ActivationType::LINEAR);
+			Tensor flattened_dy = gradient_next.view().flatten( { 0, 1, 2 });
+			Tensor flattened_dx = gradient_prev[1].view().flatten( { 0, 1, 2 });
+			const Tensor flattened_y = output.view().flatten( { 0, 1, 2 });
+			fusedBiasActCopyBackward(context(), flattened_dy, flattened_y, beta[1], flattened_dx, 0.0f, empty, ActivationType::LINEAR);
 		}
 
 		const Tensor stats = get_statistics(m_historical_stats, m_history_id);

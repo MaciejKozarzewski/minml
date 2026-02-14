@@ -248,10 +248,13 @@ namespace ml
 		 */
 		DLL_PUBLIC void cuda_emulate_low_precision(mlContext_t context, mlShape_t shape, mlDataType_t dtype, void *dst, const void *src,
 				mlQuantizationData_t qd);
+		// computes x *= alpha
+		DLL_PUBLIC void cuda_scale_tensor(mlContext_t context, float alpha, mlTensor_t x);
+		// computes y = alpha1 * x1 + alpha2 * x2 + alpha3 * x3 + beta * y
+		DLL_PUBLIC void cuda_add_tensors(mlContext_t context, float alpha1, const mlTensor_t x1, float alpha2, const mlTensor_t x2, float alpha3,
+				const mlTensor_t x3, float beta, mlTensor_t y);
 		DLL_PUBLIC void cuda_multiply_tensors(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *dst, const void *src1,
 				const void *src2);
-		DLL_PUBLIC void cuda_add_tensors(mlContext_t context, mlDataType_t dtype, mlShape_t shape, float beta, void *dst, float alpha1,
-				const void *src1, float alpha2, const void *src2);
 		DLL_PUBLIC void cuda_sum_over_first_dim(mlContext_t context, float alpha, const mlTensor_t src, float beta, mlTensor_t dst);
 
 		/*

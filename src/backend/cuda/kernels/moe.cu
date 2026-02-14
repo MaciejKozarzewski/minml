@@ -26,106 +26,6 @@ namespace
 {
 	using namespace vectors;
 
-//	__device__ int get_index(int i) noexcept
-//	{
-//		return i + i / 32;
-//	}
-//
-//	template<typename T>
-//	struct pack4
-//	{
-//			T x0, x1, x2, x3;
-//			__device__ pack4() noexcept = default;
-//			__device__ pack4(const T *ptr, int offset) noexcept
-//			{
-//				x0 = ptr[get_index(offset + 0)];
-//				x1 = ptr[get_index(offset + 1)];
-//				x2 = ptr[get_index(offset + 2)];
-//				x3 = ptr[get_index(offset + 3)];
-//			}
-//			__device__ void store(T *ptr, int offset) const noexcept
-//			{
-//				ptr[get_index(offset + 0)] = x0;
-//				ptr[get_index(offset + 1)] = x1;
-//				ptr[get_index(offset + 2)] = x2;
-//				ptr[get_index(offset + 3)] = x3;
-//			}
-//	};
-//
-//	template<typename T>
-//	__device__ void swap(T &lhs, T &rhs)
-//	{
-//		const T tmp = lhs;
-//		lhs = rhs;
-//		rhs = tmp;
-//	}
-//
-//	template<typename T>
-//	__device__ void sort4(pack4<T> &values, pack4<int> &indices) noexcept
-//	{
-//		if (values.x0 < values.x1)
-//		{
-//			swap(values.x0, values.x1);
-//			swap(indices.x0, indices.x1);
-//		}
-//		if (values.x2 < values.x3)
-//		{
-//			swap(values.x2, values.x3);
-//			swap(indices.x2, indices.x3);
-//		}
-//		if (values.x0 < values.x2)
-//		{
-//			swap(values.x0, values.x2);
-//			swap(indices.x0, indices.x2);
-//		}
-//		if (values.x1 < values.x3)
-//		{
-//			swap(values.x1, values.x3);
-//			swap(indices.x1, indices.x3);
-//		}
-//		if (values.x1 < values.x2)
-//		{
-//			swap(values.x1, values.x2);
-//			swap(indices.x1, indices.x2);
-//		}
-//	}
-//
-//	template<typename T>
-//	__global__ void kernel_select_top_k_old(const T *input, int *indices, T *values, int top_k, int first_dim, int last_dim)
-//	{
-//		assert(last_dim <= 512);
-//		__shared__ int workspace_idx[512 + 16];
-//		__shared__ T workspace_val[512 + 16];
-//
-//		for (int j = threadIdx.x; j < 512; j += blockDim.x)
-//			workspace_idx[get_index(j)] = j;
-//		for (int j = threadIdx.x; j < 512; j += blockDim.x)
-//			workspace_val[get_index(j)] = (j < last_dim) ? input[blockIdx.x * last_dim + j] : static_cast<T>(-1.0e4f);
-//		__syncthreads();
-//		int shift = 0;
-//		for (int i = 0; i < last_dim; i += 2)
-//		{
-//			for (int j = 4 * threadIdx.x + shift; j < last_dim; j += 4 * blockDim.x)
-//			{
-//				pack4<T> val(workspace_val, j);
-//				pack4<int> ind(workspace_idx, j);
-//				sort4(val, ind);
-//				val.store(workspace_val, j);
-//				ind.store(workspace_idx, j);
-//			}
-//			shift = 2 - shift;
-//			__syncthreads();
-//		}
-//
-//		__syncthreads();
-//		if (indices != nullptr)
-//			for (int j = threadIdx.x; j < top_k; j += blockDim.x)
-//				indices[blockIdx.x * top_k + j] = workspace_idx[get_index(j)];
-//		if (values != nullptr)
-//			for (int j = threadIdx.x; j < top_k; j += blockDim.x)
-//				values[blockIdx.x * top_k + j] = workspace_val[get_index(j)];
-//	}
-
 	__host__ __device__ int round_up_to_power_of_2(int i) noexcept
 	{
 		if (i <= 1)
@@ -245,27 +145,6 @@ namespace
 				if (beta != 0.0f)
 					tmp += vec<T, N>(beta) * vec<T, N>(dst + c);
 				tmp.store(dst + c);
-			}
-		}
-	}
-	template<typename T, int N>
-	__global__ void kernel_scale_add(T *ptr, float beta, int elements)
-	{
-		assert(elements % N == 0);
-		const int tid = blockIdx.x * blockDim.x + threadIdx.x;
-		const int stride = gridDim.x * blockDim.x;
-		for (int i = N * tid; i < elements; i += N * stride)
-		{
-			if (beta == 0.0f)
-			{
-				const vec<T, N> zero(static_cast<T>(0.0f));
-				zero.store(ptr + i);
-			}
-			else
-			{
-				vec<T, N> tmp(ptr + i);
-				tmp *= vec<T, N>(beta);
-				tmp.store(ptr + i);
 			}
 		}
 	}
@@ -466,32 +345,7 @@ namespace ml
 		assert(experts == indices.dim[1]);
 		assert(top_k == indices.dim[2]);
 
-		const int elements = volume(dx);
-		switch (dx.dtype)
-		{
-			case DTYPE_FLOAT16:
-			{
-				if (elements % 4 == 0)
-					kernel_scale_add<half, 4> <<<1024, 256, 0, stream>>>(data<half>(dx), beta, volume(dx));
-				else
-					kernel_scale_add<half, 1> <<<1024, 256, 0, stream>>>(data<half>(dx), beta, volume(dx));
-				break;
-			}
-			case DTYPE_FLOAT32:
-			{
-				if (elements % 4 == 0)
-					kernel_scale_add<float, 4> <<<1024, 256, 0, stream>>>(data<float>(dx), beta, volume(dx));
-				else
-					kernel_scale_add<float, 1> <<<1024, 256, 0, stream>>>(data<float>(dx), beta, volume(dx));
-				break;
-			}
-			case DTYPE_FLOAT64:
-			{
-				kernel_scale_add<double, 1> <<<1024, 256, 0, stream>>>(data<double>(dx), beta, volume(dx));
-				break;
-			}
-		}
-		assert(cudaGetLastError() == cudaSuccess);
+		cuda_scale_tensor(context, beta, dx);
 
 		dim3 block_dim(32, 8);
 		dim3 grid_dim(batch_size, experts);
@@ -541,32 +395,7 @@ namespace ml
 		assert(experts == indices.dim[1]);
 		assert(top_k == indices.dim[2]);
 
-		const int elements = volume(y);
-		switch (y.dtype)
-		{
-			case DTYPE_FLOAT16:
-			{
-				if (elements % 4 == 0)
-					kernel_scale_add<half, 4> <<<1024, 256, 0, stream>>>(data<half>(y), beta, elements);
-				else
-					kernel_scale_add<half, 1> <<<1024, 256, 0, stream>>>(data<half>(y), beta, elements);
-				break;
-			}
-			case DTYPE_FLOAT32:
-			{
-				if (elements % 4 == 0)
-					kernel_scale_add<float, 4> <<<1024, 256, 0, stream>>>(data<float>(y), beta, elements);
-				else
-					kernel_scale_add<float, 1> <<<1024, 256, 0, stream>>>(data<float>(y), beta, elements);
-				break;
-			}
-			case DTYPE_FLOAT64:
-			{
-				kernel_scale_add<double, 1> <<<1024, 256, 0, stream>>>(data<double>(y), beta, elements);
-				break;
-			}
-		}
-		assert(cudaGetLastError() == cudaSuccess);
+		cuda_scale_tensor(context, beta, y);
 
 		dim3 block_dim(32, 8);
 		dim3 grid_dim(batch_size, experts);

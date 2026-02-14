@@ -1111,9 +1111,10 @@ namespace ml
 	}
 	void addTensors(const Context &context, Tensor &dst, const Tensor &src1, const Tensor &src2)
 	{
-		addTensors(context, 0.0f, dst, 1.0f, src1, 1.0f, src2);
+		addTensors(context, 1.0f, src1, 1.0f, src2, 0.0f, Tensor(), 0.0f, dst);
 	}
-	void addTensors(const Context &context, float beta, Tensor &dst, float alpha1, const Tensor &src1, float alpha2, const Tensor &src2)
+	void addTensors(const Context &context, float alpha1, const Tensor &src1, float alpha2, const Tensor &src2, float alpha3, const Tensor &src3,
+			float beta, Tensor &dst)
 	{
 		switch (context.device().type())
 		{
@@ -1121,7 +1122,7 @@ namespace ml
 				cpu_add_tensors(get(context), get(dst.dtype()), get_shape(dst), beta, dst.data(), alpha1, src1.data(), alpha2, src2.data());
 				break;
 			case DeviceType::CUDA:
-				cuda_add_tensors(get(context), get(dst.dtype()), get_shape(dst), beta, dst.data(), alpha1, src1.data(), alpha2, src2.data());
+				cuda_add_tensors(get(context), alpha1, get(src1), alpha2, get(src2), alpha3, get(src3), beta, get(dst));
 				break;
 			case DeviceType::OPENCL:
 				opencl_add_tensors(get(context), get(dst.dtype()), get_shape(dst), beta, dst.data(), alpha1, src1.data(), alpha2, src2.data());
