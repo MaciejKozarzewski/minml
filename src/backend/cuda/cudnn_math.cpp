@@ -8,16 +8,16 @@
 #include <minml/backend/cuda_backend.h>
 #include <minml/backend/backend_utils.hpp>
 
-#ifdef USE_CUDNN
-
 #include "utils.hpp"
-
-#include "cudnn_ops.h"
-#include "cudnn_cnn.h"
 
 #include <cassert>
 #include <cstring>
 #include <iostream>
+
+#ifdef USE_CUDNN
+
+#include "cudnn_ops.h"
+#include "cudnn_cnn.h"
 
 namespace
 {
@@ -435,7 +435,8 @@ namespace ml
 			const FilterDescriptor wDesc(weights_shape, dtype);
 			const TensorDescriptor yDesc(output_shape, dtype);
 
-			const ConvolutionDescriptor convDesc(ml::cuda_backend::Context::getCudnnHandle(context), xDesc, wDesc, yDesc, dtype, weights_shape.dim[1], 1);
+			const ConvolutionDescriptor convDesc(ml::cuda_backend::Context::getCudnnHandle(context), xDesc, wDesc, yDesc, dtype, weights_shape.dim[1],
+					1);
 
 			const cudnnConvolutionFwdAlgoPerfStruct perf = get_conv_forward_algo(handle, xDesc, wDesc, yDesc, convDesc);
 
