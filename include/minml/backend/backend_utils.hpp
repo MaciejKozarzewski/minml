@@ -236,6 +236,16 @@ namespace ml
 		return result;
 	}
 
+	[[maybe_unused]] static bool same_shape(const mlTensor_t &lhs, const mlTensor_t &rhs) noexcept
+	{
+		if (lhs.rank != rhs.rank)
+			return false;
+		bool result = true;
+		for (int i = 0; i < lhs.rank; i++)
+			result = result && (lhs.dim[i] == rhs.dim[i]);
+		return result;
+	}
+
 } /* namespace ml */
 
 #endif /* MINML_BACKEND_BACKEND_UTILS_HPP_ */
