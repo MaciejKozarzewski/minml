@@ -137,7 +137,7 @@ namespace ml
 	}
 	[[maybe_unused]] static bool is_empty(const mlTensor_t &tensor) noexcept
 	{
-		return tensor.data == nullptr;
+		return tensor.data == nullptr && tensor.rank == 0;
 	}
 	[[maybe_unused]] static bool is_fp16(const mlTensor_t &tensor) noexcept
 	{

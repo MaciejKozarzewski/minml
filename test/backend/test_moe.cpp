@@ -171,19 +171,19 @@ namespace
 		const int top_k = indices.dim(2);
 
 		const Tensor flattened_input = input.view().flatten( { 1, 2 });
-		assert(output.dim(0) == experts);
-		assert(output.dim(1) == batch_size);
-		assert(output.dim(2) == top_k);
+		assert(output.dim(0) == batch_size);
+		assert(output.dim(1) == top_k);
+		assert(output.dim(2) == experts);
 		assert(output.dim(3) == channels);
 
 		output.zeroall();
 		for (int e = 0; e < experts; e++)
 			for (int b = 0; b < batch_size; b++)
-				for (int i = 0; i < top_k; i++)
+				for (int k = 0; k < top_k; k++)
 				{
-					const int token_index = (int) indices.at( { b, e, i });
-					for (int j = 0; j < channels; j++)
-						output.at( { e, b, i, j }) = flattened_input.at( { b, token_index, j });
+					const int token_index = (int) indices.at( { b, e, k });
+					for (int c = 0; c < channels; c++)
+						output.at( { b, k, e, c }) = flattened_input.at( { b, token_index, c });
 				}
 	}
 	template<typename T>
@@ -199,21 +199,21 @@ namespace
 		const int top_k = indices.dim(2);
 
 		Tensor flattened_prev = gradient_prev.view().flatten( { 1, 2 });
-		assert(gradient_next.dim(0) == experts);
-		assert(gradient_next.dim(1) == batch_size);
-		assert(gradient_next.dim(2) == top_k);
+		assert(gradient_next.dim(0) == batch_size);
+		assert(gradient_next.dim(1) == top_k);
+		assert(gradient_next.dim(2) == experts);
 		assert(gradient_next.dim(3) == channels);
 
 		flattened_prev.zeroall();
 		for (int e = 0; e < experts; e++)
 			for (int b = 0; b < batch_size; b++)
-				for (int i = 0; i < top_k; i++)
+				for (int k = 0; k < top_k; k++)
 				{
-					const int token_index = (int) indices.at( { b, e, i });
-					for (int j = 0; j < channels; j++)
+					const int token_index = (int) indices.at( { b, e, k });
+					for (int c = 0; c < channels; c++)
 					{
-						const T tmp = (T) gradient_next.at( { e, b, i, j }) + (T) flattened_prev.at( { b, token_index, j });
-						flattened_prev.at( { b, token_index, j }) = tmp;
+						const T tmp = (T) gradient_next.at( { b, k, e, c }) + (T) flattened_prev.at( { b, token_index, c });
+						flattened_prev.at( { b, token_index, c }) = tmp;
 					}
 				}
 	}
@@ -229,9 +229,10 @@ namespace
 		assert(batch_size == indices.dim(0));
 		const int experts = indices.dim(1);
 		const int top_k = indices.dim(2);
-		assert(experts == input.dim(0));
-		assert(batch_size == input.dim(1));
-		assert(top_k == input.dim(2));
+
+		assert(batch_size == input.dim(0));
+		assert(top_k == input.dim(1));
+		assert(experts == input.dim(2));
 		assert(channels == input.dim(3));
 
 		Tensor flattened_output = output.view().flatten( { 1, 2 });
@@ -247,7 +248,7 @@ namespace
 							token_index }));
 					for (int c = 0; c < channels; c++)
 					{
-						const T tmp = (T) flattened_output.at( { b, token_index, c }) + (T) input.at( { e, b, k, c }) * scale;
+						const T tmp = (T) flattened_output.at( { b, token_index, c }) + (T) input.at( { b, k, e, c }) * scale;
 						flattened_output.at( { b, token_index, c }) = tmp;
 					}
 				}
@@ -265,9 +266,9 @@ namespace
 		assert(batch_size == indices.dim(0));
 		const int experts = indices.dim(1);
 		const int top_k = indices.dim(2);
-		assert(experts == gradient_prev.dim(0));
-		assert(batch_size == gradient_prev.dim(1));
-		assert(top_k == gradient_prev.dim(2));
+		assert(batch_size == gradient_prev.dim(0));
+		assert(top_k == gradient_prev.dim(1));
+		assert(experts == gradient_prev.dim(2));
 		assert(channels == gradient_prev.dim(3));
 
 		Tensor flattened_next = gradient_next.view().flatten( { 1, 2 });
@@ -285,11 +286,44 @@ namespace
 					T scale_gradient = static_cast<T>(0);
 					for (int c = 0; c < channels; c++)
 					{
-						scale_gradient += (T) input.at( { e, b, k, c }) * (T) flattened_next.at( { b, token_index, c });
-						gradient_prev.at( { e, b, k, c }) = (T) flattened_next.at( { b, token_index, c }) * scale;
+						scale_gradient += (T) input.at( { b, k, e, c }) * (T) flattened_next.at( { b, token_index, c });
+						gradient_prev.at( { b, k, e, c }) = (T) flattened_next.at( { b, token_index, c }) * scale;
 					}
 					flattened_router_gradient.at( { b, e, token_index }) = scale_gradient;
 				}
+	}
+
+	Tensor transpose_experts_last(const Tensor &t)
+	{
+		assert(t.rank() == 4);
+		const int experts = t.dim(0);
+		const int batch_size = t.dim(1);
+		const int top_k = t.dim(2);
+		const int channels = t.dim(3);
+
+		Tensor result( { batch_size, top_k, experts, channels }, t.dtype(), t.device());
+		for (int e = 0; e < experts; e++)
+			for (int b = 0; b < batch_size; b++)
+				for (int k = 0; k < top_k; k++)
+					for (int c = 0; c < channels; c++)
+						result.at( { b, k, e, c }) = t.at( { e, b, k, c });
+		return result;
+	}
+	Tensor transpose_experts_first(const Tensor &t)
+	{
+		assert(t.rank() == 4);
+		const int batch_size = t.dim(0);
+		const int top_k = t.dim(1);
+		const int experts = t.dim(2);
+		const int channels = t.dim(3);
+
+		Tensor result( { experts, batch_size, top_k, channels }, t.dtype(), t.device());
+		for (int b = 0; b < batch_size; b++)
+			for (int k = 0; k < top_k; k++)
+				for (int e = 0; e < experts; e++)
+					for (int c = 0; c < channels; c++)
+						result.at( { e, b, k, c }) = t.at( { b, k, e, c });
+		return result;
 	}
 
 	/*
@@ -429,7 +463,7 @@ namespace
 				const int experts = getInputShape(1).dim(1);
 				assert(getInputShape(1).dim(2) == height);
 				assert(getInputShape(1).dim(3) == width);
-				return Shape( { experts, batch_size, m_top_k, channels });
+				return Shape( { batch_size, m_top_k, experts, channels });
 			}
 			std::string name() const
 			{
@@ -500,13 +534,13 @@ namespace
 				assert(shapes.size() == 2);
 				assert(shapes[0].rank() == 4);
 				assert(shapes[1].rank() == 4);
-				assert(shapes[0].dim(0) == shapes[1].dim(1)); // experts match
-				assert(shapes[0].dim(1) == shapes[1].dim(0)); // batch size match
+				assert(shapes[0].dim(0) == shapes[1].dim(0)); // experts match
+				assert(shapes[0].dim(2) == shapes[1].dim(1)); // batch size match
 				m_input_shapes = shapes;
 			}
 			Shape getOutputShape() const
 			{
-				const int batch_size = getInputShape(0).dim(1);
+				const int batch_size = getInputShape(0).dim(0);
 				const int channels = getInputShape(0).dim(3);
 				const int height = getInputShape(1).dim(2);
 				const int width = getInputShape(1).dim(3);
@@ -531,7 +565,7 @@ namespace
 			void forward(const std::vector<Tensor> &input, Tensor &output)
 			{
 				assert(input.size() == 2);
-				const int top_k = input[0].dim(2);
+				const int top_k = input[0].dim(1);
 
 				const Tensor flattened_router_output = input[1].view().flatten( { 2, 3 });
 				if (dtype() == DataType::FLOAT32)
@@ -549,7 +583,7 @@ namespace
 					const std::vector<float> &beta)
 			{
 				assert(input.size() == 2);
-				const int top_k = input[0].dim(2);
+				const int top_k = input[0].dim(1);
 
 				const Tensor flattened_router_output = input[1].view().flatten( { 2, 3 });
 				if (dtype() == DataType::FLOAT32)
@@ -597,9 +631,10 @@ namespace
 			}
 			Shape getOutputShape() const
 			{
-				const int batch_size = getInputShape().dim(1);
-				const int top_k = getInputShape().dim(2);
-				return Shape( { m_experts, batch_size, top_k, m_neurons });
+				const int batch_size = getInputShape().dim(0);
+				const int top_k = getInputShape().dim(1);
+				assert(getInputShape().dim(2) == m_experts);
+				return Shape( { batch_size, top_k, m_experts, m_neurons });
 			}
 			std::string name() const
 			{
@@ -622,17 +657,20 @@ namespace
 
 			void forward(const std::vector<Tensor> &input, Tensor &output)
 			{
-				const int experts = input[0].dim(0);
-				const int batch_size = input[0].dim(1);
-				const int top_k = input[0].dim(2);
+				const int batch_size = input[0].dim(0);
+				const int top_k = input[0].dim(1);
+				const int experts = input[0].dim(2);
 				const int in_channels = input[0].dim(3);
 				const int out_channels = output.dim(3);
 
+				const Tensor tmp_input = transpose_experts_first(input[0]);
+				const Tensor tmp_output = transpose_experts_first(output);
+
 				for (int e = 0; e < experts; e++)
 				{
-					const Tensor x = input[0].view( { batch_size * top_k, in_channels }, { e, 0, 0, 0 });
+					const Tensor x = tmp_input.view( { batch_size * top_k, in_channels }, { e, 0, 0, 0 });
 					const Tensor w = getWeights().getParam().view( { out_channels, in_channels }, { e, 0, 0 });
-					Tensor y = output.view( { batch_size * top_k, out_channels }, { e, 0, 0, 0 });
+					Tensor y = tmp_output.view( { batch_size * top_k, out_channels }, { e, 0, 0, 0 });
 					if (dtype() == DataType::FLOAT32)
 						baseline_gemm<float>('n', 't', y, x, w, 1.0f, 0.0f);
 					else
@@ -640,25 +678,30 @@ namespace
 					const Tensor b = getBias().getParam().view( { out_channels }, { e, 0 });
 					addBiasAct(context(), 1.0f, y, b, 0.0f, y, m_activation);
 				}
+				output = transpose_experts_last(tmp_output);
 			}
 			void backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next,
 					const std::vector<float> &beta)
 			{
-				const int experts = input[0].dim(0);
-				const int batch_size = input[0].dim(1);
-				const int top_k = input[0].dim(2);
+				const int batch_size = input[0].dim(0);
+				const int top_k = input[0].dim(1);
+				const int experts = input[0].dim(2);
 				const int in_channels = input[0].dim(3);
 				const int out_channels = output.dim(3);
 
 				activationBackward(context(), 1.0f, gradient_next, output, 0.0f, gradient_next, m_activation);
+
+				const Tensor tmp_next = transpose_experts_first(gradient_next);
+				const Tensor tmp_input = transpose_experts_first(input[0]);
+				Tensor tmp_prev = transpose_experts_first(gradient_prev[0]);
 				for (int e = 0; e < experts; e++)
 				{
 					Tensor db = getBias().getGradient().view( { out_channels }, { e, 0 });
-					const Tensor dy = gradient_next.view( { batch_size * top_k, out_channels }, { e, 0, 0, 0 });
+					const Tensor dy = tmp_next.view( { batch_size * top_k, out_channels }, { e, 0, 0, 0 });
 					sumOverFirstDim(context(), 1.0f, dy, 0.0f, db);
 
-					const Tensor x = input[0].view( { batch_size * top_k, in_channels }, { e, 0, 0, 0 });
-					Tensor dx = gradient_prev[0].view( { batch_size * top_k, in_channels }, { e, 0, 0, 0 });
+					const Tensor x = tmp_input.view( { batch_size * top_k, in_channels }, { e, 0, 0, 0 });
+					Tensor dx = tmp_prev.view( { batch_size * top_k, in_channels }, { e, 0, 0, 0 });
 					const Tensor w = getWeights().getParam().view( { out_channels, in_channels }, { e, 0, 0 });
 					Tensor dw = getWeights().getGradient().view( { out_channels, in_channels }, { e, 0, 0 });
 
@@ -673,6 +716,7 @@ namespace
 						baseline_gemm<double>('t', 'n', dw, dy, x, 1.0f, 0.0f);
 					}
 				}
+				gradient_prev[0] = transpose_experts_last(tmp_prev);
 			}
 	};
 }
@@ -702,7 +746,7 @@ namespace ml
 //	TEST(TestScatterTopK, baseline)
 //	{
 //		testing::GradientCheck gradcheck { BaselineScatter() };
-//		const Shape moe_output( { 5, 3, 8, 37 });
+//		const Shape moe_output( { 3, 8, 5, 37 });
 //		const Shape router_output( { 3, 5, 11, 12 });
 //		gradcheck.setInputShape( { moe_output, router_output });
 //
@@ -712,8 +756,8 @@ namespace ml
 //	}
 //	TEST(TestMoE, baseline)
 //	{
-//		testing::GradientCheck gradcheck { BaselineMoE(10, 100, "tanh") };
-//		const Shape input( { 10, 3, 8, 37 });
+//		testing::GradientCheck gradcheck { BaselineMoE(11, 100, "tanh") };
+//		const Shape input( { 3, 8, 11, 37 });
 //		gradcheck.setInputShape(input);
 //
 //		gradcheck.check(100, 1.0e-3, "all", true);
@@ -805,7 +849,7 @@ namespace ml
 		const int top_k = 27;
 		const bool verbose = false;
 
-		const Shape input_shape( { experts, batch_size, top_k, channels });
+		const Shape input_shape( { batch_size, top_k, experts, channels });
 		const Shape router_output_shape( { batch_size, experts, height, width });
 
 		testing::LayerCheck baseline { BaselineScatter() };
@@ -836,13 +880,14 @@ namespace ml
 
 	TEST(TestMixtureOfExperts, forward_and_backward)
 	{
-		const int batch_size = 3;
+		const int batch_size = 5;
 		const int top_k = 17;
 		const int channels = 56;
 		const int neurons = 80;
-		const int experts = 7;
+		const int experts = 11;
+		const bool verbose = false;
 
-		const Shape input_shape( { experts, batch_size, top_k, channels });
+		const Shape input_shape( { batch_size, top_k, experts, channels });
 
 		testing::LayerCheck baseline { BaselineMoE(experts, neurons, "relu") };
 		testing::LayerCheck under_test { MixtureOfExperts(experts, neurons, "relu") };
@@ -853,11 +898,11 @@ namespace ml
 		baseline.setup(Device::cpu(), DataType::FLOAT32);
 		under_test.setup(Device::cuda(), DataType::FLOAT32);
 
-		baseline.init();
+		baseline.init(false);
 		under_test.initFrom(baseline);
 
-		baseline.forward();
-		under_test.forward();
+		baseline.forward(verbose);
+		under_test.forward(verbose);
 
 		EXPECT_LE(output_diff(baseline, under_test), 1.0e-4f);
 

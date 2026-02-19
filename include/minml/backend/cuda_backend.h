@@ -242,6 +242,10 @@ namespace ml
 				float beta, mlTensor_t y);
 		DLL_PUBLIC void cuda_scatter_tokens_backward(mlContext_t context, const mlTensor_t x, const mlTensor_t indices, const mlTensor_t scales,
 				const mlTensor_t dy, float beta1, mlTensor_t dx, float beta2, mlTensor_t dscales);
+		DLL_PUBLIC void cuda_moe_forward(mlContext_t context, const mlTensor_t x, const mlTensor_t w, const mlTensor_t b, float beta, mlTensor_t y,
+				mlActivationType_t act);
+		DLL_PUBLIC void cuda_moe_backward(mlContext_t context, const mlTensor_t x, const mlTensor_t y, const mlTensor_t w, mlTensor_t dy,
+				float beta_dx, mlTensor_t dx, float beta_dw, mlTensor_t dw, float beta_db, mlTensor_t db, mlActivationType_t act);
 
 		/*
 		 * tensor op

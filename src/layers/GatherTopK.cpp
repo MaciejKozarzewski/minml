@@ -44,7 +44,7 @@ namespace ml
 		const int batch_size = getInputShape(0).firstDim();
 		const int channels = getInputShape(0).lastDim();
 		const int experts = getInputShape(1).dim(1);
-		return Shape( { experts, batch_size, m_top_k, channels });
+		return Shape( { batch_size, m_top_k, experts, channels });
 	}
 	std::string GatherTopK::name() const
 	{

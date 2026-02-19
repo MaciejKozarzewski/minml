@@ -22,9 +22,9 @@ namespace ml
 	{
 		if (shapes.size() != 2)
 			throw LogicError(METHOD_NAME, "gather top K must have 2 inputs");
-		const int experts = shapes[0].dim(0);
-		const int batch_size = shapes[0].dim(1);
-		const int top_k = shapes[0].dim(2);
+		const int batch_size = shapes[0].dim(0);
+		const int top_k = shapes[0].dim(1);
+		const int experts = shapes[0].dim(2);
 		const int channels = shapes[0].dim(3);
 
 		if (batch_size != shapes[1].dim(0))
@@ -41,7 +41,7 @@ namespace ml
 	}
 	Shape ScatterTopK::getOutputShape() const
 	{
-		const int batch_size = getInputShape(0).dim(1);
+		const int batch_size = getInputShape(0).dim(0);
 		const int height = getInputShape(1).dim(2);
 		const int width = getInputShape(1).dim(3);
 		const int channels = getInputShape(0).lastDim();

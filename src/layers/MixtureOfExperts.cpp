@@ -46,7 +46,7 @@ namespace ml
 
 	void MixtureOfExperts::setInputShape(const std::vector<Shape> &shapes)
 	{
-		const int experts = getInputShape().dim(0);
+		const int experts = shapes[0].dim(2);
 		if (experts != m_experts)
 			throw LogicError(METHOD_NAME, "number of experts mismatch");
 		m_input_shapes = shapes;
@@ -55,9 +55,9 @@ namespace ml
 	{
 		if (m_input_shapes.size() != 1)
 			throw UninitializedObject(METHOD_NAME, "input shape has not been set");
-		const int batch_size = getInputShape().dim(1);
-		const int top_k = getInputShape().dim(2);
-		return Shape( { m_experts, batch_size, top_k, m_neurons });
+		const int batch_size = getInputShape().dim(0);
+		const int top_k = getInputShape().dim(1);
+		return Shape( { batch_size, top_k, m_experts, m_neurons });
 	}
 	Shape MixtureOfExperts::getWeightShape() const
 	{
@@ -97,30 +97,16 @@ namespace ml
 	{
 		assert(input.size() == 1);
 
-		const Tensor flattened_input = input[0].view().flatten( { 1, 2 });
-		Tensor flattened_output = output.view().flatten( { 1, 2 });
-		gemmBatched(context(), 'n', 't', flattened_output, flattened_input, getWeights().getParam(), 1.0f, 0.0f);
-		addBiasAct(context(), 1.0f, flattened_output, getBias().getParam(), 0.0f, flattened_output, m_activation);
+		moeForward(context(), input[0], getWeights().getParam(), getBias().getParam(), 0.0f, output, m_activation);
 	}
 	void MixtureOfExperts::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next,
 			const std::vector<float> &beta)
 	{
 		assert(input.size() == 1);
 		assert(gradient_prev.size() == 1);
-
-		const Tensor flattened_input = input[0].view().flatten( { 1, 2 });
-		Tensor flattened_output = output.view().flatten( { 1, 2 });
-		Tensor flattened_next = gradient_next.view().flatten( { 1, 2 });
-		Tensor flattened_prev = gradient_prev[0].view().flatten( { 1, 2 });
-
-		Tensor empty;
-		fusedBiasActCopyBackward(context(), flattened_next, flattened_output, 0.0f, empty, 0.0f, getBias().getGradient(), m_activation);
-
-		Tensor tmp_grad = flatten_input_tensor(gradient_prev[0]);
-		gemmBatched(context(), 'n', 'n', flattened_prev, flattened_next, getWeights().getParam(), 1.0f, beta[0]);
-		gemmBatched(context(), 't', 'n', getWeights().getGradient(), flattened_next, flattened_input, 1.0f, 0.0f);
+		moeBackward(context(), input[0], output, getWeights().getParam(), gradient_next, beta[0], gradient_prev[0], 0.0f, getWeights().getGradient(),
+				0.0f, getBias().getGradient(), m_activation);
 	}
 
 } /* namespace ml */
-
 

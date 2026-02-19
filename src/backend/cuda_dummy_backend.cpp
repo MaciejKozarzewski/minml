@@ -414,6 +414,16 @@ namespace ml
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
+	void cuda_moe_forward(mlContext_t context, const mlTensor_t x, const mlTensor_t w, const mlTensor_t b, float beta, mlTensor_t y,
+			mlActivationType_t act)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+	void cuda_moe_backward(mlContext_t context, const mlTensor_t x, const mlTensor_t y, const mlTensor_t w, mlTensor_t dy, float beta_dx,
+			mlTensor_t dx, float beta_dw, mlTensor_t dw, float beta_db, mlTensor_t db, mlActivationType_t act)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
 
 	/*
 	 * tensor op
