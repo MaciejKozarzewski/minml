@@ -178,6 +178,11 @@ namespace ml
 	void scatterTokensForward(const Context &context, const Tensor &input, const Tensor &indices, const Tensor &scales, float beta, Tensor &output);
 	void scatterTokensBackward(const Context &context, const Tensor &gradient_next, const Tensor &input, const Tensor &indices, const Tensor &scales,
 			float beta1, Tensor &gradient_prev, float beta2, Tensor &scales_gradient);
+	void moeForward(const Context &context, const Tensor &input, const Tensor &weights, const Tensor &bias, float beta, Tensor &output,
+			ActivationType act);
+	void moeBackward(const Context &context, const Tensor &input, const Tensor &output, const Tensor &weights, Tensor &gradient_next, float beta_prev,
+			Tensor &gradient_prev, float beta_weights_update, Tensor &weights_update, float beta_bias_update, Tensor &bias_update,
+			ActivationType act);
 
 	/*
 	 * quantized

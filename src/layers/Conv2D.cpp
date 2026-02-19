@@ -360,16 +360,13 @@ namespace ml
 	{
 		choose_algorithm();
 
-		Tensor flattened_dy = gradient_next.view().flatten( { 0, 1, 2 });
-		Tensor flattened_dx = gradient_prev[1].view().flatten( { 0, 1, 2 });
-		const Tensor flattened_y = output.view().flatten( { 0, 1, 2 });
 		if (gradient_prev.size() == 1)
 		{
 			Tensor empty;
-			fusedBiasActCopyBackward(context(), flattened_dy, flattened_y, 0.0f, empty, 0.0f, getBias().getGradient(), m_activation);
+			fusedBiasActCopyBackward(context(), gradient_next, output, 0.0f, empty, 0.0f, getBias().getGradient(), m_activation);
 		}
 		else
-			fusedBiasActCopyBackward(context(), flattened_dy, flattened_y, beta[1], flattened_dx, 0.0f, getBias().getGradient(), m_activation);
+			fusedBiasActCopyBackward(context(), gradient_next, output, beta[1], gradient_prev[1], 0.0f, getBias().getGradient(), m_activation);
 
 		switch (m_backward_algorithm)
 		{

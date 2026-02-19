@@ -106,9 +106,7 @@ namespace ml
 		assert(gradient_prev.size() == 1);
 
 		Tensor empty;
-		Tensor flattened_dy = gradient_next.view().flatten( { 0, 1, 2 });
-		const Tensor flattened_y = output.view().flatten( { 0, 1, 2 });
-		fusedBiasActCopyBackward(context(), flattened_dy, flattened_y, 0.0f, empty, 0.0f, getBias().getGradient(), m_activation);
+		fusedBiasActCopyBackward(context(), gradient_next, output, 0.0f, empty, 0.0f, getBias().getGradient(), m_activation);
 
 		Tensor tmp_grad = flatten_input_tensor(gradient_prev[0]);
 		gemm(context(), 'n', 'n', tmp_grad, gradient_next, getWeights().getParam(), 1.0f, beta[0]);

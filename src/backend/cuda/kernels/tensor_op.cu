@@ -201,9 +201,7 @@ namespace
 		assert(last_dim % N == 0);
 		__shared__ vec<U, N> workspace[8 * 32];
 
-		const int group_idx = blockIdx.z;
-
-		const Indexer<3> in_out_indexer(gridDim.z, first_dim, last_dim);
+		const Indexer<2> in_out_indexer(first_dim, last_dim);
 
 		const int last_dim_idx = N * (blockDim.x * blockIdx.x + threadIdx.x);
 		vec<U, N> local_sum(0.0f);
@@ -211,7 +209,7 @@ namespace
 		{
 			for (int i = blockDim.y * blockIdx.y + threadIdx.y; i < first_dim; i += blockDim.y * gridDim.y)
 			{
-				const int tmp_idx = in_out_indexer.at(group_idx, i, last_dim_idx);
+				const int tmp_idx = in_out_indexer.at(i, last_dim_idx);
 				vec<U, N> dy = load_vec<U, N>(gradient_next + tmp_idx);
 				if (act != ml::ACTIVATION_LINEAR)
 				{
@@ -256,11 +254,11 @@ namespace
 				__syncthreads();
 			}
 
-			const Indexer<2> db_indexer(gridDim.z, last_dim);
+			const Indexer<1> db_indexer(last_dim);
 			if (threadIdx.y == 0 && last_dim_idx < last_dim)
 			{
 				const vec<T, N> tmp = convert<T>(workspace[workspace_indexer.at(0, threadIdx.x)]);
-				atomic_add(bias_gradient + db_indexer.at(group_idx, last_dim_idx), tmp);
+				atomic_add(bias_gradient + db_indexer.at(last_dim_idx), tmp);
 			}
 		}
 	}
@@ -325,6 +323,8 @@ namespace ml
 	void cuda_add_tensors(mlContext_t context, float alpha1, const mlTensor_t x1, float alpha2, const mlTensor_t x2, float alpha3,
 			const mlTensor_t x3, float beta, mlTensor_t y)
 	{
+		if (is_empty(x1) && is_empty(x2) && is_empty(x3) && is_empty(y))
+			return;
 		const int elements = volume(y);
 		dim3 blockDim(256);
 		dim3 gridDim = ml::cuda_backend::gridSize<1024>(elements, blockDim.x);
@@ -527,39 +527,18 @@ namespace ml
 	void cuda_fused_act_bias_copy_backward(mlContext_t context, mlTensor_t dy, const mlTensor_t y, float beta_dx, mlTensor_t dx, float beta_db,
 			mlTensor_t db, mlActivationType_t act)
 	{
-//		assert(same_shape(dy, dx));
-//		assert(same_shape(dy, y));
-		assert(dy.rank == 2 || dy.rank == 3);
-//		if (dy.rank == 3)
-//		{
-//			assert(db.rank == 2);
-//			assert(db.dim[0] == dy.dim[0]);
-//			assert(db.dim[1] == dy.dim[2]);
-//		}
-//		else
-//		{
-//			assert(db.rank == 1);
-//			assert(db.dim[0] == dy.dim[1]);
-//		}
+		assert(same_shape(dy, y));
+		assert(is_empty(dx) || same_shape(dy, dx));
 
 		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
-		const int group_dim = (dy.rank == 3) ? dy.dim[0] : 1;
-		const int first_dim = (dy.rank == 3) ? dy.dim[1] : dy.dim[0];
-		const int last_dim = get_last_dim(dy);
-
-//		assert(ml::cuda_backend::Context::getWorkspaceSize(context) >= last_dim * sizeof(float));
-//		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
-//		float *workspace = ml::cuda_backend::Context::getWorkspace<float>(context);
-//		const size_t workspace_size = ml::cuda_backend::Context::getWorkspaceSize(context);
-//		const int workspace_first_dim = std::min((size_t) 512, workspace_size / (sizeof(float) * group_dim * last_dim));
+		const int first_dim = volume_without_last_dim(y);
+		const int last_dim = get_last_dim(y);
 
 		const int hw_dim = std::min(1024, (first_dim + 7) / 8);
 
 		dim3 blockDim1(32, 8);
-		dim3 gridDim1_x1((last_dim + 31) / 32, hw_dim, group_dim);
-		dim3 gridDim1_x4((last_dim + 127) / 127, hw_dim, group_dim);
-
-//		float *dw_tmp_ptr = (db.data == nullptr) ? nullptr : workspace;
+		dim3 gridDim1_x1((last_dim + 31) / 32, hw_dim);
+		dim3 gridDim1_x4((last_dim + 127) / 127, hw_dim);
 
 		cuda_scale_tensor(context, beta_db, db);
 
@@ -595,38 +574,5 @@ namespace ml
 				break;
 		}
 		assert(cudaGetLastError() == cudaSuccess);
-
-//		dim3 blockDim2(32, 32);
-//		dim3 gridDim2_x1((last_dim + 31) / 32);
-//		dim3 gridDim2_x4((last_dim + 127) / 127);
-//		if (db.data != nullptr)
-//		{
-//			switch (db.dtype)
-//			{
-//				case DTYPE_FLOAT16:
-//				{
-//					if (last_dim % 4 == 0)
-//						kernel_sum_over_first_dim<float, 4, 2> <<<gridDim2_x4, blockDim2, 0, stream>>>(beta_db, data<half>(db), 1.0f, dw_tmp_ptr,
-//								workspace_first_dim, last_dim);
-//					else
-//						kernel_sum_over_first_dim<float, 1, 2> <<<gridDim2_x1, blockDim2, 0, stream>>>(beta_db, data<half>(db), 1.0f, dw_tmp_ptr,
-//								workspace_first_dim, last_dim);
-//					break;
-//				}
-//				case DTYPE_FLOAT32:
-//				{
-//					if (last_dim % 4 == 0)
-//						kernel_sum_over_first_dim<float, 4, 2> <<<gridDim2_x4, blockDim2, 0, stream>>>(beta_db, data<float>(db), 1.0f, dw_tmp_ptr,
-//								workspace_first_dim, last_dim);
-//					else
-//						kernel_sum_over_first_dim<float, 1, 2> <<<gridDim2_x1, blockDim2, 0, stream>>>(beta_db, data<float>(db), 1.0f, dw_tmp_ptr,
-//								workspace_first_dim, last_dim);
-//					break;
-//				}
-//				default:
-//					break;
-//			}
-//			assert(cudaGetLastError() == cudaSuccess);
-//		}
 	}
 } /* namespace ml */

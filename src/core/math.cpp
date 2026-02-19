@@ -1336,6 +1336,35 @@ namespace ml
 				break;
 		}SYNC();
 	}
+	void moeForward(const Context &context, const Tensor &input, const Tensor &weights, const Tensor &bias, float beta, Tensor &output,
+			ActivationType act)
+	{
+		switch (context.device().type())
+		{
+			case DeviceType::CPU:
+				break;
+			case DeviceType::CUDA:
+				cuda_moe_forward(get(context), get(input), get(weights), get(bias), beta, get(output), get(act));
+				break;
+			case DeviceType::OPENCL:
+				break;
+		}SYNC();
+	}
+	void moeBackward(const Context &context, const Tensor &input, const Tensor &output, const Tensor &weights, Tensor &gradient_next, float beta_prev,
+			Tensor &gradient_prev, float beta_weights_update, Tensor &weights_update, float beta_bias_update, Tensor &bias_update, ActivationType act)
+	{
+		switch (context.device().type())
+		{
+			case DeviceType::CPU:
+				break;
+			case DeviceType::CUDA:
+				cuda_moe_backward(get(context), get(input), get(output), get(weights), get(gradient_next), beta_prev, get(gradient_prev),
+						beta_weights_update, get(weights_update), beta_bias_update, get(bias_update), get(act));
+				break;
+			case DeviceType::OPENCL:
+				break;
+		}SYNC();
+	}
 
 	/*
 	 * quantization
