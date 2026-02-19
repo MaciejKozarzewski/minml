@@ -8,6 +8,7 @@
 #include <minml/backend/cuda_backend.h>
 #include <minml/backend/backend_utils.hpp>
 
+#include "activations.cuh"
 #include "../utils.hpp"
 #include "../vec/vec_headers.cuh"
 #include "../helpers/misc.cuh"
@@ -33,55 +34,13 @@ namespace
 	}
 
 	template<int ACT, typename T, int N>
-	__device__ vec<T, N> activation_forward(const vec<T, N> &x)
-	{
-		switch (ACT)
-		{
-			default:
-			case ml::ACTIVATION_LINEAR:
-				return x;
-			case ml::ACTIVATION_SIGMOID:
-				return vectors::sigmoid(x);
-			case ml::ACTIVATION_TANH:
-				return vectors::tanh(x);
-			case ml::ACTIVATION_RELU:
-				return vectors::relu(x);
-			case ml::ACTIVATION_LEAKY_RELU:
-				return select(x > zero<T, N>(), x, x * vec<T, N>(0.1f));
-			case ml::ACTIVATION_EXP:
-				return vectors::exp(x);
-		}
-	}
-
-	template<int ACT, typename T, int N>
-	__device__ vec<T, N> activation_backward(const vec<T, N> &gradient, const vec<T, N> &input, const vec<T, N> &output)
-	{
-		switch (ACT)
-		{
-			default:
-			case ml::ACTIVATION_LINEAR:
-				return gradient;
-			case ml::ACTIVATION_SIGMOID:
-				return gradient * output * (one<T, N>() - output);
-			case ml::ACTIVATION_TANH:
-				return gradient * (one<T, N>() - square(output));
-			case ml::ACTIVATION_RELU:
-				return select(output > zero<T, N>(), gradient, zero<T, N>());
-			case ml::ACTIVATION_LEAKY_RELU:
-				return select(output > zero<T, N>(), gradient, gradient * vec<T, N>(0.1f));
-			case ml::ACTIVATION_EXP:
-				return gradient * output;
-		}
-	}
-
-	template<int ACT, typename T, int N>
 	__global__ void kernel_activation_forward(float beta, T *output, float alpha, const T *input, int elements)
 	{
 		assert(elements % N == 0);
 		for (int i = (blockIdx.x * blockDim.x + threadIdx.x) * N; i < elements; i += gridDim.x * blockDim.x * N)
 		{
 			const vec<T, N> x(input + i);
-			vec<T, N> y = activation_forward<ACT>(x) * vec<T, N>(alpha);
+			vec<T, N> y = activation_forward(static_cast<ml::mlActivationType_t>(ACT), x) * vec<T, N>(alpha);
 			if (beta != 0.0f)
 				y += vec<T, N>(beta) * vec<T, N>(output + i);
 			y.store(output + i);
@@ -95,7 +54,7 @@ namespace
 		{
 			const vec<T, N> dy(gradient_next + i);
 			const vec<T, N> y(output + i);
-			vec<T, N> dx = activation_backward<ACT>(dy, vec<T, N>(), y) * vec<T, N>(alpha);
+			vec<T, N> dx = activation_backward(static_cast<ml::mlActivationType_t>(ACT), dy, vec<T, N>(), y) * vec<T, N>(alpha);
 			if (beta != 0.0f)
 				dx += vec<T, N>(beta) * vec<T, N>(gradient_prev + i);
 			dx.store(gradient_prev + i);
@@ -106,19 +65,17 @@ namespace
 	__global__ void kernel_add_to_last_dim(float beta, T *output, float alpha, const T *input, const T *bias, int first_dim, int last_dim)
 	{
 		assert(last_dim % N == 0);
-		const Indexer<2> bias_indexer(gridDim.z, last_dim);
-		const Indexer<3> in_out_indexer(gridDim.z, first_dim, last_dim);
-
-		const int group_idx = blockIdx.z;
+		const Indexer<1> bias_indexer(last_dim);
+		const Indexer<2> in_out_indexer(first_dim, last_dim);
 
 		for (int j = (blockIdx.x * blockDim.x + threadIdx.x) * N; j < last_dim; j += gridDim.x * blockDim.x * N)
 		{
-			const vec<T, N> _bias(bias + bias_indexer.at(group_idx, j));
+			const vec<T, N> _bias(bias + bias_indexer.at(j));
 			for (int i = blockIdx.y * blockDim.y + threadIdx.y; i < first_dim; i += gridDim.y * blockDim.y)
 			{
-				const int offset = in_out_indexer.at(group_idx, i, j);
+				const int offset = in_out_indexer.at(i, j);
 				vec<T, N> tmp(input + offset);
-				tmp = activation_forward<ACT>(tmp + _bias) * vec<T, N>(alpha);
+				tmp = activation_forward(static_cast<ml::mlActivationType_t>(ACT), tmp + _bias) * vec<T, N>(alpha);
 				if (beta != 0.0f)
 					tmp += vec<T, N>(beta) * vec<T, N>(output + offset);
 				tmp.store(output + offset);
@@ -193,26 +150,14 @@ namespace
 			mlActivationType_t act)
 	{
 		assert(same_shape(x, y));
-		assert(x.rank == 2 || x.rank == 3);
-		if (x.rank == 3)
-		{
-			assert(b.rank == 2);
-			assert(b.dim[0] == x.dim[0]);
-			assert(b.dim[1] == x.dim[2]);
-		}
-		else
-		{
-			assert(b.rank == 1);
-			assert(b.dim[0] == x.dim[1]);
-		}
 
 		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
-		const int group_dim = (x.rank == 3) ? x.dim[0] : 1;
-		const int first_dim = (x.rank == 3) ? x.dim[1] : x.dim[0];
+		const int first_dim = volume_without_last_dim(x);
 		const int last_dim = get_last_dim(x);
+		assert(get_last_dim(b) == last_dim);
 		dim3 blockDim(32, 8);
-		dim3 gridDim_x1((last_dim + 31) / 32, std::min(1024, (first_dim + 7) / 8), group_dim);
-		dim3 gridDim_x4((last_dim + 127) / 128, std::min(1024, (first_dim + 7) / 8), group_dim);
+		dim3 gridDim_x1((last_dim + 31) / 32, std::min(1024, (first_dim + 7) / 8));
+		dim3 gridDim_x4((last_dim + 127) / 128, std::min(1024, (first_dim + 7) / 8));
 
 		switch (x.dtype)
 		{
