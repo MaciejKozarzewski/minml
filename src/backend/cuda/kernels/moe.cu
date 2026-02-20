@@ -54,7 +54,7 @@ namespace
 	__global__ void kernel_select_top_k(const T *input, int *indices, T *values, int top_k, int first_dim, int last_dim)
 	{
 		extern __shared__ char shared_array[];
-
+#if __CUDA_ARCH__ >= FP16_MIN_ARCH
 		int *s_idx = reinterpret_cast<int*>(shared_array);
 		T *s_val = reinterpret_cast<T*>(s_idx + blockDim.x);
 
@@ -115,6 +115,7 @@ namespace
 			if (values != nullptr)
 				values[blockIdx.x * top_k + tid] = s_val[tid];
 		}
+#endif
 	}
 	/*
 	 * indices	[N x E x K]
@@ -196,13 +197,13 @@ namespace
 				atomic_add(dst + c, vec<T, N>(src + c) * scale);
 		}
 	}
-	template<typename T, int N>
+	template<typename T, int N, typename U = T>
 	__global__ void kernel_scatter_backward(const T *gradient_next, float beta1, T *gradient_prev, const T *input, const int *indices,
 			const T *scales, float beta2, T *gradient_scales, int batch_size, int tokens, int channels, int experts, int top_k)
 	{
 		assert(channels % N == 0);
 		extern __shared__ char shared_array[];
-		T *workspace = reinterpret_cast<T*>(shared_array);
+		U *workspace = reinterpret_cast<U*>(shared_array);
 
 		const int tid = threadIdx.y * blockDim.x + threadIdx.x;
 		for (int i = tid; i < tokens; i += blockDim.x * blockDim.y)
@@ -233,7 +234,7 @@ namespace
 				dx.store(gradient_prev + prev_indexer.at(b, k, e, c));
 			}
 
-			T reduced_scale_gradient = horizontal_add(scale_gradient);
+			U reduced_scale_gradient = horizontal_add(scale_gradient);
 			for (int i = 16; i >= 1; i /= 2)
 				reduced_scale_gradient += __shfl_xor_sync(0xffffffff, reduced_scale_gradient, i);
 			if (threadIdx.x == 0)
@@ -244,10 +245,10 @@ namespace
 		const Indexer<3> ds_indexer(batch_size, experts, tokens);
 		for (int i = tid; i < tokens; i += blockDim.x * blockDim.y)
 		{
-			T tmp = workspace[i];
+			U tmp = workspace[i];
 			if (beta2 != 0.0f)
-				tmp += static_cast<T>(gradient_scales[ds_indexer.at(b, e, i)]) * static_cast<T>(beta2);
-			gradient_scales[ds_indexer.at(b, e, i)] = tmp;
+				tmp += static_cast<U>(gradient_scales[ds_indexer.at(b, e, i)]) * static_cast<U>(beta2);
+			gradient_scales[ds_indexer.at(b, e, i)] = static_cast<T>(tmp);
 		}
 	}
 
@@ -653,23 +654,25 @@ namespace ml
 
 		dim3 block_dim(32, 8);
 		dim3 grid_dim(batch_size, experts);
-		const size_t shared_memory_size = size_of(x.dtype) * tokens;
+		
 		switch (x.dtype)
 		{
 			case DTYPE_FLOAT16:
 			{
+				const size_t shared_memory_size = sizeof(float) * tokens;
 				if (channels % 4 == 0)
-					kernel_scatter_backward<half, 4> <<<grid_dim, block_dim, shared_memory_size, stream>>>(data<half>(dy), beta1, data<half>(dx),
+					kernel_scatter_backward<half, 4, float> <<<grid_dim, block_dim, shared_memory_size, stream>>>(data<half>(dy), beta1, data<half>(dx),
 							data<half>(x), data<int>(indices), data<half>(scales), beta2, data<half>(dscales), batch_size, tokens, channels, experts,
 							top_k);
 				else
-					kernel_scatter_backward<half, 1> <<<grid_dim, block_dim, shared_memory_size, stream>>>(data<half>(dy), beta1, data<half>(dx),
+					kernel_scatter_backward<half, 1, float> <<<grid_dim, block_dim, shared_memory_size, stream>>>(data<half>(dy), beta1, data<half>(dx),
 							data<half>(x), data<int>(indices), data<half>(scales), beta2, data<half>(dscales), batch_size, tokens, channels, experts,
 							top_k);
 				break;
 			}
 			case DTYPE_FLOAT32:
 			{
+				const size_t shared_memory_size = sizeof(float) * tokens;
 				if (channels % 4 == 0)
 					kernel_scatter_backward<float, 4> <<<grid_dim, block_dim, shared_memory_size, stream>>>(data<float>(dy), beta1, data<float>(dx),
 							data<float>(x), data<int>(indices), data<float>(scales), beta2, data<float>(dscales), batch_size, tokens, channels,
@@ -682,6 +685,7 @@ namespace ml
 			}
 			case DTYPE_FLOAT64:
 			{
+				const size_t shared_memory_size = sizeof(double) * tokens;
 				kernel_scatter_backward<double, 1> <<<grid_dim, block_dim, shared_memory_size, stream>>>(data<double>(dy), beta1, data<double>(dx),
 						data<double>(x), data<int>(indices), data<double>(scales), beta2, data<double>(dscales), batch_size, tokens, channels,
 						experts, top_k);
