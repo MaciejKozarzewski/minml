@@ -148,6 +148,7 @@ namespace ml
 	void sumOverFirstDim(const Context &context, float alpha, const Tensor &src, float beta, Tensor &dst);
 	void multiplyTensors(const Context &context, Tensor &dst, const Tensor &lhs, const Tensor &rhs);
 	void addTensors(const Context &context, Tensor &dst, const Tensor &src1, const Tensor &src2);
+	void addTensors(const Context &context, float alpha1, const Tensor &src1, float alpha2, const Tensor &src2, float beta, Tensor &dst);
 	void addTensors(const Context &context, float alpha1, const Tensor &src1, float alpha2, const Tensor &src2, float alpha3, const Tensor &src3,
 			float beta, Tensor &dst);
 

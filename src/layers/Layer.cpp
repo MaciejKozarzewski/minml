@@ -31,14 +31,17 @@
 #include <minml/layers/DepthToSpace.hpp>
 #include <minml/layers/DepthwiseConv2D.hpp>
 #include <minml/layers/FusedConvBlock.hpp>
+#include <minml/layers/GatherTopK.hpp>
 #include <minml/layers/GlobalAveragePooling.hpp>
 #include <minml/layers/Input.hpp>
 #include <minml/layers/LayerNormalization.hpp>
 #include <minml/layers/LearnableGlobalPooling.hpp>
+#include <minml/layers/MixtureOfExperts.hpp>
 #include <minml/layers/MultiHeadAttention.hpp>
 #include <minml/layers/PositionalEncoding.hpp>
 #include <minml/layers/RMSNormalization.hpp>
 #include <minml/layers/Router.hpp>
+#include <minml/layers/ScatterTopK.hpp>
 #include <minml/layers/Softmax.hpp>
 #include <minml/layers/SpaceToDepth.hpp>
 #include <minml/layers/SpatialScaling.hpp>
@@ -321,14 +324,17 @@ namespace ml
 		static const DepthToSpace depth_to_space(0, { 0, 0 });
 		static const DepthwiseConv2D depthwise_conv2d(0, 0);
 		static const FusedConvBlock fused_conv_block;
+		static const GatherTopK gather_top_k(0);
 		static const GlobalAveragePooling global_average_pooling;
 		static const LayerNormalization layernorm;
 		static const LearnableGlobalPooling learnable_global_pooling(0);
-		static const MultiHeadAttention mha(0, 0, false);
+		static const MixtureOfExperts mixture_of_experts(0, 0);
+		static const MultiHeadAttention multi_head_attention(0, 0, false);
 		static const Input input;
 		static const RMSNormalization rmsnorm;
 		static const Router router(0);
 		static const PositionalEncoding positional_encoding;
+		static const ScatterTopK scatter_top_k;
 		static const Softmax softmax( { 0 });
 		static const SpaceToDepth space_to_depth(0);
 		static const SpatialScaling spatial_scaling;
@@ -361,14 +367,18 @@ namespace ml
 			result = depthwise_conv2d.clone(json);
 		if (name == fused_conv_block.name())
 			result = fused_conv_block.clone(json);
+		if (name == gather_top_k.name())
+			result = gather_top_k.clone(json);
 		if (name == global_average_pooling.name())
 			result = global_average_pooling.clone(json);
 		if (name == layernorm.name())
 			result = layernorm.clone(json);
 		if (name == learnable_global_pooling.name())
 			result = learnable_global_pooling.clone(json);
-		if (name == mha.name())
-			result = mha.clone(json);
+		if (name == mixture_of_experts.name())
+			result = mixture_of_experts.clone(json);
+		if (name == multi_head_attention.name())
+			result = multi_head_attention.clone(json);
 		if (name == input.name())
 			result = input.clone(json);
 		if (name == positional_encoding.name())
@@ -377,6 +387,8 @@ namespace ml
 			result = rmsnorm.clone(json);
 		if (name == router.name())
 			result = router.clone(json);
+		if (name == scatter_top_k.name())
+			result = scatter_top_k.clone(json);
 		if (name == softmax.name())
 			result = softmax.clone(json);
 		if (name == space_to_depth.name())

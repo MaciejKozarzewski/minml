@@ -77,18 +77,32 @@ namespace ml
 	{
 		assert(input.size() == 2);
 
+		const int batch_size = input[0].dim(0);
+		const int top_k = input[0].dim(1);
+		const int experts = input[0].dim(2);
+
+		Tensor indices = m_indices_cache.view( { batch_size, experts, top_k });
+		Tensor values = m_values_cache.view( { batch_size, experts, top_k });
+
 		const Tensor flattened_router_output = input[1].view().flatten( { 2, 3 });
 
-		selectTopK(context(), flattened_router_output, m_indices_cache, m_values_cache);
-		scatterTokensForward(context(), input[0], m_indices_cache, m_values_cache, 0.0f, output);
+		selectTopK(context(), flattened_router_output, indices, values);
+		scatterTokensForward(context(), input[0], indices, values, 0.0f, output);
 	}
 	void ScatterTopK::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next,
 			const std::vector<float> &beta)
 	{
 		assert(input.size() == 2);
 		assert(gradient_prev.size() == 2);
-		scatterTokensBackward(context(), gradient_next, input[0], m_indices_cache, m_values_cache, beta[0], gradient_prev[0], beta[1],
-				gradient_prev[1]);
+
+		const int batch_size = input[0].dim(0);
+		const int top_k = input[0].dim(1);
+		const int experts = input[0].dim(2);
+
+		const Tensor indices = m_indices_cache.view( { batch_size, experts, top_k });
+		const Tensor values = m_values_cache.view( { batch_size, experts, top_k });
+
+		scatterTokensBackward(context(), gradient_next, input[0], indices, values, beta[0], gradient_prev[0], beta[1], gradient_prev[1]);
 	}
 
 } /* namespace ml */

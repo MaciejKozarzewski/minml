@@ -225,6 +225,8 @@ namespace ml
 	}
 	Optimizer& Graph::getOptimizer()
 	{
+		if (m_optimizer == nullptr)
+			throw LogicError(METHOD_NAME, "Optimizer has not been set");
 		return *m_optimizer;
 	}
 	GradientScaler& Graph::getGradientScaler()

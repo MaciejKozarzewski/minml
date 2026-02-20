@@ -569,7 +569,7 @@ namespace ml
 			{
 				betas[i] = zero_beta ? 0.0f : randFloat();
 				initForTest(input[i], i + 1);
-//				initForTest(gradient_prev[i], 0.1 * (i + 1));
+				initForTest(gradient_prev[i], 0.1 * (i + 1));
 			}
 			initForTest(gradient_next, 0.0);
 			m_layer->init();
@@ -580,6 +580,7 @@ namespace ml
 			for (size_t i = 0; i < input.size(); i++)
 			{
 				convertTensor(*context, input[i], lc.input[i]);
+				convertTensor(*context, gradient_prev[i], lc.gradient_prev[i]);
 				betas[i] = lc.betas[i];
 			}
 			convertTensor(*context, gradient_next, lc.gradient_next);

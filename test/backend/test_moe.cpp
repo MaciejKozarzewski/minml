@@ -28,17 +28,6 @@ namespace
 	using namespace ml;
 
 	template<typename T>
-	T clamp(T x, T lower, T upper) noexcept
-	{
-		assert(lower <= upper);
-		return std::max(lower, std::min(upper, x));
-	}
-	int round_up(int x, int y) noexcept
-	{
-		return y * ((x + y - 1) / y);
-	}
-
-	template<typename T>
 	void baseline_gemm(char opA, char opB, Tensor &C, const Tensor &A, const Tensor &B, T alpha, T beta)
 	{
 		assert(A.device().isCPU());
@@ -134,6 +123,21 @@ namespace
 			}
 		}
 	}
+	template<typename T>
+	void scale_by_beta(T beta, Tensor &x)
+	{
+		if (beta == static_cast<T>(0))
+		{
+			x.zeroall();
+			return;
+		}
+		else
+		{
+			Tensor tmp = x.view().flatten();
+			for (int i = 0; i < tmp.volume(); i++)
+				tmp.at( { i }) = (T) tmp.at( { i }) * beta;
+		}
+	}
 
 	template<typename T>
 	Tensor top_k_indices(const Tensor &t, int top_k)
@@ -187,7 +191,7 @@ namespace
 				}
 	}
 	template<typename T>
-	void gather_tokens_backward(Tensor &gradient_prev, const Tensor &gradient_next, const Tensor &indices)
+	void gather_tokens_backward(float beta, Tensor &gradient_prev, const Tensor &gradient_next, const Tensor &indices)
 	{
 		assert(gradient_prev.rank() == 4);
 		assert(indices.rank() == 3);
@@ -204,7 +208,7 @@ namespace
 		assert(gradient_next.dim(2) == experts);
 		assert(gradient_next.dim(3) == channels);
 
-		flattened_prev.zeroall();
+		scale_by_beta<T>(beta, gradient_prev);
 		for (int e = 0; e < experts; e++)
 			for (int b = 0; b < batch_size; b++)
 				for (int k = 0; k < top_k; k++)
@@ -254,8 +258,8 @@ namespace
 				}
 	}
 	template<typename T>
-	void scatter_tokens_backward(Tensor &gradient_prev, const Tensor &gradient_next, const Tensor &input, const Tensor &indices,
-			Tensor &router_gradient, const Tensor &router_output)
+	void scatter_tokens_backward(float beta_prev, Tensor &gradient_prev, const Tensor &gradient_next, const Tensor &input, const Tensor &indices,
+			float beta_router, Tensor &router_gradient, const Tensor &router_output)
 	{
 		assert(gradient_prev.rank() == 4);
 		assert(gradient_next.rank() == 4);
@@ -274,8 +278,9 @@ namespace
 		Tensor flattened_next = gradient_next.view().flatten( { 1, 2 });
 		const Tensor flattened_router_output = router_output.view().flatten( { 2, 3 });
 		Tensor flattened_router_gradient = router_gradient.view().flatten( { 2, 3 });
-		gradient_prev.zeroall();
-		router_gradient.zeroall();
+
+		scale_by_beta<T>(beta_prev, gradient_prev);
+		scale_by_beta<T>(beta_router, router_gradient);
 
 		for (int e = 0; e < experts; e++)
 			for (int b = 0; b < batch_size; b++)
@@ -287,9 +292,10 @@ namespace
 					for (int c = 0; c < channels; c++)
 					{
 						scale_gradient += (T) input.at( { b, k, e, c }) * (T) flattened_next.at( { b, token_index, c });
-						gradient_prev.at( { b, k, e, c }) = (T) flattened_next.at( { b, token_index, c }) * scale;
+						gradient_prev.at( { b, k, e, c }) = (T) gradient_prev.at( { b, k, e, c })
+								+ (T) flattened_next.at( { b, token_index, c }) * scale;
 					}
-					flattened_router_gradient.at( { b, e, token_index }) = scale_gradient;
+					flattened_router_gradient.at( { b, e, token_index }) = (T) flattened_router_gradient.at( { b, e, token_index }) + scale_gradient;
 				}
 	}
 
@@ -374,6 +380,7 @@ namespace
 
 			void forward(const std::vector<Tensor> &input, Tensor &output)
 			{
+				assert(input.size() == 1);
 				const int batch_size = input[0].dim(0);
 				const int tokens = input[0].dim(1) * input[0].dim(2);
 				const int channels = input[0].dim(3);
@@ -396,6 +403,9 @@ namespace
 			void backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next,
 					const std::vector<float> &beta)
 			{
+				assert(input.size() == 1);
+				assert(gradient_prev.size() == 1);
+
 				{ /* artificial scope for variables */
 					Tensor dy = gradient_next.view().flatten( { 0, 1 }, { 2, 3 });
 					const Tensor y = output.view().flatten( { 0, 1 }, { 2, 3 });
@@ -417,12 +427,12 @@ namespace
 
 					if (dtype() == DataType::FLOAT32)
 					{
-						baseline_gemm<float>('t', 'n', dx, dy, getWeights().getParam(), 1.0f, 0.0f);
+						baseline_gemm<float>('t', 'n', dx, dy, getWeights().getParam(), 1.0f, beta[0]);
 						baseline_gemm<float>('n', 'n', getWeights().getGradient(), dy, x, 1.0f, 1.0f);
 					}
 					else
 					{
-						baseline_gemm<double>('t', 'n', dx, dy, getWeights().getParam(), 1.0f, 0.0f);
+						baseline_gemm<double>('t', 'n', dx, dy, getWeights().getParam(), 1.0f, beta[0]);
 						baseline_gemm<double>('n', 'n', getWeights().getGradient(), dy, x, 1.0f, 1.0f);
 					}
 				}
@@ -502,17 +512,18 @@ namespace
 					const std::vector<float> &beta)
 			{
 				assert(input.size() == 2);
+				assert(gradient_prev.size() == 2);
 
 				const Tensor flattened_router_output = input[1].view().flatten( { 2, 3 });
 				if (dtype() == DataType::FLOAT32)
 				{
 					const Tensor indices = top_k_indices<float>(flattened_router_output, m_top_k);
-					gather_tokens_backward<float>(gradient_prev[0], gradient_next, indices);
+					gather_tokens_backward<float>(beta[0], gradient_prev[0], gradient_next, indices);
 				}
 				else
 				{
 					const Tensor indices = top_k_indices<double>(flattened_router_output, m_top_k);
-					gather_tokens_backward<double>(gradient_prev[0], gradient_next, indices);
+					gather_tokens_backward<double>(beta[0], gradient_prev[0], gradient_next, indices);
 				}
 			}
 	};
@@ -583,18 +594,20 @@ namespace
 					const std::vector<float> &beta)
 			{
 				assert(input.size() == 2);
+				assert(gradient_prev.size() == 2);
+
 				const int top_k = input[0].dim(1);
 
 				const Tensor flattened_router_output = input[1].view().flatten( { 2, 3 });
 				if (dtype() == DataType::FLOAT32)
 				{
 					const Tensor indices = top_k_indices<float>(flattened_router_output, top_k);
-					scatter_tokens_backward<float>(gradient_prev[0], gradient_next, input[0], indices, gradient_prev[1], input[1]);
+					scatter_tokens_backward<float>(beta[0], gradient_prev[0], gradient_next, input[0], indices, beta[1], gradient_prev[1], input[1]);
 				}
 				else
 				{
 					const Tensor indices = top_k_indices<double>(flattened_router_output, top_k);
-					scatter_tokens_backward<double>(gradient_prev[0], gradient_next, input[0], indices, gradient_prev[1], input[1]);
+					scatter_tokens_backward<double>(beta[0], gradient_prev[0], gradient_next, input[0], indices, beta[1], gradient_prev[1], input[1]);
 				}
 			}
 	};
@@ -657,6 +670,7 @@ namespace
 
 			void forward(const std::vector<Tensor> &input, Tensor &output)
 			{
+				assert(input.size() == 1);
 				const int batch_size = input[0].dim(0);
 				const int top_k = input[0].dim(1);
 				const int experts = input[0].dim(2);
@@ -683,6 +697,8 @@ namespace
 			void backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next,
 					const std::vector<float> &beta)
 			{
+				assert(input.size() == 1);
+				assert(gradient_prev.size() == 1);
 				const int batch_size = input[0].dim(0);
 				const int top_k = input[0].dim(1);
 				const int experts = input[0].dim(2);
@@ -707,12 +723,12 @@ namespace
 
 					if (dtype() == DataType::FLOAT32)
 					{
-						baseline_gemm<float>('n', 'n', dx, dy, w, 1.0f, 0.0f);
+						baseline_gemm<float>('n', 'n', dx, dy, w, 1.0f, beta[0]);
 						baseline_gemm<float>('t', 'n', dw, dy, x, 1.0f, 0.0f);
 					}
 					else
 					{
-						baseline_gemm<double>('n', 'n', dx, dy, w, 1.0f, 0.0f);
+						baseline_gemm<double>('n', 'n', dx, dy, w, 1.0f, beta[0]);
 						baseline_gemm<double>('t', 'n', dw, dy, x, 1.0f, 0.0f);
 					}
 				}
@@ -772,6 +788,7 @@ namespace ml
 		const int width = 14;
 		const int channels = 56;
 		const int experts = 7;
+		const bool verbose = false;
 
 		const Shape input_shape( { batch_size, height, width, channels });
 
@@ -787,13 +804,13 @@ namespace ml
 		baseline.init();
 		under_test.initFrom(baseline);
 
-		baseline.forward();
-		under_test.forward();
+		baseline.forward(verbose);
+		under_test.forward(verbose);
 
 		EXPECT_LE(output_diff(baseline, under_test), 1.0e-4f);
 
-		baseline.backward();
-		under_test.backward();
+		baseline.backward(verbose);
+		under_test.backward(verbose);
 
 		EXPECT_LE(gradient_prev_diff(baseline, under_test, 0), 1.0e-4f);
 		EXPECT_LE(weight_gradient_diff(baseline, under_test), 1.0e-4f);
@@ -898,7 +915,7 @@ namespace ml
 		baseline.setup(Device::cpu(), DataType::FLOAT32);
 		under_test.setup(Device::cuda(), DataType::FLOAT32);
 
-		baseline.init(false);
+		baseline.init();
 		under_test.initFrom(baseline);
 
 		baseline.forward(verbose);

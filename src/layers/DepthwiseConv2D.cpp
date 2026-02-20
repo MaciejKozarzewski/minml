@@ -91,7 +91,7 @@ namespace ml
 
 	void DepthwiseConv2D::forward(const std::vector<Tensor> &input, Tensor &output)
 	{
-		assert(input.size() == 1);
+		assert(input.size() == 1 || input.size() == 2);
 		if (isInteger(input[0].dtype()))
 		{
 			assert(output.dtype() == dtype());
@@ -140,7 +140,15 @@ namespace ml
 			}
 		}
 		else
-			depthwiseConvForward(context(), 1.0f, input[0], getWeights().getParam(), 0.0f, output, getBias().getParam());
+		{
+			float beta = 0.0f;
+			if (input.size() == 2)
+			{
+				output.copyFrom(context(), input[1]);
+				beta = 1.0f;
+			}
+			depthwiseConvForward(context(), 1.0f, input[0], getWeights().getParam(), beta, output, getBias().getParam());
+		}
 	}
 	void DepthwiseConv2D::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next,
 			const std::vector<float> &beta)
