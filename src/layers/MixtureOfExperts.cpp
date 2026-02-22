@@ -93,6 +93,12 @@ namespace ml
 		return result;
 	}
 
+	void MixtureOfExperts::init()
+	{
+		m_initializer.init_weights(context(), getWeights(), 1.0f / std::sqrt(getWeightShape().lastDim()), 0.0f);
+		m_initializer.init_bias(context(), getBias(), 0.1f, 0.0f);
+	}
+
 	void MixtureOfExperts::forward(const std::vector<Tensor> &input, Tensor &output)
 	{
 		assert(input.size() == 1);
