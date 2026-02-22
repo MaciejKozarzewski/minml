@@ -198,30 +198,34 @@ namespace
 		}
 	}
 	template<typename T, int N, typename U = T>
-	__global__ void kernel_scatter_backward(const T *gradient_next, float beta1, T *gradient_prev, const T *input, const int *indices,
-			const T *scales, float beta2, T *gradient_scales, int batch_size, int tokens, int channels, int experts, int top_k)
+	__global__ void kernel_scatter_backward(const T *gradient_next, float beta_prev, T *gradient_prev, const T *input, const int *indices,
+			const T *scales, float beta_scales, T *gradient_scales, int batch_size, int tokens, int channels, int experts, int top_k)
 	{
 		assert(channels % N == 0);
 		extern __shared__ char shared_array[];
-		U *workspace = reinterpret_cast<U*>(shared_array);
-
-		const int tid = threadIdx.y * blockDim.x + threadIdx.x;
-		for (int i = tid; i < tokens; i += blockDim.x * blockDim.y)
-			workspace[i] = static_cast<T>(0.0f);
-		__syncthreads();
+		U *workspace_grad = reinterpret_cast<U*>(shared_array);
+		U *workspace_scales = workspace_grad + top_k;
 
 		const int b = blockIdx.x;
 		const int e = blockIdx.y;
 
+		const Indexer<3> indices_indexer(batch_size, experts, top_k);
+
+		const int tid = threadIdx.y * blockDim.x + threadIdx.x;
+		for (int k = tid; k < top_k; k += blockDim.x * blockDim.y)
+		{
+			workspace_grad[k] = static_cast<T>(0.0f);
+			workspace_scales[k] = static_cast<T>(scales[indices_indexer.at(b, e, k)]);
+		}
+		__syncthreads();
+
 		const Indexer<4> prev_indexer(batch_size, top_k, experts, channels);
 		const Indexer<3> next_indexer(batch_size, tokens, channels);
-		const Indexer<3> indices_indexer(batch_size, experts, top_k);
 
 		for (int k = threadIdx.y; k < top_k; k += blockDim.y)
 		{
-			const int idx = indices_indexer.at(b, e, k);
-			const int token_index = indices[idx];
-			const vec<T, N> scale(scales[idx]);
+			const int token_index = indices[indices_indexer.at(b, e, k)];
+			const vec<T, N> scale(workspace_scales[k]);
 			vec<T, N> scale_gradient(static_cast<T>(0.0f));
 			for (int c = N * threadIdx.x; c < channels; c += N * blockDim.x)
 			{
@@ -229,8 +233,8 @@ namespace
 				const vec<T, N> x(input + prev_indexer.at(b, k, e, c));
 				vec<T, N> dx = dy * scale;
 				scale_gradient += dy * x;
-				if (beta1 != 0.0f)
-					dx += vec<T, N>(beta1) * vec<T, N>(gradient_prev + prev_indexer.at(b, k, e, c));
+				if (beta_prev != 0.0f)
+					dx += vec<T, N>(beta_prev) * vec<T, N>(gradient_prev + prev_indexer.at(b, k, e, c));
 				dx.store(gradient_prev + prev_indexer.at(b, k, e, c));
 			}
 
@@ -238,18 +242,44 @@ namespace
 			for (int i = 16; i >= 1; i /= 2)
 				reduced_scale_gradient += __shfl_xor_sync(0xffffffff, reduced_scale_gradient, i);
 			if (threadIdx.x == 0)
-				workspace[token_index] = reduced_scale_gradient;
+				workspace_grad[k] = reduced_scale_gradient;
 		}
 
 		__syncthreads();
-		const Indexer<3> ds_indexer(batch_size, experts, tokens);
-		for (int i = tid; i < tokens; i += blockDim.x * blockDim.y)
+		// perform softmax backward over scales
+		if (threadIdx.y == 0)
 		{
-			U tmp = workspace[i];
-			if (beta2 != 0.0f)
-				tmp += static_cast<U>(gradient_scales[ds_indexer.at(b, e, i)]) * static_cast<U>(beta2);
-			gradient_scales[ds_indexer.at(b, e, i)] = static_cast<T>(tmp);
+			U tmp = 0;
+			for (int k = threadIdx.x; k < top_k; k += blockDim.x)
+			{
+				const U y = static_cast<U>(workspace_scales[k]);
+				const U dy = static_cast<U>(workspace_grad[k]);
+				tmp += dy * y;
+			}
+			for (int i = 16; i >= 1; i /= 2)
+				tmp += __shfl_xor_sync(0xffffffff, tmp, i);
+
+			for (int k = threadIdx.x; k < top_k; k += blockDim.x)
+			{
+				const U y = static_cast<U>(workspace_scales[k]);
+				const U dy = static_cast<U>(workspace_grad[k]);
+				workspace_grad[k] = y * (dy - tmp);
+			}
 		}
+
+		// scale router output gradient by beta
+		__syncthreads();
+		const Indexer<3> ds_indexer(batch_size, experts, tokens);
+		for (int t = tid; t < tokens; t += blockDim.x * blockDim.y)
+		{
+			const T tmp = (beta_scales == 0.0f) ? static_cast<T>(0.0f) : (gradient_scales[ds_indexer.at(b, e, t)] * static_cast<T>(beta_scales));
+			gradient_scales[ds_indexer.at(b, e, t)] = tmp;
+		}
+
+		// apply scale gradients to router output gradient
+		__syncthreads();
+		for (int k = tid; k < top_k; k += blockDim.x * blockDim.y)
+			gradient_scales[ds_indexer.at(b, e, indices[indices_indexer.at(b, e, k)])] += workspace_grad[k];
 	}
 
 	void print_shape(const mlTensor_t &t)
@@ -583,9 +613,13 @@ namespace ml
 		}
 		assert(cudaGetLastError() == cudaSuccess);
 	}
-	void cuda_scatter_tokens_forward(mlContext_t context, const mlTensor_t x, const mlTensor_t indices, const mlTensor_t scales, float beta,
-			mlTensor_t y)
+	void cuda_scatter_tokens_forward(mlContext_t context, const mlTensor_t x, const mlTensor_t indices, mlTensor_t scales, float beta, mlTensor_t y)
 	{
+		// x		[NKEC]
+		// indices	[NEK]
+		// scales	[NEK]
+		// y		[NHWC]	HW = tokens
+		assert(same_shape(indices, scales));
 		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
 		const int batch_size = y.dim[0];
 		const int tokens = y.dim[1] * y.dim[2];
@@ -601,6 +635,8 @@ namespace ml
 		assert(top_k == indices.dim[2]);
 
 		cuda_scale_tensor(context, beta, y);
+
+		cuda_softmax_forward(context, scales.dtype, make_shape( { scales.dim[0] * scales.dim[1], scales.dim[2] }), scales.data, scales.data);
 
 		dim3 block_dim(32, 8);
 		dim3 grid_dim(batch_size, experts);
@@ -638,6 +674,13 @@ namespace ml
 	void cuda_scatter_tokens_backward(mlContext_t context, const mlTensor_t x, const mlTensor_t indices, const mlTensor_t scales, const mlTensor_t dy,
 			float beta1, mlTensor_t dx, float beta2, mlTensor_t dscales)
 	{
+		// x		[NKEC]
+		// indices	[NEK]
+		// scales	[NEK]
+		// dy		[NHWC]	HW = tokens
+		// dx		[NKEC]
+		// dscales	[NEHW]
+		assert(same_shape(scales, indices));
 		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
 		const int batch_size = dy.dim[0];
 		const int tokens = dy.dim[1] * dy.dim[2];
@@ -654,25 +697,25 @@ namespace ml
 
 		dim3 block_dim(32, 8);
 		dim3 grid_dim(batch_size, experts);
-		
+
 		switch (x.dtype)
 		{
 			case DTYPE_FLOAT16:
 			{
-				const size_t shared_memory_size = sizeof(float) * tokens;
+				const size_t shared_memory_size = sizeof(float) * top_k;
 				if (channels % 4 == 0)
-					kernel_scatter_backward<half, 4, float> <<<grid_dim, block_dim, shared_memory_size, stream>>>(data<half>(dy), beta1, data<half>(dx),
-							data<half>(x), data<int>(indices), data<half>(scales), beta2, data<half>(dscales), batch_size, tokens, channels, experts,
-							top_k);
+					kernel_scatter_backward<half, 4, float> <<<grid_dim, block_dim, shared_memory_size, stream>>>(data<half>(dy), beta1,
+							data<half>(dx), data<half>(x), data<int>(indices), data<half>(scales), beta2, data<half>(dscales), batch_size, tokens,
+							channels, experts, top_k);
 				else
-					kernel_scatter_backward<half, 1, float> <<<grid_dim, block_dim, shared_memory_size, stream>>>(data<half>(dy), beta1, data<half>(dx),
-							data<half>(x), data<int>(indices), data<half>(scales), beta2, data<half>(dscales), batch_size, tokens, channels, experts,
-							top_k);
+					kernel_scatter_backward<half, 1, float> <<<grid_dim, block_dim, shared_memory_size, stream>>>(data<half>(dy), beta1,
+							data<half>(dx), data<half>(x), data<int>(indices), data<half>(scales), beta2, data<half>(dscales), batch_size, tokens,
+							channels, experts, top_k);
 				break;
 			}
 			case DTYPE_FLOAT32:
 			{
-				const size_t shared_memory_size = sizeof(float) * tokens;
+				const size_t shared_memory_size = sizeof(float) * top_k;
 				if (channels % 4 == 0)
 					kernel_scatter_backward<float, 4> <<<grid_dim, block_dim, shared_memory_size, stream>>>(data<float>(dy), beta1, data<float>(dx),
 							data<float>(x), data<int>(indices), data<float>(scales), beta2, data<float>(dscales), batch_size, tokens, channels,
@@ -685,7 +728,7 @@ namespace ml
 			}
 			case DTYPE_FLOAT64:
 			{
-				const size_t shared_memory_size = sizeof(double) * tokens;
+				const size_t shared_memory_size = sizeof(double) * top_k;
 				kernel_scatter_backward<double, 1> <<<grid_dim, block_dim, shared_memory_size, stream>>>(data<double>(dy), beta1, data<double>(dx),
 						data<double>(x), data<int>(indices), data<double>(scales), beta2, data<double>(dscales), batch_size, tokens, channels,
 						experts, top_k);

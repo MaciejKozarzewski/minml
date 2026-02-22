@@ -66,8 +66,8 @@ namespace ml
 		const Tensor flattened_input = input[0].view().flatten( { 1, 2 });
 		Tensor flattened_output = output.view().flatten( { 2, 3 });
 		gemmBatched(context(), 'n', 't', flattened_output, getWeights().getParam(), flattened_input, 1.0f, 0.0f);
-		Tensor y = output.view().flatten( { 0, 1 }, { 2, 3 });
-		softmaxForward(context(), y, y);
+//		Tensor y = output.view().flatten( { 0, 1 }, { 2, 3 });
+//		softmaxForward(context(), y, y);
 	}
 	void Router::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next,
 			const std::vector<float> &beta)
@@ -75,11 +75,11 @@ namespace ml
 		assert(input.size() == 1);
 		assert(gradient_prev.size() == 1);
 
-		{ /* artificial scope for variables */
-			const Tensor flattened_y = output.view().flatten( { 0, 1 }, { 2, 3 }); // (NE) x (HW)
-			Tensor flattened_dy = gradient_next.view().flatten( { 0, 1 }, { 2, 3 }); // (NE) x (HW)
-			softmaxBackward(context(), 1.0f, flattened_dy, flattened_y, 0.0f, flattened_dy);
-		}
+//		{ /* artificial scope for variables */
+//			const Tensor flattened_y = output.view().flatten( { 0, 1 }, { 2, 3 }); // (NE) x (HW)
+//			Tensor flattened_dy = gradient_next.view().flatten( { 0, 1 }, { 2, 3 }); // (NE) x (HW)
+//			softmaxBackward(context(), 1.0f, flattened_dy, flattened_y, 0.0f, flattened_dy);
+//		}
 
 		const Tensor flattened_x = input[0].view().flatten( { 1, 2 }); // N x (HW) x C
 		Tensor flattened_dx = gradient_prev[0].view().flatten( { 1, 2 }); // N x (HW) x C

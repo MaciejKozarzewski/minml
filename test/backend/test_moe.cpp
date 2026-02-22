@@ -163,6 +163,34 @@ namespace
 			}
 		return result;
 	}
+	template<typename T>
+	Tensor get_scales_forward(const Tensor &router_output, const Tensor &indices)
+	{
+		Tensor result(indices.shape(), router_output.dtype(), router_output.device());
+		for (int b = 0; b < indices.dim(0); b++)
+			for (int e = 0; e < indices.dim(1); e++)
+				for (int k = 0; k < indices.dim(2); k++)
+					result.at( { b, e, k }) = router_output.at( { b, e, (int) indices.at( { b, e, k }) });
+		Tensor tmp = result.view().flatten( { 0, 1 });
+		baseline_softmax_forward<T>(tmp, tmp);
+		return result;
+	}
+	template<typename T>
+	void get_scales_backward(float beta, Tensor &router_gradient, const Tensor &scales_gradient, const Tensor &indices, const Tensor &scales)
+	{
+		Tensor tmp1 = scales_gradient.view().flatten( { 0, 1 });
+		Tensor tmp2 = scales.view().flatten( { 0, 1 });
+		baseline_softmax_backward<T>(tmp1, tmp1, tmp2);
+
+		scale_by_beta<T>(beta, router_gradient);
+		Tensor tmp_prev = router_gradient.view().flatten( { 2, 3 });
+		for (int b = 0; b < scales_gradient.dim(0); b++)
+			for (int e = 0; e < scales_gradient.dim(1); e++)
+				for (int k = 0; k < scales_gradient.dim(2); k++)
+					tmp_prev.at( { b, e, (int) indices.at( { b, e, k }) }) = (T) tmp_prev.at( { b, e, (int) indices.at( { b, e, k }) })
+							+ (T) scales_gradient.at( { b, e, k });
+	}
+
 	void gather_tokens_forward(Tensor &output, const Tensor &input, const Tensor &indices)
 	{
 		assert(input.rank() == 4);
@@ -222,7 +250,7 @@ namespace
 				}
 	}
 	template<typename T>
-	void scatter_tokens_forward(Tensor &output, const Tensor &input, const Tensor &indices, const Tensor &router_output)
+	void scatter_tokens_forward(Tensor &output, const Tensor &input, const Tensor &indices, const Tensor &scales)
 	{
 		assert(output.rank() == 4);
 		assert(input.rank() == 4);
@@ -240,7 +268,6 @@ namespace
 		assert(channels == input.dim(3));
 
 		Tensor flattened_output = output.view().flatten( { 1, 2 });
-		const Tensor flattened_router_output = router_output.isEmpty() ? Tensor() : router_output.view().flatten( { 2, 3 });
 		output.zeroall();
 
 		for (int e = 0; e < experts; e++)
@@ -248,8 +275,7 @@ namespace
 				for (int k = 0; k < top_k; k++)
 				{
 					const int token_index = (int) indices.at( { b, e, k });
-					const T scale = flattened_router_output.isEmpty() ? static_cast<T>(1) : static_cast<T>(flattened_router_output.at( { b, e,
-							token_index }));
+					const T scale = scales.isEmpty() ? static_cast<T>(1) : static_cast<T>(scales.at( { b, e, k }));
 					for (int c = 0; c < channels; c++)
 					{
 						const T tmp = (T) flattened_output.at( { b, token_index, c }) + (T) input.at( { b, k, e, c }) * scale;
@@ -259,7 +285,7 @@ namespace
 	}
 	template<typename T>
 	void scatter_tokens_backward(float beta_prev, Tensor &gradient_prev, const Tensor &gradient_next, const Tensor &input, const Tensor &indices,
-			float beta_router, Tensor &router_gradient, const Tensor &router_output)
+			const Tensor &scales, Tensor &scales_gradient)
 	{
 		assert(gradient_prev.rank() == 4);
 		assert(gradient_next.rank() == 4);
@@ -276,18 +302,15 @@ namespace
 		assert(channels == gradient_prev.dim(3));
 
 		Tensor flattened_next = gradient_next.view().flatten( { 1, 2 });
-		const Tensor flattened_router_output = router_output.view().flatten( { 2, 3 });
-		Tensor flattened_router_gradient = router_gradient.view().flatten( { 2, 3 });
 
 		scale_by_beta<T>(beta_prev, gradient_prev);
-		scale_by_beta<T>(beta_router, router_gradient);
 
 		for (int e = 0; e < experts; e++)
 			for (int b = 0; b < batch_size; b++)
 				for (int k = 0; k < top_k; k++)
 				{
 					const int token_index = (int) indices.at( { b, e, k });
-					const T scale = (T) flattened_router_output.at( { b, e, token_index });
+					const T scale = (T) scales.at( { b, e, k });
 					T scale_gradient = static_cast<T>(0);
 					for (int c = 0; c < channels; c++)
 					{
@@ -295,7 +318,7 @@ namespace
 						gradient_prev.at( { b, k, e, c }) = (T) gradient_prev.at( { b, k, e, c })
 								+ (T) flattened_next.at( { b, token_index, c }) * scale;
 					}
-					flattened_router_gradient.at( { b, e, token_index }) = (T) flattened_router_gradient.at( { b, e, token_index }) + scale_gradient;
+					scales_gradient.at( { b, e, k }) = scale_gradient;
 				}
 	}
 
@@ -394,11 +417,11 @@ namespace
 					else
 						baseline_gemm<double>('n', 't', y, getWeights().getParam(), x, 1.0f, 0.0f);
 				}
-				Tensor y = output.view().flatten( { 0, 1 }, { 2, 3 });
-				if (dtype() == DataType::FLOAT32)
-					baseline_softmax_forward<float>(y, y);
-				else
-					baseline_softmax_forward<double>(y, y);
+//				Tensor y = output.view().flatten( { 0, 1 }, { 2, 3 });
+//				if (dtype() == DataType::FLOAT32)
+//					baseline_softmax_forward<float>(y, y);
+//				else
+//					baseline_softmax_forward<double>(y, y);
 			}
 			void backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next,
 					const std::vector<float> &beta)
@@ -406,14 +429,14 @@ namespace
 				assert(input.size() == 1);
 				assert(gradient_prev.size() == 1);
 
-				{ /* artificial scope for variables */
-					Tensor dy = gradient_next.view().flatten( { 0, 1 }, { 2, 3 });
-					const Tensor y = output.view().flatten( { 0, 1 }, { 2, 3 });
-					if (dtype() == DataType::FLOAT32)
-						baseline_softmax_backward<float>(dy, dy, y);
-					else
-						baseline_softmax_backward<double>(dy, dy, y);
-				}
+//				{ /* artificial scope for variables */
+//					Tensor dy = gradient_next.view().flatten( { 0, 1 }, { 2, 3 });
+//					const Tensor y = output.view().flatten( { 0, 1 }, { 2, 3 });
+//					if (dtype() == DataType::FLOAT32)
+//						baseline_softmax_backward<float>(dy, dy, y);
+//					else
+//						baseline_softmax_backward<double>(dy, dy, y);
+//				}
 
 				const int batch_size = input[0].dim(0);
 				const int tokens = input[0].dim(1) * input[0].dim(2);
@@ -582,12 +605,14 @@ namespace
 				if (dtype() == DataType::FLOAT32)
 				{
 					const Tensor indices = top_k_indices<float>(flattened_router_output, top_k);
-					scatter_tokens_forward<float>(output, input[0], indices, input[1]);
+					Tensor scales = get_scales_forward<float>(flattened_router_output, indices);
+					scatter_tokens_forward<float>(output, input[0], indices, scales);
 				}
 				else
 				{
 					const Tensor indices = top_k_indices<double>(flattened_router_output, top_k);
-					scatter_tokens_forward<double>(output, input[0], indices, input[1]);
+					Tensor scales = get_scales_forward<double>(flattened_router_output, indices);
+					scatter_tokens_forward<double>(output, input[0], indices, scales);
 				}
 			}
 			void backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next,
@@ -602,12 +627,20 @@ namespace
 				if (dtype() == DataType::FLOAT32)
 				{
 					const Tensor indices = top_k_indices<float>(flattened_router_output, top_k);
-					scatter_tokens_backward<float>(beta[0], gradient_prev[0], gradient_next, input[0], indices, beta[1], gradient_prev[1], input[1]);
+					Tensor scales = get_scales_forward<float>(flattened_router_output, indices);
+					Tensor scales_gradient = zeros_like(scales);
+					scatter_tokens_backward<float>(beta[0], gradient_prev[0], gradient_next, input[0], indices, scales, scales_gradient);
+
+					get_scales_backward<float>(beta[1], gradient_prev[1], scales_gradient, indices, scales);
 				}
 				else
 				{
 					const Tensor indices = top_k_indices<double>(flattened_router_output, top_k);
-					scatter_tokens_backward<double>(beta[0], gradient_prev[0], gradient_next, input[0], indices, beta[1], gradient_prev[1], input[1]);
+					Tensor scales = get_scales_forward<double>(flattened_router_output, indices);
+					Tensor scales_gradient = zeros_like(scales);
+					scatter_tokens_backward<double>(beta[0], gradient_prev[0], gradient_next, input[0], indices, scales, scales_gradient);
+
+					get_scales_backward<double>(beta[1], gradient_prev[1], scales_gradient, indices, scales);
 				}
 			}
 	};
@@ -864,7 +897,7 @@ namespace ml
 		const int channels = 56;
 		const int experts = 17;
 		const int top_k = 27;
-		const bool verbose = false;
+		const bool verbose = true;
 
 		const Shape input_shape( { batch_size, top_k, experts, channels });
 		const Shape router_output_shape( { batch_size, experts, height, width });
