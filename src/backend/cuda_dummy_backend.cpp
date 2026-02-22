@@ -404,7 +404,7 @@ namespace ml
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
-	void cuda_scatter_tokens_forward(mlContext_t context, const mlTensor_t x, const mlTensor_t indices, const mlTensor_t scales, float beta,
+	void cuda_scatter_tokens_forward(mlContext_t context, const mlTensor_t x, const mlTensor_t indices, mlTensor_t scales, float beta,
 			mlTensor_t y)
 	{
 		throw NotImplemented(METHOD_NAME);
