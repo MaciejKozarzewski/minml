@@ -57,7 +57,7 @@ namespace
 	void init_random_fp64(double *ptr, size_t length)
 	{
 		for (size_t i = 0; i < length; i++)
-			ptr[i] = 2 * randDouble() - 1;
+			ptr[i] = 20 * randDouble() - 10;
 	}
 	void init_random_fp32(float *ptr, size_t length)
 	{
@@ -157,6 +157,13 @@ namespace
 		return result;
 	}
 
+	double sum_for_test_fp64(const double *ptr, size_t length)
+	{
+		double result = 0.0;
+		for (size_t i = 0; i < length; i++)
+			result += ptr[i];
+		return result;
+	}
 	double sum_for_test_fp32(const float *ptr, size_t length)
 	{
 		double result = 0.0;
@@ -170,6 +177,28 @@ namespace
 		for (size_t i = 0; i < length; i++)
 			result += convert_fp16_to_fp32(ptr[i]);
 		return result;
+	}
+
+	double variance_for_test_fp64(const double *ptr, size_t length, double mean)
+	{
+		double result = 0.0;
+		for (size_t i = 0; i < length; i++)
+			result += square(ptr[i] - mean);
+		return result / (length - 1);
+	}
+	double variance_for_test_fp32(const float *ptr, size_t length, double mean)
+	{
+		double result = 0.0;
+		for (size_t i = 0; i < length; i++)
+			result += square(ptr[i] - mean);
+		return result / (length - 1);
+	}
+	double variance_for_test_fp16(const uint16_t *ptr, size_t length, double mean)
+	{
+		double result = 0.0;
+		for (size_t i = 0; i < length; i++)
+			result += square(convert_fp16_to_fp32(ptr[i]) - mean);
+		return result / (length - 1);
 	}
 
 	void abs_for_test_fp32(float *ptr, size_t length)
@@ -225,6 +254,25 @@ namespace
 		std::cout << ")\n";
 	}
 
+	Tensor uniform_random_tensor_like(const Tensor &t)
+	{
+		assert(t.dtype() == DataType::FLOAT64);
+		Tensor result(t.shape(), t.dtype(), Device::cpu());
+		for (int i = 0; i < result.volume(); i++)
+			reinterpret_cast<double*>(result.data())[i] = randDouble();
+		return result;
+	}
+	Tensor apply_random_eps(const Tensor &x, const Tensor &r, float alpha)
+	{
+		assert(x.dtype() == DataType::FLOAT64);
+		assert(r.dtype() == DataType::FLOAT64);
+		Tensor result = x;
+		result.moveTo(Device::cpu());
+		for (int i = 0; i < result.volume(); i++)
+			reinterpret_cast<double*>(result.data())[i] += alpha * reinterpret_cast<const double*>(r.data())[i];
+		result.moveTo(x.device());
+		return result;
+	}
 }
 
 namespace ml
@@ -375,6 +423,33 @@ namespace ml
 					return sum_for_test_fp16(reinterpret_cast<uint16_t*>(tmp.data()), tmp.volume());
 				case DataType::FLOAT32:
 					return sum_for_test_fp32(reinterpret_cast<float*>(tmp.data()), tmp.volume());
+				case DataType::FLOAT64:
+					return sum_for_test_fp64(reinterpret_cast<double*>(tmp.data()), tmp.volume());
+				default:
+					throw DataTypeNotSupported(METHOD_NAME, tensor.dtype());
+			}
+			return 0.0;
+		}
+		double meanForTest(const Tensor &tensor)
+		{
+			return sumForTest(tensor) / tensor.volume();
+		}
+		double varianceForTest(const Tensor &tensor)
+		{
+			if (tensor.volume() <= 1)
+				return 0.0;
+
+			const double mean = meanForTest(tensor);
+			Tensor tmp(tensor.shape(), tensor.dtype(), Device::cpu());
+			tmp.copyFrom(Context(), tensor);
+			switch (tmp.dtype())
+			{
+				case DataType::FLOAT16:
+					return variance_for_test_fp16(reinterpret_cast<uint16_t*>(tmp.data()), tmp.volume(), mean);
+				case DataType::FLOAT32:
+					return variance_for_test_fp32(reinterpret_cast<float*>(tmp.data()), tmp.volume(), mean);
+				case DataType::FLOAT64:
+					return variance_for_test_fp64(reinterpret_cast<double*>(tmp.data()), tmp.volume(), mean);
 				default:
 					throw DataTypeNotSupported(METHOD_NAME, tensor.dtype());
 			}
@@ -648,7 +723,7 @@ namespace ml
 				{
 					std::cout << lhs.output.shape() << '\n';
 					print_index(i, lhs.output.shape());
-					std::cout << i << " " << tmp_lhs.get( { i }) << " " << tmp_rhs.get( { i }) << '\n';
+					std::cout << i << " : " << tmp_lhs.get( { i }) << " vs " << tmp_rhs.get( { i }) << '\n';
 					exit(0);
 				}
 			return diffForTest(lhs.output, rhs.output);

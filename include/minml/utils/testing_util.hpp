@@ -18,8 +18,7 @@ namespace ml /* forward declarations */
 	class Device;
 	class Layer;
 	class Shape;
-	enum class DataType
-	;
+	enum class DataType;
 }
 
 namespace ml
@@ -32,6 +31,8 @@ namespace ml
 		double maxAbsDiff(const Tensor &lhs, const Tensor &rhs);
 		double normForTest(const Tensor &tensor);
 		double sumForTest(const Tensor &tensor);
+		double meanForTest(const Tensor &tensor);
+		double varianceForTest(const Tensor &tensor);
 		void abs(Tensor &tensor);
 
 		bool has_device_supporting(DataType dtype);

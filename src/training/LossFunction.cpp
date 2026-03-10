@@ -17,7 +17,8 @@ namespace ml
 	{
 		return crossEntropyLoss(context, output, target, mask);
 	}
-	void CrossEntropyLoss::getGradient(const Context &context, float scale, Tensor &gradient, const Tensor &output, const Tensor &target, const Tensor &mask) const
+	void CrossEntropyLoss::getGradient(const Context &context, float scale, Tensor &gradient, const Tensor &output, const Tensor &target,
+			const Tensor &mask) const
 	{
 		crossEntropyGradient(context, scale, output, target, mask, 0.0f, gradient);
 	}
@@ -38,7 +39,8 @@ namespace ml
 	{
 		return meanSquaredLoss(context, output, target, mask);
 	}
-	void MeanSquaredLoss::getGradient(const Context &context, float scale, Tensor &gradient, const Tensor &output, const Tensor &target, const Tensor &mask) const
+	void MeanSquaredLoss::getGradient(const Context &context, float scale, Tensor &gradient, const Tensor &output, const Tensor &target,
+			const Tensor &mask) const
 	{
 		meanSquaredGradient(context, scale, output, target, mask, 0.0f, gradient);
 	}
@@ -54,7 +56,6 @@ namespace ml
 	{
 		return std::make_unique<MeanSquaredLoss>();
 	}
-
 
 } /* namespace ml */
 
