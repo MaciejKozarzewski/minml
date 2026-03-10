@@ -1,34 +1,34 @@
 /*
- * GatherTopK.hpp
+ * LearnableScaling.hpp
  *
- *  Created on: Feb 3, 2026
+ *  Created on: Feb 24, 2026
  *      Author: Maciej Kozarzewski
  */
 
-#ifndef MINML_LAYERS_GATHERTOPK_HPP_
-#define MINML_LAYERS_GATHERTOPK_HPP_
+#ifndef MINML_LAYERS_LEARNABLESCALING_HPP_
+#define MINML_LAYERS_LEARNABLESCALING_HPP_
 
 #include <minml/layers/Layer.hpp>
 
 namespace ml
 {
 
-	class GatherTopK: public Layer
+	class LearnableScaling: public Layer
 	{
-			int m_top_k = 0;
-			Tensor m_indices_cache;
+			float m_initial_scale = 0.0f;
+			bool m_trainable_scale = true;
 		public:
-			GatherTopK(int top_k);
+			LearnableScaling(const std::string &act, float initialScale, bool trainable);
 
-			void setInputShape(const std::vector<Shape> &shapes);
 			Shape getOutputShape() const;
+			Shape getWeightShape() const;
 
 			std::string name() const;
 			Json getConfig() const;
 
 			std::unique_ptr<Layer> clone(const Json &config) const;
-			void changeContext(std::shared_ptr<Context> &context);
 
+			void init();
 			void forward(const std::vector<Tensor> &input, Tensor &output);
 			void backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next,
 					const std::vector<float> &beta);
@@ -36,4 +36,4 @@ namespace ml
 
 } /* namespace ml */
 
-#endif /* MINML_LAYERS_GATHERTOPK_HPP_ */
+#endif /* MINML_LAYERS_LEARNABLESCALING_HPP_ */

@@ -125,17 +125,17 @@ namespace
 		assert(gradient_scales.shape() == scales.shape());
 		assert(gradient_prev.shape() == gradient_next.shape());
 
-		for (int i = 0; i < gradient_next.dim(0); i++)
-			for (int l = 0; l < gradient_next.dim(3); l++)
+		for (int n = 0; n < gradient_next.dim(0); n++)
+			for (int c = 0; c < gradient_next.dim(3); c++)
 			{
 				T grad = 0;
-				for (int j = 0; j < gradient_next.dim(1); j++)
-					for (int k = 0; k < gradient_next.dim(2); k++)
+				for (int h = 0; h < gradient_next.dim(1); h++)
+					for (int w = 0; w < gradient_next.dim(2); w++)
 					{
-						grad += (T) gradient_next.at( { i, j, k, l }) * (T) input.at( { i, j, k, l });
-						gradient_prev.at( { i, j, k, l }) = (T) scales.at( { i, l }) * (T) gradient_next.at( { i, j, k, l });
+						grad += (T) gradient_next.at( { n, h, w, c }) * (T) input.at( { n, h, w, c });
+						gradient_prev.at( { n, h, w, c }) = (T) scales.at( { n, c }) * (T) gradient_next.at( { n, h, w, c });
 					}
-				gradient_scales.at( { i, l }) = grad;
+				gradient_scales.at( { n, c }) = grad;
 			}
 	}
 

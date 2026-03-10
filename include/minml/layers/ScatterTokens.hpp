@@ -1,33 +1,24 @@
 /*
- * Router.hpp
+ * ScatterTokens.hpp
  *
  *  Created on: Feb 3, 2026
  *      Author: Maciej Kozarzewski
  */
 
-#ifndef MINML_LAYERS_ROUTER_HPP_
-#define MINML_LAYERS_ROUTER_HPP_
+#ifndef MINML_LAYERS_SCATTERTOKENS_HPP_
+#define MINML_LAYERS_SCATTERTOKENS_HPP_
 
 #include <minml/layers/Layer.hpp>
 
 namespace ml
 {
 
-	enum class RoutingAlgorithm
+	class ScatterTokens: public Layer
 	{
-		HASH,
-		TOKEN_CHOICE,
-		EXPERT_CHOICE
-	};
-
-	class Router: public Layer
-	{
-			RoutingAlgorithm m_algorithm = RoutingAlgorithm::HASH;
-			float m_capacity_factor = 1.0f;
-			float m_load_balancing_alpha = 0.0f;
-			Tensor m_expert_biases;
+			int m_height = 0;
+			int m_width = 0;
 		public:
-			Router(RoutingAlgorithm algo, float capacityFactor, float loadBalancingAlpha = 0.0f);
+			ScatterTokens(int height, int width);
 
 			void setInputShape(const std::vector<Shape> &shapes);
 			Shape getOutputShape() const;
@@ -35,10 +26,7 @@ namespace ml
 			std::string name() const;
 			Json getConfig() const;
 
-			void convertTo(DataType newType);
 			std::unique_ptr<Layer> clone(const Json &config) const;
-			int getWorkspaceSize() const noexcept;
-			void changeContext(std::shared_ptr<Context> &context);
 
 			void forward(const std::vector<Tensor> &input, Tensor &output);
 			void backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next,
@@ -47,4 +35,4 @@ namespace ml
 
 } /* namespace ml */
 
-#endif /* MINML_LAYERS_ROUTER_HPP_ */
+#endif /* MINML_LAYERS_SCATTERTOKENS_HPP_ */

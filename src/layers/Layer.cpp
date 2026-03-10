@@ -31,20 +31,22 @@
 #include <minml/layers/DepthToSpace.hpp>
 #include <minml/layers/DepthwiseConv2D.hpp>
 #include <minml/layers/FusedConvBlock.hpp>
-#include <minml/layers/GatherTopK.hpp>
+#include <minml/layers/GatherTokens.hpp>
 #include <minml/layers/GlobalAveragePooling.hpp>
 #include <minml/layers/Input.hpp>
 #include <minml/layers/LayerNormalization.hpp>
 #include <minml/layers/LearnableGlobalPooling.hpp>
+#include <minml/layers/LearnableScaling.hpp>
 #include <minml/layers/MixtureOfExperts.hpp>
 #include <minml/layers/MultiHeadAttention.hpp>
 #include <minml/layers/PositionalEncoding.hpp>
 #include <minml/layers/RMSNormalization.hpp>
 #include <minml/layers/Router.hpp>
-#include <minml/layers/ScatterTopK.hpp>
+#include <minml/layers/ScatterTokens.hpp>
 #include <minml/layers/Softmax.hpp>
 #include <minml/layers/SpaceToDepth.hpp>
 #include <minml/layers/SpatialScaling.hpp>
+#include <minml/layers/StochasticDepth.hpp>
 #include <minml/layers/SqueezeAndExcitation.hpp>
 #include <minml/layers/WindowPartitioning.hpp>
 #include <minml/layers/WindowMerging.hpp>
@@ -324,20 +326,22 @@ namespace ml
 		static const DepthToSpace depth_to_space(0, { 0, 0 });
 		static const DepthwiseConv2D depthwise_conv2d(0, 0);
 		static const FusedConvBlock fused_conv_block;
-		static const GatherTopK gather_top_k(0);
+		static const GatherTokens gather_tokens;
 		static const GlobalAveragePooling global_average_pooling;
 		static const LayerNormalization layernorm;
 		static const LearnableGlobalPooling learnable_global_pooling(0);
+		static const LearnableScaling learnable_scaling("linear", 0, false);
 		static const MixtureOfExperts mixture_of_experts(0, 0);
 		static const MultiHeadAttention multi_head_attention(0, 0, false);
 		static const Input input;
 		static const RMSNormalization rmsnorm;
-		static const Router router(0);
+		static const Router router(RoutingAlgorithm::HASH, 0.0f);
 		static const PositionalEncoding positional_encoding;
-		static const ScatterTopK scatter_top_k;
+		static const ScatterTokens scatter_top_k(0, 0);
 		static const Softmax softmax( { 0 });
 		static const SpaceToDepth space_to_depth(0);
 		static const SpatialScaling spatial_scaling;
+		static const StochasticDepth stochastic_depth(0);
 		static const SqueezeAndExcitation se;
 		static const WindowPartitioning window_partitioning(0, 0);
 		static const WindowMerging window_merging(Shape(), 0);
@@ -367,14 +371,16 @@ namespace ml
 			result = depthwise_conv2d.clone(json);
 		if (name == fused_conv_block.name())
 			result = fused_conv_block.clone(json);
-		if (name == gather_top_k.name())
-			result = gather_top_k.clone(json);
+		if (name == gather_tokens.name())
+			result = gather_tokens.clone(json);
 		if (name == global_average_pooling.name())
 			result = global_average_pooling.clone(json);
 		if (name == layernorm.name())
 			result = layernorm.clone(json);
 		if (name == learnable_global_pooling.name())
 			result = learnable_global_pooling.clone(json);
+		if (name == learnable_scaling.name())
+			result = learnable_scaling.clone(json);
 		if (name == mixture_of_experts.name())
 			result = mixture_of_experts.clone(json);
 		if (name == multi_head_attention.name())
@@ -395,6 +401,8 @@ namespace ml
 			result = space_to_depth.clone(json);
 		if (name == spatial_scaling.name())
 			result = spatial_scaling.clone(json);
+		if (name == stochastic_depth.name())
+			result = stochastic_depth.clone(json);
 		if (name == se.name())
 			result = se.clone(json);
 		if (name == window_partitioning.name())

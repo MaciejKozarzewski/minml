@@ -96,12 +96,8 @@ namespace ml
 		if (isTrainable() and m_backward_data.volume() < tmp)
 			m_backward_data = Tensor( { tmp }, dtype(), device());
 
-		Tensor mask;
-		if (input.size() == 2)
-			mask = input[1].view();
-
-		multiHeadAttentionForward(context(), input.at(0), output, getWeights().getParam(), getBias().getParam(), mask, *m_workspace.lock(),
-				m_backward_data, m_number_of_heads, m_symmetric);
+		multiHeadAttentionForward(context(), input.at(0), output, getWeights().getParam(), getBias().getParam(), *m_workspace.lock(), m_backward_data,
+				m_number_of_heads, m_symmetric);
 	}
 	void MultiHeadAttention::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev,
 			Tensor &gradient_next, const std::vector<float> &beta)
@@ -109,16 +105,8 @@ namespace ml
 		assert(input.size() == 1);
 		assert(gradient_prev.size() == 1);
 
-		Tensor mask, mask_gradient;
-		if (input.size() == 2)
-		{
-			mask = input[1].view();
-			mask_gradient = gradient_prev[1].view();
-		}
-
-		multiHeadAttentionBackward(context(), input.at(0), getWeights().getParam(), getBias().getParam(), mask, gradient_prev.at(0), gradient_next,
-				getWeights().getGradient(), getBias().getGradient(), mask_gradient, *m_workspace.lock(), m_backward_data, m_number_of_heads,
-				m_symmetric, beta[0]);
+		multiHeadAttentionBackward(context(), input.at(0), getWeights().getParam(), getBias().getParam(), gradient_prev.at(0), gradient_next,
+				getWeights().getGradient(), getBias().getGradient(), *m_workspace.lock(), m_backward_data, m_number_of_heads, m_symmetric, beta[0]);
 	}
 
 } /* namespace ml */

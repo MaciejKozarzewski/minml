@@ -13,29 +13,83 @@
 #include <minml/utils/json.hpp>
 #include <minml/utils/testing_util.hpp>
 
+namespace
+{
+	using namespace ml;
+	Shape get_tmp_output_shape(int experts, const Shape &input_shape)
+	{
+		assert(input_shape.rank() == 4);
+		return Shape( { input_shape[0], input_shape[1] * input_shape[2], experts });
+	}
+	std::string algo_to_string(RoutingAlgorithm ra)
+	{
+		switch (ra)
+		{
+			case RoutingAlgorithm::HASH:
+				return "hash";
+			case RoutingAlgorithm::TOKEN_CHOICE:
+				return "token_choice";
+			case RoutingAlgorithm::EXPERT_CHOICE:
+				return "expert_choice";
+			default:
+				return "";
+		}
+	}
+	RoutingAlgorithm algo_from_string(const std::string &str)
+	{
+		if (str == "hash")
+			return RoutingAlgorithm::HASH;
+		if (str == "token_choice")
+			return RoutingAlgorithm::TOKEN_CHOICE;
+		if (str == "expert_choice")
+			return RoutingAlgorithm::EXPERT_CHOICE;
+		throw LogicError(METHOD_NAME, "unknown routing algorithm '" + str + "'");
+	}
+	Json tensor_to_json(const Tensor &t)
+	{
+		if (t.isEmpty())
+			return Json::null();
+		assert(t.rank() == 1);
+		Json result = Json::array();
+		for (int i = 0; i < t.volume(); i++)
+			result[i] = (float) t.at( { i });
+		return result;
+	}
+	Tensor tensor_from_json(const Json &json)
+	{
+		if (json.isNull())
+			return Tensor();
+		Tensor result(Shape( { json.size() }), DataType::FLOAT32, Device::cpu());
+		for (int i = 0; i < result.volume(); i++)
+			result.at( { i }) = json[i].getDouble();
+		return result;
+	}
+}
+
 namespace ml
 {
-	Router::Router(int experts) :
+	Router::Router(RoutingAlgorithm algo, float capacityFactor, float loadBalancingAlpha) :
 			Layer(),
-			m_experts(experts)
+			m_algorithm(algo),
+			m_capacity_factor(capacityFactor),
+			m_load_balancing_alpha(loadBalancingAlpha)
 	{
 	}
 
 	void Router::setInputShape(const std::vector<Shape> &shapes)
 	{
 		if (shapes.size() != 1)
-			throw UninitializedObject(METHOD_NAME, "Router can onyl have 1 input");
+			throw UninitializedObject(METHOD_NAME, "Router can only have 1 input");
 		m_input_shapes = shapes;
 	}
 	Shape Router::getOutputShape() const
 	{
 		if (m_input_shapes.size() != 1)
 			throw UninitializedObject(METHOD_NAME, "input shape has not been set");
-		return Shape( { getInputShape().dim(0), m_experts, getInputShape().dim(1), getInputShape().dim(2) });
-	}
-	Shape Router::getWeightShape() const
-	{
-		return Shape( { m_experts, getInputShape().lastDim() });
+		const int batch_size = getInputShape().dim(0);
+		const int tokens = getInputShape().dim(1) * getInputShape().dim(2);
+		const int experts = getInputShape().dim(3);
+		return Shape( { batch_size, 2, experts, static_cast<int>(m_capacity_factor * tokens / experts + 0.5f) });
 	}
 
 	std::string Router::name() const
@@ -45,54 +99,83 @@ namespace ml
 	Json Router::getConfig() const
 	{
 		Json result = Layer::getConfig();
-		result["experts"] = m_experts;
+		result["algorithm"] = algo_to_string(m_algorithm);
+		result["capacity_factor"] = m_capacity_factor;
+		result["load_balancing_alpha"] = m_load_balancing_alpha;
+		result["expert_biases"] = tensor_to_json(m_expert_biases);
 		return result;
 	}
 
+	void Router::convertTo(DataType newType)
+	{
+		Layer::convertTo(newType);
+		m_expert_biases.convertTo(context(), newType);
+	}
 	std::unique_ptr<Layer> Router::clone(const Json &config) const
 	{
-		std::unique_ptr<Router> result = std::make_unique<Router>(config["experts"]);
+		std::unique_ptr<Router> result = std::make_unique<Router>(algo_from_string(config["algorithm"].getString()),
+				config["capacity_factor"].getDouble(), config["load_balancing_alpha"].getDouble());
+		result->m_expert_biases = tensor_from_json(config["expert_biases"]);
 		result->loadConfig(config);
 		return result;
 	}
 	int Router::getWorkspaceSize() const noexcept
 	{
-		return getInputShape().firstDim() * getWeightShape().volume();
+		return getInputShape().volume();
 	}
+	void Router::changeContext(std::shared_ptr<Context> &context)
+	{
+		Layer::changeContext(context);
+		m_expert_biases.moveTo(context->device());
+	}
+
 	void Router::forward(const std::vector<Tensor> &input, Tensor &output)
 	{
 		assert(input.size() == 1);
 
-		const Tensor flattened_input = input[0].view().flatten( { 1, 2 });
-		Tensor flattened_output = output.view().flatten( { 2, 3 });
-		gemmBatched(context(), 'n', 't', flattened_output, getWeights().getParam(), flattened_input, 1.0f, 0.0f);
-//		Tensor y = output.view().flatten( { 0, 1 }, { 2, 3 });
-//		softmaxForward(context(), y, y);
+		switch (m_algorithm)
+		{
+			case RoutingAlgorithm::HASH:
+				hashRouting(context(), input[0], output);
+				break;
+			case RoutingAlgorithm::TOKEN_CHOICE:
+			{
+				if (m_expert_biases.isEmpty())
+					m_expert_biases = Tensor( { getInputShape().dim(3) }, dtype(), device());
+				tokenChoiceRoutingForward(context(), input[0], m_expert_biases, output);
+				break;
+			}
+			case RoutingAlgorithm::EXPERT_CHOICE:
+				expertChoiceRouting(context(), input[0], output);
+				break;
+			default:
+				break;
+		}
+
 	}
 	void Router::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next,
 			const std::vector<float> &beta)
 	{
 		assert(input.size() == 1);
 		assert(gradient_prev.size() == 1);
-
-//		{ /* artificial scope for variables */
-//			const Tensor flattened_y = output.view().flatten( { 0, 1 }, { 2, 3 }); // (NE) x (HW)
-//			Tensor flattened_dy = gradient_next.view().flatten( { 0, 1 }, { 2, 3 }); // (NE) x (HW)
-//			softmaxBackward(context(), 1.0f, flattened_dy, flattened_y, 0.0f, flattened_dy);
-//		}
-
-		const Tensor flattened_x = input[0].view().flatten( { 1, 2 }); // N x (HW) x C
-		Tensor flattened_dx = gradient_prev[0].view().flatten( { 1, 2 }); // N x (HW) x C
-		const Tensor flattened_y = output.view().flatten( { 2, 3 }); // N x E x (HW)
-		Tensor flattened_dy = gradient_next.view().flatten( { 2, 3 }); // N x E x (HW)
-		gemmBatched(context(), 't', 'n', flattened_dx, flattened_dy, getWeights().getParam(), 1.0f, beta[0]);
-
-		Tensor tmp_dw = m_workspace.lock()->view( { input[0].firstDim(), m_experts, input[0].lastDim() });
-		gemmBatched(context(), 'n', 'n', tmp_dw, flattened_dy, flattened_x, 1.0f, 0.0f);
-
-		Tensor flattened_dw = getWeights().getGradient().view().flatten(); // (EC)
-		Tensor flattened_tmp_dw = tmp_dw.view().flatten( { 1, 2 }); // N x (EC)
-		sumOverFirstDim(context(), 1.0f, flattened_tmp_dw, 0.0f, flattened_dw);
+		Tensor workspace = m_workspace.lock()->view(gradient_prev[0].shape());
+		switch (m_algorithm)
+		{
+			case RoutingAlgorithm::HASH:
+				break;
+			case RoutingAlgorithm::TOKEN_CHOICE:
+			{
+				if (m_expert_biases.isEmpty())
+					m_expert_biases = Tensor( { getInputShape().dim(3) }, dtype(), device());
+				tokenChoiceRoutingBackward(context(), input[0], output, gradient_next, beta[0], gradient_prev[0], m_load_balancing_alpha,
+						m_expert_biases, workspace);
+				break;
+			}
+			case RoutingAlgorithm::EXPERT_CHOICE:
+				break;
+			default:
+				break;
+		}
 	}
 
 } /* namespace ml */
