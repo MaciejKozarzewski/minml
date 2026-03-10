@@ -462,13 +462,12 @@ namespace ml
 		testing::initForTest(weights, 1.0);
 
 		Tensor bias;
-		Tensor mask;
 
 		const Tensor correct_output = baseline_mha_forward(input, weights, num_heads, symmetric);
 
 		const int workspace_size = multiHeadAttentionGetWorkspaceSize(context, input.shape(), weights.shape(), num_heads, false);
 		Tensor workspace( { workspace_size }, "float32", context.device());
-		multiHeadAttentionForward(context, input, output, weights, bias, mask, workspace, backward_data, num_heads, symmetric);
+		multiHeadAttentionForward(context, input, output, weights, bias, workspace, backward_data, num_heads, symmetric);
 
 		for (int i = 0; i < correct_output.dim(0); i++)
 			for (int j = 0; j < correct_output.dim(1); j++)
