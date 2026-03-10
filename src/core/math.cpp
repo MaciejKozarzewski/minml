@@ -893,47 +893,44 @@ namespace ml
 		}
 	}
 	void multiHeadAttentionForward(const Context &context, const Tensor &input, Tensor &output, const Tensor &weights, const Tensor &bias,
-			const Tensor &mask, Tensor &workspace, Tensor &backwardData, int num_heads, bool symmetric)
+			Tensor &workspace, Tensor &backwardData, int num_heads, bool symmetric)
 	{
 		static Timer timer("multiHeadAttentionForward");
 		TimerGuard tg(timer);
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
-				cpu_multi_head_attention_forward(get(context), get(input), get(output), get(bias), get(mask), get(workspace), get(backwardData),
-						num_heads);
+				cpu_multi_head_attention_forward(get(context), get(input), get(output), get(bias), get(workspace), get(backwardData), num_heads);
 				break;
 			case DeviceType::CUDA:
 				cuda_multi_head_attention_forward(get(context), get_shape(input), get_shape(weights), get_shape(bias), get(input.dtype()),
-						input.data(), output.data(), weights.data(), bias.data(), mask.data(), workspace.data(), backwardData.data(), num_heads,
-						symmetric);
+						input.data(), output.data(), weights.data(), bias.data(), workspace.data(), backwardData.data(), num_heads, symmetric);
 				break;
 			case DeviceType::OPENCL:
 				opencl_multi_head_attention_forward(get(context), get_shape(input), get_shape(weights), get_shape(bias), get(input.dtype()),
-						input.data(), output.data(), weights.data(), bias.data(), mask.data(), workspace.data(), backwardData.data(), num_heads,
-						symmetric);
+						input.data(), output.data(), weights.data(), bias.data(), workspace.data(), backwardData.data(), num_heads, symmetric);
 				break;
 		}SYNC();
 	}
-	void multiHeadAttentionBackward(const Context &context, const Tensor &input, const Tensor &weights, const Tensor &bias, const Tensor &mask,
-			Tensor &gradient_prev, Tensor &gradient_next, Tensor &weights_update, Tensor &bias_update, Tensor &mask_update, Tensor &workspace,
-			Tensor &backwardData, int num_heads, bool symmetric, float beta)
+	void multiHeadAttentionBackward(const Context &context, const Tensor &input, const Tensor &weights, const Tensor &bias, Tensor &gradient_prev,
+			Tensor &gradient_next, Tensor &weights_update, Tensor &bias_update, Tensor &workspace, Tensor &backwardData, int num_heads,
+			bool symmetric, float beta)
 	{
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
-				cpu_multi_head_attention_backward(get(context), get(input), get(bias), get(mask), get(gradient_prev), get(gradient_next),
-						get(bias_update), get(workspace), get(backwardData), num_heads);
+				cpu_multi_head_attention_backward(get(context), get(input), get(bias), get(gradient_prev), get(gradient_next), get(bias_update),
+						get(workspace), get(backwardData), num_heads);
 				break;
 			case DeviceType::CUDA:
 				cuda_multi_head_attention_backward(get(context), get_shape(input), get_shape(weights), get_shape(bias), input.data(), weights.data(),
-						bias.data(), mask.data(), gradient_prev.data(), gradient_next.data(), weights_update.data(), bias_update.data(),
-						mask_update.data(), workspace.data(), backwardData.data(), num_heads, symmetric);
+						bias.data(), gradient_prev.data(), gradient_next.data(), weights_update.data(), bias_update.data(), workspace.data(),
+						backwardData.data(), num_heads, symmetric);
 				break;
 			case DeviceType::OPENCL:
 				opencl_multi_head_attention_backward(get(context), get_shape(input), get_shape(weights), get_shape(bias), input.data(),
-						weights.data(), bias.data(), mask.data(), gradient_prev.data(), gradient_next.data(), weights_update.data(),
-						bias_update.data(), workspace.data(), backwardData.data(), num_heads, symmetric);
+						weights.data(), bias.data(), gradient_prev.data(), gradient_next.data(), weights_update.data(), bias_update.data(),
+						workspace.data(), backwardData.data(), num_heads, symmetric);
 				break;
 		}
 	}
@@ -1284,6 +1281,60 @@ namespace ml
 	/*
 	 * mixture of experts
 	 */
+	void hashRouting(const Context &context, const Tensor &input, Tensor &indicesAndValues)
+	{
+		switch (context.device().type())
+		{
+			case DeviceType::CPU:
+				break;
+			case DeviceType::CUDA:
+				cuda_hash_routing(get(context), get(input), get(indicesAndValues));
+				break;
+			case DeviceType::OPENCL:
+				break;
+		}SYNC();
+	}
+	void tokenChoiceRoutingForward(const Context &context, const Tensor &input, const Tensor &bias, Tensor &indicesAndValues)
+	{
+		switch (context.device().type())
+		{
+			case DeviceType::CPU:
+				break;
+			case DeviceType::CUDA:
+				cuda_token_choice_routing_forward(get(context), get(input), get(bias), get(indicesAndValues));
+				break;
+			case DeviceType::OPENCL:
+				break;
+		}SYNC();
+	}
+	void tokenChoiceRoutingBackward(const Context &context, const Tensor &input, const Tensor &indicesAndValues, const Tensor &gradient_next,
+			float beta, Tensor &gradient_prev, float alpha, Tensor &bias, Tensor &workspace)
+	{
+		switch (context.device().type())
+		{
+			case DeviceType::CPU:
+				break;
+			case DeviceType::CUDA:
+				cuda_token_choice_routing_backward(get(context), get(input), get(indicesAndValues), get(gradient_next), beta, get(gradient_prev),
+						alpha, get(bias), get(workspace));
+				break;
+			case DeviceType::OPENCL:
+				break;
+		}SYNC();
+	}
+	void expertChoiceRouting(const Context &context, const Tensor &input, Tensor &indicesAndValues)
+	{
+		switch (context.device().type())
+		{
+			case DeviceType::CPU:
+				break;
+			case DeviceType::CUDA:
+				cuda_expert_choice_routing(get(context), get(input), get(indicesAndValues));
+				break;
+			case DeviceType::OPENCL:
+				break;
+		}SYNC();
+	}
 	void selectTopK(const Context &context, const Tensor &input, Tensor &indices, Tensor &values)
 	{
 		switch (context.device().type())
@@ -1297,55 +1348,55 @@ namespace ml
 				break;
 		}SYNC();
 	}
-	void gatherTokensForward(const Context &context, const Tensor &input, const Tensor &indices, float beta, Tensor &output)
+	void gatherTokensForward(const Context &context, const Tensor &input, const Tensor &indicesAndValues, float beta, Tensor &output)
 	{
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
 				break;
 			case DeviceType::CUDA:
-				cuda_gather_tokens_forward(get(context), get(input), get(indices), beta, get(output));
+				cuda_gather_tokens_forward(get(context), get(input), get(indicesAndValues), beta, get(output));
 				break;
 			case DeviceType::OPENCL:
 				break;
 		}SYNC();
 	}
-	void gatherTokensBackward(const Context &context, const Tensor &gradient_next, const Tensor &indices, float beta, Tensor &gradient_prev)
+	void gatherTokensBackward(const Context &context, const Tensor &gradient_next, const Tensor &indicesAndValues, float beta, Tensor &gradient_prev)
 	{
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
 				break;
 			case DeviceType::CUDA:
-				cuda_gather_tokens_backward(get(context), get(gradient_next), get(indices), beta, get(gradient_prev));
+				cuda_gather_tokens_backward(get(context), get(gradient_next), get(indicesAndValues), beta, get(gradient_prev));
 				break;
 			case DeviceType::OPENCL:
 				break;
 		}SYNC();
 	}
-	void scatterTokensForward(const Context &context, const Tensor &input, const Tensor &indices, const Tensor &scales, float beta, Tensor &output)
+	void scatterTokensForward(const Context &context, const Tensor &input, const Tensor &indicesAndValues, float beta, Tensor &output)
 	{
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
 				break;
 			case DeviceType::CUDA:
-				cuda_scatter_tokens_forward(get(context), get(input), get(indices), get(scales), beta, get(output));
+				cuda_scatter_tokens_forward(get(context), get(input), get(indicesAndValues), beta, get(output));
 				break;
 			case DeviceType::OPENCL:
 				break;
 		}SYNC();
 	}
-	void scatterTokensBackward(const Context &context, const Tensor &gradient_next, const Tensor &input, const Tensor &indices, const Tensor &scales,
-			float beta1, Tensor &gradient_prev, float beta2, Tensor &scales_gradient)
+	void scatterTokensBackward(const Context &context, const Tensor &gradient_next, const Tensor &input, const Tensor &indicesAndValues, float beta1,
+			Tensor &gradient_prev, float beta2, Tensor &scales_gradient)
 	{
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
 				break;
 			case DeviceType::CUDA:
-				cuda_scatter_tokens_backward(get(context), get(input), get(indices), get(scales), get(gradient_next), beta1, get(gradient_prev),
-						beta2, get(scales_gradient));
+				cuda_scatter_tokens_backward(get(context), get(input), get(indicesAndValues), get(gradient_next), beta1, get(gradient_prev), beta2,
+						get(scales_gradient));
 				break;
 			case DeviceType::OPENCL:
 				break;
@@ -1375,6 +1426,39 @@ namespace ml
 			case DeviceType::CUDA:
 				cuda_moe_backward(get(context), get(input), get(output), get(weights), get(gradient_next), beta_prev, get(gradient_prev),
 						beta_weights_update, get(weights_update), beta_bias_update, get(bias_update), get(act));
+				break;
+			case DeviceType::OPENCL:
+				break;
+		}SYNC();
+	}
+
+	/*
+	 * learnable scaling
+	 */
+	void channelLearnableScalingForward(const Context &context, float alpha, const Tensor &input, ActivationType act, const Tensor &weights,
+			float beta, Tensor &output)
+	{
+		switch (context.device().type())
+		{
+			case DeviceType::CPU:
+				break;
+			case DeviceType::CUDA:
+				cuda_learnable_scaling_forward(get(context), alpha, get(input), get(act), get(weights), beta, get(output));
+				break;
+			case DeviceType::OPENCL:
+				break;
+		}SYNC();
+	}
+	void channelLearnableScalingBackward(const Context &context, float alpha, const Tensor &gradient_next, const Tensor &input, ActivationType act,
+			const Tensor &weights, float beta_input, Tensor &gradient_prev, float beta_weights, Tensor &gradient_weights)
+	{
+		switch (context.device().type())
+		{
+			case DeviceType::CPU:
+				break;
+			case DeviceType::CUDA:
+				cuda_learnable_scaling_backward(get(context), alpha, get(gradient_next), get(input), get(act), get(weights), beta_input,
+						get(gradient_prev), beta_weights, get(gradient_weights));
 				break;
 			case DeviceType::OPENCL:
 				break;

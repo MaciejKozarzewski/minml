@@ -303,13 +303,13 @@ namespace ml
 		throw NotImplemented(METHOD_NAME);
 	}
 	void opencl_multi_head_attention_forward(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, mlShape_t bias_shape,
-			mlDataType_t dtype, const void *input, void *output, const void *weights, const void *bias, const void *mask, void *workspace,
+			mlDataType_t dtype, const void *input, void *output, const void *weights, const void *bias, void *workspace,
 			void *backward_data, int num_heads, bool symmetric)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
 	void opencl_multi_head_attention_backward(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, mlShape_t bias_shape,
-			const void *input, const void *weights, const void *bias, const void *mask, void *gradient_prev, void *gradient_next,
+			const void *input, const void *weights, const void *bias, void *gradient_prev, void *gradient_next,
 			void *weights_update, void *bias_update, void *workspace, void *backward_data, int num_heads, bool symmetric)
 	{
 		throw NotImplemented(METHOD_NAME);

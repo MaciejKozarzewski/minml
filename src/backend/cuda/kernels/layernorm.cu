@@ -53,6 +53,154 @@ namespace
 		return 1.0f / std::sqrt(epsilon + variance / (N - 1));
 	}
 
+	template<typename T, int N, typename U = T>
+	__global__ void kernel_layernorm_forward(const T *input, T *output, const T *weights, const T *bias, const T *ext, int first_dim, int last_dim)
+	{
+		assert(last_dim % N == 0);
+		assert(blockDim.x == 32);
+		assert(blockDim.y == 8);
+
+		extern __shared__ char shared_array[];
+
+		T *shared_input = reinterpret_cast<T*>(shared_array);
+		T *shared_weights = shared_input + last_dim;
+		T *shared_bias = shared_weights + last_dim;
+
+		const int tid = blockIdx.y * blockDim.x + threadIdx.x;
+
+		for (int j = N * tid; j < last_dim; j += N * blockDim.x * blockDim.y)
+		{
+			if (weights != nullptr)
+				vector_copy<N>(shared_weights + j, weights + j);
+			else
+				store_vec(shared_weights + j, one<T, N>());
+			if (bias != nullptr)
+				vector_copy<N>(shared_bias + j, bias + j);
+			else
+				store_vec(shared_bias + j, zero<T, N>());
+		}
+		__syncthreads();
+
+		for (int i = blockIdx.x * blockDim.y + threadIdx.y; i < first_dim; i += gridDim.x * blockDim.y)
+		{
+			U avg = static_cast<U>(0.0f);
+			for (int j = N * threadIdx.x; j < last_dim; j += N * blockDim.x)
+			{
+				const vec<T, N> in(input + i * last_dim + j);
+				avg += (horizontal_add(in));
+				store_vec(shared_input + j, in);
+			}
+			for (int k = 16; k >= 1; k /= 2)
+				avg += __shfl_xor_sync(0xffffffff, avg, k);
+			avg /= static_cast<U>(last_dim);
+
+			const vec<T, N> vec_avg(avg);
+			U var = static_cast<U>(0.0f);
+			for (int j = N * threadIdx.x; j < last_dim; j += N * blockDim.x)
+			{
+				const vec<T, N> in(shared_input + j);
+				var += static_cast<U>(horizontal_add(square(in - vec_avg)));
+			}
+			for (int k = 16; k >= 1; k /= 2)
+				var += __shfl_xor_sync(0xffffffff, var, k);
+
+			const vec<T, N> inv_stddev(static_cast<U>(1.0f) / std::sqrt(static_cast<U>(1.0e-6f) + var / (last_dim - 1)));
+
+			for (int j = N * threadIdx.x; j < last_dim; j += N * blockDim.x)
+			{
+				const vec<T, N> gamma(shared_weights + j);
+				const vec<T, N> beta(shared_bias + j);
+				const vec<T, N> in(shared_input + j);
+				const vec<T, N> out = gamma * (in - avg) * inv_stddev + beta;
+				out.store(output + i * last_dim + j);
+			}
+		}
+	}
+	template<typename T, int N, typename U = T>
+	__global__ void kernel_layernorm_backward(const T *input, float beta_prev, T *gradient_prev, T *gradient_next, const T *weights, float beta_w,
+			T *weights_update, float beta_b, T *bias_update, int first_dim, int last_dim)
+	{
+		assert(last_dim % N == 0);
+
+		extern __shared__ char shared_array[];
+
+		T *shared_input = reinterpret_cast<T*>(shared_array);
+		T *shared_gradient = shared_input + last_dim;
+		T *shared_weights = shared_gradient + last_dim;
+		T *shared_weights_update = shared_weights + last_dim;
+		T *shared_bias_update = shared_weights_update + last_dim;
+
+		__shared__ cg::block_tile_memory<256> btm;
+		cg::thread_block thb = cg::this_thread_block(btm);
+		cg::thread_block_tile<256> tile = cg::tiled_partition<256>(thb);
+
+		vec<float, N> thread_weights_update(0.0f);
+		vec<float, N> thread_bias_update(0.0f);
+
+		for (int j = N * threadIdx.x; j < last_dim; j += N * blockDim.x)
+		{
+			const vec<float, N> zero(0.0f);
+			zero.store(shared_weights_update + j);
+			zero.store(shared_bias_update + j);
+			vector_copy<N>(shared_weights + j, weights + j);
+		}
+
+		__syncthreads();
+
+		for (int i = blockIdx.x; i < first_dim; i += gridDim.x)
+		{
+			float avg = 0.0f;
+			for (int j = N * threadIdx.x; j < last_dim; j += N * blockDim.x)
+			{
+				const vec<float, N> in = load_vec<float, N>(input + i * last_dim + j);
+				const vec<float, N> grad = load_vec<float, N>(gradient_next + i * last_dim + j);
+				avg += horizontal_add(in);
+				store_vec(shared_input + j, in);
+				store_vec(shared_gradient + j, grad);
+			}
+			avg = cg::reduce(tile, avg, cg::plus<float>()) / last_dim;
+
+			float var = 0.0f;
+			for (int j = threadIdx.x; j < last_dim; j += blockDim.x)
+				var += square(shared_input[j] - avg);
+			const float inv_stddev = get_inv_stddev(cg::reduce(tile, var, cg::plus<float>()), last_dim, 1.0e-6f);
+
+			float d_sigma = 0.0f;
+			float d_mu = 0.0f;
+			for (int j = threadIdx.x; j < last_dim; j += blockDim.x)
+			{
+				const float in = (shared_input[j] - avg) * inv_stddev;
+				const float grad = shared_gradient[j];
+				const float gamma = shared_weights[j];
+
+				d_sigma -= grad * in * gamma;
+				d_mu -= grad * gamma;
+				shared_weights_update[j] += grad * in;
+				shared_bias_update[j] += grad;
+
+				shared_input[j] = in;
+				shared_gradient[j] = grad * gamma;
+			}
+
+			d_sigma = cg::reduce(tile, d_sigma, cg::plus<float>()) * inv_stddev / (last_dim - 1);
+			d_mu = cg::reduce(tile, d_mu, cg::plus<float>()) * inv_stddev / last_dim;
+
+			for (int j = N * threadIdx.x; j < last_dim; j += N * blockDim.x)
+			{
+				const vec<float, N> in = load_vec<float, N>(shared_input + j);
+				const vec<float, N> grad = load_vec<float, N>(shared_gradient + j);
+				const vec<float, N> tmp = grad * inv_stddev + d_sigma * in + d_mu;
+				store_vec(gradient_prev + i * last_dim + j, tmp);
+			}
+		}
+		__syncthreads();
+		for (int j = N * threadIdx.x; j < last_dim; j += N * blockDim.x)
+		{
+			vector_copy<N>(weights_update + blockIdx.x * last_dim + j, shared_weights_update + j);
+			vector_copy<N>(bias_update + blockIdx.x * last_dim + j, shared_bias_update + j);
+		}
+	}
+
 	template<typename T, int N>
 	__launch_bounds__(256, 4)
 	__global__ void kernel_layernorm_forward_v2(const T *input, T *output, const T *weights, const T *bias, const T *ext, int first_dim, int last_dim)
@@ -366,6 +514,14 @@ namespace ml
 							last_dim);
 				break;
 			}
+//			case DTYPE_FLOAT64:
+//			{
+//				const int shared_mem = sizeof(double) * 2 * last_dim;
+//				kernel_layernorm_forward_v3<double, 1> <<<gridDim, blockDim, shared_mem, stream >>>(getPointer<double>(input),
+//						getPointer<double>(output), getPointer<double>(weights), getPointer<double>(bias), getPointer<double>(ext), first_dim,
+//						last_dim);
+//				break;
+//			}
 		}
 
 		assert(cudaGetLastError() == cudaSuccess);

@@ -140,10 +140,10 @@ namespace ml
 //				const void *input, const void *weights, const void *bias, const void *mask, void *gradient_prev, void *gradient_next,
 //				void *weights_update, void *bias_update, void *workspace, void *backward_data, int num_heads, bool symmetric);
 
-		void cpu_multi_head_attention_forward(mlContext_t context, const mlTensor_t x, mlTensor_t y, const mlTensor_t b, const mlTensor_t mask,
-				mlTensor_t workspace, mlTensor_t backward_data, int num_heads);
-		void cpu_multi_head_attention_backward(mlContext_t context, const mlTensor_t x, const mlTensor_t b, const mlTensor_t mask, mlTensor_t dx,
-				const mlTensor_t dy, mlTensor_t db, mlTensor_t workspace, mlTensor_t backward_data, int num_heads);
+		void cpu_multi_head_attention_forward(mlContext_t context, const mlTensor_t x, mlTensor_t y, const mlTensor_t b, mlTensor_t workspace,
+				mlTensor_t backward_data, int num_heads);
+		void cpu_multi_head_attention_backward(mlContext_t context, const mlTensor_t x, const mlTensor_t b, mlTensor_t dx, const mlTensor_t dy,
+				mlTensor_t db, mlTensor_t workspace, mlTensor_t backward_data, int num_heads);
 
 		/*
 		 * activation

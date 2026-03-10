@@ -122,10 +122,10 @@ namespace ml
 	 */
 	int multiHeadAttentionGetWorkspaceSize(const Context &context, const Shape &inputShape, const Shape &weightsShape, int num_heads, bool training);
 	void multiHeadAttentionForward(const Context &context, const Tensor &input, Tensor &output, const Tensor &weights, const Tensor &bias,
-			const Tensor &mask, Tensor &workspace, Tensor &backwardData, int num_heads, bool symmetric);
-	void multiHeadAttentionBackward(const Context &context, const Tensor &input, const Tensor &weights, const Tensor &bias, const Tensor &mask,
-			Tensor &gradient_prev, Tensor &gradient_next, Tensor &weights_update, Tensor &bias_update, Tensor &mask_update, Tensor &workspace,
-			Tensor &backwardData, int num_heads, bool symmetric, float beta);
+			Tensor &workspace, Tensor &backwardData, int num_heads, bool symmetric);
+	void multiHeadAttentionBackward(const Context &context, const Tensor &input, const Tensor &weights, const Tensor &bias, Tensor &gradient_prev,
+			Tensor &gradient_next, Tensor &weights_update, Tensor &bias_update, Tensor &workspace, Tensor &backwardData, int num_heads,
+			bool symmetric, float beta);
 
 	void windowPartitioning(const Context &context, const Tensor &input, Tensor &output, const Shape &offset);
 	void windowMerging(const Context &context, const Tensor &input, Tensor &output, const Shape &offset);
@@ -173,17 +173,30 @@ namespace ml
 	/*
 	 * mixture of experts
 	 */
+	void hashRouting(const Context &context, const Tensor &input, Tensor &indicesAndValues);
+	void tokenChoiceRoutingForward(const Context &context, const Tensor &input, const Tensor &bias, Tensor &indicesAndValues);
+	void tokenChoiceRoutingBackward(const Context &context, const Tensor &input, const Tensor &indicesAndValues, const Tensor &gradient_next,
+			float beta, Tensor &gradient_prev, float alpha, Tensor &bias, Tensor &workspace);
+	void expertChoiceRouting(const Context &context, const Tensor &input, Tensor &indicesAndValues);
 	void selectTopK(const Context &context, const Tensor &input, Tensor &indices, Tensor &values);
-	void gatherTokensForward(const Context &context, const Tensor &input, const Tensor &indices, float beta, Tensor &output);
-	void gatherTokensBackward(const Context &context, const Tensor &gradient_next, const Tensor &indices, float beta, Tensor &gradient_prev);
-	void scatterTokensForward(const Context &context, const Tensor &input, const Tensor &indices, const Tensor &scales, float beta, Tensor &output);
-	void scatterTokensBackward(const Context &context, const Tensor &gradient_next, const Tensor &input, const Tensor &indices, const Tensor &scales,
-			float beta1, Tensor &gradient_prev, float beta2, Tensor &scales_gradient);
+	void gatherTokensForward(const Context &context, const Tensor &input, const Tensor &indicesAndValues, float beta, Tensor &output);
+	void gatherTokensBackward(const Context &context, const Tensor &gradient_next, const Tensor &indicesAndValues, float beta, Tensor &gradient_prev);
+	void scatterTokensForward(const Context &context, const Tensor &input, const Tensor &indicesAndValues, float beta, Tensor &output);
+	void scatterTokensBackward(const Context &context, const Tensor &gradient_next, const Tensor &input, const Tensor &indicesAndValues, float beta1,
+			Tensor &gradient_prev, float beta2, Tensor &scales_gradient);
 	void moeForward(const Context &context, const Tensor &input, const Tensor &weights, const Tensor &bias, float beta, Tensor &output,
 			ActivationType act);
 	void moeBackward(const Context &context, const Tensor &input, const Tensor &output, const Tensor &weights, Tensor &gradient_next, float beta_prev,
 			Tensor &gradient_prev, float beta_weights_update, Tensor &weights_update, float beta_bias_update, Tensor &bias_update,
 			ActivationType act);
+
+	/*
+	 * learnable scaling
+	 */
+	void channelLearnableScalingForward(const Context &context, float alpha, const Tensor &input, ActivationType act, const Tensor &weights,
+			float beta, Tensor &output);
+	void channelLearnableScalingBackward(const Context &context, float alpha, const Tensor &gradient_next, const Tensor &input, ActivationType act,
+			const Tensor &weights, float beta_input, Tensor &gradient_prev, float beta_weights, Tensor &gradient_weights);
 
 	/*
 	 * quantized

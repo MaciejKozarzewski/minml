@@ -139,11 +139,11 @@ namespace ml
 		 */
 		int opencl_multi_head_attention_get_workspace_size(mlShape_t input_shape, mlShape_t weights_shape, int num_heads, bool training);
 		void opencl_multi_head_attention_forward(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, mlShape_t bias_shape,
-				mlDataType_t dtype, const void *input, void *output, const void *weights, const void *bias, const void *mask, void *workspace,
-				void *backward_data, int num_heads, bool symmetric);
+				mlDataType_t dtype, const void *input, void *output, const void *weights, const void *bias, void *workspace, void *backward_data,
+				int num_heads, bool symmetric);
 		void opencl_multi_head_attention_backward(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, mlShape_t bias_shape,
-				const void *input, const void *weights, const void *bias, const void *mask, void *gradient_prev, void *gradient_next,
-				void *weights_update, void *bias_update, void *workspace, void *backward_data, int num_heads, bool symmetric);
+				const void *input, const void *weights, const void *bias, void *gradient_prev, void *gradient_next, void *weights_update,
+				void *bias_update, void *workspace, void *backward_data, int num_heads, bool symmetric);
 
 		void opencl_activation_forward(mlContext_t context, mlDataType_t dtype, mlShape_t shape, void *output, const void *input,
 				mlActivationType_t act);

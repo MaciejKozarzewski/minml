@@ -13,6 +13,7 @@ else()
 		kernels/depthwise_conv.cu
 		kernels/global_pooling.cu
 		kernels/layernorm.cu
+		kernels/learnable_scaling.cu
 		kernels/moe.cu
 		kernels/pooling.cu
 		kernels/quantized.cu

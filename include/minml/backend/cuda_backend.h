@@ -206,11 +206,11 @@ namespace ml
 		 */
 		DLL_PUBLIC int cuda_multi_head_attention_get_workspace_size(mlShape_t input_shape, mlShape_t weights_shape, int num_heads, bool training);
 		DLL_PUBLIC void cuda_multi_head_attention_forward(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, mlShape_t bias_shape,
-				mlDataType_t dtype, const void *input, void *output, const void *weights, const void *bias, const void *mask, void *workspace,
-				void *backward_data, int num_heads, bool symmetric);
+				mlDataType_t dtype, const void *input, void *output, const void *weights, const void *bias, void *workspace, void *backward_data,
+				int num_heads, bool symmetric);
 		DLL_PUBLIC void cuda_multi_head_attention_backward(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, mlShape_t bias_shape,
-				const void *input, const void *weights, const void *bias, const void *mask, void *gradient_prev, void *gradient_next,
-				void *weights_update, void *bias_update, void *mask_update, void *workspace, void *backward_data, int num_heads, bool symmetric);
+				const void *input, const void *weights, const void *bias, void *gradient_prev, void *gradient_next, void *weights_update,
+				void *bias_update, void *workspace, void *backward_data, int num_heads, bool symmetric);
 
 		/*
 		 * window processing
@@ -235,17 +235,32 @@ namespace ml
 		/*
 		 * mixture of experts
 		 */
+		DLL_PUBLIC void cuda_hash_routing(mlContext_t context, const mlTensor_t x, mlTensor_t indices_and_values);
+		DLL_PUBLIC void cuda_token_choice_routing_forward(mlContext_t context, const mlTensor_t x, const mlTensor_t bias, mlTensor_t indices_and_values);
+		DLL_PUBLIC void cuda_token_choice_routing_backward(mlContext_t context, const mlTensor_t x, const mlTensor_t indices_and_values,
+				const mlTensor_t dy, float beta, mlTensor_t dx, float alpha, mlTensor_t bias, mlTensor_t workspace);
+		DLL_PUBLIC void cuda_expert_choice_routing(mlContext_t context, const mlTensor_t x, mlTensor_t indices_and_values);
 		DLL_PUBLIC void cuda_select_top_k(mlContext_t context, const mlTensor_t x, mlTensor_t indices, mlTensor_t values);
-		DLL_PUBLIC void cuda_gather_tokens_forward(mlContext_t context, const mlTensor_t x, const mlTensor_t indices, float beta, mlTensor_t y);
-		DLL_PUBLIC void cuda_gather_tokens_backward(mlContext_t context, const mlTensor_t dy, const mlTensor_t indices, float beta, mlTensor_t dx);
-		DLL_PUBLIC void cuda_scatter_tokens_forward(mlContext_t context, const mlTensor_t x, const mlTensor_t indices, mlTensor_t scales,
-				float beta, mlTensor_t y);
-		DLL_PUBLIC void cuda_scatter_tokens_backward(mlContext_t context, const mlTensor_t x, const mlTensor_t indices, const mlTensor_t scales,
+		DLL_PUBLIC void cuda_gather_tokens_forward(mlContext_t context, const mlTensor_t x, const mlTensor_t indices_and_values, float beta,
+				mlTensor_t y);
+		DLL_PUBLIC void cuda_gather_tokens_backward(mlContext_t context, const mlTensor_t dy, const mlTensor_t indices_and_values, float beta,
+				mlTensor_t dx);
+		DLL_PUBLIC void cuda_scatter_tokens_forward(mlContext_t context, const mlTensor_t x, const mlTensor_t indices_and_values, float beta,
+				mlTensor_t y);
+		DLL_PUBLIC void cuda_scatter_tokens_backward(mlContext_t context, const mlTensor_t x, const mlTensor_t indices_and_values,
 				const mlTensor_t dy, float beta1, mlTensor_t dx, float beta2, mlTensor_t dscales);
 		DLL_PUBLIC void cuda_moe_forward(mlContext_t context, const mlTensor_t x, const mlTensor_t w, const mlTensor_t b, float beta, mlTensor_t y,
 				mlActivationType_t act);
 		DLL_PUBLIC void cuda_moe_backward(mlContext_t context, const mlTensor_t x, const mlTensor_t y, const mlTensor_t w, mlTensor_t dy,
 				float beta_dx, mlTensor_t dx, float beta_dw, mlTensor_t dw, float beta_db, mlTensor_t db, mlActivationType_t act);
+
+		/*
+		 * learnable scaling
+		 */
+		DLL_PUBLIC void cuda_learnable_scaling_forward(mlContext_t context, float alpha, const mlTensor_t x, mlActivationType_t act,
+				const mlTensor_t w, float beta, mlTensor_t y);
+		DLL_PUBLIC void cuda_learnable_scaling_backward(mlContext_t context, float alpha, const mlTensor_t dy, const mlTensor_t x,
+				mlActivationType_t act, const mlTensor_t w, float beta_dx, mlTensor_t dx, float beta_dw, mlTensor_t dw);
 
 		/*
 		 * tensor op

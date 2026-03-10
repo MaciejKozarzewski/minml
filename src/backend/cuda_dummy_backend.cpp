@@ -343,14 +343,14 @@ namespace ml
 		throw NotImplemented(METHOD_NAME);
 	}
 	void cuda_multi_head_attention_forward(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, mlShape_t bias_shape,
-			mlDataType_t dtype, const void *input, void *output, const void *weights, const void *bias, const void *mask, void *workspace,
-			void *backward_data, int num_heads, bool symmetric)
+			mlDataType_t dtype, const void *input, void *output, const void *weights, const void *bias, void *workspace, void *backward_data,
+			int num_heads, bool symmetric)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
 	void cuda_multi_head_attention_backward(mlContext_t context, mlShape_t input_shape, mlShape_t weights_shape, mlShape_t bias_shape,
-			const void *input, const void *weights, const void *bias, const void *mask, void *gradient_prev, void *gradient_next,
-			void *weights_update, void *bias_update, void *mask_update, void *workspace, void *backward_data, int num_heads, bool symmetric)
+			const void *input, const void *weights, const void *bias, void *gradient_prev, void *gradient_next, void *weights_update,
+			void *bias_update, void *workspace, void *backward_data, int num_heads, bool symmetric)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
@@ -392,25 +392,41 @@ namespace ml
 	/*
 	 * mixture of experts
 	 */
+	void cuda_hash_routing(mlContext_t context, const mlTensor_t x, mlTensor_t indices_and_values)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+	void cuda_token_choice_routing_forward(mlContext_t context, const mlTensor_t x, const mlTensor_t bias, mlTensor_t indices_and_values)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+	void cuda_token_choice_routing_backward(mlContext_t context, const mlTensor_t x, const mlTensor_t indices_and_values, const mlTensor_t dy,
+			float beta, mlTensor_t dx, float alpha, mlTensor_t bias, mlTensor_t workspace)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+	void cuda_expert_choice_routing(mlContext_t context, const mlTensor_t x, mlTensor_t indices_and_values)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
 	void cuda_select_top_k(mlContext_t context, const mlTensor_t x, mlTensor_t indices, mlTensor_t values)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
-	void cuda_gather_tokens_forward(mlContext_t context, const mlTensor_t x, const mlTensor_t indices, float beta, mlTensor_t y)
+	void cuda_gather_tokens_forward(mlContext_t context, const mlTensor_t x, const mlTensor_t indices_and_values, float beta, mlTensor_t y)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
-	void cuda_gather_tokens_backward(mlContext_t context, const mlTensor_t dy, const mlTensor_t indices, float beta, mlTensor_t dx)
+	void cuda_gather_tokens_backward(mlContext_t context, const mlTensor_t dy, const mlTensor_t indices_and_values, float beta, mlTensor_t dx)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
-	void cuda_scatter_tokens_forward(mlContext_t context, const mlTensor_t x, const mlTensor_t indices, mlTensor_t scales, float beta,
-			mlTensor_t y)
+	void cuda_scatter_tokens_forward(mlContext_t context, const mlTensor_t x, const mlTensor_t indices_and_values, float beta, mlTensor_t y)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
-	void cuda_scatter_tokens_backward(mlContext_t context, const mlTensor_t x, const mlTensor_t indices, const mlTensor_t scales, const mlTensor_t dy,
-			float beta1, mlTensor_t dx, float beta2, mlTensor_t dscales)
+	void cuda_scatter_tokens_backward(mlContext_t context, const mlTensor_t x, const mlTensor_t indices_and_values, const mlTensor_t dy, float beta1,
+			mlTensor_t dx, float beta2, mlTensor_t dscales)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
@@ -501,6 +517,20 @@ namespace ml
 		throw NotImplemented(METHOD_NAME);
 	}
 	void cuda_fused_l2_regularization(mlContext_t context, mlTensor_t *gradients, const mlTensor_t *params, float scale, int num_tensors)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+
+	/*
+	 * learnable scaling
+	 */
+	void cuda_learnable_scaling_forward(mlContext_t context, float alpha, const mlTensor_t x, mlActivationType_t act, const mlTensor_t w, float beta,
+			mlTensor_t y)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+	void cuda_learnable_scaling_backward(mlContext_t context, float alpha, const mlTensor_t dy, const mlTensor_t x, mlActivationType_t act,
+			const mlTensor_t w, float beta_dx, mlTensor_t dx, float beta_dw, mlTensor_t dw)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}

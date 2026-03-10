@@ -9,6 +9,7 @@
 #include <minml/backend/backend_utils.hpp>
 
 #include "../utils.hpp"
+#include "../helpers/indexers.cuh"
 #include "../vec/vec_headers.cuh"
 
 #include <cuda_runtime_api.h>
@@ -78,7 +79,7 @@ namespace
 		assert(blockDim.x == 256);
 		__shared__ cg::block_tile_memory<256> btm;
 		cg::thread_block thb = cg::this_thread_block(btm);
-		cg::thread_block_tile<256> tile = cg::tiled_partition<256>(thb);
+		cg::thread_block_tile < 256 > tile = cg::tiled_partition<256>(thb);
 
 		const int tid = blockIdx.x * blockDim.x + threadIdx.x;
 		const int stride = gridDim.x * blockDim.x;
@@ -101,7 +102,7 @@ namespace
 		assert(blockDim.x == 256);
 		__shared__ cg::block_tile_memory<256> btm;
 		cg::thread_block thb = cg::this_thread_block(btm);
-		cg::thread_block_tile<256> tile = cg::tiled_partition<256>(thb);
+		cg::thread_block_tile < 256 > tile = cg::tiled_partition<256>(thb);
 
 		float acc = 0.0f;
 		for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < elements; i += gridDim.x * blockDim.x)
@@ -121,7 +122,7 @@ namespace
 		assert(blockDim.x == 256);
 		__shared__ cg::block_tile_memory<256> btm;
 		cg::thread_block thb = cg::this_thread_block(btm);
-		cg::thread_block_tile<256> tile = cg::tiled_partition<256>(thb);
+		cg::thread_block_tile < 256 > tile = cg::tiled_partition<256>(thb);
 
 		float acc = 0.0f;
 		for (int i = threadIdx.x; i < elements; i += blockDim.x)
@@ -245,7 +246,7 @@ namespace
 		assert(blockDim.x == 256);
 		__shared__ cg::block_tile_memory<256> btm;
 		cg::thread_block thb = cg::this_thread_block(btm);
-		cg::thread_block_tile<256> tile = cg::tiled_partition<256>(thb);
+		cg::thread_block_tile < 256 > tile = cg::tiled_partition<256>(thb);
 
 		const T *data = reinterpret_cast<const T*>(tensors[blockIdx.x].data);
 		const int elements = tensors[blockIdx.x].elements;

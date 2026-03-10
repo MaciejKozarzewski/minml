@@ -127,10 +127,9 @@ namespace
 	{
 		assert(channels % N == 0);
 		assert(blockDim.x == 32 && blockDim.y == 8);
-		__shared__ vec<T, N> workspace[32 * 8];
+		__shared__ vec<T, N> workspace[8][32];
 
 		const int global_idx = N * (blockIdx.x * blockDim.x + threadIdx.x);
-		const int local_idx = threadIdx.y * blockDim.x + threadIdx.x;
 
 		const Indexer<2> scales_indexer(batch_size, channels);
 
@@ -151,21 +150,21 @@ namespace
 					dx += vec<T, N>(beta1) * vec<T, N>(gradient_input + tmp);
 				dx.store(gradient_input + tmp);
 			}
-			workspace[local_idx] = scale_gradient;
+			workspace[threadIdx.y][threadIdx.x] = scale_gradient;
 		}
 
 		__syncthreads();
 		for (int i = blockDim.y / 2; i >= 1; i /= 2)
 		{
 			if (threadIdx.y < i)
-				workspace[local_idx] += workspace[local_idx + i * blockDim.x];
+				workspace[threadIdx.y][threadIdx.x] += workspace[threadIdx.y + i][threadIdx.x];
 			__syncthreads();
 		}
 
 		if (threadIdx.y == 0 && global_idx < channels)
 		{
 			const int tmp = scales_indexer.at(blockIdx.z, global_idx);
-			vec<T, N> dscales = vec<T, N>(alpha) * workspace[threadIdx.x];
+			vec<T, N> dscales = vec<T, N>(alpha) * workspace[0][threadIdx.x];
 			if (beta2 != 0.0f)
 				dscales += vec<T, N>(beta2) * vec<T, N>(gradient_scales + tmp);
 			dscales.store(gradient_scales + tmp);
@@ -298,17 +297,17 @@ namespace ml
 			case DTYPE_FLOAT32:
 			{
 				if (channels % 4 == 0)
-					kernel_average_pooling_forward<float, 4, float> <<<gridDim_x4, blockDim, 0, stream >>>(beta, data<float>(y), alpha, data<float>(x),
-							batch_size, hw, channels);
+					kernel_average_pooling_forward<float, 4, float> <<<gridDim_x4, blockDim, 0, stream >>>(beta, data<float>(y), alpha,
+							data<float>(x), batch_size, hw, channels);
 				else
-					kernel_average_pooling_forward<float, 1, float> <<<gridDim_x1, blockDim, 0, stream >>>(beta, data<float>(y), alpha, data<float>(x),
-							batch_size, hw, channels);
+					kernel_average_pooling_forward<float, 1, float> <<<gridDim_x1, blockDim, 0, stream >>>(beta, data<float>(y), alpha,
+							data<float>(x), batch_size, hw, channels);
 				break;
 			}
 			case DTYPE_FLOAT64:
 			{
-				kernel_average_pooling_forward<double, 1, double> <<<gridDim_x1, blockDim, 0, stream >>>(beta, data<double>(y), alpha, data<double>(x),
-						batch_size, hw, channels);
+				kernel_average_pooling_forward<double, 1, double> <<<gridDim_x1, blockDim, 0, stream >>>(beta, data<double>(y), alpha,
+						data<double>(x), batch_size, hw, channels);
 				break;
 			}
 		}
@@ -462,27 +461,27 @@ namespace ml
 			case DTYPE_FLOAT16:
 			{
 				if (last_dim % 4 == 0)
-					kernel_channel_average_pooling_forward<half, 4, float> <<<gridDim, blockDim, 0, stream >>>(beta, data<half>(y), alpha, data<half>(x),
-							first_dim, last_dim);
+					kernel_channel_average_pooling_forward<half, 4, float> <<<gridDim, blockDim, 0, stream >>>(beta, data<half>(y), alpha,
+							data<half>(x), first_dim, last_dim);
 				else
-					kernel_channel_average_pooling_forward<half, 1, float> <<<gridDim, blockDim, 0, stream >>>(beta, data<half>(y), alpha, data<half>(x),
-							first_dim, last_dim);
+					kernel_channel_average_pooling_forward<half, 1, float> <<<gridDim, blockDim, 0, stream >>>(beta, data<half>(y), alpha,
+							data<half>(x), first_dim, last_dim);
 				break;
 			}
 			case DTYPE_FLOAT32:
 			{
 				if (last_dim % 4 == 0)
-					kernel_channel_average_pooling_forward<float, 4, float> <<<gridDim, blockDim, 0, stream >>>(beta, data<float>(y), alpha, data<float>(x),
-							first_dim, last_dim);
+					kernel_channel_average_pooling_forward<float, 4, float> <<<gridDim, blockDim, 0, stream >>>(beta, data<float>(y), alpha,
+							data<float>(x), first_dim, last_dim);
 				else
-					kernel_channel_average_pooling_forward<float, 1, float> <<<gridDim, blockDim, 0, stream >>>(beta, data<float>(y), alpha, data<float>(x),
-							first_dim, last_dim);
+					kernel_channel_average_pooling_forward<float, 1, float> <<<gridDim, blockDim, 0, stream >>>(beta, data<float>(y), alpha,
+							data<float>(x), first_dim, last_dim);
 				break;
 			}
 			case DTYPE_FLOAT64:
 			{
-				kernel_channel_average_pooling_forward<double, 1, double> <<<gridDim, blockDim, 0, stream >>>(beta, data<double>(y), alpha, data<double>(x),
-						first_dim, last_dim);
+				kernel_channel_average_pooling_forward<double, 1, double> <<<gridDim, blockDim, 0, stream >>>(beta, data<double>(y), alpha,
+						data<double>(x), first_dim, last_dim);
 				break;
 			}
 		}

@@ -53,8 +53,8 @@ namespace
 	template<typename T>
 	__global__ void kernel_select_top_k(const T *input, int *indices, T *values, int top_k, int first_dim, int last_dim)
 	{
-		extern __shared__ char shared_array[];
 #if __CUDA_ARCH__ >= FP16_MIN_ARCH
+		extern __shared__ char shared_array[];
 		int *s_idx = reinterpret_cast<int*>(shared_array);
 		T *s_val = reinterpret_cast<T*>(s_idx + blockDim.x);
 
@@ -115,20 +115,259 @@ namespace
 			if (values != nullptr)
 				values[blockIdx.x * top_k + tid] = s_val[tid];
 		}
-#endif
+	#endif
 	}
-	/*
-	 * indices	[N x E x K]
-	 * flags	[N x T x E]		true if given token is being used by given expert within the batch, false otherwise
-	 */
-	__global__ void kernel_invert_indices(const int *indices, bool *flags, int batch_size, int experts, int top_k, int tokens)
-	{
 
+	template<typename T>
+	__global__ void kernel_hash_routing(T *indices_and_values, int batch_size, int tokens, int experts, int capacity)
+	{
+		const int b = blockIdx.x;
+
+		const Indexer<4> indexer(batch_size, 2, experts, capacity);
+
+		for (int e = threadIdx.y; e < experts; e += blockDim.y)
+			for (int k = threadIdx.x; k < capacity; k += blockDim.x)
+			{
+				const int token_index = k * experts + e;
+				if (token_index < tokens)
+				{
+					indices_and_values[indexer.at(b, 0, e, k)] = static_cast<T>(token_index);
+					indices_and_values[indexer.at(b, 1, e, k)] = static_cast<T>(1.0f);
+				}
+				else
+				{
+					indices_and_values[indexer.at(b, 0, e, k)] = static_cast<T>(-1.0f);
+					indices_and_values[indexer.at(b, 1, e, k)] = static_cast<T>(0.0f);
+				}
+			}
+	}
+	template<typename T, typename U = T>
+	__global__ void kernel_softmax_and_top_1(const T *input, const T *bias, int *expert_indices, T *expert_scores, int first_dim, int experts)
+	{
+		// input	[NHWE]
+		// output	[NHW] (int) x2	[NHW] (T)
+
+		extern __shared__ char shared_array[];
+		U *expert_bias = reinterpret_cast<U*>(shared_array);
+		U *workspace = expert_bias + experts;
+
+		for (int j = threadIdx.y * blockDim.x + threadIdx.x; j < experts; j += blockDim.x * blockDim.y)
+			expert_bias[j] = bias[j];
+		__syncthreads();
+
+		const Indexer<2> input_indexer(first_dim, experts);
+		const Indexer<1> output_indexer(first_dim);
+
+		for (int i = blockIdx.y * blockDim.y + threadIdx.y; i < first_dim; i += gridDim.y * blockDim.y)
+		{
+			U max_logit = static_cast<U>(-1e+32f);
+			U max_score = static_cast<U>(-1e+32f);
+			for (int j = threadIdx.x; j < experts; j += blockDim.x)
+			{
+				const U x = input[input_indexer.at(i, j)];
+				max_logit = max(max_logit, x);
+				max_score = max(max_score, x + expert_bias[j]);
+				workspace[threadIdx.y * experts + j] = x;
+			}
+			for (int k = 16; k >= 1; k /= 2)
+			{
+				max_logit = max(max_logit, __shfl_xor_sync(0xffffffff, max_logit, k));
+				max_score = max(max_score, __shfl_xor_sync(0xffffffff, max_score, k));
+			}
+			__syncthreads();
+
+			U sum = static_cast<U>(0.0f);
+			for (int j = threadIdx.x; j < experts; j += blockDim.x)
+				sum += exp(workspace[threadIdx.y * experts + j] - max_logit);
+			for (int k = 16; k >= 1; k /= 2)
+				sum += __shfl_xor_sync(0xffffffff, sum, k);
+			__syncthreads();
+
+			for (int j = threadIdx.x; j < experts; j += blockDim.x)
+				if (max_score == (workspace[threadIdx.y * experts + j] + expert_bias[j]))
+				{
+					const U x = exp(workspace[threadIdx.y * experts + j] - max_logit) / sum;
+					expert_indices[i] = j;
+					expert_scores[i] = static_cast<T>(x);
+				}
+			__syncthreads();
+		}
+	}
+	template<typename T>
+	__global__ void kernel_token_choice_routing(const int *indices, const T *scores, T *indices_and_values, int batch_size, int tokens, int experts,
+			int capacity)
+	{
+		// input	[NHWE]
+		// indices	[N2EK]
+		extern __shared__ char shared_array[];
+		const int workspace_size = round_up_to_power_of_2(tokens);
+		int *expert_count = reinterpret_cast<int*>(shared_array);
+		int *expert_index = reinterpret_cast<int*>(expert_count + experts + 1);
+		int *token_index = reinterpret_cast<int*>(expert_index + workspace_size);
+		T *expert_score = reinterpret_cast<T*>(token_index + workspace_size);
+
+		const int b = blockIdx.x;
+
+		const Indexer<2> input_indexer(batch_size, tokens);
+		for (int j = threadIdx.x; j < workspace_size; j += blockDim.x)
+			if (j < tokens)
+			{
+				expert_index[j] = indices[input_indexer.at(b, j)];
+				token_index[j] = j;
+				expert_score[j] = scores[input_indexer.at(b, j)];
+			}
+			else
+			{
+				expert_index[j] = experts + 1;
+				token_index[j] = -1;
+				expert_score[j] = static_cast<T>(0.0f);
+			}
+		for (int j = threadIdx.x; j <= experts; j += blockDim.x)
+			expert_count[j] = 0;
+		__syncthreads();
+
+		// first sort by values to pick top k
+		const int tid = threadIdx.x;
+		for (int k = 2; k <= blockDim.x; k *= 2)
+		{
+			for (int j = k / 2; j > 0; j /= 2)
+			{
+				const int ixj = tid ^ j;
+				if (ixj > tid)
+				{
+					const bool ascending = ((tid & k) == 0);
+					// sort by expert id (ascending), and by score within same expert id (descending)
+					const bool same_expert = (expert_index[tid] == expert_index[ixj]);
+					const bool compare = same_expert ? (expert_score[tid] <= expert_score[ixj]) : (expert_index[tid] > expert_index[ixj]);
+					if (compare == ascending)
+					{
+						swap(expert_index[tid], expert_index[ixj]);
+						swap(token_index[tid], token_index[ixj]);
+						swap(expert_score[tid], expert_score[ixj]);
+					}
+				}
+				__syncthreads();
+			}
+		}
+
+		// now count how many times each expert is selected
+		for (int j = threadIdx.x; j < tokens; j += blockDim.x)
+			for (int e = expert_index[j] + 1; e <= experts; e++)
+				atomicAdd(expert_count + e, 1);
+		__syncthreads();
+
+		const int eidx = tid / 32;
+		const int cidx = tid % 32;
+		const int e_str = blockDim.x / 32;
+
+		const Indexer<4> output_indexer(batch_size, 2, experts, capacity);
+		for (int e = eidx; e < experts; e += e_str)
+		{
+			const int c0 = expert_count[e];
+			const int c1 = expert_count[e + 1];
+			for (int c = cidx; c < capacity; c += 32)
+				if (c < (c1 - c0))
+				{
+					indices_and_values[output_indexer.at(b, 0, e, c)] = static_cast<T>(token_index[c0 + c]);
+					indices_and_values[output_indexer.at(b, 1, e, c)] = static_cast<T>(expert_score[c0 + c]);
+				}
+				else
+				{
+					indices_and_values[output_indexer.at(b, 0, e, c)] = static_cast<T>(-1.0f);
+					indices_and_values[output_indexer.at(b, 1, e, c)] = static_cast<T>(0.0f);
+				}
+		}
+
+	}
+	template<typename T, typename U = T>
+	__global__ void kernel_token_choice_scatter_gradient(T *workspace, const T *indices_and_values, const T *gradient_next, int batch_size,
+			int tokens, int experts, int capacity)
+	{
+		const Indexer<3> input_indexer(batch_size, tokens, experts);
+		const Indexer<4> output_indexer(batch_size, 2, experts, capacity);
+
+		const int b = blockIdx.x;
+
+		for (int e = threadIdx.y; e < experts; e += blockDim.y)
+			for (int k = threadIdx.x; k < capacity; k += blockDim.x)
+			{
+				const int index = (int) indices_and_values[output_indexer.at(b, 0, e, k)];
+				if (index >= 0)
+					workspace[input_indexer.at(b, index, e)] = gradient_next[output_indexer.at(b, 1, e, k)];
+			}
+	}
+	template<typename T, typename U = T>
+	__global__ void kernel_token_choice_backward(float beta, T *gradient_prev, const T *input, const T *gradient_next, int batch_size, int tokens,
+			int experts, int capacity)
+	{
+		// input	[NHWE]
+		// output	[N2EK]
+
+		extern __shared__ char shared_array[];
+		U *workspace = reinterpret_cast<U*>(shared_array);
+
+		const Indexer<3> input_indexer(batch_size, tokens, experts);
+		const Indexer<4> output_indexer(batch_size, 2, experts, capacity);
+
+		const int b = blockIdx.x;
+
+		for (int t = threadIdx.y; t < tokens; t += blockDim.y)
+		{
+			U max_value = static_cast<U>(-1e+32f);
+			for (int e = threadIdx.x; e < experts; e += blockDim.x)
+			{
+				const U x = input[input_indexer.at(b, t, e)];
+				max_value = max(max_value, x);
+				workspace[threadIdx.y * experts + e] = x;
+			}
+			for (int k = 16; k >= 1; k /= 2)
+				max_value = max(max_value, __shfl_xor_sync(0xffffffff, max_value, k));
+			__syncthreads();
+
+			U sum = static_cast<U>(0.0f);
+			for (int e = threadIdx.x; e < experts; e += blockDim.x)
+			{
+				const U x = exp(workspace[threadIdx.y * experts + e] - max_value);
+				workspace[threadIdx.y * experts + e] = x;
+				sum += x;
+			}
+			for (int k = 16; k >= 1; k /= 2)
+				sum += __shfl_xor_sync(0xffffffff, sum, k);
+			__syncthreads();
+
+			const U inv_scale = static_cast<U>(1.0f) / sum;
+			for (int e = threadIdx.x; e < experts; e += blockDim.x)
+				workspace[threadIdx.y * experts + e] *= inv_scale;
+			__syncthreads();
+
+			U tmp = static_cast<U>(0.0f);
+			for (int e = threadIdx.x; e < experts; e += blockDim.x)
+			{
+				const U y = workspace[threadIdx.y * experts + e];
+				const U dy = static_cast<U>(gradient_next[input_indexer.at(b, t, e)]);
+				tmp += dy * y;
+			}
+			for (int k = 16; k >= 1; k /= 2)
+				tmp += __shfl_xor_sync(0xffffffff, tmp, k);
+			__syncthreads();
+
+			for (int e = threadIdx.x; e < experts; e += blockDim.x)
+			{
+				const int idx = input_indexer.at(b, t, e);
+				const U y = workspace[threadIdx.y * experts + e];
+				const U dy = static_cast<U>(gradient_next[idx]);
+				U dx = y * (dy - tmp);
+				if (beta != 0.0f)
+					dx += static_cast<U>(beta) * static_cast<U>(gradient_prev[idx]);
+				gradient_prev[idx] = static_cast<T>(dx);
+			}
+			__syncthreads();
+		}
 	}
 
 	template<typename T, int N>
-	__global__ void kernel_gather_forward(const T *input, float beta, T *output, const int *indices, int batch_size, int tokens, int channels,
-			int experts, int top_k)
+	__global__ void kernel_gather_forward(const T *input, float beta, T *output, const T *indices_and_values, int batch_size, int tokens,
+			int channels, int experts, int top_k)
 	{
 		assert(channels % N == 0);
 		const int b = blockIdx.x;
@@ -136,25 +375,28 @@ namespace
 
 		const Indexer<3> input_indexer(batch_size, tokens, channels);
 		const Indexer<4> output_indexer(batch_size, top_k, experts, channels);
-		const Indexer<3> indices_indexer(batch_size, experts, top_k);
+		const Indexer<4> indices_indexer(batch_size, 2, experts, top_k);
 
 		for (int k = threadIdx.y; k < top_k; k += blockDim.y)
 		{
-			const int token_index = indices[indices_indexer.at(b, e, k)];
-			const T *src = input + input_indexer.at(b, token_index, 0);
-			T *dst = output + output_indexer.at(b, k, e, 0);
-			for (int c = N * threadIdx.x; c < channels; c += N * blockDim.x)
+			const int token_index = indices_and_values[indices_indexer.at(b, 0, e, k)];
+			if (token_index >= 0)
 			{
-				vec<T, N> tmp(src + c);
-				if (beta != 0.0f)
-					tmp += vec<T, N>(beta) * vec<T, N>(dst + c);
-				tmp.store(dst + c);
+				const T *src = input + input_indexer.at(b, token_index, 0);
+				T *dst = output + output_indexer.at(b, k, e, 0);
+				for (int c = N * threadIdx.x; c < channels; c += N * blockDim.x)
+				{
+					vec<T, N> tmp(src + c);
+					if (beta != 0.0f)
+						tmp += vec<T, N>(beta) * vec<T, N>(dst + c);
+					tmp.store(dst + c);
+				}
 			}
 		}
 	}
 	template<typename T, int N>
-	__global__ void kernel_gather_backward(const T *gradient_next, T *gradient_prev, const int *indices, int batch_size, int tokens, int channels,
-			int experts, int top_k)
+	__global__ void kernel_gather_backward(const T *gradient_next, T *gradient_prev, const T *indices_and_values, int batch_size, int tokens,
+			int channels, int experts, int top_k)
 	{
 		assert(channels % N == 0);
 		const int b = blockIdx.x;
@@ -162,20 +404,23 @@ namespace
 
 		const Indexer<3> prev_indexer(batch_size, tokens, channels);
 		const Indexer<4> next_indexer(batch_size, top_k, experts, channels);
-		const Indexer<3> indices_indexer(batch_size, experts, top_k);
+		const Indexer<4> indices_indexer(batch_size, 2, experts, top_k);
 
 		for (int k = threadIdx.y; k < top_k; k += blockDim.y)
 		{
-			const int token_index = indices[indices_indexer.at(b, e, k)];
-			const T *src = gradient_next + next_indexer.at(b, k, e, 0);
-			T *dst = gradient_prev + prev_indexer.at(b, token_index, 0);
-			for (int c = N * threadIdx.x; c < channels; c += N * blockDim.x)
-				atomic_add(dst + c, vec<T, N>(src + c));
+			const int token_index = indices_and_values[indices_indexer.at(b, 0, e, k)];
+			if (token_index >= 0)
+			{
+				const T *src = gradient_next + next_indexer.at(b, k, e, 0);
+				T *dst = gradient_prev + prev_indexer.at(b, token_index, 0);
+				for (int c = N * threadIdx.x; c < channels; c += N * blockDim.x)
+					atomic_add(dst + c, vec<T, N>(src + c));
+			}
 		}
 	}
 
 	template<typename T, int N>
-	__global__ void kernel_scatter_forward(const T *input, T *output, const int *indices, const T *scales, int batch_size, int tokens, int channels,
+	__global__ void kernel_scatter_forward(const T *input, T *output, const T *indices_and_values, int batch_size, int tokens, int channels,
 			int experts, int top_k)
 	{
 		assert(channels % N == 0);
@@ -184,22 +429,24 @@ namespace
 
 		const Indexer<4> input_indexer(batch_size, top_k, experts, channels);
 		const Indexer<3> output_indexer(batch_size, tokens, channels);
-		const Indexer<3> indices_indexer(batch_size, experts, top_k);
+		const Indexer<4> indices_indexer(batch_size, 2, experts, top_k);
 
 		for (int k = threadIdx.y; k < top_k; k += blockDim.y)
 		{
-			const int idx = indices_indexer.at(b, e, k);
-			const int token_index = indices[idx];
-			const vec<T, N> scale(scales[idx]);
-			const T *src = input + input_indexer.at(b, k, e, 0);
-			T *dst = output + output_indexer.at(b, token_index, 0);
-			for (int c = N * threadIdx.x; c < channels; c += N * blockDim.x)
-				atomic_add(dst + c, vec<T, N>(src + c) * scale);
+			const int token_index = indices_and_values[indices_indexer.at(b, 0, e, k)];
+			if (token_index >= 0)
+			{
+				const vec<T, N> scale(indices_and_values[indices_indexer.at(b, 1, e, k)]);
+				const T *src = input + input_indexer.at(b, k, e, 0);
+				T *dst = output + output_indexer.at(b, token_index, 0);
+				for (int c = N * threadIdx.x; c < channels; c += N * blockDim.x)
+					atomic_add(dst + c, vec<T, N>(src + c) * scale);
+			}
 		}
 	}
 	template<typename T, int N, typename U = T>
-	__global__ void kernel_scatter_backward(const T *gradient_next, float beta_prev, T *gradient_prev, const T *input, const int *indices,
-			const T *scales, float beta_scales, T *gradient_scales, int batch_size, int tokens, int channels, int experts, int top_k)
+	__global__ void kernel_scatter_backward(const T *gradient_next, float beta_prev, T *gradient_prev, const T *input, const T *indices_and_values,
+			float beta_scales, T *gradient_scales, int batch_size, int tokens, int channels, int experts, int top_k)
 	{
 		assert(channels % N == 0);
 		extern __shared__ char shared_array[];
@@ -209,13 +456,13 @@ namespace
 		const int b = blockIdx.x;
 		const int e = blockIdx.y;
 
-		const Indexer<3> indices_indexer(batch_size, experts, top_k);
+		const Indexer<4> indices_indexer(batch_size, 2, experts, top_k);
 
 		const int tid = threadIdx.y * blockDim.x + threadIdx.x;
 		for (int k = tid; k < top_k; k += blockDim.x * blockDim.y)
 		{
 			workspace_grad[k] = static_cast<T>(0.0f);
-			workspace_scales[k] = static_cast<T>(scales[indices_indexer.at(b, e, k)]);
+			workspace_scales[k] = static_cast<T>(indices_and_values[indices_indexer.at(b, 1, e, k)]);
 		}
 		__syncthreads();
 
@@ -224,18 +471,23 @@ namespace
 
 		for (int k = threadIdx.y; k < top_k; k += blockDim.y)
 		{
-			const int token_index = indices[indices_indexer.at(b, e, k)];
-			const vec<T, N> scale(workspace_scales[k]);
 			vec<T, N> scale_gradient(static_cast<T>(0.0f));
-			for (int c = N * threadIdx.x; c < channels; c += N * blockDim.x)
+
+			const int token_index = indices_and_values[indices_indexer.at(b, 0, e, k)];
+			if (token_index >= 0)
 			{
-				const vec<T, N> dy(gradient_next + next_indexer.at(b, token_index, c));
-				const vec<T, N> x(input + prev_indexer.at(b, k, e, c));
-				vec<T, N> dx = dy * scale;
-				scale_gradient += dy * x;
-				if (beta_prev != 0.0f)
-					dx += vec<T, N>(beta_prev) * vec<T, N>(gradient_prev + prev_indexer.at(b, k, e, c));
-				dx.store(gradient_prev + prev_indexer.at(b, k, e, c));
+				const vec<T, N> scale(workspace_scales[k]);
+
+				for (int c = N * threadIdx.x; c < channels; c += N * blockDim.x)
+				{
+					const vec<T, N> dy(gradient_next + next_indexer.at(b, token_index, c));
+					const vec<T, N> x(input + prev_indexer.at(b, k, e, c));
+					vec<T, N> dx = dy * scale;
+					scale_gradient += dy * x;
+					if (beta_prev != 0.0f)
+						dx += vec<T, N>(beta_prev) * vec<T, N>(gradient_prev + prev_indexer.at(b, k, e, c));
+					dx.store(gradient_prev + prev_indexer.at(b, k, e, c));
+				}
 			}
 
 			U reduced_scale_gradient = horizontal_add(scale_gradient);
@@ -243,50 +495,18 @@ namespace
 				reduced_scale_gradient += __shfl_xor_sync(0xffffffff, reduced_scale_gradient, i);
 			if (threadIdx.x == 0)
 				workspace_grad[k] = reduced_scale_gradient;
+			__syncthreads();
 		}
 
-		__syncthreads();
-		// perform softmax backward over scales
-		if (threadIdx.y == 0)
-		{
-			U tmp = 0;
-			for (int k = threadIdx.x; k < top_k; k += blockDim.x)
-			{
-				const U y = static_cast<U>(workspace_scales[k]);
-				const U dy = static_cast<U>(workspace_grad[k]);
-				tmp += dy * y;
-			}
-			for (int i = 16; i >= 1; i /= 2)
-				tmp += __shfl_xor_sync(0xffffffff, tmp, i);
-
-			for (int k = threadIdx.x; k < top_k; k += blockDim.x)
-			{
-				const U y = static_cast<U>(workspace_scales[k]);
-				const U dy = static_cast<U>(workspace_grad[k]);
-				workspace_grad[k] = y * (dy - tmp);
-			}
-		}
-
-		// scale router output gradient by beta
-		__syncthreads();
-		const Indexer<3> ds_indexer(batch_size, experts, tokens);
-		for (int t = tid; t < tokens; t += blockDim.x * blockDim.y)
-		{
-			const T tmp = (beta_scales == 0.0f) ? static_cast<T>(0.0f) : (gradient_scales[ds_indexer.at(b, e, t)] * static_cast<T>(beta_scales));
-			gradient_scales[ds_indexer.at(b, e, t)] = tmp;
-		}
-
-		// apply scale gradients to router output gradient
-		__syncthreads();
 		for (int k = tid; k < top_k; k += blockDim.x * blockDim.y)
-			gradient_scales[ds_indexer.at(b, e, indices[indices_indexer.at(b, e, k)])] += workspace_grad[k];
-	}
-
-	void print_shape(const mlTensor_t &t)
-	{
-		for (int i = 0; i < t.rank; i++)
-			std::cout << ((i != 0) ? std::string(" x ") : std::string()) << t.dim[i];
-		std::cout << '\n';
+		{
+			const int idx = indices_indexer.at(b, 1, e, k);
+			T tmp = workspace_grad[k];
+			if (beta_scales != 0.0f)
+				tmp += gradient_scales[idx] * static_cast<T>(beta_scales);
+			gradient_scales[idx] = tmp;
+			gradient_scales[indices_indexer.at(b, 0, e, k)] = static_cast<T>(0.0f); // set index gradient to zero
+		}
 	}
 
 	int get_batch_size(const mlTensor_t &t)
@@ -476,10 +696,207 @@ namespace
 			}
 		}
 	}
+
+	template<typename T>
+	__global__ void kernel_expert_bias_update(const T *indices_and_values, int *workspace, int batch_size, int experts, int capacity)
+	{
+		const int b = blockIdx.x;
+		const Indexer<4> indexer(batch_size, 2, experts, capacity);
+
+		for (int e = threadIdx.y; e < experts; e += blockDim.y)
+		{
+			int token_count = 0;
+			for (int k = threadIdx.x; k < capacity; k += blockDim.x)
+				token_count += static_cast<int>(indices_and_values[indexer.at(b, 0, e, k)]) != -1;
+			for (int k = 16; k >= 1; k /= 2)
+				token_count += __shfl_xor_sync(0xffffffff, token_count, k);
+			__syncthreads();
+			if (threadIdx.x == 0)
+				atomicAdd(workspace + e, token_count);
+			__syncthreads();
+		}
+	}
+	template<typename T>
+	__global__ void kernel_expert_bias_update(const int *workspace, float alpha, T *bias, int batch_size, int tokens, int experts)
+	{
+		const float avg_capacity = static_cast<float>(tokens) / static_cast<float>(experts);
+		for (int e = threadIdx.x; e < experts; e += blockDim.x)
+		{
+			const float token_count = static_cast<float>(workspace[e]) / static_cast<float>(batch_size);
+			if (token_count > avg_capacity)
+				bias[e] -= alpha;
+			else
+				bias[e] += alpha;
+		}
+	}
 }
 
 namespace ml
 {
+	void cuda_hash_routing(mlContext_t context, const mlTensor_t x, mlTensor_t indices_and_values)
+	{
+		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
+		const int batch_size = indices_and_values.dim[0];
+		assert(indices_and_values.dim[1] == 2);
+		const int experts = indices_and_values.dim[2];
+		const int capacity = indices_and_values.dim[3];
+		assert(x.dim[0] == batch_size);
+		const int tokens = x.dim[1] * x.dim[2];
+
+		dim3 block_dim(32, 8);
+		dim3 grid_dim(batch_size);
+
+		switch (x.dtype)
+		{
+			case DTYPE_FLOAT16:
+				kernel_hash_routing<<<grid_dim, block_dim, 0, stream>>>(data<half>(indices_and_values), batch_size, tokens, experts, capacity);
+				break;
+			case DTYPE_FLOAT32:
+				kernel_hash_routing<<<grid_dim, block_dim, 0, stream>>>(data<float>(indices_and_values), batch_size, tokens, experts, capacity);
+				break;
+			case DTYPE_FLOAT64:
+				kernel_hash_routing<<<grid_dim, block_dim, 0, stream>>>(data<double>(indices_and_values), batch_size, tokens, experts, capacity);
+				break;
+		}
+		assert(cudaGetLastError() == cudaSuccess);
+	}
+	void cuda_token_choice_routing_forward(mlContext_t context, const mlTensor_t x, const mlTensor_t bias, mlTensor_t indices_and_values)
+	{
+		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
+		const int batch_size = indices_and_values.dim[0];
+		assert(indices_and_values.dim[1] == 2);
+		const int experts = indices_and_values.dim[2];
+		const int capacity = indices_and_values.dim[3];
+		assert(x.dim[0] == batch_size);
+		const int tokens = x.dim[1] * x.dim[2];
+
+		int *expert_indices = getPointer<int>(ml::cuda_backend::Context::getWorkspace(context));
+		void *expert_scores = reinterpret_cast<void*>(expert_indices + batch_size * tokens + (batch_size * tokens) % 2);
+
+		dim3 block_dim(32, 8);
+		dim3 grid_dim(min(1024, batch_size * tokens));
+
+		switch (x.dtype)
+		{
+			case DTYPE_FLOAT16:
+			{
+				const int shared_mem_size = (block_dim.y + 1) * experts * sizeof(float); // +1 for storing expert biases
+				kernel_softmax_and_top_1<half, float> <<<grid_dim, block_dim, shared_mem_size, stream>>>(data<half>(x), data<half>(bias),
+						expert_indices, reinterpret_cast<half*>(expert_scores), batch_size * tokens, experts);
+				break;
+			}
+			case DTYPE_FLOAT32:
+			{
+				const int shared_mem_size = (block_dim.y + 1) * experts * sizeof(float);
+				kernel_softmax_and_top_1<<<grid_dim, block_dim, shared_mem_size, stream>>>(data<float>(x), data<float>(bias), expert_indices,
+						reinterpret_cast<float*>(expert_scores), batch_size * tokens, experts);
+				break;
+			}
+			case DTYPE_FLOAT64:
+			{
+				const int shared_mem_size = (block_dim.y + 1) * experts * sizeof(double);
+				kernel_softmax_and_top_1<<<grid_dim, block_dim, shared_mem_size, stream>>>(data<double>(x), data<double>(bias), expert_indices,
+						reinterpret_cast<double*>(expert_scores), batch_size * tokens, experts);
+				break;
+			}
+		}
+		assert(cudaGetLastError() == cudaSuccess);
+
+		dim3 block_dim2(round_up_to_power_of_2(tokens));
+		dim3 grid_dim2(min(1024, batch_size));
+
+		switch (x.dtype)
+		{
+			case DTYPE_FLOAT16:
+			{
+				const int shared_mem_size = block_dim2.x * (2 * sizeof(int) + sizeof(half)) + (experts + 1) * sizeof(int);
+				kernel_token_choice_routing <<<grid_dim2, block_dim2, shared_mem_size, stream>>>(expert_indices,
+						reinterpret_cast<half*>(expert_scores), data<half>(indices_and_values), batch_size, tokens, experts, capacity);
+				break;
+			}
+			case DTYPE_FLOAT32:
+			{
+				const int shared_mem_size = block_dim2.x * (2 * sizeof(int) + sizeof(float)) + (experts + 1) * sizeof(int);
+				kernel_token_choice_routing<<<grid_dim2, block_dim2, shared_mem_size, stream>>>(expert_indices,
+						reinterpret_cast<float*>(expert_scores), data<float>(indices_and_values), batch_size, tokens, experts, capacity);
+				break;
+			}
+			case DTYPE_FLOAT64:
+			{
+				const int shared_mem_size = block_dim2.x * (2 * sizeof(int) + sizeof(double)) + (experts + 1) * sizeof(int);
+				kernel_token_choice_routing<<<grid_dim2, block_dim2, shared_mem_size, stream>>>(expert_indices,
+						reinterpret_cast<double*>(expert_scores), data<double>(indices_and_values), batch_size, tokens, experts, capacity);
+				break;
+			}
+		}
+		assert(cudaGetLastError() == cudaSuccess);
+	}
+	void cuda_token_choice_routing_backward(mlContext_t context, const mlTensor_t x, const mlTensor_t indices_and_values, const mlTensor_t dy,
+			float beta, mlTensor_t dx, float alpha, mlTensor_t bias, mlTensor_t workspace)
+	{
+		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
+		const int batch_size = indices_and_values.dim[0];
+		assert(indices_and_values.dim[1] == 2);
+		const int experts = indices_and_values.dim[2];
+		const int capacity = indices_and_values.dim[3];
+		assert(x.dim[0] == batch_size);
+		const int tokens = x.dim[1] * x.dim[2];
+
+		dim3 block_dim(32, 8);
+		dim3 grid_dim(min(1024, batch_size));
+
+		cuda_memset(context, workspace.data, 0, volume(workspace) * size_of(workspace.dtype), nullptr, 0);
+
+		int *token_counts = getPointer<int>(ml::cuda_backend::Context::getWorkspace(context));
+
+		switch (x.dtype)
+		{
+			case DTYPE_FLOAT16:
+			{
+				kernel_token_choice_scatter_gradient<<<grid_dim, block_dim, 0, stream>>>(data<half>(workspace), data<half>(indices_and_values),
+						data<half>(dy), batch_size, tokens, experts, capacity);
+				const int shared_mem_size = block_dim.y * tokens * sizeof(float);
+				kernel_token_choice_backward<half, float> <<<grid_dim, block_dim, shared_mem_size, stream>>>(beta, data<half>(dx), data<half>(x),
+						data<half>(workspace), batch_size, tokens, experts, capacity);
+
+				kernel_expert_bias_update<<<grid_dim, block_dim, 0, stream>>>(data<half>(indices_and_values), token_counts, batch_size, experts,
+						capacity);
+				kernel_expert_bias_update<<<1, 256, 0, stream>>>(token_counts, alpha, data<half>(bias), batch_size, tokens, experts);
+				break;
+			}
+			case DTYPE_FLOAT32:
+			{
+				kernel_token_choice_scatter_gradient<<<grid_dim, block_dim, 0, stream>>>(data<float>(workspace), data<float>(indices_and_values),
+						data<float>(dy), batch_size, tokens, experts, capacity);
+				const int shared_mem_size = block_dim.y * tokens * sizeof(float);
+				kernel_token_choice_backward <<<grid_dim, block_dim, shared_mem_size, stream>>>(beta, data<float>(dx), data<float>(x),
+						data<float>(workspace), batch_size, tokens, experts, capacity);
+
+				kernel_expert_bias_update<<<grid_dim, block_dim, 0, stream>>>(data<float>(indices_and_values), token_counts, batch_size, experts,
+						capacity);
+				kernel_expert_bias_update<<<1, 256, 0, stream>>>(token_counts, alpha, data<float>(bias), batch_size, tokens, experts);
+				break;
+			}
+			case DTYPE_FLOAT64:
+			{
+				kernel_token_choice_scatter_gradient<<<grid_dim, block_dim, 0, stream>>>(data<double>(workspace), data<double>(indices_and_values),
+						data<double>(dy), batch_size, tokens, experts, capacity);
+				const int shared_mem_size = block_dim.y * tokens * sizeof(double);
+				kernel_token_choice_backward<<<grid_dim, block_dim, shared_mem_size, stream>>>(beta, data<double>(dx), data<double>(x),
+						data<double>(workspace), batch_size, tokens, experts, capacity);
+
+				kernel_expert_bias_update<<<grid_dim, block_dim, 0, stream>>>(data<double>(indices_and_values), token_counts, batch_size, experts,
+						capacity);
+				kernel_expert_bias_update<<<1, 256, 0, stream>>>(token_counts, alpha, data<double>(bias), batch_size, tokens, experts);
+				break;
+			}
+		}
+		assert(cudaGetLastError() == cudaSuccess);
+	}
+	void cuda_expert_choice_routing(mlContext_t context, const mlTensor_t x, mlTensor_t indices_and_values)
+	{
+	}
+
 	void cuda_select_top_k(mlContext_t context, const mlTensor_t x, mlTensor_t indices, mlTensor_t values)
 	{
 		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
@@ -512,7 +929,7 @@ namespace ml
 		}
 		assert(cudaGetLastError() == cudaSuccess);
 	}
-	void cuda_gather_tokens_forward(mlContext_t context, const mlTensor_t x, const mlTensor_t indices, float beta, mlTensor_t y)
+	void cuda_gather_tokens_forward(mlContext_t context, const mlTensor_t x, const mlTensor_t indices_and_values, float beta, mlTensor_t y)
 	{
 		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
 		const int batch_size = x.dim[0];
@@ -524,9 +941,10 @@ namespace ml
 		const int experts = y.dim[2];
 		assert(channels == y.dim[3]);
 
-		assert(batch_size == indices.dim[0]);
-		assert(experts == indices.dim[1]);
-		assert(top_k == indices.dim[2]);
+		assert(indices_and_values.dim[0] == batch_size);
+		assert(indices_and_values.dim[1] == 2);
+		assert(indices_and_values.dim[2] == experts);
+		assert(indices_and_values.dim[3] == top_k);
 
 		dim3 block_dim(32, 8);
 		dim3 grid_dim(batch_size, experts);
@@ -536,33 +954,33 @@ namespace ml
 			case DTYPE_FLOAT16:
 			{
 				if (channels % 4 == 0)
-					kernel_gather_forward<half, 4> <<<grid_dim, block_dim, 0, stream>>>(data<half>(x), beta, data<half>(y), data<int>(indices),
-							batch_size, tokens, channels, experts, top_k);
+					kernel_gather_forward<half, 4> <<<grid_dim, block_dim, 0, stream>>>(data<half>(x), beta, data<half>(y),
+							data<half>(indices_and_values), batch_size, tokens, channels, experts, top_k);
 				else
-					kernel_gather_forward<half, 1> <<<grid_dim, block_dim, 0, stream>>>(data<half>(x), beta, data<half>(y), data<int>(indices),
-							batch_size, tokens, channels, experts, top_k);
+					kernel_gather_forward<half, 1> <<<grid_dim, block_dim, 0, stream>>>(data<half>(x), beta, data<half>(y),
+							data<half>(indices_and_values), batch_size, tokens, channels, experts, top_k);
 				break;
 			}
 			case DTYPE_FLOAT32:
 			{
 				if (channels % 4 == 0)
-					kernel_gather_forward<float, 4> <<<grid_dim, block_dim, 0, stream>>>(data<float>(x), beta, data<float>(y), data<int>(indices),
-							batch_size, tokens, channels, experts, top_k);
+					kernel_gather_forward<float, 4> <<<grid_dim, block_dim, 0, stream>>>(data<float>(x), beta, data<float>(y),
+							data<float>(indices_and_values), batch_size, tokens, channels, experts, top_k);
 				else
-					kernel_gather_forward<float, 1> <<<grid_dim, block_dim, 0, stream>>>(data<float>(x), beta, data<float>(y), data<int>(indices),
-							batch_size, tokens, channels, experts, top_k);
+					kernel_gather_forward<float, 1> <<<grid_dim, block_dim, 0, stream>>>(data<float>(x), beta, data<float>(y),
+							data<float>(indices_and_values), batch_size, tokens, channels, experts, top_k);
 				break;
 			}
 			case DTYPE_FLOAT64:
 			{
-				kernel_gather_forward<double, 1> <<<grid_dim, block_dim, 0, stream>>>(data<double>(x), beta, data<double>(y), data<int>(indices),
-						batch_size, tokens, channels, experts, top_k);
+				kernel_gather_forward<double, 1> <<<grid_dim, block_dim, 0, stream>>>(data<double>(x), beta, data<double>(y),
+						data<double>(indices_and_values), batch_size, tokens, channels, experts, top_k);
 				break;
 			}
 		}
 		assert(cudaGetLastError() == cudaSuccess);
 	}
-	void cuda_gather_tokens_backward(mlContext_t context, const mlTensor_t dy, const mlTensor_t indices, float beta, mlTensor_t dx)
+	void cuda_gather_tokens_backward(mlContext_t context, const mlTensor_t dy, const mlTensor_t indices_and_values, float beta, mlTensor_t dx)
 	{
 		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
 		const int batch_size = dx.dim[0];
@@ -574,9 +992,10 @@ namespace ml
 		const int experts = dy.dim[2];
 		assert(channels == dy.dim[3]);
 
-		assert(batch_size == indices.dim[0]);
-		assert(experts == indices.dim[1]);
-		assert(top_k == indices.dim[2]);
+		assert(indices_and_values.dim[0] == batch_size);
+		assert(indices_and_values.dim[1] == 2);
+		assert(indices_and_values.dim[2] == experts);
+		assert(indices_and_values.dim[3] == top_k);
 
 		cuda_scale_tensor(context, beta, dx);
 
@@ -587,39 +1006,37 @@ namespace ml
 			case DTYPE_FLOAT16:
 			{
 				if (channels % 4 == 0)
-					kernel_gather_backward<half, 4> <<<grid_dim, block_dim, 0, stream>>>(data<half>(dy), data<half>(dx), data<int>(indices),
-							batch_size, tokens, channels, experts, top_k);
+					kernel_gather_backward<half, 4> <<<grid_dim, block_dim, 0, stream>>>(data<half>(dy), data<half>(dx),
+							data<half>(indices_and_values), batch_size, tokens, channels, experts, top_k);
 				else
-					kernel_gather_backward<half, 1> <<<grid_dim, block_dim, 0, stream>>>(data<half>(dy), data<half>(dx), data<int>(indices),
-							batch_size, tokens, channels, experts, top_k);
+					kernel_gather_backward<half, 1> <<<grid_dim, block_dim, 0, stream>>>(data<half>(dy), data<half>(dx),
+							data<half>(indices_and_values), batch_size, tokens, channels, experts, top_k);
 				break;
 			}
 			case DTYPE_FLOAT32:
 			{
 				if (channels % 4 == 0)
-					kernel_gather_backward<float, 4> <<<grid_dim, block_dim, 0, stream>>>(data<float>(dy), data<float>(dx), data<int>(indices),
-							batch_size, tokens, channels, experts, top_k);
+					kernel_gather_backward<float, 4> <<<grid_dim, block_dim, 0, stream>>>(data<float>(dy), data<float>(dx),
+							data<float>(indices_and_values), batch_size, tokens, channels, experts, top_k);
 				else
-					kernel_gather_backward<float, 1> <<<grid_dim, block_dim, 0, stream>>>(data<float>(dy), data<float>(dx), data<int>(indices),
-							batch_size, tokens, channels, experts, top_k);
+					kernel_gather_backward<float, 1> <<<grid_dim, block_dim, 0, stream>>>(data<float>(dy), data<float>(dx),
+							data<float>(indices_and_values), batch_size, tokens, channels, experts, top_k);
 				break;
 			}
 			case DTYPE_FLOAT64:
 			{
-				kernel_gather_backward<double, 1> <<<grid_dim, block_dim, 0, stream>>>(data<double>(dy), data<double>(dx), data<int>(indices),
-						batch_size, tokens, channels, experts, top_k);
+				kernel_gather_backward<double, 1> <<<grid_dim, block_dim, 0, stream>>>(data<double>(dy), data<double>(dx),
+						data<double>(indices_and_values), batch_size, tokens, channels, experts, top_k);
 				break;
 			}
 		}
 		assert(cudaGetLastError() == cudaSuccess);
 	}
-	void cuda_scatter_tokens_forward(mlContext_t context, const mlTensor_t x, const mlTensor_t indices, mlTensor_t scales, float beta, mlTensor_t y)
+	void cuda_scatter_tokens_forward(mlContext_t context, const mlTensor_t x, const mlTensor_t indices_and_values, float beta, mlTensor_t y)
 	{
 		// x		[NKEC]
-		// indices	[NEK]
-		// scales	[NEK]
+		// indices	[N2EK]
 		// y		[NHWC]	HW = tokens
-		assert(same_shape(indices, scales));
 		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
 		const int batch_size = y.dim[0];
 		const int tokens = y.dim[1] * y.dim[2];
@@ -630,13 +1047,12 @@ namespace ml
 		const int experts = x.dim[2];
 		assert(channels == x.dim[3]);
 
-		assert(batch_size == indices.dim[0]);
-		assert(experts == indices.dim[1]);
-		assert(top_k == indices.dim[2]);
+		assert(batch_size == indices_and_values.dim[0]);
+		assert(2 == indices_and_values.dim[1]);
+		assert(experts == indices_and_values.dim[2]);
+		assert(top_k == indices_and_values.dim[3]);
 
 		cuda_scale_tensor(context, beta, y);
-
-		cuda_softmax_forward(context, scales.dtype, make_shape( { scales.dim[0] * scales.dim[1], scales.dim[2] }), scales.data, scales.data);
 
 		dim3 block_dim(32, 8);
 		dim3 grid_dim(batch_size, experts);
@@ -645,42 +1061,40 @@ namespace ml
 			case DTYPE_FLOAT16:
 			{
 				if (channels % 4 == 0)
-					kernel_scatter_forward<half, 4> <<<grid_dim, block_dim, 0, stream>>>(data<half>(x), data<half>(y), data<int>(indices),
-							data<half>(scales), batch_size, tokens, channels, experts, top_k);
+					kernel_scatter_forward<half, 4> <<<grid_dim, block_dim, 0, stream>>>(data<half>(x), data<half>(y), data<half>(indices_and_values),
+							batch_size, tokens, channels, experts, top_k);
 				else
-					kernel_scatter_forward<half, 1> <<<grid_dim, block_dim, 0, stream>>>(data<half>(x), data<half>(y), data<int>(indices),
-							data<half>(scales), batch_size, tokens, channels, experts, top_k);
+					kernel_scatter_forward<half, 1> <<<grid_dim, block_dim, 0, stream>>>(data<half>(x), data<half>(y), data<half>(indices_and_values),
+							batch_size, tokens, channels, experts, top_k);
 				break;
 			}
 			case DTYPE_FLOAT32:
 			{
 				if (channels % 4 == 0)
-					kernel_scatter_forward<float, 4> <<<grid_dim, block_dim, 0, stream>>>(data<float>(x), data<float>(y), data<int>(indices),
-							data<float>(scales), batch_size, tokens, channels, experts, top_k);
+					kernel_scatter_forward<float, 4> <<<grid_dim, block_dim, 0, stream>>>(data<float>(x), data<float>(y),
+							data<float>(indices_and_values), batch_size, tokens, channels, experts, top_k);
 				else
-					kernel_scatter_forward<float, 1> <<<grid_dim, block_dim, 0, stream>>>(data<float>(x), data<float>(y), data<int>(indices),
-							data<float>(scales), batch_size, tokens, channels, experts, top_k);
+					kernel_scatter_forward<float, 1> <<<grid_dim, block_dim, 0, stream>>>(data<float>(x), data<float>(y),
+							data<float>(indices_and_values), batch_size, tokens, channels, experts, top_k);
 				break;
 			}
 			case DTYPE_FLOAT64:
 			{
-				kernel_scatter_forward<double, 1> <<<grid_dim, block_dim, 0, stream>>>(data<double>(x), data<double>(y), data<int>(indices),
-						data<double>(scales), batch_size, tokens, channels, experts, top_k);
+				kernel_scatter_forward<double, 1> <<<grid_dim, block_dim, 0, stream>>>(data<double>(x), data<double>(y),
+						data<double>(indices_and_values), batch_size, tokens, channels, experts, top_k);
 				break;
 			}
 		}
 		assert(cudaGetLastError() == cudaSuccess);
 	}
-	void cuda_scatter_tokens_backward(mlContext_t context, const mlTensor_t x, const mlTensor_t indices, const mlTensor_t scales, const mlTensor_t dy,
-			float beta1, mlTensor_t dx, float beta2, mlTensor_t dscales)
+	void cuda_scatter_tokens_backward(mlContext_t context, const mlTensor_t x, const mlTensor_t indices_and_values, const mlTensor_t dy, float beta1,
+			mlTensor_t dx, float beta2, mlTensor_t dscales)
 	{
 		// x		[NKEC]
-		// indices	[NEK]
-		// scales	[NEK]
+		// indices	[N2EK]
 		// dy		[NHWC]	HW = tokens
 		// dx		[NKEC]
 		// dscales	[NEHW]
-		assert(same_shape(scales, indices));
 		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
 		const int batch_size = dy.dim[0];
 		const int tokens = dy.dim[1] * dy.dim[2];
@@ -691,9 +1105,10 @@ namespace ml
 		const int experts = x.dim[2];
 		assert(channels == x.dim[3]);
 
-		assert(batch_size == indices.dim[0]);
-		assert(experts == indices.dim[1]);
-		assert(top_k == indices.dim[2]);
+		assert(batch_size == indices_and_values.dim[0]);
+		assert(2 == indices_and_values.dim[1]);
+		assert(experts == indices_and_values.dim[2]);
+		assert(top_k == indices_and_values.dim[3]);
 
 		dim3 block_dim(32, 8);
 		dim3 grid_dim(batch_size, experts);
@@ -702,36 +1117,36 @@ namespace ml
 		{
 			case DTYPE_FLOAT16:
 			{
-				const size_t shared_memory_size = sizeof(float) * top_k;
+				const size_t shared_memory_size = 2 * sizeof(float) * top_k;
 				if (channels % 4 == 0)
 					kernel_scatter_backward<half, 4, float> <<<grid_dim, block_dim, shared_memory_size, stream>>>(data<half>(dy), beta1,
-							data<half>(dx), data<half>(x), data<int>(indices), data<half>(scales), beta2, data<half>(dscales), batch_size, tokens,
-							channels, experts, top_k);
+							data<half>(dx), data<half>(x), data<half>(indices_and_values), beta2, data<half>(dscales), batch_size, tokens, channels,
+							experts, top_k);
 				else
 					kernel_scatter_backward<half, 1, float> <<<grid_dim, block_dim, shared_memory_size, stream>>>(data<half>(dy), beta1,
-							data<half>(dx), data<half>(x), data<int>(indices), data<half>(scales), beta2, data<half>(dscales), batch_size, tokens,
-							channels, experts, top_k);
+							data<half>(dx), data<half>(x), data<half>(indices_and_values), beta2, data<half>(dscales), batch_size, tokens, channels,
+							experts, top_k);
 				break;
 			}
 			case DTYPE_FLOAT32:
 			{
-				const size_t shared_memory_size = sizeof(float) * top_k;
+				const size_t shared_memory_size = 2 * sizeof(float) * top_k;
 				if (channels % 4 == 0)
 					kernel_scatter_backward<float, 4> <<<grid_dim, block_dim, shared_memory_size, stream>>>(data<float>(dy), beta1, data<float>(dx),
-							data<float>(x), data<int>(indices), data<float>(scales), beta2, data<float>(dscales), batch_size, tokens, channels,
-							experts, top_k);
+							data<float>(x), data<float>(indices_and_values), beta2, data<float>(dscales), batch_size, tokens, channels, experts,
+							top_k);
 				else
 					kernel_scatter_backward<float, 1> <<<grid_dim, block_dim, shared_memory_size, stream>>>(data<float>(dy), beta1, data<float>(dx),
-							data<float>(x), data<int>(indices), data<float>(scales), beta2, data<float>(dscales), batch_size, tokens, channels,
-							experts, top_k);
+							data<float>(x), data<float>(indices_and_values), beta2, data<float>(dscales), batch_size, tokens, channels, experts,
+							top_k);
 				break;
 			}
 			case DTYPE_FLOAT64:
 			{
-				const size_t shared_memory_size = sizeof(double) * top_k;
+				const size_t shared_memory_size = 2 * sizeof(double) * top_k;
 				kernel_scatter_backward<double, 1> <<<grid_dim, block_dim, shared_memory_size, stream>>>(data<double>(dy), beta1, data<double>(dx),
-						data<double>(x), data<int>(indices), data<double>(scales), beta2, data<double>(dscales), batch_size, tokens, channels,
-						experts, top_k);
+						data<double>(x), data<double>(indices_and_values), beta2, data<double>(dscales), batch_size, tokens, channels, experts,
+						top_k);
 				break;
 			}
 		}
