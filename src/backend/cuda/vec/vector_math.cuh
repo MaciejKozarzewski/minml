@@ -31,6 +31,11 @@ namespace vectors
 		store_vec(dst, load_vec<U, N>(src));
 	}
 
+	template<>
+	DEVICE_INLINE void vector_copy<4, double, double>(double *dst, const double *src)
+	{
+	}
+
 	template<typename T, int N>
 	DEVICE_INLINE vec<T, N> zero()
 	{

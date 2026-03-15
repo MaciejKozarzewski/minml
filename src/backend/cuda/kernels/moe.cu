@@ -29,6 +29,29 @@ namespace
 	using namespace vectors;
 	using namespace ml;
 
+	__device__ __forceinline__ float atomicMax(float *address, float val)
+	{
+		int ret = __float_as_int(*address);
+		while (val > __int_as_float(ret))
+		{
+			int old = ret;
+			if ((ret = atomicCAS((int*) address, old, __float_as_int(val))) == old)
+				break;
+		}
+		return __int_as_float(ret);
+	}
+	__device__ __forceinline__ double atomicMax(double *address, double val)
+	{
+		unsigned long long ret = __double_as_longlong(*address);
+		while (val > __longlong_as_double(ret))
+		{
+			unsigned long long old = ret;
+			if ((ret = atomicCAS((unsigned long long*) address, old, __double_as_longlong(val))) == old)
+				break;
+		}
+		return __longlong_as_double(ret);
+	}
+
 	__host__ __device__ int round_up_to_power_of_2(int i) noexcept
 	{
 		if (i <= 1)
@@ -142,54 +165,78 @@ namespace
 			}
 	}
 	template<typename T, typename U = T>
-	__global__ void kernel_softmax_and_top_1(const T *input, const T *bias, int *expert_indices, T *expert_scores, int first_dim, int experts)
+	__global__ void kernel_softmax_and_top_1(const T *input, const T *bias, int *expert_indices, T *expert_scores, int tokens, int experts,
+			int tokens_per_block)
 	{
 		// input	[NHWE]
-		// output	[NHW] (int) x2	[NHW] (T)
+		// output	[NHW] (int) [NHW] (T)
+
+		// shared memory size = tokens_per_block * experts + experts + 3 * tokens_per_block
 
 		extern __shared__ char shared_array[];
-		U *expert_bias = reinterpret_cast<U*>(shared_array);
-		U *workspace = expert_bias + experts;
+		U *input_copy = reinterpret_cast<U*>(shared_array);
+		U *expert_bias = input_copy + tokens_per_block * experts;
+		U *max_values_per_token = expert_bias + experts;
+		U *softmax_sum_per_token = max_values_per_token + tokens_per_block;
+		U *output_indices = softmax_sum_per_token + tokens_per_block;
 
 		for (int j = threadIdx.y * blockDim.x + threadIdx.x; j < experts; j += blockDim.x * blockDim.y)
 			expert_bias[j] = bias[j];
+		for (int j = threadIdx.y * blockDim.x + threadIdx.x; j < tokens_per_block; j += blockDim.x * blockDim.y)
+		{
+			max_values_per_token[j] = static_cast<U>(-1e+32f);
+			softmax_sum_per_token[j] = static_cast<U>(0.0f);
+			output_indices[j] = static_cast<T>(-1.0f);
+		}
 		__syncthreads();
 
-		const Indexer<2> input_indexer(first_dim, experts);
-		const Indexer<1> output_indexer(first_dim);
-
-		for (int i = blockIdx.y * blockDim.y + threadIdx.y; i < first_dim; i += gridDim.y * blockDim.y)
+		for (int i = tokens_per_block * blockIdx.x; i < tokens; i += tokens_per_block * gridDim.x)
 		{
-			U max_logit = static_cast<U>(-1e+32f);
-			U max_score = static_cast<U>(-1e+32f);
-			for (int j = threadIdx.x; j < experts; j += blockDim.x)
+			const int tokens_left = min(tokens_per_block, tokens - i);
+			const int offset = i * experts;
+			if ((tokens_left * experts) % 4 == 0 && std::is_same<U, float>::value)
 			{
-				const U x = input[input_indexer.at(i, j)];
-				max_logit = max(max_logit, x);
-				max_score = max(max_score, x + expert_bias[j]);
-				workspace[threadIdx.y * experts + j] = x;
+				for (int j = 4 * threadIdx.x; j < tokens_left * experts; j += blockDim.x * 4)
+					vector_copy<4>(input_copy + j, input + offset + j);
 			}
-			for (int k = 16; k >= 1; k /= 2)
+			else
 			{
-				max_logit = max(max_logit, __shfl_xor_sync(0xffffffff, max_logit, k));
-				max_score = max(max_score, __shfl_xor_sync(0xffffffff, max_score, k));
+				for (int j = threadIdx.x; j < tokens_left * experts; j += blockDim.x)
+					vector_copy<1>(input_copy + j, input + offset + j);
 			}
 			__syncthreads();
 
-			U sum = static_cast<U>(0.0f);
-			for (int j = threadIdx.x; j < experts; j += blockDim.x)
-				sum += exp(workspace[threadIdx.y * experts + j] - max_logit);
-			for (int k = 16; k >= 1; k /= 2)
-				sum += __shfl_xor_sync(0xffffffff, sum, k);
+			const int elements = tokens_per_block * experts;
+			for (int j = threadIdx.x; j < elements; j += blockDim.x)
+			{
+				const int token_idx = j / experts;
+				const int expert_idx = j - token_idx * experts;
+				const U x = input_copy[j];
+				const U score_plus_bias = x + expert_bias[expert_idx];
+				atomicMax(max_values_per_token + token_idx, x);
+			}
 			__syncthreads();
 
-			for (int j = threadIdx.x; j < experts; j += blockDim.x)
-				if (max_score == (workspace[threadIdx.y * experts + j] + expert_bias[j]))
-				{
-					const U x = exp(workspace[threadIdx.y * experts + j] - max_logit) / sum;
-					expert_indices[i] = j;
-					expert_scores[i] = static_cast<T>(x);
-				}
+			for (int j = threadIdx.x; j < elements; j += blockDim.x)
+			{
+				const int token_idx = j / experts;
+				const int expert_idx = j - token_idx * experts;
+				const U x = input_copy[j];
+				const U tmp = exp(x - max_values_per_token[token_idx]);
+				atomicAdd(softmax_sum_per_token + token_idx, tmp);
+
+				const U score_plus_bias = x + expert_bias[expert_idx];
+				if (score_plus_bias == max_values_per_token[token_idx])
+					output_indices[token_idx] = expert_idx;
+			}
+			__syncthreads();
+
+			for (int j = threadIdx.x; j < tokens_left; j += blockDim.x)
+			{
+				const int expert_idx = output_indices[j];
+				expert_indices[i + j] = expert_idx;
+				expert_scores[i + j] = exp(input_copy[j * experts + expert_idx] - max_values_per_token[j]) / softmax_sum_per_token[j];
+			}
 			__syncthreads();
 		}
 	}
@@ -773,30 +820,34 @@ namespace ml
 		int *expert_indices = getPointer<int>(ml::cuda_backend::Context::getWorkspace(context));
 		void *expert_scores = reinterpret_cast<void*>(expert_indices + batch_size * tokens + (batch_size * tokens) % 2);
 
-		dim3 block_dim(32, 8);
+		dim3 block_dim(256);
+
+		const int tokens_per_block = (4 * block_dim.x) / experts;
 		dim3 grid_dim(min(1024, batch_size * tokens));
+
+		const int shared_memory_elements = tokens_per_block * experts + experts + 3 * tokens_per_block;
 
 		switch (x.dtype)
 		{
 			case DTYPE_FLOAT16:
 			{
-				const int shared_mem_size = (block_dim.y + 1) * experts * sizeof(float); // +1 for storing expert biases
+				const int shared_mem_size = shared_memory_elements * sizeof(float);
 				kernel_softmax_and_top_1<half, float> <<<grid_dim, block_dim, shared_mem_size, stream>>>(data<half>(x), data<half>(bias),
-						expert_indices, reinterpret_cast<half*>(expert_scores), batch_size * tokens, experts);
+						expert_indices, reinterpret_cast<half*>(expert_scores), batch_size * tokens, experts, tokens_per_block);
 				break;
 			}
 			case DTYPE_FLOAT32:
 			{
-				const int shared_mem_size = (block_dim.y + 1) * experts * sizeof(float);
+				const int shared_mem_size = shared_memory_elements * sizeof(float);
 				kernel_softmax_and_top_1<<<grid_dim, block_dim, shared_mem_size, stream>>>(data<float>(x), data<float>(bias), expert_indices,
-						reinterpret_cast<float*>(expert_scores), batch_size * tokens, experts);
+						reinterpret_cast<float*>(expert_scores), batch_size * tokens, experts, tokens_per_block);
 				break;
 			}
 			case DTYPE_FLOAT64:
 			{
-				const int shared_mem_size = (block_dim.y + 1) * experts * sizeof(double);
+				const int shared_mem_size = shared_memory_elements * sizeof(double);
 				kernel_softmax_and_top_1<<<grid_dim, block_dim, shared_mem_size, stream>>>(data<double>(x), data<double>(bias), expert_indices,
-						reinterpret_cast<double*>(expert_scores), batch_size * tokens, experts);
+						reinterpret_cast<double*>(expert_scores), batch_size * tokens, experts, tokens_per_block);
 				break;
 			}
 		}

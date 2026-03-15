@@ -64,6 +64,11 @@ namespace
 			result.at( { i }) = json[i].getDouble();
 		return result;
 	}
+	int get_capacity(float capacity_factor, int tokens, int experts) noexcept
+	{
+		const int tmp = static_cast<int>(capacity_factor * tokens / experts);
+		return (tmp * experts >= tokens) ? tmp : (tmp + 1);
+	}
 }
 
 namespace ml
@@ -89,7 +94,8 @@ namespace ml
 		const int batch_size = getInputShape().dim(0);
 		const int tokens = getInputShape().dim(1) * getInputShape().dim(2);
 		const int experts = getInputShape().dim(3);
-		return Shape( { batch_size, 2, experts, static_cast<int>(m_capacity_factor * tokens / experts + 0.5f) });
+
+		return Shape( { batch_size, 2, experts, get_capacity(m_capacity_factor, tokens, experts) });
 	}
 
 	std::string Router::name() const
