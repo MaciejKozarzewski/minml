@@ -435,7 +435,9 @@ namespace
 				const int batch_size = getInputShape().dim(0);
 				const int tokens = getInputShape().dim(1) * getInputShape().dim(2);
 				const int experts = getInputShape().dim(3);
-				return Shape( { batch_size, 2, experts, static_cast<int>(m_capacity_factor * tokens / experts + 0.5f) });
+				const int tmp = static_cast<int>(m_capacity_factor * tokens / experts);
+				const int capacity = (tmp * experts >= tokens) ? tmp : (tmp + 1);
+				return Shape( { batch_size, 2, experts, capacity });
 			}
 			std::string name() const
 			{
@@ -462,7 +464,8 @@ namespace
 				const int batch_size = input[0].dim(0);
 				const int tokens = input[0].dim(1) * input[0].dim(2);
 				const int experts = input[0].dim(3);
-				const int capacity = m_capacity_factor * tokens / experts + 0.5f;
+				const int tmp = static_cast<int>(m_capacity_factor * tokens / experts);
+				const int capacity = (tmp * experts >= tokens) ? tmp : (tmp + 1);
 
 				if (m_algorithm == "hash")
 				{
@@ -574,7 +577,8 @@ namespace
 				const int batch_size = input[0].dim(0);
 				const int tokens = input[0].dim(1) * input[0].dim(2);
 				const int experts = input[0].dim(3);
-				const int capacity = m_capacity_factor * tokens / experts + 0.5f;
+				const int tmp = static_cast<int>(m_capacity_factor * tokens / experts);
+				const int capacity = (tmp * experts >= tokens) ? tmp : (tmp + 1);
 
 				if (m_algorithm == "hash")
 				{
@@ -951,9 +955,9 @@ namespace ml
 
 	TEST(TestRouter, forward_and_backward)
 	{
-		const int batch_size = 3;
-		const int height = 7;
-		const int width = 8;
+		const int batch_size = 128;
+		const int height = 15;
+		const int width = 15;
 		const int experts = 2;
 		const bool verbose = true;
 

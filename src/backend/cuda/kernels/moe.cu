@@ -181,7 +181,7 @@ namespace
 		U *output_indices = softmax_sum_per_token + tokens_per_block;
 
 		for (int j = threadIdx.y * blockDim.x + threadIdx.x; j < experts; j += blockDim.x * blockDim.y)
-			expert_bias[j] = bias[j];
+			expert_bias[j] = static_cast<U>(bias[j]);
 		for (int j = threadIdx.y * blockDim.x + threadIdx.x; j < tokens_per_block; j += blockDim.x * blockDim.y)
 		{
 			max_values_per_token[j] = static_cast<U>(-1e+32f);
@@ -211,9 +211,8 @@ namespace
 			{
 				const int token_idx = j / experts;
 				const int expert_idx = j - token_idx * experts;
-				const U x = input_copy[j];
-				const U score_plus_bias = x + expert_bias[expert_idx];
-				atomicMax(max_values_per_token + token_idx, x);
+				const U score_plus_bias = input_copy[j] + expert_bias[expert_idx];
+				atomicMax(max_values_per_token + token_idx, score_plus_bias);
 			}
 			__syncthreads();
 
@@ -221,11 +220,10 @@ namespace
 			{
 				const int token_idx = j / experts;
 				const int expert_idx = j - token_idx * experts;
-				const U x = input_copy[j];
-				const U tmp = exp(x - max_values_per_token[token_idx]);
+				const U tmp = exp(input_copy[j] - max_values_per_token[token_idx]);
 				atomicAdd(softmax_sum_per_token + token_idx, tmp);
 
-				const U score_plus_bias = x + expert_bias[expert_idx];
+				const U score_plus_bias = input_copy[j] + expert_bias[expert_idx];
 				if (score_plus_bias == max_values_per_token[token_idx])
 					output_indices[token_idx] = expert_idx;
 			}
@@ -234,6 +232,7 @@ namespace
 			for (int j = threadIdx.x; j < tokens_left; j += blockDim.x)
 			{
 				const int expert_idx = output_indices[j];
+				assert(0 <= expert_idx && expert_idx < experts);
 				expert_indices[i + j] = expert_idx;
 				expert_scores[i + j] = exp(input_copy[j * experts + expert_idx] - max_values_per_token[j]) / softmax_sum_per_token[j];
 			}
@@ -747,21 +746,22 @@ namespace
 	template<typename T>
 	__global__ void kernel_expert_bias_update(const T *indices_and_values, int *workspace, int batch_size, int experts, int capacity)
 	{
-		const int b = blockIdx.x;
 		const Indexer<4> indexer(batch_size, 2, experts, capacity);
 
-		for (int e = threadIdx.y; e < experts; e += blockDim.y)
-		{
-			int token_count = 0;
-			for (int k = threadIdx.x; k < capacity; k += blockDim.x)
-				token_count += static_cast<int>(indices_and_values[indexer.at(b, 0, e, k)]) != -1;
-			for (int k = 16; k >= 1; k /= 2)
-				token_count += __shfl_xor_sync(0xffffffff, token_count, k);
-			__syncthreads();
-			if (threadIdx.x == 0)
-				atomicAdd(workspace + e, token_count);
-			__syncthreads();
-		}
+		for (int b = blockIdx.x; b < batch_size; b += gridDim.x)
+			for (int e = threadIdx.y; e < experts; e += blockDim.y)
+			{
+				int token_count = 0;
+				for (int k = threadIdx.x; k < capacity; k += blockDim.x)
+					token_count += static_cast<int>(indices_and_values[indexer.at(b, 0, e, k)]) != -1;
+				__syncthreads();
+				for (int k = 16; k >= 1; k /= 2)
+					token_count += __shfl_xor_sync(0xffffffff, token_count, k);
+				__syncthreads();
+				if (threadIdx.x == 0)
+					atomicAdd(workspace + e, token_count);
+				__syncthreads();
+			}
 	}
 	template<typename T>
 	__global__ void kernel_expert_bias_update(const int *workspace, float alpha, T *bias, int batch_size, int tokens, int experts)
@@ -770,11 +770,20 @@ namespace
 		for (int e = threadIdx.x; e < experts; e += blockDim.x)
 		{
 			const float token_count = static_cast<float>(workspace[e]) / static_cast<float>(batch_size);
-			if (token_count > avg_capacity)
-				bias[e] -= alpha;
-			else
-				bias[e] += alpha;
+			if (token_count != avg_capacity)
+			{
+				if (token_count > avg_capacity)
+					bias[e] -= alpha;
+				else
+					bias[e] += alpha;
+			}
 		}
+	}
+	template<int N>
+	int round_to_multiple_of(int x) noexcept
+	{
+		const int tmp = x % N;
+		return (tmp == 0) ? x : (x + N - tmp);
 	}
 }
 
@@ -825,7 +834,7 @@ namespace ml
 		const int tokens_per_block = (4 * block_dim.x) / experts;
 		dim3 grid_dim(min(1024, batch_size * tokens));
 
-		const int shared_memory_elements = tokens_per_block * experts + experts + 3 * tokens_per_block;
+		const int shared_memory_elements = round_to_multiple_of<4>(tokens_per_block * experts + experts + 3 * tokens_per_block);
 
 		switch (x.dtype)
 		{
@@ -880,6 +889,7 @@ namespace ml
 				break;
 			}
 		}
+		cudaDeviceSynchronize();
 		assert(cudaGetLastError() == cudaSuccess);
 	}
 	void cuda_token_choice_routing_backward(mlContext_t context, const mlTensor_t x, const mlTensor_t indices_and_values, const mlTensor_t dy,
@@ -899,6 +909,7 @@ namespace ml
 		cuda_memset(context, workspace.data, 0, volume(workspace) * size_of(workspace.dtype), nullptr, 0);
 
 		int *token_counts = getPointer<int>(ml::cuda_backend::Context::getWorkspace(context));
+		cuda_memset(context, token_counts, 0, experts * sizeof(int), nullptr, 0);
 
 		switch (x.dtype)
 		{
@@ -920,7 +931,7 @@ namespace ml
 				kernel_token_choice_scatter_gradient<<<grid_dim, block_dim, 0, stream>>>(data<float>(workspace), data<float>(indices_and_values),
 						data<float>(dy), batch_size, tokens, experts, capacity);
 				const int shared_mem_size = block_dim.y * tokens * sizeof(float);
-				kernel_token_choice_backward <<<grid_dim, block_dim, shared_mem_size, stream>>>(beta, data<float>(dx), data<float>(x),
+				kernel_token_choice_backward<<<grid_dim, block_dim, shared_mem_size, stream>>>(beta, data<float>(dx), data<float>(x),
 						data<float>(workspace), batch_size, tokens, experts, capacity);
 
 				kernel_expert_bias_update<<<grid_dim, block_dim, 0, stream>>>(data<float>(indices_and_values), token_counts, batch_size, experts,
