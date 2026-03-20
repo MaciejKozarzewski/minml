@@ -405,7 +405,12 @@ namespace ml
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
-	void cuda_expert_choice_routing(mlContext_t context, const mlTensor_t x, mlTensor_t indices_and_values)
+	void cuda_expert_choice_routing_forward(mlContext_t context, const mlTensor_t x, mlTensor_t indices_and_values)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+	void cuda_expert_choice_routing_backward(mlContext_t context, const mlTensor_t x, const mlTensor_t indices_and_values, const mlTensor_t dy,
+			float beta, mlTensor_t dx)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}

@@ -26,7 +26,6 @@ namespace cg = cooperative_groups;
 
 namespace
 {
-	using namespace vectors;
 	using namespace ml;
 
 	__device__ __forceinline__ float atomicMax(float *address, float val)
@@ -50,6 +49,12 @@ namespace
 				break;
 		}
 		return __longlong_as_double(ret);
+	}
+
+	template<typename T>
+	__device__ T sigmoid(T x)
+	{
+		return static_cast<T>(1.0f) / (static_cast<T>(1.0f) + exp(-x));
 	}
 
 	__host__ __device__ int round_up_to_power_of_2(int i) noexcept
@@ -164,6 +169,7 @@ namespace
 				}
 			}
 	}
+
 	template<typename T, typename U = T>
 	__global__ void kernel_softmax_and_top_1(const T *input, const T *bias, int *expert_indices, T *expert_scores, int tokens, int experts,
 			int tokens_per_block)
@@ -197,12 +203,12 @@ namespace
 			if ((tokens_left * experts) % 4 == 0 && std::is_same<U, float>::value)
 			{
 				for (int j = 4 * threadIdx.x; j < tokens_left * experts; j += blockDim.x * 4)
-					vector_copy<4>(input_copy + j, input + offset + j);
+					vectors::vector_copy<4>(input_copy + j, input + offset + j);
 			}
 			else
 			{
 				for (int j = threadIdx.x; j < tokens_left * experts; j += blockDim.x)
-					vector_copy<1>(input_copy + j, input + offset + j);
+					vectors::vector_copy<1>(input_copy + j, input + offset + j);
 			}
 			__syncthreads();
 
@@ -411,6 +417,73 @@ namespace
 		}
 	}
 
+	template<typename T, typename U = T>
+	__global__ void kernel_expert_choice_routing(const T *input, T *indices_and_values, int batch_size, int tokens, int experts, int top_k)
+	{
+		// input	[NHWE]
+		// output	[NHW] (int) [NHW] (T)
+
+		extern __shared__ char shared_array[];
+		int *s_idx = reinterpret_cast<int*>(shared_array);
+		U *s_val = reinterpret_cast<U*>(s_idx + blockDim.x);
+
+		const int tid = threadIdx.x;
+
+		const Indexer<3> input_indexer(batch_size, tokens, experts);
+		s_val[tid] = (tid < tokens) ? static_cast<U>(input[input_indexer.at(blockIdx.y, tid, blockIdx.x)]) : static_cast<U>(-1e+32f);
+		s_idx[tid] = tid;
+		__syncthreads();
+
+		// first sort by values to pick top k
+		for (int k = 2; k <= blockDim.x; k *= 2)
+		{
+			for (int j = k / 2; j > 0; j /= 2)
+			{
+				const int ixj = tid ^ j;
+				if (ixj > tid)
+				{
+					const bool ascending = ((tid & k) == 0);
+					if ((s_val[tid] < s_val[ixj]) == ascending)
+					{
+						swap(s_val[tid], s_val[ixj]);
+						swap(s_idx[tid], s_idx[ixj]);
+					}
+				}
+				__syncthreads();
+			}
+		}
+
+		if (tid < top_k)
+		{
+			const Indexer<4> indexer(batch_size, 2, experts, top_k);
+			indices_and_values[indexer.at(blockIdx.y, 0, blockIdx.x, tid)] = static_cast<T>(s_idx[tid]);
+			indices_and_values[indexer.at(blockIdx.y, 1, blockIdx.x, tid)] = static_cast<T>(sigmoid(s_val[tid]));
+		}
+	}
+	template<typename T, typename U = T>
+	__global__ void kernel_expert_choice_scatter_gradient(float beta, T *gradient_prev, const T *indices_and_values, const T *gradient_next,
+			int batch_size, int tokens, int experts, int capacity)
+	{
+		const Indexer<3> input_indexer(batch_size, tokens, experts);
+		const Indexer<4> output_indexer(batch_size, 2, experts, capacity);
+
+		const int b = blockIdx.x;
+
+		for (int e = threadIdx.y; e < experts; e += blockDim.y)
+			for (int k = threadIdx.x; k < capacity; k += blockDim.x)
+			{
+				const int index = (int) indices_and_values[output_indexer.at(b, 0, e, k)];
+				const U value = static_cast<U>(indices_and_values[output_indexer.at(b, 1, e, k)]);
+				if (index >= 0)
+				{
+					U dx = static_cast<U>(gradient_next[output_indexer.at(b, 1, e, k)]) * value * (static_cast<U>(1.0f) - value);
+					if (beta != 0.0f)
+						dx += static_cast<U>(gradient_prev[input_indexer.at(b, index, e)]) * beta;
+					gradient_prev[input_indexer.at(b, index, e)] = static_cast<T>(dx);
+				}
+			}
+	}
+
 	template<typename T, int N>
 	__global__ void kernel_gather_forward(const T *input, float beta, T *output, const T *indices_and_values, int batch_size, int tokens,
 			int channels, int experts, int top_k)
@@ -432,9 +505,9 @@ namespace
 				T *dst = output + output_indexer.at(b, k, e, 0);
 				for (int c = N * threadIdx.x; c < channels; c += N * blockDim.x)
 				{
-					vec<T, N> tmp(src + c);
+					vectors::vec<T, N> tmp(src + c);
 					if (beta != 0.0f)
-						tmp += vec<T, N>(beta) * vec<T, N>(dst + c);
+						tmp += vectors::vec<T, N>(beta) * vectors::vec<T, N>(dst + c);
 					tmp.store(dst + c);
 				}
 			}
@@ -460,7 +533,7 @@ namespace
 				const T *src = gradient_next + next_indexer.at(b, k, e, 0);
 				T *dst = gradient_prev + prev_indexer.at(b, token_index, 0);
 				for (int c = N * threadIdx.x; c < channels; c += N * blockDim.x)
-					atomic_add(dst + c, vec<T, N>(src + c));
+					vectors::atomic_add(dst + c, vectors::vec<T, N>(src + c));
 			}
 		}
 	}
@@ -482,11 +555,11 @@ namespace
 			const int token_index = indices_and_values[indices_indexer.at(b, 0, e, k)];
 			if (token_index >= 0)
 			{
-				const vec<T, N> scale(indices_and_values[indices_indexer.at(b, 1, e, k)]);
+				const vectors::vec<T, N> scale(indices_and_values[indices_indexer.at(b, 1, e, k)]);
 				const T *src = input + input_indexer.at(b, k, e, 0);
 				T *dst = output + output_indexer.at(b, token_index, 0);
 				for (int c = N * threadIdx.x; c < channels; c += N * blockDim.x)
-					atomic_add(dst + c, vec<T, N>(src + c) * scale);
+					vectors::atomic_add(dst + c, vectors::vec<T, N>(src + c) * scale);
 			}
 		}
 	}
@@ -517,26 +590,26 @@ namespace
 
 		for (int k = threadIdx.y; k < top_k; k += blockDim.y)
 		{
-			vec<T, N> scale_gradient(static_cast<T>(0.0f));
+			vectors::vec<T, N> scale_gradient(static_cast<T>(0.0f));
 
 			const int token_index = indices_and_values[indices_indexer.at(b, 0, e, k)];
 			if (token_index >= 0)
 			{
-				const vec<T, N> scale(workspace_scales[k]);
+				const vectors::vec<T, N> scale(workspace_scales[k]);
 
 				for (int c = N * threadIdx.x; c < channels; c += N * blockDim.x)
 				{
-					const vec<T, N> dy(gradient_next + next_indexer.at(b, token_index, c));
-					const vec<T, N> x(input + prev_indexer.at(b, k, e, c));
-					vec<T, N> dx = dy * scale;
+					const vectors::vec<T, N> dy(gradient_next + next_indexer.at(b, token_index, c));
+					const vectors::vec<T, N> x(input + prev_indexer.at(b, k, e, c));
+					vectors::vec<T, N> dx = dy * scale;
 					scale_gradient += dy * x;
 					if (beta_prev != 0.0f)
-						dx += vec<T, N>(beta_prev) * vec<T, N>(gradient_prev + prev_indexer.at(b, k, e, c));
+						dx += vectors::vec<T, N>(beta_prev) * vectors::vec<T, N>(gradient_prev + prev_indexer.at(b, k, e, c));
 					dx.store(gradient_prev + prev_indexer.at(b, k, e, c));
 				}
 			}
 
-			U reduced_scale_gradient = horizontal_add(scale_gradient);
+			U reduced_scale_gradient = vectors::horizontal_add(scale_gradient);
 			for (int i = 16; i >= 1; i /= 2)
 				reduced_scale_gradient += __shfl_xor_sync(0xffffffff, reduced_scale_gradient, i);
 			if (threadIdx.x == 0)
@@ -666,11 +739,11 @@ namespace
 
 		for (int j = (blockIdx.x * blockDim.x + threadIdx.x) * N; j < last_dim; j += gridDim.x * blockDim.x * N)
 		{
-			const vec<T, N> _bias(bias + bias_indexer.at(expert_idx, j));
+			const vectors::vec<T, N> _bias(bias + bias_indexer.at(expert_idx, j));
 			for (int i = blockIdx.y * blockDim.y + threadIdx.y; i < first_dim; i += gridDim.y * blockDim.y)
 			{
 				const int offset = in_out_indexer.at(i, expert_idx, j);
-				vec<T, N> tmp(output + offset);
+				vectors::vec<T, N> tmp(output + offset);
 				tmp = activation_forward(act, tmp + _bias);
 				tmp.store(output + offset);
 			}
@@ -683,36 +756,36 @@ namespace
 		assert(blockDim.x == 32);
 		assert(blockDim.y == 8);
 		assert(last_dim % N == 0);
-		__shared__ vec<U, N> workspace[8 * 32];
+		__shared__ vectors::vec<U, N> workspace[8 * 32];
 
 		const int expert_idx = blockIdx.z;
 
 		const Indexer<3> in_out_indexer(first_dim, gridDim.z, last_dim);
 
 		const int last_dim_idx = N * (blockDim.x * blockIdx.x + threadIdx.x);
-		vec<U, N> local_sum(0.0f);
+		vectors::vec<U, N> local_sum(0.0f);
 		if (last_dim_idx < last_dim)
 		{
 			for (int i = blockDim.y * blockIdx.y + threadIdx.y; i < first_dim; i += blockDim.y * gridDim.y)
 			{
 				const int tmp_idx = in_out_indexer.at(i, expert_idx, last_dim_idx);
-				vec<U, N> dy = load_vec<U, N>(gradient_next + tmp_idx);
+				vectors::vec<U, N> dy = vectors::load_vec<U, N>(gradient_next + tmp_idx);
 				if (act != ml::ACTIVATION_LINEAR)
 				{
-					const vec<U, N> y = load_vec<U, N>(output + tmp_idx);
+					const vectors::vec<U, N> y = vectors::load_vec<U, N>(output + tmp_idx);
 					switch (act)
 					{
 						case ml::ACTIVATION_SIGMOID:
-							dy *= y * (one<U, N>() - y);
+							dy *= y * (vectors::one<U, N>() - y);
 							break;
 						case ml::ACTIVATION_TANH:
-							dy *= one<U, N>() - square(y);
+							dy *= vectors::one<U, N>() - vectors::square(y);
 							break;
 						case ml::ACTIVATION_RELU:
-							dy = select(y > zero<U, N>(), dy, zero<U, N>());
+							dy = vectors::select(y > vectors::zero<U, N>(), dy, vectors::zero<U, N>());
 							break;
 						case ml::ACTIVATION_LEAKY_RELU:
-							dy = select(y > zero<U, N>(), dy, dy * vec<U, N>(0.1f));
+							dy = vectors::select(y > vectors::zero<U, N>(), dy, dy * vectors::vec<U, N>(0.1f));
 							break;
 					}
 					store_vec(gradient_next + tmp_idx, dy);
@@ -737,7 +810,7 @@ namespace
 			const Indexer<2> db_indexer(gridDim.z, last_dim);
 			if (threadIdx.y == 0 && last_dim_idx < last_dim)
 			{
-				const vec<T, N> tmp = convert<T>(workspace[workspace_indexer.at(0, threadIdx.x)]);
+				const vectors::vec<T, N> tmp = vectors::convert<T>(workspace[workspace_indexer.at(0, threadIdx.x)]);
 				atomic_add(bias_gradient + db_indexer.at(expert_idx, last_dim_idx), tmp);
 			}
 		}
@@ -889,7 +962,6 @@ namespace ml
 				break;
 			}
 		}
-		cudaDeviceSynchronize();
 		assert(cudaGetLastError() == cudaSuccess);
 	}
 	void cuda_token_choice_routing_backward(mlContext_t context, const mlTensor_t x, const mlTensor_t indices_and_values, const mlTensor_t dy,
@@ -955,8 +1027,77 @@ namespace ml
 		}
 		assert(cudaGetLastError() == cudaSuccess);
 	}
-	void cuda_expert_choice_routing(mlContext_t context, const mlTensor_t x, mlTensor_t indices_and_values)
+	void cuda_expert_choice_routing_forward(mlContext_t context, const mlTensor_t x, mlTensor_t indices_and_values)
 	{
+		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
+		const int batch_size = indices_and_values.dim[0];
+		assert(indices_and_values.dim[1] == 2);
+		const int experts = indices_and_values.dim[2];
+		const int capacity = indices_and_values.dim[3];
+		assert(x.dim[0] == batch_size);
+		const int tokens = x.dim[1] * x.dim[2];
+
+		dim3 block_dim(round_up_to_power_of_2(tokens));
+		dim3 grid_dim(experts, batch_size);
+
+		switch (x.dtype)
+		{
+			case DTYPE_FLOAT16:
+			{
+				const int shared_mem_size = block_dim.x * sizeof(float);
+				kernel_expert_choice_routing<half, float> <<<grid_dim, block_dim, shared_mem_size, stream>>>(data<half>(x),
+						data<half>(indices_and_values), batch_size, tokens, experts, capacity);
+				break;
+			}
+			case DTYPE_FLOAT32:
+			{
+				const int shared_mem_size = block_dim.x * sizeof(float);
+				kernel_expert_choice_routing<<<grid_dim, block_dim, shared_mem_size, stream>>>(data<float>(x), data<float>(indices_and_values),
+						batch_size, tokens, experts, capacity);
+				break;
+			}
+			case DTYPE_FLOAT64:
+			{
+				const int shared_mem_size = block_dim.x * sizeof(double);
+				kernel_expert_choice_routing<<<grid_dim, block_dim, shared_mem_size, stream>>>(data<double>(x), data<double>(indices_and_values),
+						batch_size, tokens, experts, capacity);
+				break;
+			}
+		}
+		assert(cudaGetLastError() == cudaSuccess);
+	}
+	void cuda_expert_choice_routing_backward(mlContext_t context, const mlTensor_t x, const mlTensor_t indices_and_values, const mlTensor_t dy,
+			float beta, mlTensor_t dx)
+	{
+		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
+		const int batch_size = indices_and_values.dim[0];
+		assert(indices_and_values.dim[1] == 2);
+		const int experts = indices_and_values.dim[2];
+		const int capacity = indices_and_values.dim[3];
+		assert(x.dim[0] == batch_size);
+		const int tokens = x.dim[1] * x.dim[2];
+
+		dim3 block_dim(32, 8);
+		dim3 grid_dim(batch_size);
+
+		cuda_memset(context, dx.data, 0, volume(dx) * size_of(dx.dtype), nullptr, 0);
+
+		switch (x.dtype)
+		{
+			case DTYPE_FLOAT16:
+				kernel_expert_choice_scatter_gradient<half, float> <<<grid_dim, block_dim, 0, stream>>>(beta, data<half>(dx),
+						data<half>(indices_and_values), data<half>(dy), batch_size, tokens, experts, capacity);
+				break;
+			case DTYPE_FLOAT32:
+				kernel_expert_choice_scatter_gradient<<<grid_dim, block_dim, 0, stream>>>(beta, data<float>(dx), data<float>(indices_and_values),
+						data<float>(dy), batch_size, tokens, experts, capacity);
+				break;
+			case DTYPE_FLOAT64:
+				kernel_expert_choice_scatter_gradient<<<grid_dim, block_dim, 0, stream>>>(beta, data<double>(dx), data<double>(indices_and_values),
+						data<double>(dy), batch_size, tokens, experts, capacity);
+				break;
+		}
+		assert(cudaGetLastError() == cudaSuccess);
 	}
 
 	void cuda_select_top_k(mlContext_t context, const mlTensor_t x, mlTensor_t indices, mlTensor_t values)

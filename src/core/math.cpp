@@ -1322,14 +1322,28 @@ namespace ml
 				break;
 		}SYNC();
 	}
-	void expertChoiceRouting(const Context &context, const Tensor &input, Tensor &indicesAndValues)
+	void expertChoiceRoutingForward(const Context &context, const Tensor &input, Tensor &indicesAndValues)
 	{
 		switch (context.device().type())
 		{
 			case DeviceType::CPU:
 				break;
 			case DeviceType::CUDA:
-				cuda_expert_choice_routing(get(context), get(input), get(indicesAndValues));
+				cuda_expert_choice_routing_forward(get(context), get(input), get(indicesAndValues));
+				break;
+			case DeviceType::OPENCL:
+				break;
+		}SYNC();
+	}
+	void expertChoiceRoutingBackward(const Context &context, const Tensor &input, const Tensor &indicesAndValues, const Tensor &gradient_next,
+			float beta, Tensor &gradient_prev)
+	{
+		switch (context.device().type())
+		{
+			case DeviceType::CPU:
+				break;
+			case DeviceType::CUDA:
+				cuda_expert_choice_routing_backward(get(context), get(input), get(indicesAndValues), get(gradient_next), beta, get(gradient_prev));
 				break;
 			case DeviceType::OPENCL:
 				break;

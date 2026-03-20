@@ -236,10 +236,13 @@ namespace ml
 		 * mixture of experts
 		 */
 		DLL_PUBLIC void cuda_hash_routing(mlContext_t context, const mlTensor_t x, mlTensor_t indices_and_values);
-		DLL_PUBLIC void cuda_token_choice_routing_forward(mlContext_t context, const mlTensor_t x, const mlTensor_t bias, mlTensor_t indices_and_values);
+		DLL_PUBLIC void cuda_token_choice_routing_forward(mlContext_t context, const mlTensor_t x, const mlTensor_t bias,
+				mlTensor_t indices_and_values);
 		DLL_PUBLIC void cuda_token_choice_routing_backward(mlContext_t context, const mlTensor_t x, const mlTensor_t indices_and_values,
 				const mlTensor_t dy, float beta, mlTensor_t dx, float alpha, mlTensor_t bias, mlTensor_t workspace);
-		DLL_PUBLIC void cuda_expert_choice_routing(mlContext_t context, const mlTensor_t x, mlTensor_t indices_and_values);
+		DLL_PUBLIC void cuda_expert_choice_routing_forward(mlContext_t context, const mlTensor_t x, mlTensor_t indices_and_values);
+		DLL_PUBLIC void cuda_expert_choice_routing_backward(mlContext_t context, const mlTensor_t x, const mlTensor_t indices_and_values,
+				const mlTensor_t dy, float beta, mlTensor_t dx);
 		DLL_PUBLIC void cuda_select_top_k(mlContext_t context, const mlTensor_t x, mlTensor_t indices, mlTensor_t values);
 		DLL_PUBLIC void cuda_gather_tokens_forward(mlContext_t context, const mlTensor_t x, const mlTensor_t indices_and_values, float beta,
 				mlTensor_t y);

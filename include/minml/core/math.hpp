@@ -177,7 +177,9 @@ namespace ml
 	void tokenChoiceRoutingForward(const Context &context, const Tensor &input, const Tensor &bias, Tensor &indicesAndValues);
 	void tokenChoiceRoutingBackward(const Context &context, const Tensor &input, const Tensor &indicesAndValues, const Tensor &gradient_next,
 			float beta, Tensor &gradient_prev, float alpha, Tensor &bias, Tensor &workspace);
-	void expertChoiceRouting(const Context &context, const Tensor &input, Tensor &indicesAndValues);
+	void expertChoiceRoutingForward(const Context &context, const Tensor &input, Tensor &indicesAndValues);
+	void expertChoiceRoutingBackward(const Context &context, const Tensor &input, const Tensor &indicesAndValues, const Tensor &gradient_next,
+			float beta, Tensor &gradient_prev);
 	void selectTopK(const Context &context, const Tensor &input, Tensor &indices, Tensor &values);
 	void gatherTokensForward(const Context &context, const Tensor &input, const Tensor &indicesAndValues, float beta, Tensor &output);
 	void gatherTokensBackward(const Context &context, const Tensor &gradient_next, const Tensor &indicesAndValues, float beta, Tensor &gradient_prev);

@@ -94,8 +94,9 @@ namespace ml
 		const int batch_size = getInputShape().dim(0);
 		const int tokens = getInputShape().dim(1) * getInputShape().dim(2);
 		const int experts = getInputShape().dim(3);
+		const int capacity = get_capacity(m_capacity_factor, tokens, experts);
 
-		return Shape( { batch_size, 2, experts, get_capacity(m_capacity_factor, tokens, experts) });
+		return Shape( { batch_size, 2, experts, capacity });
 	}
 
 	std::string Router::name() const
@@ -127,7 +128,10 @@ namespace ml
 	}
 	int Router::getWorkspaceSize() const noexcept
 	{
-		return getInputShape().volume();
+		if (m_algorithm == RoutingAlgorithm::TOKEN_CHOICE)
+			return getInputShape().volume();
+		else
+			return 0;
 	}
 	void Router::changeContext(std::shared_ptr<Context> &context)
 	{
@@ -152,7 +156,7 @@ namespace ml
 				break;
 			}
 			case RoutingAlgorithm::EXPERT_CHOICE:
-				expertChoiceRouting(context(), input[0], output);
+				expertChoiceRoutingForward(context(), input[0], output);
 				break;
 			default:
 				break;
@@ -178,6 +182,7 @@ namespace ml
 				break;
 			}
 			case RoutingAlgorithm::EXPERT_CHOICE:
+				expertChoiceRoutingBackward(context(), input[0], output, gradient_next, beta[0], gradient_prev[0]);
 				break;
 			default:
 				break;
