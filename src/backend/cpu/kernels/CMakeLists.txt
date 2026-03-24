@@ -1,4 +1,5 @@
 add_library(kernels_backend OBJECT avx_kernels.cpp
+								avx2_kernels.cpp
 								def_kernels.cpp
 								pooling_and_scaling.cpp
 								sse2_kernels.cpp)
@@ -8,5 +9,6 @@ target_include_directories(kernels_backend PUBLIC PUBLIC "${PROJECT_SOURCE_DIR}/
 
 set_source_files_properties(sse2_kernels.cpp PROPERTIES COMPILE_OPTIONS "-msse2")
 set_source_files_properties(avx_kernels.cpp PROPERTIES COMPILE_OPTIONS "-mavx;-mf16c")
+set_source_files_properties(avx2_kernels.cpp PROPERTIES COMPILE_OPTIONS "-mavx2;-mf16c")
 
 target_link_libraries(${LibName} PRIVATE kernels_backend)

@@ -69,6 +69,7 @@ namespace ml
 			 */
 			int memory() const;
 			static CpuSimd cpuSimdLevel();
+			static bool cpuHasFastIntFMA();
 			static int numberOfCpuCores();
 			static int numberOfCudaDevices();
 			static int numberOfOpenCLDevices();

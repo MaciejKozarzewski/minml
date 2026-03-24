@@ -43,6 +43,8 @@ namespace ml
 				static const cpu_x86& get();
 				static void flush_denormals_to_zero(bool b) noexcept;
 		};
+
+		bool has_fast_int8_dot_product(int repeats);
 	}
 }
 

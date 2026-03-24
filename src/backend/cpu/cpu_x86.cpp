@@ -6,6 +6,7 @@
  */
 
 #include "cpu_x86.hpp"
+#include "kernels/kernels.hpp"
 
 #include <cstring>
 #include <algorithm>
@@ -361,6 +362,19 @@ namespace ml
 		void cpu_x86::flush_denormals_to_zero(bool b) noexcept
 		{
 			_MM_SET_FLUSH_ZERO_MODE(b ? _MM_FLUSH_ZERO_ON : _MM_FLUSH_ZERO_OFF);
+		}
+
+		bool has_fast_int8_dot_product(int repeats)
+		{
+			double fp32 = 0.0;
+			double int8 = 0.0;
+			for (int i = 0; i < 10; i++)
+			{
+				fp32 += measure_timing_fp32_fma(repeats);
+				int8 += measure_timing_int8_fma(repeats);
+			}
+			const double ratio = int8 / fp32;
+			return ratio < 1.25;
 		}
 
 	} /* namespace cpu */

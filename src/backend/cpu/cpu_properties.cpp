@@ -105,6 +105,10 @@ namespace ml
 	{
 		return cpu_x86::get().cores();
 	}
+	bool cpu_has_fast_int8_fma()
+	{
+		return cpu::has_fast_int8_dot_product(1000000);
+	}
 	int cpu_get_memory()
 	{
 		return cpu_x86::get().memory() >> 20;

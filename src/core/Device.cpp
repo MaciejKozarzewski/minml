@@ -122,6 +122,11 @@ namespace ml
 		static const CpuSimd result = static_cast<CpuSimd>(cpu_get_simd_level());
 		return result;
 	}
+	bool Device::cpuHasFastIntFMA()
+	{
+		static const bool result = cpu_has_fast_int8_fma();
+		return result;
+	}
 	int Device::numberOfCpuCores()
 	{
 		static const int result = cpu_get_number_of_cores();

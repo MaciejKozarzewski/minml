@@ -21,6 +21,7 @@ namespace ml
 		void cpu_flush_denormals_to_zero(bool b);
 		void cpu_set_number_of_threads(int number);
 		int cpu_get_number_of_cores();
+		bool cpu_has_fast_int8_fma();
 		/*
 		 * \brief In MB.
 		 */

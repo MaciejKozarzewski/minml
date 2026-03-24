@@ -50,6 +50,12 @@ namespace ml
 	void channel_scaling_avx_1x8xfp16(const TensorFragment &input, const TensorFragment &scales, TensorFragment &output) noexcept;
 	void channel_scaling_avx_1x8xfp32(const TensorFragment &input, const TensorFragment &scales, TensorFragment &output) noexcept;
 
+	/*
+	 * avx2 kernels
+	 */
+	double measure_timing_fp32_fma(int repeats);
+	double measure_timing_int8_fma(int repeats);
+
 } /* namespace ml */
 
 #endif /* BACKEND_CPU_KERNELS_KERNELS_HPP_ */
