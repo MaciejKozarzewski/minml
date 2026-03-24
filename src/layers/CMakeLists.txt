@@ -4,6 +4,7 @@ target_sources(${LibName} PRIVATE 	AbsolutePositionalEncoding.cpp
 								BatchNormalization.cpp
 								ChannelAveragePooling.cpp
 								ChannelScaling.cpp
+								ChannelShuffle.cpp
 								Conv2D.cpp
 								Dense.cpp
 								DepthToSpace.cpp

@@ -68,6 +68,11 @@ namespace ml
 	{
 		return m_use_bias;
 	}
+	Conv2D& Conv2D::groups(int g) noexcept
+	{
+		m_groups = g;
+		return *this;
+	}
 
 	void Conv2D::setInputShape(const std::vector<Shape> &shapes)
 	{
@@ -83,6 +88,9 @@ namespace ml
 
 		if (shapes.size() == 2 and shapes[1] != getOutputShape())
 			throw IllegalArgument(METHOD_NAME, "Conv2D layer expects second input shape to be equal to the output shape");
+		if (m_input_filters % m_groups != 0)
+			throw IllegalArgument(METHOD_NAME, "number of input filters must be divisible by number of groups");
+		m_input_shapes = shapes;
 	}
 	Shape Conv2D::getOutputShape() const
 	{
@@ -90,7 +98,7 @@ namespace ml
 	}
 	Shape Conv2D::getWeightShape() const
 	{
-		return Shape( { m_output_filters, m_kernel_size, m_kernel_size, m_input_filters });
+		return Shape( { m_output_filters / m_groups, m_kernel_size, m_kernel_size, m_input_filters });
 	}
 	Shape Conv2D::getBiasShape() const
 	{
@@ -110,6 +118,7 @@ namespace ml
 		result["input_filters"] = m_input_filters;
 		result["output_filters"] = m_output_filters;
 		result["kernel_size"] = m_kernel_size;
+		result["groups"] = m_groups;
 		result["use_bias"] = m_use_bias;
 		return result;
 	}
@@ -119,6 +128,7 @@ namespace ml
 		std::unique_ptr<Conv2D> result = std::make_unique<Conv2D>(config["output_filters"], config["kernel_size"], config["nonlinearity"],
 				config["use_bias"]);
 		result->m_input_filters = config["input_filters"];
+		result->m_groups = config.hasKey("groups") ? config["groups"].getInt() : 1;
 		result->loadConfig(config);
 		return result;
 	}
@@ -318,12 +328,27 @@ namespace ml
 			}
 			case ConvolutionAlgorithm::EXPLICIT_GEMM:
 			{
-				if (input.size() == 2)
-					explicit_gemm_forward(context(), input[0], output, getWeights().getParam(), getBias().getParam(), *m_workspace.lock(),
-							m_activation, input[1]);
+				if (m_groups == 1)
+				{
+					if (input.size() == 2)
+						explicit_gemm_forward(context(), input[0], output, getWeights().getParam(), getBias().getParam(), *m_workspace.lock(),
+								m_activation, input[1]);
+					else
+						explicit_gemm_forward(context(), input[0], output, getWeights().getParam(), getBias().getParam(), *m_workspace.lock(),
+								m_activation, Tensor());
+				}
 				else
-					explicit_gemm_forward(context(), input[0], output, getWeights().getParam(), getBias().getParam(), *m_workspace.lock(),
-							m_activation, Tensor());
+				{
+					const Tensor input_matrix = input[0].view().flatten( { 0, 1, 2 });
+					Tensor output_matrix = output.view().flatten( { 0, 1, 2 });
+					const Tensor weight_matrix = getWeights().getParam().view().flatten( { 1, 2, 3 });
+					gemmGrouped(context(), 'n', 't', output_matrix, input_matrix, weight_matrix, 1.0f, 0.0f, m_groups);
+					if (isUsingBias())
+						addBiasAct(context(), 1.0f, output, getBias().getParam(), 0.0f, output, m_activation);
+					else
+						activationForward(context(), 1.0f, output, 0.0f, output, m_activation);
+				}
+
 				break;
 			}
 			case ConvolutionAlgorithm::WINOGRAD_NON_FUSED:
@@ -374,8 +399,22 @@ namespace ml
 				throw NotImplemented(METHOD_NAME, "");
 			case ConvolutionAlgorithm::EXPLICIT_GEMM:
 			{
-				explicit_gemm_backward(context(), gradient_prev[0], gradient_next, output, getWeights().getParam(), *m_workspace.lock(), beta[0]);
-				explicit_gemm_update(context(), input[0], gradient_next, getWeights().getGradient(), *m_workspace.lock());
+				if (m_groups == 1)
+				{
+					explicit_gemm_backward(context(), gradient_prev[0], gradient_next, output, getWeights().getParam(), *m_workspace.lock(), beta[0]);
+					explicit_gemm_update(context(), input[0], gradient_next, getWeights().getGradient(), *m_workspace.lock());
+				}
+				else
+				{
+					Tensor gradient_prev_matrix = gradient_prev[0].view().flatten( { 0, 1, 2 });
+					const Tensor weight_matrix = getWeights().getParam().view().flatten( { 1, 2, 3 });
+					const Tensor gradient_next_matrix = gradient_next.view().flatten( { 0, 1, 2 });
+					gemmGrouped(context(), 'n', 'n', gradient_prev_matrix, gradient_next_matrix, weight_matrix, 1.0f, beta[0], m_groups);
+
+					const Tensor input_matrix = input[0].view().flatten( { 0, 1, 2 });
+					Tensor weight_update_matrix = getWeights().getGradient().view().flatten( { 1, 2, 3 });
+					gemmGrouped(context(), 't', 'n', weight_update_matrix, gradient_next_matrix, input_matrix, 1.0f, 0.0f, m_groups);
+				}
 				break;
 			}
 			case ConvolutionAlgorithm::WINOGRAD_NON_FUSED:
@@ -437,8 +476,8 @@ namespace ml
 			case DeviceType::CUDA:
 			{
 #ifdef USE_CUDNN
-				const bool can_use_cudnn = startsWith(context().device().info(), "NVIDIA GeForce RTX") and dtype() == DataType::FLOAT16 and not isTrainable()
-					and m_activation == ActivationType::RELU;
+				const bool can_use_cudnn = startsWith(context().device().info(), "NVIDIA GeForce RTX") and dtype() == DataType::FLOAT16
+						and not isTrainable() and m_activation == ActivationType::RELU;
 #else
 				const bool can_use_cudnn = false;
 #endif

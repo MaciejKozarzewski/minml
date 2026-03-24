@@ -27,6 +27,7 @@ namespace ml
 			int m_width = 0;
 			int m_input_filters = 0;
 			int m_kernel_size = 0;
+			int m_groups = 1;
 			mutable ConvolutionAlgorithm m_forward_algorithm = ConvolutionAlgorithm::EXPLICIT_GEMM;
 			mutable ConvolutionAlgorithm m_backward_algorithm = ConvolutionAlgorithm::EXPLICIT_GEMM;
 			mutable int m_winograd_tile_size = 1;
@@ -39,6 +40,7 @@ namespace ml
 
 			Conv2D& useBias(bool b) noexcept;
 			bool isUsingBias() const noexcept;
+			Conv2D& groups(int g) noexcept;
 
 			void setInputShape(const std::vector<Shape> &shapes);
 			Shape getOutputShape() const;

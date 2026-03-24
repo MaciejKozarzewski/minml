@@ -26,6 +26,7 @@
 #include <minml/layers/BatchNormalization.hpp>
 #include <minml/layers/ChannelAveragePooling.hpp>
 #include <minml/layers/ChannelScaling.hpp>
+#include <minml/layers/ChannelShuffle.hpp>
 #include <minml/layers/Conv2D.hpp>
 #include <minml/layers/Dense.hpp>
 #include <minml/layers/DepthToSpace.hpp>
@@ -320,6 +321,7 @@ namespace ml
 		static const AveragePooling average_pooling(0);
 		static const BatchNormalization batchnorm;
 		static const ChannelScaling channel_scaling;
+		static const ChannelShuffle channel_shuffle(0);
 		static const ChannelAveragePooling channel_average_pooling;
 		static const Conv2D conv2d(0, 0);
 		static const Dense dense(0);
@@ -359,6 +361,8 @@ namespace ml
 			result = batchnorm.clone(json);
 		if (name == channel_scaling.name())
 			result = channel_scaling.clone(json);
+		if (name == channel_shuffle.name())
+			result = channel_shuffle.clone(json);
 		if (name == channel_average_pooling.name())
 			result = channel_average_pooling.clone(json);
 		if (name == conv2d.name())

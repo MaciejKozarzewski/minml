@@ -142,6 +142,12 @@ namespace ml
 			float beta_bias_update, Tensor &bias_update, ActivationType act);
 
 	/*
+	 * group gemm and channel shuffle
+	 */
+	void channelShuffle(const Context &context, const Tensor &input, float beta, Tensor &output, int groups, bool invert);
+	void gemmGrouped(const Context &context, char opA, char opB, Tensor &C, const Tensor &A, const Tensor &B, float alpha, float beta, int groups);
+
+	/*
 	 * tensor op
 	 */
 	void emulateLowPrecision(const Context &context, Tensor &dst, const Tensor &src, DataType dtype, AffineTransform transform);

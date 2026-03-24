@@ -1061,6 +1061,37 @@ namespace ml
 		}SYNC();
 	}
 
+	void channelShuffle(const Context &context, const Tensor &input, float beta, Tensor &output, int groups, bool invert)
+	{
+		static Timer timer("channelShuffle");
+		TimerGuard tg(timer);
+		switch (context.device().type())
+		{
+			case DeviceType::CPU:
+				break;
+			case DeviceType::CUDA:
+				cuda_channel_shuffle(get(context), get(input), beta, get(output), groups, invert);
+				break;
+			case DeviceType::OPENCL:
+				break;
+		}SYNC();
+	}
+	void gemmGrouped(const Context &context, char opA, char opB, Tensor &C, const Tensor &A, const Tensor &B, float alpha, float beta, int groups)
+	{
+		static Timer timer("gemmGrouped");
+		TimerGuard tg(timer);
+		switch (context.device().type())
+		{
+			case DeviceType::CPU:
+				break;
+			case DeviceType::CUDA:
+				cuda_group_gemm(get(context), opA, opB, alpha, get(A), get(B), beta, get(C), groups);
+				break;
+			case DeviceType::OPENCL:
+				break;
+		}SYNC();
+	}
+
 	void emulateLowPrecision(const Context &context, Tensor &dst, const Tensor &src, DataType dtype, AffineTransform transform)
 	{
 		switch (context.device().type())
