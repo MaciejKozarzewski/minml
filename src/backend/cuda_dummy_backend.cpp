@@ -390,6 +390,20 @@ namespace ml
 	}
 
 	/*
+	 * group gemm and channel shuffle
+	 */
+
+	void cuda_channel_shuffle(mlContext_t context, const mlTensor_t x, float beta, mlTensor_t y, int groups, bool invert)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+	void cuda_group_gemm(mlContext_t context, char opA, char opB, float alpha, const mlTensor_t A, const mlTensor_t B, float beta, mlTensor_t C,
+			int groups)
+	{
+		throw NotImplemented(METHOD_NAME);
+	}
+
+	/*
 	 * mixture of experts
 	 */
 	void cuda_hash_routing(mlContext_t context, const mlTensor_t x, mlTensor_t indices_and_values)
