@@ -488,6 +488,10 @@ namespace ml
 	/*
 	 * training
 	 */
+ 	float cuda_l2_norm(mlContext_t context, const mlTensor_t tensor)
+ 	{
+		throw NotImplemented(METHOD_NAME);
+	}
 	float cuda_mean_squared_loss(mlContext_t context, const mlTensor_t output, const mlTensor_t target, const mlTensor_t mask)
 	{
 		throw NotImplemented(METHOD_NAME);
