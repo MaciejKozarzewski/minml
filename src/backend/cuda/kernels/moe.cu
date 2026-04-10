@@ -28,18 +28,36 @@ namespace
 {
 	using namespace ml;
 
-	__device__ __forceinline__ float atomicMax(float *address, float val)
+//	__device__ __forceinline__ float atomic_max(float *address, float val)
+//	{
+//		int ret = __float_as_int(*address);
+//		while (val > __int_as_float(ret))
+//		{
+//			int old = ret;
+//			if ((ret = atomicCAS((int*) address, old, __float_as_int(val))) == old)
+//				break;
+//		}
+//		return __int_as_float(ret);
+//	}
+	__device__ __forceinline__ float atomic_max(float *addr, float value)
 	{
-		int ret = __float_as_int(*address);
-		while (val > __int_as_float(ret))
-		{
-			int old = ret;
-			if ((ret = atomicCAS((int*) address, old, __float_as_int(val))) == old)
-				break;
-		}
-		return __int_as_float(ret);
+		float old;
+		old = !signbit(value) ?
+				__int_as_float(atomicMax((int*) addr, __float_as_int(value))) :
+				__uint_as_float(atomicMin((unsigned int*) addr, __float_as_uint(value)));
+
+		return old;
 	}
-	__device__ __forceinline__ double atomicMax(double *address, double val)
+//	__device__ __forceinline__ float atomic_max(float *addr, float value)
+//	{
+//		float old;
+//		if (signbit(value))
+//			old = __uint_as_float(atomicMin(reinterpret_cast<unsigned int*>(addr), __float_as_uint(value)));
+//		else
+//			old = __int_as_float(atomicMax(reinterpret_cast<int*>(addr), __float_as_int(value)));
+//		return old;
+//	}
+	__device__ __forceinline__ double atomic_max(double *address, double val)
 	{
 		unsigned long long ret = __double_as_longlong(*address);
 		while (val > __longlong_as_double(ret))
@@ -192,7 +210,7 @@ namespace
 		{
 			max_values_per_token[j] = static_cast<U>(-1e+32f);
 			softmax_sum_per_token[j] = static_cast<U>(0.0f);
-			output_indices[j] = static_cast<T>(-1.0f);
+			output_indices[j] = static_cast<U>(-1.0f);
 		}
 		__syncthreads();
 
@@ -218,7 +236,7 @@ namespace
 				const int token_idx = j / experts;
 				const int expert_idx = j - token_idx * experts;
 				const U score_plus_bias = input_copy[j] + expert_bias[expert_idx];
-				atomicMax(max_values_per_token + token_idx, score_plus_bias);
+				atomic_max(max_values_per_token + token_idx, score_plus_bias);
 			}
 			__syncthreads();
 
@@ -837,18 +855,19 @@ namespace
 			}
 	}
 	template<typename T>
-	__global__ void kernel_expert_bias_update(const int *workspace, float alpha, T *bias, int batch_size, int tokens, int experts)
+	__global__ void kernel_expert_bias_update(const int *workspace, float alpha, T *bias, int batch_size, int tokens, int experts, int capacity)
 	{
 		const float avg_capacity = static_cast<float>(tokens) / static_cast<float>(experts);
 		for (int e = threadIdx.x; e < experts; e += blockDim.x)
 		{
 			const float token_count = static_cast<float>(workspace[e]) / static_cast<float>(batch_size);
-			if (token_count != avg_capacity)
+//			if (token_count != avg_capacity)
 			{
-				if (token_count > avg_capacity)
-					bias[e] -= alpha;
-				else
-					bias[e] += alpha;
+				bias[e] -= alpha * (token_count - avg_capacity) / capacity;
+//				if (token_count > avg_capacity)
+//					bias[e] -= alpha;
+//				else
+//					bias[e] += alpha;
 			}
 		}
 	}
@@ -995,7 +1014,7 @@ namespace ml
 
 				kernel_expert_bias_update<<<grid_dim, block_dim, 0, stream>>>(data<half>(indices_and_values), token_counts, batch_size, experts,
 						capacity);
-				kernel_expert_bias_update<<<1, 256, 0, stream>>>(token_counts, alpha, data<half>(bias), batch_size, tokens, experts);
+				kernel_expert_bias_update<<<1, 256, 0, stream>>>(token_counts, alpha, data<half>(bias), batch_size, tokens, experts, capacity);
 				break;
 			}
 			case DTYPE_FLOAT32:
@@ -1008,7 +1027,25 @@ namespace ml
 
 				kernel_expert_bias_update<<<grid_dim, block_dim, 0, stream>>>(data<float>(indices_and_values), token_counts, batch_size, experts,
 						capacity);
-				kernel_expert_bias_update<<<1, 256, 0, stream>>>(token_counts, alpha, data<float>(bias), batch_size, tokens, experts);
+				kernel_expert_bias_update<<<1, 256, 0, stream>>>(token_counts, alpha, data<float>(bias), batch_size, tokens, experts, capacity);
+				cudaDeviceSynchronize();
+
+//				std::vector<int> expert_load(experts);
+//				std::vector<float> expert_bias(experts);
+//				cudaMemcpy(expert_load.data(), token_counts, sizeof(int) * experts, cudaMemcpyDeviceToHost);
+//				cudaMemcpy(expert_bias.data(), bias.data, sizeof(float) * experts, cudaMemcpyDeviceToHost);
+//				const float optimal_load = (float) tokens / experts;
+//				std::cout << "optimal load = " << optimal_load << "/" << capacity << "\n";
+//				std::cout << "expert load : ";
+//				for (int i = 0; i < experts; i++)
+//				{
+//					const float load = (float) expert_load[i] / batch_size;
+//					std::cout << load << " (" << (load > optimal_load ? "+" : "-") << ") ";
+//				}
+//				std::cout << '\n' << "expert biases : ";
+//				for (int i = 0; i < experts; i++)
+//					std::cout << expert_bias[i] << ' ';
+//				std::cout << '\n';
 				break;
 			}
 			case DTYPE_FLOAT64:
@@ -1021,7 +1058,7 @@ namespace ml
 
 				kernel_expert_bias_update<<<grid_dim, block_dim, 0, stream>>>(data<double>(indices_and_values), token_counts, batch_size, experts,
 						capacity);
-				kernel_expert_bias_update<<<1, 256, 0, stream>>>(token_counts, alpha, data<double>(bias), batch_size, tokens, experts);
+				kernel_expert_bias_update<<<1, 256, 0, stream>>>(token_counts, alpha, data<double>(bias), batch_size, tokens, experts, capacity);
 				break;
 			}
 		}

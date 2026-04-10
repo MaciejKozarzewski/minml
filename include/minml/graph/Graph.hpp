@@ -74,6 +74,7 @@ namespace ml
 			GraphNodeID add(const Layer &layer, std::initializer_list<GraphNodeID> nodes);
 			void addOutput(GraphNodeID node, const LossFunction &loss, float weight = 1.0f);
 			void addOutput(GraphNodeID node);
+			void setLossWeight(int idx, float weight);
 
 			const Tensor& getInput(int index = 0) const;
 			const Tensor& getOutput(int index = 0) const;

@@ -289,6 +289,7 @@ namespace ml
 		/*
 		 * training
 		 */
+		DLL_PUBLIC float cuda_l2_norm(mlContext_t context, const mlTensor_t tensor);
 		DLL_PUBLIC float cuda_mean_squared_loss(mlContext_t context, const mlTensor_t output, const mlTensor_t target, const mlTensor_t mask);
 		DLL_PUBLIC float cuda_cross_entropy_loss(mlContext_t context, const mlTensor_t output, const mlTensor_t target, const mlTensor_t mask);
 		DLL_PUBLIC void cuda_mean_squared_gradient(mlContext_t context, float alpha, const mlTensor_t output, const mlTensor_t target,

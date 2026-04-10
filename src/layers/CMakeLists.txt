@@ -12,6 +12,7 @@ target_sources(${LibName} PRIVATE 	AbsolutePositionalEncoding.cpp
 								FusedConvBlock.cpp
 								GatherTokens.cpp
 								GlobalAveragePooling.cpp
+								Identity.cpp
 								Input.cpp
 								Layer.cpp
 								LayerNormalization.cpp

@@ -16,11 +16,6 @@
 namespace
 {
 	using namespace ml;
-	Shape get_tmp_output_shape(int experts, const Shape &input_shape)
-	{
-		assert(input_shape.rank() == 4);
-		return Shape( { input_shape[0], input_shape[1] * input_shape[2], experts });
-	}
 	std::string algo_to_string(RoutingAlgorithm ra)
 	{
 		switch (ra)
@@ -153,6 +148,13 @@ namespace ml
 				if (m_expert_biases.isEmpty())
 					m_expert_biases = Tensor( { getInputShape().dim(3) }, dtype(), device());
 				tokenChoiceRoutingForward(context(), input[0], m_expert_biases, output);
+//				for (int b = 0; b < output.dim(0); b++)
+//				{
+//					std::cout << "B=" << b << " : ";
+//					for (int k = 0; k < output.dim(3); k++)
+//						std::cout << (float) output.at( { b, 0, 0, k }) << ' ';
+//					std::cout << '\n';
+//				}
 				break;
 			}
 			case RoutingAlgorithm::EXPERT_CHOICE:

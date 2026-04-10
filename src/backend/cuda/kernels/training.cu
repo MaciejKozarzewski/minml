@@ -58,6 +58,22 @@ namespace
 	}
 
 	template<typename T>
+	__global__ void kernel_l2_norm_step_1(float *workspace, const T *tensor, int elements)
+	{
+		assert(blockDim.x == 256);
+		__shared__ cg::block_tile_memory<256> btm;
+		cg::thread_block thb = cg::this_thread_block(btm);
+		cg::thread_block_tile<256>tile = cg::tiled_partition<256>(thb);
+
+		float acc = 0.0f;
+		for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < elements; i += gridDim.x * blockDim.x)
+			acc += square(static_cast<float>(tensor[i]));
+		const float sum = cg::reduce(tile, acc, cg::plus<float>());
+		if (threadIdx.x == 0)
+			workspace[blockIdx.x] = sum;
+	}
+
+	template<typename T>
 	__global__ void kernel_loss_gradient(float beta, T *gradient, float alpha, const T *output, const T *target, const T *mask, int elements)
 	{
 		const int tid = blockIdx.x * blockDim.x + threadIdx.x;
@@ -79,7 +95,7 @@ namespace
 		assert(blockDim.x == 256);
 		__shared__ cg::block_tile_memory<256> btm;
 		cg::thread_block thb = cg::this_thread_block(btm);
-		cg::thread_block_tile<256> tile = cg::tiled_partition<256>(thb);
+		cg::thread_block_tile < 256 > tile = cg::tiled_partition<256>(thb);
 
 		const int tid = blockIdx.x * blockDim.x + threadIdx.x;
 		const int stride = gridDim.x * blockDim.x;
@@ -102,7 +118,7 @@ namespace
 		assert(blockDim.x == 256);
 		__shared__ cg::block_tile_memory<256> btm;
 		cg::thread_block thb = cg::this_thread_block(btm);
-		cg::thread_block_tile<256> tile = cg::tiled_partition<256>(thb);
+		cg::thread_block_tile < 256 > tile = cg::tiled_partition<256>(thb);
 
 		float acc = 0.0f;
 		for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < elements; i += gridDim.x * blockDim.x)
@@ -122,7 +138,7 @@ namespace
 		assert(blockDim.x == 256);
 		__shared__ cg::block_tile_memory<256> btm;
 		cg::thread_block thb = cg::this_thread_block(btm);
-		cg::thread_block_tile<256> tile = cg::tiled_partition<256>(thb);
+		cg::thread_block_tile < 256 > tile = cg::tiled_partition<256>(thb);
 
 		float acc = 0.0f;
 		for (int i = threadIdx.x; i < elements; i += blockDim.x)
@@ -246,7 +262,7 @@ namespace
 		assert(blockDim.x == 256);
 		__shared__ cg::block_tile_memory<256> btm;
 		cg::thread_block thb = cg::this_thread_block(btm);
-		cg::thread_block_tile<256> tile = cg::tiled_partition<256>(thb);
+		cg::thread_block_tile < 256 > tile = cg::tiled_partition<256>(thb);
 
 		const T *data = reinterpret_cast<const T*>(tensors[blockIdx.x].data);
 		const int elements = tensors[blockIdx.x].elements;
@@ -277,6 +293,32 @@ namespace
 
 namespace ml
 {
+	float cuda_l2_norm(mlContext_t context, const mlTensor_t tensor)
+	{
+		const int elements = volume(tensor);
+
+		assert(ml::cuda_backend::Context::getWorkspaceSize(context) >= 1024 * sizeof(float));
+
+		float *workspace = ml::cuda_backend::Context::getWorkspace<float>(context);
+
+		dim3 blockDim(256);
+		dim3 gridDim = ml::cuda_backend::gridSize<1024>(elements, blockDim.x);
+		cudaStream_t stream = ml::cuda_backend::Context::getStream(context);
+
+		switch (tensor.dtype)
+		{
+			case DTYPE_FLOAT16:
+				kernel_l2_norm_step_1<<<gridDim, blockDim, 0, stream>>>(workspace, data<half>(tensor), elements);
+				break;
+			case DTYPE_FLOAT32:
+				kernel_l2_norm_step_1<<<gridDim, blockDim, 0, stream>>>(workspace, data<float>(tensor), elements);
+				break;
+		}
+		assert(cudaGetLastError() == cudaSuccess);
+
+		return reduce_loss_step_2(stream, workspace, gridDim.x);
+	}
+
 	float cuda_mean_squared_loss(mlContext_t context, const mlTensor_t output, const mlTensor_t target, const mlTensor_t mask)
 	{
 		const int elements = volume(output);

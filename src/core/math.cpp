@@ -1173,6 +1173,19 @@ namespace ml
 		}SYNC();
 	}
 
+	float l2Norm(const Context &context, const Tensor &tensor)
+	{
+		switch (context.device().type())
+		{
+			case DeviceType::CPU:
+				return 0.0f;
+			case DeviceType::CUDA:
+				return cuda_l2_norm(get(context), get(tensor));
+			case DeviceType::OPENCL:
+				return 0.0f;
+		}
+		return 0.0f;
+	}
 	float meanSquaredLoss(const Context &context, const Tensor &output, const Tensor &target, const Tensor &mask)
 	{
 		switch (context.device().type())

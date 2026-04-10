@@ -34,6 +34,7 @@
 #include <minml/layers/FusedConvBlock.hpp>
 #include <minml/layers/GatherTokens.hpp>
 #include <minml/layers/GlobalAveragePooling.hpp>
+#include <minml/layers/Identity.hpp>
 #include <minml/layers/Input.hpp>
 #include <minml/layers/LayerNormalization.hpp>
 #include <minml/layers/LearnableGlobalPooling.hpp>
@@ -335,6 +336,7 @@ namespace ml
 		static const LearnableScaling learnable_scaling("linear", 0, false);
 		static const MixtureOfExperts mixture_of_experts(0, 0);
 		static const MultiHeadAttention multi_head_attention(0, 0, false);
+		static const Identity identity;
 		static const Input input;
 		static const RMSNormalization rmsnorm;
 		static const Router router(RoutingAlgorithm::HASH, 0.0f);
@@ -389,6 +391,8 @@ namespace ml
 			result = mixture_of_experts.clone(json);
 		if (name == multi_head_attention.name())
 			result = multi_head_attention.clone(json);
+		if (name == identity.name())
+			result = identity.clone(json);
 		if (name == input.name())
 			result = input.clone(json);
 		if (name == positional_encoding.name())

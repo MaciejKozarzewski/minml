@@ -93,6 +93,10 @@ namespace ml
 	{
 		addOutput(node, CrossEntropyLoss());
 	}
+	void Graph::setLossWeight(int idx, float weight)
+	{
+		m_loss_weights.at(idx) = weight;
+	}
 
 	const Tensor& Graph::getInput(int index) const
 	{

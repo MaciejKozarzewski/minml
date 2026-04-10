@@ -161,6 +161,7 @@ namespace ml
 	/*
 	 * training
 	 */
+	float l2Norm(const Context &context, const Tensor &tensor);
 	float meanSquaredLoss(const Context &context, const Tensor &output, const Tensor &target, const Tensor &mask);
 	float crossEntropyLoss(const Context &context, const Tensor &output, const Tensor &target, const Tensor &mask);
 	void meanSquaredGradient(const Context &context, float alpha, const Tensor &output, const Tensor &target, const Tensor &mask, float beta,
