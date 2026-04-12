@@ -46,6 +46,11 @@ namespace
 		return (node == nullptr) ? false : node->getLayer().getActivationType() == ActivationType::SIGMOID;
 	}
 
+	bool is_batchnorm(const GraphNode *node) noexcept
+	{
+		static const BatchNormalization layer;
+		return (node == nullptr) ? false : node->getLayer().name() == layer.name();
+	}
 	bool is_dense(const GraphNode *node) noexcept
 	{
 		static const Dense layer(0);
@@ -102,10 +107,47 @@ namespace ml
 
 		bool has_anything_changed = false;
 		for (int i = 0; i < graph.numberOfNodes(); i++)
+//		{
+//			const std::array<GraphNode*, 2> nodes = get_consecutive_nodes<2>(graph.getNode(i));
+//
+//			const bool first_node_match = is_depthwise_conv2d(nodes[0]) or is_dense(nodes[0]) or is_conv2d(nodes[0]);
+//			const bool second_node_match = is_batchnorm(nodes[1]);
+//			if (first_node_match and second_node_match)
+//			{
+//				// enable bias
+//				if (is_conv2d(nodes[0]))
+//				{
+//					static_cast<Conv2D&>(nodes[0]->getLayer()).useBias(true);
+//					static_cast<Conv2D&>(nodes[0]->getLayer()).invalidateWeightsCache();
+//				}
+//				if (is_depthwise_conv2d(nodes[0]))
+//					static_cast<DepthwiseConv2D&>(nodes[0]->getLayer()).useBias(true);
+//				if (is_dense(nodes[0]))
+//					static_cast<Dense&>(nodes[0]->getLayer()).useBias(true);
+//
+//				const Tensor &bn_weights = nodes[1]->getLayer().getWeights().getParam();
+//				const Tensor &bn_bias = nodes[1]->getLayer().getBias().getParam();
+//				const Tensor &bn_avg_var = static_cast<BatchNormalization&>(nodes[1]->getLayer()).getStatistics();
+//
+//				Tensor &layer_weights = nodes[0]->getLayer().getWeights().getParam();
+//				Tensor &layer_bias = nodes[0]->getLayer().getBias().getParam();
+//
+//				foldBatchnorm(graph.context(), layer_weights, layer_bias, bn_weights, bn_bias, bn_avg_var);
+//
+//				nodes[0]->getLayer().setActivationType(nodes[1]->getLayer().getActivationType());
+//
+//				while (nodes[1]->numberOfOutputs() > 0)
+//					GraphNode::replaceInputLink(nodes[1], nodes[0], nodes[1]->getOutputNode(0));
+//
+//				graph.remove_node(nodes[1]);
+//
+//				has_anything_changed = true;
+//			}
+//		}
 			if (graph.getNode(i).getLayer().name() == batchnorm.name())
 			{
 				GraphNode *next = &(graph.getNode(i));
-				GraphNode *prev = next->getInputNode(0); // BatchNorm can have only one input
+				GraphNode *prev = next->getInputNode(0);
 				if (can_merge_activations(prev, next) and prev->numberOfInputs() == 1)
 				{
 					if (is_conv2d(prev))
