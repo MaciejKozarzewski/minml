@@ -188,10 +188,10 @@ namespace ml
 		/*
 		 *  layernorm
 		 */
-		DLL_PUBLIC void cuda_layernorm_forward(mlContext_t context, mlShape_t shape, mlDataType_t dtype, const void *input, void *output,
-				const void *weights, const void *bias, const void *ext);
-		DLL_PUBLIC void cuda_layernorm_backward(mlContext_t context, mlShape_t shape, const void *input, void *gradient_prev, void *gradient_next,
-				const void *weights, void *weights_update, void *bias_update);
+		DLL_PUBLIC void cuda_layernorm_forward(mlContext_t context, float alpha, const mlTensor_t x, const mlTensor_t w, const mlTensor_t b,
+				float beta, mlTensor_t y, mlActivationType_t act);
+		DLL_PUBLIC void cuda_layernorm_backward(mlContext_t context, float alpha, const mlTensor_t x, float beta_dx, mlTensor_t dx, mlTensor_t dy,
+				const mlTensor_t w, float beta_dw, mlTensor_t dw, mlTensor_t db);
 
 		/*
 		 * RMSnorm

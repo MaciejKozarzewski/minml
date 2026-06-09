@@ -16,8 +16,8 @@
 
 namespace ml
 {
-	LayerNormalization::LayerNormalization(bool useGamma, bool useBeta) :
-			Layer()
+	LayerNormalization::LayerNormalization(std::string activation, bool useGamma, bool useBeta) :
+			Layer(activation)
 	{
 		m_use_gamma = useGamma;
 		m_use_beta = useBeta;
@@ -87,20 +87,30 @@ namespace ml
 	{
 		assert(input.size() <= 2);
 
-		Tensor ext;
+		float beta = 0.0f;
 		if (input.size() == 2)
-			ext = input.at(1).view();
+		{
+			output.copyFrom(context(), input[1]);
+			beta = 1.0f;
+		}
 
-		layernormForward(context(), input[0], output, getWeights().getParam(), getBias().getParam(), ext);
+		layernormForward(context(), 1.0f, input[0], beta, output, getWeights().getParam(), getBias().getParam(), m_activation);
 	}
 	void LayerNormalization::backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev,
 			Tensor &gradient_next, const std::vector<float> &beta)
 	{
-		assert(input.size() == 1);
+		assert(input.size() == 2);
 		assert(gradient_prev.size() == input.size());
 
-		layernormBackward(context(), input[0], gradient_prev[0], gradient_next, getWeights().getParam(), getWeights().getGradient(),
-				getBias().getGradient(), beta[0]);
+		if (input.size() == 2)
+		{
+			Tensor empty;
+			fusedBiasActCopyBackward(context(), gradient_next, output, beta[1], gradient_prev[1], 0.0f, empty, ActivationType::LINEAR);
+		}
+		activationBackward(context(), 1.0f, gradient_next, output, 0.0f, gradient_next, m_activation);
+
+		layernormBackward(context(), 1.0f, input[0], beta[0], gradient_prev[0], gradient_next, getWeights().getParam(), getWeights().getGradient(),
+				getBias().getGradient(), 1.0f);
 	}
 
 } /* namespace ml */

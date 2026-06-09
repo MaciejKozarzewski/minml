@@ -106,16 +106,17 @@ namespace ml
 	/*
 	 * Layer normalization
 	 */
-	void layernormForward(const Context &context, const Tensor &input, Tensor &output, const Tensor &weights, const Tensor &bias, const Tensor &ext);
-	void layernormBackward(const Context &context, const Tensor &input, Tensor &gradient_prev, Tensor &gradient_next, const Tensor &weights,
-			Tensor &weights_update, Tensor &bias_update, float beta);
+	void layernormForward(const Context &context, float alpha, const Tensor &input, float beta, Tensor &output, const Tensor &weights,
+			const Tensor &bias, ActivationType act);
+	void layernormBackward(const Context &context, float alpha, const Tensor &input, float beta_prev, Tensor &gradient_prev, Tensor &gradient_next,
+			const Tensor &weights, Tensor &weights_update, Tensor &bias_update, float beta_update);
 
 	/*
 	 * RMS normalization
 	 */
 	void rmsnormForward(const Context &context, const Tensor &input, Tensor &output, const Tensor &weights);
 	void rmsnormBackward(const Context &context, const Tensor &input, Tensor &gradient_prev, Tensor &gradient_next, const Tensor &weights,
-			Tensor &weights_update, float beta);
+				Tensor &weights_update, float beta);
 
 	/*
 	 * attention

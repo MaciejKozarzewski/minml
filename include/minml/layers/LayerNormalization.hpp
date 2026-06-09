@@ -18,7 +18,7 @@ namespace ml
 			bool m_use_gamma = true;
 			bool m_use_beta = true;
 		public:
-			LayerNormalization(bool useGamma = true, bool useBeta = true);
+			LayerNormalization(std::string activation = "linear", bool useGamma = true, bool useBeta = true);
 
 			LayerNormalization& useGamma(bool b) noexcept;
 			LayerNormalization& useBeta(bool b) noexcept;

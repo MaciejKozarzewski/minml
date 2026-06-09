@@ -801,7 +801,8 @@ namespace ml
 		context.synchronize();
 	}
 
-	void layernormForward(const Context &context, const Tensor &input, Tensor &output, const Tensor &weights, const Tensor &bias, const Tensor &ext)
+	void layernormForward(const Context &context, float alpha, const Tensor &input, float beta, Tensor &output, const Tensor &weights,
+			const Tensor &bias,  ActivationType act)
 	{
 		static Timer timer("layernormForward");
 		TimerGuard tg(timer);
@@ -809,20 +810,19 @@ namespace ml
 		{
 			case DeviceType::CPU:
 				cpu_layernorm_forward(get(context), get_shape(input), get(input.dtype()), input.data(), output.data(), weights.data(), bias.data(),
-						ext.data());
+						nullptr);
 				break;
 			case DeviceType::CUDA:
-				cuda_layernorm_forward(get(context), get_shape(input), get(input.dtype()), input.data(), output.data(), weights.data(), bias.data(),
-						ext.data());
+				cuda_layernorm_forward(get(context), alpha, get(input), get(weights), get(bias), beta, get(output), get(act));
 				break;
 			case DeviceType::OPENCL:
 				opencl_layernorm_forward(get(context), get_shape(input), get(input.dtype()), input.data(), output.data(), weights.data(), bias.data(),
-						ext.data());
+						nullptr);
 				break;
 		}SYNC();
 	}
-	void layernormBackward(const Context &context, const Tensor &input, Tensor &gradient_prev, Tensor &gradient_next, const Tensor &weights,
-			Tensor &weights_update, Tensor &bias_update, float beta)
+	void layernormBackward(const Context &context, float alpha, const Tensor &input, float beta_prev, Tensor &gradient_prev, Tensor &gradient_next,
+			const Tensor &weights, Tensor &weights_update, Tensor &bias_update, float beta_update)
 	{
 		switch (context.device().type())
 		{
@@ -831,8 +831,8 @@ namespace ml
 						weights_update.data(), bias_update.data());
 				break;
 			case DeviceType::CUDA:
-				cuda_layernorm_backward(get(context), get_shape(input), input.data(), gradient_prev.data(), gradient_next.data(), weights.data(),
-						weights_update.data(), bias_update.data());
+				cuda_layernorm_backward(get(context), alpha, get(input), beta_prev, get(gradient_prev), get(gradient_next), get(weights), beta_update,
+						get(weights_update), get(bias_update));
 				break;
 			case DeviceType::OPENCL:
 				opencl_layernorm_backward(get(context), get_shape(input), input.data(), gradient_prev.data(), gradient_next.data(), weights.data(),

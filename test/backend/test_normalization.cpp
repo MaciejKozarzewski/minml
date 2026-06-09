@@ -19,6 +19,17 @@ namespace
 {
 	using namespace ml;
 
+	template<typename T>
+	DataType get_type_of() noexcept
+	{
+		if (std::is_same<T, float>::value)
+			return DataType::FLOAT32;
+		if (std::is_same<T, double>::value)
+			return DataType::FLOAT64;
+		return DataType::UNKNOWN;
+	}
+
+	template<typename T = float>
 	void baseline_bn_forward(const Tensor &input, Tensor &output, const Tensor &weights, const Tensor &bias, Tensor &stats, int stat_id,
 			ActivationType act, float epsilon = 1.0e-6)
 	{
@@ -27,31 +38,35 @@ namespace
 		const int last_dim = input.shape().lastDim();
 
 		for (int f = 0; f < last_dim; f++)
-			stats.set(first_dim, { stat_id, 3 * f + 0 });
+		{
+			stats.at( { stat_id, 3 * f + 0 }) = first_dim;
+			stats.at( { stat_id, 3 * f + 1 }) = 0.0f;
+			stats.at( { stat_id, 3 * f + 2 }) = 0.0f;
+		}
 
 		for (int b = 0; b < first_dim; b++) // calculate average
 			for (int f = 0; f < last_dim; f++)
-				stats.set(stats.get( { stat_id, 3 * f + 1 }) + input.get( { b, f }), { stat_id, 3 * f + 1 });
+				stats.at( { stat_id, 3 * f + 1 }) = (T) stats.at( { stat_id, 3 * f + 1 }) + (T) input.at( { b, f });
 
 		for (int f = 0; f < last_dim; f++) //divide by first dim (in this case batch size)
-			stats.set(stats.get( { stat_id, 3 * f + 1 }) / first_dim, { stat_id, 3 * f + 1 });
+			stats.at( { stat_id, 3 * f + 1 }) = (T) stats.at( { stat_id, 3 * f + 1 }) / first_dim;
 
 		for (int b = 0; b < first_dim; b++) // subtract average, also calculate variance
 			for (int f = 0; f < last_dim; f++)
 			{
-				const float tmp = input.get( { b, f }) - stats.get( { stat_id, 3 * f + 1 });
-				stats.set(stats.get( { stat_id, 3 * f + 2 }) + tmp * tmp, { stat_id, 3 * f + 2 });
+				const T tmp = (T) input.at( { b, f }) - (T) stats.at( { stat_id, 3 * f + 1 });
+				stats.at( { stat_id, 3 * f + 2 }) = (T) stats.at( { stat_id, 3 * f + 2 }) + tmp * tmp;
 			}
 
 		for (int b = 0; b < first_dim; b++) // apply variance, beta and gamma to output
 			for (int f = 0; f < last_dim; f++)
 			{
-				const float avg = stats.get( { stat_id, 3 * f + 1 });
-				const float stddev = std::sqrt(epsilon + stats.get( { stat_id, 3 * f + 2 }) / (first_dim - 1));
-				const float gamma = weights.get( { f });
-				const float beta = bias.get( { f });
-				const float tmp = (input.get( { b, f }) - avg) / stddev;
-				output.set(tmp * gamma + beta, { b, f });
+				const T avg = stats.at( { stat_id, 3 * f + 1 });
+				const T stddev = std::sqrt(epsilon + (T) stats.at( { stat_id, 3 * f + 2 }) / (first_dim - 1));
+				const T gamma = weights.at( { f });
+				const T beta = bias.at( { f });
+				const T tmp = ((T) input.at( { b, f }) - avg) / stddev;
+				output.at( { b, f }) = tmp * gamma + beta;
 			}
 		activationForward(Context(), 1.0f, output, 0.0f, output, act);
 	}
@@ -73,67 +88,74 @@ namespace
 			}
 		activationForward(Context(), 1.0f, output, 0.0f, output, act);
 	}
+	template<typename T = float>
 	void baseline_bn_backward(const Tensor &input, const Tensor &output, Tensor &gradient_prev, Tensor &gradient_next, const Tensor &weights,
 			const Tensor &stats, int stat_id, ActivationType act, float epsilon = 1.0e-6f)
 	{
 		assert(input.device().isCPU());
 		const int first_dim = input.shape().volumeWithoutLastDim();
 		const int last_dim = input.shape().lastDim();
-		Tensor d_sigma( { last_dim }, DataType::FLOAT32, Device::cpu());
-		Tensor d_mu( { last_dim }, DataType::FLOAT32, Device::cpu());
+		Tensor d_sigma( { last_dim }, get_type_of<T>(), Device::cpu());
+		Tensor d_mu( { last_dim }, get_type_of<T>(), Device::cpu());
 
-//		activationBackward(Context(), 1.0f, gradient_next, output, 0.0f, gradient_next, act);
+		activationBackward(Context(), 1.0f, gradient_next, output, 0.0f, gradient_next, act);
 		for (int b = 0; b < first_dim; b++) //apply variance, beta and gamma to output
 			for (int f = 0; f < last_dim; f++)
 			{
-				const float gamma = 1.0e-16f + weights.get( { f });
-				const float avg = stats.get( { stat_id, 3 * f + 1 });
-				const float var = sqrt(epsilon + stats.get( { stat_id, 3 * f + 2 }) / (first_dim - 1));
-				const float in = (input.get( { b, f }) - avg) / var;
-				float tmp = -gamma * gradient_next.get( { b, f }) * in / var;
-				d_sigma.set(d_sigma.get( { f }) + tmp, { f });
+				const T gamma = 1.0e-16f + (T) weights.at( { f });
+				const T avg = stats.at( { stat_id, 3 * f + 1 });
+				const T var = stats.at( { stat_id, 3 * f + 2 });
+				const T stddev = sqrt(epsilon + var / (first_dim - 1));
+				const T in = ((T) input.at( { b, f }) - avg) / stddev;
+				float tmp = -gamma * (T) gradient_next.at( { b, f }) * in / stddev;
+				d_sigma.at( { f }) = (T) d_sigma.at( { f }) + tmp;
 
-				tmp = -gamma * gradient_next.get( { b, f }) / var;
-				d_mu.set(d_mu.get( { f }) + tmp, { f });
+				tmp = -gamma * (T) gradient_next.at( { b, f }) / stddev;
+				d_mu.at( { f }) = (T) d_mu.at( { f }) + tmp;
 			}
 
 		for (int b = 0; b < first_dim; b++) //apply variance, beta and gamma to output
 			for (int f = 0; f < last_dim; f++)
 			{
-				const float gamma = 1.0e-8f + weights.get( { f });
-				const float avg = stats.get( { stat_id, 3 * f + 1 });
-				const float var = sqrt(epsilon + stats.get( { stat_id, 3 * f + 2 }) / (first_dim - 1));
-				const float in = (input.get( { b, f }) - avg) / var;
-				const float m = first_dim;
-				const float tmp1 = gamma * gradient_next.get( { b, f }) / var;
-				const float tmp2 = d_sigma.get( { f }) * in / (m - 1);
-				const float tmp3 = d_mu.get( { f }) / m;
-				gradient_prev.set(tmp1 + tmp2 + tmp3, { b, f });
+				const T gamma = 1.0e-16f + (T) weights.at( { f });
+				const T avg = stats.at( { stat_id, 3 * f + 1 });
+				const T var = stats.at( { stat_id, 3 * f + 2 });
+				const T stddev = sqrt(epsilon + var / (first_dim - 1));
+				const T in = ((T) input.at( { b, f }) - avg) / stddev;
+				const T m = first_dim;
+				const T tmp1 = gamma * (T) gradient_next.at( { b, f }) / stddev;
+				const T tmp2 = (T) d_sigma.at( { f }) * in / (m - 1);
+				const T tmp3 = (T) d_mu.at( { f }) / m;
+				gradient_prev.at( { b, f }) = tmp1 + tmp2 + tmp3;
 			}
 	}
+	template<typename T = float>
 	void baseline_bn_update(const Tensor &input, const Tensor &gradient_next, const Tensor &stats, int stat_id, Tensor &weight_update,
-			Tensor &bias_update, float epsilon = 1.0e-6f)
+			Tensor &bias_update, float beta_update, float epsilon = 1.0e-6f)
 	{
 		assert(input.device().isCPU());
 		const int first_dim = input.shape().volumeWithoutLastDim();
 		const int last_dim = input.shape().lastDim();
-		Tensor d_gamma( { last_dim }, DataType::FLOAT32, Device::cpu());
-		Tensor d_beta( { last_dim }, DataType::FLOAT32, Device::cpu());
+		Tensor d_gamma( { last_dim }, get_type_of<T>(), Device::cpu());
+		Tensor d_beta( { last_dim }, get_type_of<T>(), Device::cpu());
 
 		for (int b = 0; b < first_dim; b++)
 			for (int f = 0; f < last_dim; f++)
 			{
-				const float avg = stats.get( { stat_id, 3 * f + 1 });
-				const float var = sqrt(epsilon + stats.get( { stat_id, 3 * f + 2 }) / (first_dim - 1));
-				const float gamma_update = gradient_next.get( { b, f }) * (input.get( { b, f }) - avg) / var;
-				const float beta_update = gradient_next.get( { b, f });
-				d_gamma.at( { f }) = d_gamma.get( { f }) + gamma_update;
-				d_beta.at( { f }) = d_beta.get( { f }) + beta_update;
+				const T avg = stats.at( { stat_id, 3 * f + 1 });
+				const T var = stats.at( { stat_id, 3 * f + 2 });
+				const T stddev = sqrt(epsilon + var / (first_dim - 1));
+				const T gamma_update = (T) gradient_next.at( { b, f }) * ((T) input.at( { b, f }) - avg) / stddev;
+				const T beta_update = gradient_next.at( { b, f });
+				d_gamma.at( { f }) = (T) d_gamma.at( { f }) + gamma_update;
+				d_beta.at( { f }) = (T) d_beta.at( { f }) + beta_update;
 			}
 		for (int f = 0; f < last_dim; f++)
 		{
-			weight_update.at( { f }) = weight_update.get( { f }) + d_gamma.get( { f });
-			bias_update.at( { f }) = bias_update.get( { f }) + d_beta.get( { f });
+			const T dw = (beta_update == 0.0f) ? 0.0 : (beta_update * (T) weight_update.at( { f }));
+			const T db = (beta_update == 0.0f) ? 0.0 : (beta_update * (T) bias_update.at( { f }));
+			weight_update.at( { f }) = dw + (T) d_gamma.at( { f });
+			bias_update.at( { f }) = db + (T) d_beta.at( { f });
 		}
 	}
 	void baseline_bn_learn(Tensor &stat, const Tensor &running_stat, int first_dim)
@@ -166,30 +188,25 @@ namespace
 	}
 
 	template<typename T>
-	void baseline_ln_forward(const Tensor &input, Tensor &output, const Tensor &weight, const Tensor &bias, const Tensor &ext, T epsilon = 0.0e-6)
+	void baseline_ln_forward(const Tensor &input, Tensor &output, const Tensor &weight, const Tensor &bias, float alpha, float beta_out, T epsilon =
+			1.0e-6)
 	{
 		assert(input.device().isCPU());
 		assert(input.rank() == 2);
 		const int first_dim = input.shape().firstDim();
 		const int last_dim = input.shape().lastDim();
 
-		Tensor tmp_in(input.shape(), input.dtype(), input.device());
-		if (not ext.isEmpty())
-			addTensors(Context(), tmp_in, input, ext);
-		else
-			tmp_in = input;
-
 		for (int i = 0; i < first_dim; i++)
 		{
 			T avg = 0;
 			for (int j = 0; j < last_dim; j++)
-				avg += static_cast<T>(tmp_in.at( { i, j }));
+				avg += static_cast<T>(input.at( { i, j }));
 			avg /= last_dim;
 
 			T var = 0;
 			for (int j = 0; j < last_dim; j++)
 			{
-				const T tmp = static_cast<T>(tmp_in.at( { i, j })) - avg;
+				const T tmp = static_cast<T>(input.at( { i, j })) - avg;
 				var += tmp * tmp;
 			}
 
@@ -199,60 +216,30 @@ namespace
 			{
 				const T gamma = weight.at( { j });
 				const T beta = bias.at( { j });
-				const T tmp = gamma * (static_cast<T>(tmp_in.at( { i, j })) - avg) / stddev + beta;
+				T tmp = alpha * (gamma * (static_cast<T>(input.at( { i, j })) - avg) / stddev + beta);
+				if (beta_out != 0.0f)
+					tmp += beta_out * (T) output.at( { i, j });
 				output.at( { i, j }) = tmp;
 			}
 		}
 	}
 	template<typename T>
 	void baseline_ln_backward(const Tensor &input, Tensor &gradient_prev, Tensor &gradient_next, const Tensor &weight, Tensor &weight_update,
-			Tensor &bias_update, T epsilon = 0.0e-6)
+			Tensor &bias_update, float alpha, float beta_prev, float beta_update, T epsilon = 1.0e-6)
 	{
 		assert(input.device().isCPU());
 		assert(input.rank() == 2);
 		const int first_dim = input.shape().firstDim();
 		const int last_dim = input.shape().lastDim();
 
+		for (int j = 0; j < last_dim; j++)
+		{
+			weight_update.at( { j }) = (beta_update == 0.0f) ? 0.0f : beta_update * (T) weight_update.at( { j });
+			bias_update.at( { j }) = (beta_update == 0.0f) ? 0.0f : beta_update * (T) bias_update.at( { j });
+		}
+
 		for (int i = 0; i < first_dim; i++)
 		{
-//			T mu = 0;
-//			for (int j = 0; j < last_dim; j++)
-//				mu += static_cast<T>(input.at( { i, j }));
-//			mu /= last_dim;
-//
-//			T sq = 0;
-//			for (int j = 0; j < last_dim; j++)
-//			{
-//				const T tmp = static_cast<T>(input.at( { i, j })) - mu;
-//				sq += tmp * tmp;
-//			}
-//			const T var = sq / (last_dim - 1);
-//			const T sqrtvar = std::sqrt(var + epsilon);
-//
-//			T d_sigma = 0;
-//			T d_mu = 0;
-//			for (int j = 0; j < last_dim; j++)
-//			{
-//				const T in = input.at( { i, j });
-//				const T grad = gradient_next.at( { i, j });
-//				const T gamma = weight.at( { j });
-//
-//				d_sigma -= grad * gamma * (in - mu);
-//				d_mu -= grad * gamma;
-//			}
-//			d_sigma *= 0.5 / (sqrtvar * sqrtvar * sqrtvar * (last_dim - 1));
-//			d_mu *= static_cast<T>(1) / (sqrtvar * last_dim);
-//
-//			for (int j = 0; j < last_dim; j++)
-//			{
-//				const T in = input.at( { i, j });
-//				const T grad = gradient_next.at( { i, j });
-//				const T gamma = weight.at( { j });
-//
-//				const T dy = grad * gamma / sqrtvar + d_sigma * 2 * (in - mu) + d_mu;
-//				gradient_prev.at( { i, j }) = dy;
-//			}
-
 			T avg = 0;
 			for (int j = 0; j < last_dim; j++)
 				avg += static_cast<T>(input.at( { i, j }));
@@ -284,9 +271,12 @@ namespace
 				const T grad = gradient_next.at( { i, j });
 				const T gamma = weight.at( { j });
 				const T tmp1 = gamma * grad / stddev;
-				const T tmp2 = d_sigma * (in - avg) / stddev / (last_dim - 1);
+				const T tmp2 = d_sigma * (in - avg) / (stddev * (last_dim - 1));
 				const T tmp3 = d_mu / last_dim;
-				gradient_prev.at( { i, j }) = (tmp1 + tmp2 + tmp3);
+				T tmp4 = alpha * (tmp1 + tmp2 + tmp3);
+				if (beta_prev != 0.0f)
+					tmp4 += beta_prev * (T) gradient_prev.at( { i, j });
+				gradient_prev.at( { i, j }) = tmp4;
 			}
 
 			for (int j = 0; j < last_dim; j++)
@@ -305,7 +295,7 @@ namespace
 	}
 
 	template<typename T>
-	void baseline_rmsnorm_forward(const Tensor &input, Tensor &output, const Tensor &weights, T epsilon = 0.0e-6)
+	void baseline_rmsnorm_forward(const Tensor &input, Tensor &output, const Tensor &weights, T epsilon = 1.0e-6)
 	{
 		const bool use_gamma = not weights.isEmpty();
 		const int first_dim = input.shape().volumeWithoutLastDim();
@@ -332,7 +322,7 @@ namespace
 	}
 	template<typename T>
 	void baseline_rmsnorm_backward(const Tensor &input, Tensor &gradient_prev, Tensor &gradient_next, const Tensor &weights, Tensor &weights_update,
-			T epsilon = 0.0e-6)
+			T epsilon = 1.0e-6)
 	{
 		const bool use_gamma = not weights.isEmpty();
 		const int first_dim = input.shape().volumeWithoutLastDim();
@@ -369,6 +359,69 @@ namespace
 		}
 	}
 
+	class BaselineBN: public Layer
+	{
+			Tensor stats;
+		public:
+			void setInputShape(const std::vector<Shape> &shapes)
+			{
+				m_input_shapes = shapes;
+			}
+			Shape getOutputShape() const
+			{
+				return getInputShape();
+			}
+			Shape getWeightShape() const
+			{
+				return Shape( { getInputShape().lastDim() });
+			}
+			Shape getBiasShape() const
+			{
+				return Shape( { getInputShape().lastDim() });
+			}
+			std::string name() const
+			{
+				return "BaselineBN";
+			}
+			std::unique_ptr<Layer> clone(const Json &config) const
+			{
+				return std::make_unique<BaselineBN>();
+			}
+			void init()
+			{
+				ml::testing::initRandom(getWeights().getParam());
+				ml::testing::initRandom(getBias().getParam());
+			}
+			void forward(const std::vector<Tensor> &input, Tensor &output)
+			{
+				if (stats.isEmpty())
+					stats = Tensor( { 1, 3 * getInputShape().lastDim() }, dtype(), Device::cpu());
+
+				if (input[0].dtype() == DataType::FLOAT32)
+					baseline_bn_forward<float>(input[0], output, getWeights().getParam(), getBias().getParam(), stats, 0, ActivationType::LINEAR);
+				if (input[0].dtype() == DataType::FLOAT64)
+					baseline_bn_forward<double>(input[0], output, getWeights().getParam(), getBias().getParam(), stats, 0, ActivationType::LINEAR);
+			}
+			void backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next,
+					const std::vector<float> &beta)
+			{
+				if (stats.isEmpty())
+					stats = Tensor( { 1, 3 * getInputShape().lastDim() }, dtype(), Device::cpu());
+
+				if (input[0].dtype() == DataType::FLOAT32)
+				{
+					baseline_bn_backward<float>(input[0], output, gradient_prev[0], gradient_next, getWeights().getParam(), stats, 0,
+							ActivationType::LINEAR);
+					baseline_bn_update<float>(input[0], gradient_next, stats, 0, getWeights().getGradient(), getBias().getGradient(), 0.0f);
+				}
+				if (input[0].dtype() == DataType::FLOAT64)
+				{
+					baseline_bn_backward<double>(input[0], output, gradient_prev[0], gradient_next, getWeights().getParam(), stats, 0,
+							ActivationType::LINEAR);
+					baseline_bn_update<double>(input[0], gradient_next, stats, 0, getWeights().getGradient(), getBias().getGradient(), 0.0f);
+				}
+			}
+	};
 	class BaselineLN: public Layer
 	{
 		public:
@@ -404,19 +457,19 @@ namespace
 			void forward(const std::vector<Tensor> &input, Tensor &output)
 			{
 				if (input[0].dtype() == DataType::FLOAT32)
-					baseline_ln_forward<float>(input[0], output, getWeights().getParam(), getBias().getParam(), Tensor());
+					baseline_ln_forward<float>(input[0], output, getWeights().getParam(), getBias().getParam(), 1.0f, 0.0f);
 				if (input[0].dtype() == DataType::FLOAT64)
-					baseline_ln_forward<double>(input[0], output, getWeights().getParam(), getBias().getParam(), Tensor());
+					baseline_ln_forward<double>(input[0], output, getWeights().getParam(), getBias().getParam(), 1.0f, 0.0f);
 			}
 			void backward(const std::vector<Tensor> &input, const Tensor &output, std::vector<Tensor> &gradient_prev, Tensor &gradient_next,
 					const std::vector<float> &beta)
 			{
 				if (input[0].dtype() == DataType::FLOAT32)
 					baseline_ln_backward<float>(input[0], gradient_prev[0], gradient_next, getWeights().getParam(), getWeights().getGradient(),
-							getBias().getGradient());
+							getBias().getGradient(), 1.0f, 0.0f, 0.0f);
 				if (input[0].dtype() == DataType::FLOAT64)
 					baseline_ln_backward<double>(input[0], gradient_prev[0], gradient_next, getWeights().getParam(), getWeights().getGradient(),
-							getBias().getGradient());
+							getBias().getGradient(), 1.0f, 0.0f, 0.0f);
 			}
 	};
 	class BaselineRMSN: public Layer
@@ -466,6 +519,15 @@ namespace
 
 namespace ml
 {
+//	TEST(TestBatchNorm, baseline)
+//	{
+//		testing::GradientCheck gradcheck { BaselineBN() };
+//		gradcheck.setInputShape(Shape( { 12, 34 }));
+//
+//		gradcheck.check(100, 1.0e-3, "all", true);
+//
+//		exit(0);
+//	}
 	TEST(TestBatchNorm, forward)
 	{
 		const int batch_size = 1;
@@ -600,7 +662,7 @@ namespace ml
 
 		baseline_bn_forward(input, output, weights, bias, stats, stat_id, ActivationType::LINEAR);
 		baseline_bn_backward(input, output, correct_prev, gradient_next, weights, stats, stat_id, ActivationType::LINEAR);
-		baseline_bn_update(input, gradient_next, stats, stat_id, correct_weights_update, correct_bias_update);
+		baseline_bn_update(input, gradient_next, stats, stat_id, correct_weights_update, correct_bias_update, 0.0f);
 
 		Tensor running_stats( { 64, 3 * filters }, "float32", Device::cpu());
 		output.zeroall();
@@ -778,7 +840,7 @@ namespace ml
 
 		baseline_bn_forward(input, output, weights, bias, stats, stat_id, ActivationType::LINEAR);
 		baseline_bn_backward(input, output, correct_prev, gradient_next, weights, stats, stat_id, ActivationType::LINEAR);
-		baseline_bn_update(input, gradient_next, stats, stat_id, correct_weights_update, correct_bias_update);
+		baseline_bn_update(input, gradient_next, stats, stat_id, correct_weights_update, correct_bias_update, 0.0f);
 
 		Tensor running_stats( { 64, 3 * filters }, "float32", Device::cpu());
 		output.zeroall();
@@ -854,9 +916,9 @@ namespace ml
 //	TEST(TestLayerNorm, baseline)
 //	{
 //		testing::GradientCheck gradcheck { BaselineLN() };
-//		gradcheck.setInputShape(Shape( { 1, 3 }));
+//		gradcheck.setInputShape(Shape( { 12, 34 }));
 //
-//		gradcheck.check(3, 1.0e-4, "all");
+//		gradcheck.check(100, 1.0e-3, "all", true);
 //
 //		exit(0);
 //	}
@@ -879,8 +941,8 @@ namespace ml
 		Tensor correct(input.shape(), "float32", Device::cpu());
 
 		testing::initForTest(input, 0.0f);
-		baseline_ln_forward<float>(input, correct, weight, bias, Tensor());
-		layernormForward(context, input, output, weight, bias, Tensor());
+		baseline_ln_forward<float>(input, correct, weight, bias, 1.0f, 0.0f);
+		layernormForward(context, 1.0f, input, 0.0f, output, weight, bias, ActivationType::LINEAR);
 
 		EXPECT_LE(testing::diffForTest(correct, output), 1.0e-4f);
 
@@ -895,7 +957,7 @@ namespace ml
 			bias.moveTo(device);
 
 			testing::initForTest(input, 0.0f);
-			layernormForward(context, input, output, weight, bias, Tensor());
+			layernormForward(context, 1.0f, input, 0.0f, output, weight, bias, ActivationType::LINEAR);
 			context.synchronize();
 
 			EXPECT_LE(testing::diffForTest(correct, output), 1.0e-4f);
@@ -930,10 +992,10 @@ namespace ml
 		Tensor correct_bias_update( { filters }, "float32", Device::cpu());
 		correct_bias_update.copyFrom(Context(), bias_update);
 
-		baseline_ln_backward<float>(input, correct_prev, gradient_next, weight, correct_weight_update, correct_bias_update);
+		baseline_ln_backward<float>(input, correct_prev, gradient_next, weight, correct_weight_update, correct_bias_update, 1.0f, 0.0f, 0.0f);
 
 		testing::initForTest(gradient_next, 1.57f);
-		layernormBackward(context, input, gradient_prev, gradient_next, weight, weight_update, bias_update, 0.0f);
+		layernormBackward(context, 1.0f, input, 0.0f, gradient_prev, gradient_next, weight, weight_update, bias_update, 0.0f);
 		EXPECT_LE(testing::diffForTest(correct_prev, gradient_prev), 1.0e-4f);
 		EXPECT_LE(testing::diffForTest(correct_weight_update, weight_update), 1.0e-4f);
 		EXPECT_LE(testing::diffForTest(correct_bias_update, bias_update), 1.0e-4f);
@@ -956,7 +1018,7 @@ namespace ml
 
 			gradient_prev.zeroall();
 
-			layernormBackward(context, input, gradient_prev, gradient_next, weight, weight_update, bias_update, 0.0f);
+			layernormBackward(context, 1.0f, input, 0.0f, gradient_prev, gradient_next, weight, weight_update, bias_update, 0.0f);
 			context.synchronize();
 
 			EXPECT_LE(testing::diffForTest(correct_prev, gradient_prev), 1.0e-4f);

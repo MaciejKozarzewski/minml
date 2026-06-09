@@ -413,6 +413,12 @@ namespace ml
 		float *weights_update_ptr = getPointer<float>(weights_update);
 		float *bias_update_ptr = getPointer<float>(bias_update);
 
+		for (int j = 0; j < last_dim; j++)
+		{
+			weights_update_ptr[j] = 0.0f;
+			bias_update_ptr[j] = 0.0f;
+		}
+
 		for (int i = 0; i < first_dim; i++)
 		{
 			AvgVarStats<float> stats;

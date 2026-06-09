@@ -315,13 +315,13 @@ namespace ml
 	}
 
 	// layernorm
-	void cuda_layernorm_forward(mlContext_t context, mlShape_t shape, mlDataType_t dtype, const void *input, void *output, const void *weights,
-			const void *bias, const void *ext)
+	void cuda_layernorm_forward(mlContext_t context, float alpha, const mlTensor_t x, const mlTensor_t w, const mlTensor_t b, float beta,
+			mlTensor_t y, mlActivationType_t act)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
-	void cuda_layernorm_backward(mlContext_t context, mlShape_t shape, const void *input, void *gradient_prev, void *gradient_next,
-			const void *weights, void *weights_update, void *bias_update)
+	void cuda_layernorm_backward(mlContext_t context, float alpha, const mlTensor_t x, float beta_dx, mlTensor_t dx, mlTensor_t dy,
+			const mlTensor_t w, float beta_dw, mlTensor_t dw, mlTensor_t db)
 	{
 		throw NotImplemented(METHOD_NAME);
 	}
@@ -488,8 +488,8 @@ namespace ml
 	/*
 	 * training
 	 */
- 	float cuda_l2_norm(mlContext_t context, const mlTensor_t tensor)
- 	{
+	float cuda_l2_norm(mlContext_t context, const mlTensor_t tensor)
+	{
 		throw NotImplemented(METHOD_NAME);
 	}
 	float cuda_mean_squared_loss(mlContext_t context, const mlTensor_t output, const mlTensor_t target, const mlTensor_t mask)
